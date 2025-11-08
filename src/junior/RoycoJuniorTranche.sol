@@ -47,9 +47,11 @@ contract RoycoJuniorTranche {
     mapping(address user => Position position) userToPosition;
 
     event Commit(address indexed user, address indexed onBehalfOf, uint256 collateralAmount, uint256 commitmentUSD);
+    event CollateralAdded(address indexed user, address indexed onBehalfOf, uint256 collateralAmount);
+    event CommitmentAdded(address indexed user, uint256 commitmentUSD);
 
     error InvalidCollateralAsset();
-    error maxCtvExceeded();
+    error MaxCtvExceeded();
 
     constructor(address _owner, address _collateralAsset, address _priceFeedUSD, uint256 _maxCtv, uint256 _lctv) {
         COLLATERAL_ASSET = _collateralAsset;
@@ -72,12 +74,41 @@ contract RoycoJuniorTranche {
         uint256 userCollateralAmount = (position.collateralBalance += _collateralAmount);
         uint256 userCommitmentUSD = (position.commitmentUSD += _commitmentUSD);
 
-        // Ensure that the user's cumulative position doesn't exceed the max configured CTV
-        uint256 collateralValueUSD = userCollateralAmount.mulDiv(
-            IRoycoOracle(priceFeedUSD).getAssetPriceUSD(), ONE_COLLATERAL_ASSET, Math.Rounding.Floor
-        );
-        require(collateralValueUSD.mulDiv(maxCtv, WAD, Math.Rounding.Floor) >= userCommitmentUSD, maxCtvExceeded());
+        // Check that the max CTV isn't exceeded the ensure the user has a margin before liquidation
+        _checkMaxCTV(userCollateralAmount, userCommitmentUSD);
 
         emit Commit(msg.sender, _onBehalfOf, _collateralAmount, _commitmentUSD);
+    }
+
+    function addCollateral(uint256 _collateralAmount, address _onBehalfOf) external {
+        // Transfer the collateral into the tranche
+        IERC20(COLLATERAL_ASSET).safeTransferFrom(msg.sender, address(this), _collateralAmount);
+
+        // Update the user's collateral amount
+        userToPosition[_onBehalfOf].collateralBalance += _collateralAmount;
+
+        emit CollateralAdded(msg.sender, _onBehalfOf, _collateralAmount);
+    }
+
+    function addCommitment(uint256 _commitmentUSD) external {
+        // Increase the total commitments
+        totalCommitmentsUSD += _commitmentUSD;
+
+        // Update the user's position accouting and cache it in local variables
+        Position storage position = userToPosition[msg.sender];
+        uint256 userCollateralAmount = position.collateralBalance;
+        uint256 userCommitmentUSD = (position.commitmentUSD += _commitmentUSD);
+
+        _checkMaxCTV(userCollateralAmount, userCommitmentUSD);
+
+        emit CommitmentAdded(msg.sender, _commitmentUSD);
+    }
+
+    function _checkMaxCTV(uint256 _userCollateralAmount, uint256 _userCommitmentUSD) internal {
+        // Ensure that the user's position doesn't exceed the max configured CTV
+        uint256 collateralValueUSD = _userCollateralAmount.mulDiv(
+            IRoycoOracle(priceFeedUSD).getAssetPriceUSD(), ONE_COLLATERAL_ASSET, Math.Rounding.Floor
+        );
+        require(collateralValueUSD.mulDiv(maxCtv, WAD, Math.Rounding.Floor) >= _userCommitmentUSD, MaxCtvExceeded());
     }
 }
