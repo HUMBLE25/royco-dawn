@@ -13,6 +13,9 @@ contract RoycoJuniorTranche {
     /// @dev Constant for the WAD scaling factor
     uint256 private constant WAD = 1e18;
 
+    /// @dev The stablecoin used to denominate commitments in.
+    address public immutable USD;
+
     /// @dev The collateral asset used to make USD commitments to the junior tranche
     address public immutable COLLATERAL_ASSET;
 
@@ -22,13 +25,13 @@ contract RoycoJuniorTranche {
     /// @dev The price feed returning the price of the collateral asset in USD
     address public priceFeedUSD;
 
-    /// @notice The maximum commitment to value the protocol allows a user to open a commitment with
-    /// @dev Scaled by WAD
-    uint256 public maxCtv;
-
     /// @notice The liquidation commitment to value at which point a liquidator can seize the collateral by fulfilling the user's commitment
     /// @dev Scaled by WAD
     uint256 public lctv;
+
+    /// @notice The liquidation incentive factor
+    /// @dev Scaled by WAD
+    uint256 public lif;
 
     /// @notice The total number of USD commitments securing the corresponding senior tranche
     uint256 public totalCommitmentsUSD;
@@ -51,15 +54,24 @@ contract RoycoJuniorTranche {
     event CommitmentAdded(address indexed user, uint256 commitmentUSD);
 
     error InvalidCollateralAsset();
-    error MaxCtvExceeded();
+    error PositionIsHealthy();
+    error PositionIsUnhealthy();
 
-    constructor(address _owner, address _collateralAsset, address _priceFeedUSD, uint256 _maxCtv, uint256 _lctv) {
+    constructor(
+        address _owner,
+        address _usd,
+        address _collateralAsset,
+        address _priceFeedUSD,
+        uint256 _lctv,
+        uint256 _lif
+    ) {
+        USD = _usd;
         COLLATERAL_ASSET = _collateralAsset;
         ONE_COLLATERAL_ASSET = 10 ** IERC20Metadata(_collateralAsset).decimals();
 
         priceFeedUSD = _priceFeedUSD;
-        maxCtv = _maxCtv;
         lctv = _lctv;
+        lif = _lif;
     }
 
     function commit(uint256 _commitmentUSD, uint256 _collateralAmount, address _onBehalfOf) external {
@@ -69,13 +81,13 @@ contract RoycoJuniorTranche {
         // Increase the total commitments
         totalCommitmentsUSD += _commitmentUSD;
 
-        // Update the user's position accouting and cache it in local variables
+        // Update the user's position accouting and cache it
         Position storage position = userToPosition[_onBehalfOf];
         uint256 userCollateralAmount = (position.collateralBalance += _collateralAmount);
         uint256 userCommitmentUSD = (position.commitmentUSD += _commitmentUSD);
 
-        // Check that the max CTV isn't exceeded the ensure the user has a margin before liquidation
-        _checkMaxCTV(userCollateralAmount, userCommitmentUSD);
+        // Check that the user's position is healthy post-commitment
+        require(_isHealthy(userCollateralAmount, userCommitmentUSD), PositionIsUnhealthy());
 
         emit Commit(msg.sender, _onBehalfOf, _collateralAmount, _commitmentUSD);
     }
@@ -94,21 +106,44 @@ contract RoycoJuniorTranche {
         // Increase the total commitments
         totalCommitmentsUSD += _commitmentUSD;
 
-        // Update the user's position accouting and cache it in local variables
+        // Update the user's position accouting and cache it
         Position storage position = userToPosition[msg.sender];
-        uint256 userCollateralAmount = position.collateralBalance;
         uint256 userCommitmentUSD = (position.commitmentUSD += _commitmentUSD);
 
-        _checkMaxCTV(userCollateralAmount, userCommitmentUSD);
+        // Check that the user's position is healthy post-commitment
+        require(_isHealthy(position.collateralBalance, userCommitmentUSD), PositionIsUnhealthy());
 
         emit CommitmentAdded(msg.sender, _commitmentUSD);
     }
 
-    function _checkMaxCTV(uint256 _userCollateralAmount, uint256 _userCommitmentUSD) internal {
-        // Ensure that the user's position doesn't exceed the max configured CTV
-        uint256 collateralValueUSD = _userCollateralAmount.mulDiv(
+    function liquidate(address _user, uint256 _commitmentRepaymentUSD) external {
+        // Cache the user's position
+        Position storage position = userToPosition[_user];
+        uint256 userCollateralAmount = position.collateralBalance;
+        uint256 userCommitmentUSD = position.commitmentUSD;
+
+        // Ensure that the position is liquidatable (unhealthy)
+        require(!_isHealthy(userCollateralAmount, userCommitmentUSD), PositionIsHealthy());
+
+        // Mark the repayment as processed
+        userCommitmentUSD -= _commitmentRepaymentUSD;
+        // Transfer the collateral into the tranche
+        IERC20(USD).safeTransferFrom(msg.sender, address(this), _commitmentRepaymentUSD);
+
+        // TODO: Process the liquidation with the LIF
+    }
+
+    function _isHealthy(uint256 _userCollateralAmount, uint256 _userCommitmentUSD) internal returns (bool) {
+        // Compute the USD value of their collateral
+        uint256 collateralValueUSD = _computeCollateralValueUSD(_userCollateralAmount);
+        // Compute the maximum healthy commitment given the collateral value and the LCTV
+        uint256 maxCommitment = collateralValueUSD.mulDiv(lctv, WAD, Math.Rounding.Floor);
+        return maxCommitment >= _userCommitmentUSD;
+    }
+
+    function _computeCollateralValueUSD(uint256 _collateralAmount) internal returns (uint256) {
+        return _collateralAmount.mulDiv(
             IRoycoOracle(priceFeedUSD).getAssetPriceUSD(), ONE_COLLATERAL_ASSET, Math.Rounding.Floor
         );
-        require(collateralValueUSD.mulDiv(maxCtv, WAD, Math.Rounding.Floor) >= _userCommitmentUSD, MaxCtvExceeded());
     }
 }
