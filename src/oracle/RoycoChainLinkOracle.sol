@@ -11,7 +11,7 @@ contract RoycoCLOracle is IRoycoOracle {
         ASSET_USD_PRICE_FEED = AggregatorV3Interface(_assetUsdPriceFeed);
     }
 
-    function getAssetPriceUSD() external view returns (uint256) {
+    function getPrice() external view returns (uint256) {
         (, int256 priceInUSD,,,) = ASSET_USD_PRICE_FEED.latestRoundData();
         return uint256(priceInUSD);
     }
