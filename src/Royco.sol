@@ -9,50 +9,61 @@ import { IRoycoOracle } from "./interfaces/IRoycoOracle.sol";
 import { ConstantsLib } from "./libraries/ConstantsLib.sol";
 import { ErrorsLib } from "./libraries/ErrorsLib.sol";
 import { EventsLib } from "./libraries/EventsLib.sol";
-import { JuniorTranche, JuniorTranchePosition, Market } from "./libraries/Types.sol";
+import { CreateMarketParams, JuniorTranche, JuniorTranchePosition, Market, TypesLib } from "./libraries/Types.sol";
+import { RoycoVaultFactory } from "./vault/RoycoVaultFactory.sol";
 
-contract Royco {
+contract Royco is RoycoVaultFactory {
     using SafeERC20 for IERC20;
     using Math for uint256;
+    using TypesLib for CreateMarketParams;
 
     mapping(bytes32 marketId => Market market) marketIdToMarket;
 
-    mapping(uint96 lctv => bool enabled) lctvToEnabled;
+    mapping(uint96 lctv => bool enabled) public lctvToEnabled;
 
-    constructor(address _owner) { }
+    constructor(address _owner, address _roycoVaultImplementation) RoycoVaultFactory(_roycoVaultImplementation) { }
 
-    function createMarket(
-        address _kernel,
-        uint96 _expectedLossWAD,
-        address _commitmentAsset,
-        address _collateralAsset,
-        address _collateralAssetPriceFeed,
-        address _ydm,
-        uint96 _lctv
-    )
-        external
-        returns (bytes32 marketId)
-    {
-        marketId = keccak256(abi.encode(_kernel, _expectedLossWAD, _commitmentAsset, _collateralAsset, _collateralAssetPriceFeed, _ydm, _lctv));
+    function createMarket(CreateMarketParams calldata _params) external returns (bytes32 marketId) {
+        marketId = _params.hash();
 
         Market storage market = marketIdToMarket[marketId];
         require(market.seniorTranche == address(0), ErrorsLib.MARKET_EXISTS());
-        require(_expectedLossWAD <= ConstantsLib.WAD, ErrorsLib.EXPECTED_LOSS_EXCEEDS_MAX());
+        require(_params.expectedLossWAD <= ConstantsLib.WAD, ErrorsLib.EXPECTED_LOSS_EXCEEDS_MAX());
 
         // Set the expected loss for this market
         // This set the minimum ratio between the junior and senior tranche
-        market.expectedLossWAD = _expectedLossWAD;
+        market.expectedLossWAD = _params.expectedLossWAD;
 
         // TODO: Deploy the senior tranche configured with the specified kernel
+        market.seniorTranche = _deployVault(
+            _params.stName,
+            _params.stSymbol,
+            _params.stOwner,
+            _params.stKernel,
+            _params.commitmentAsset,
+            _params.stFeeClaimant,
+            _params.stYieldFeeBPS,
+            _params.stNavPriceFeed,
+            _params.stKernelInitParams
+        );
 
         // Setup the Junior Tranche with the specified parameters
-        market.juniorTranche.commitmentAsset = _commitmentAsset;
-        market.juniorTranche.collateralAsset = _collateralAsset;
-        market.juniorTranche.collateralAssetPriceFeed = _collateralAssetPriceFeed;
-        market.juniorTranche.ydm = _ydm;
-        market.juniorTranche.lctv = _lctv;
+        market.juniorTranche.commitmentAsset = _params.commitmentAsset;
+        market.juniorTranche.collateralAsset = _params.collateralAsset;
+        market.juniorTranche.collateralAssetPriceFeed = _params.collateralAssetPriceFeed;
+        market.juniorTranche.ydm = _params.ydm;
+        market.juniorTranche.lctv = _params.lctv;
 
-        emit EventsLib.MarketCreated(_kernel, _commitmentAsset, _collateralAsset, _expectedLossWAD, _collateralAssetPriceFeed, _ydm, _lctv, marketId);
+        emit EventsLib.MarketCreated(
+            _params.stKernel,
+            _params.commitmentAsset,
+            _params.collateralAsset,
+            _params.expectedLossWAD,
+            _params.collateralAssetPriceFeed,
+            _params.ydm,
+            _params.lctv,
+            marketId
+        );
     }
 
     function addCollateral(bytes32 _marketId, uint256 _collateralAmount, address _onBehalfOf) external {
