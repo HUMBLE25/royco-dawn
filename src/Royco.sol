@@ -3,6 +3,8 @@ pragma solidity ^0.8.28;
 
 import { IERC20, SafeERC20 } from "../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import { Math } from "../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
+
+import { IRoycoLiquidator } from "./interfaces/IRoycoLiquidator.sol";
 import { IRoycoOracle } from "./interfaces/IRoycoOracle.sol";
 import { ConstantsLib } from "./libraries/ConstantsLib.sol";
 import { ErrorsLib } from "./libraries/ErrorsLib.sol";
@@ -14,6 +16,8 @@ contract Royco {
     using Math for uint256;
 
     mapping(bytes32 marketId => Market market) marketIdToMarket;
+
+    mapping(uint96 lctv => bool enabled) lctvToEnabled;
 
     constructor(address _owner) { }
 
@@ -104,6 +108,9 @@ contract Royco {
         Market storage market = marketIdToMarket[_marketId];
         require(market.seniorTranche != address(0), ErrorsLib.NONEXISTANT_MARKET());
 
+        // TODO: Make sure that the deposits here can still cover expected loss
+        // TODO: Implement a withdrawal queue to avoid bank run
+
         // Update the user's position accouting and cache it
         market.juniorTranche.userToPosition[msg.sender].commitmentMade -= _commitmentAmount;
 
@@ -113,16 +120,62 @@ contract Royco {
         emit EventsLib.CommitmentWithdrawn(_marketId, msg.sender, _commitmentAmount);
     }
 
-    function _isHealthy(JuniorTranche storage _juniorTranche, uint256 _collateralBalance, uint256 _commitmentMade) internal returns (bool) {
-        // Compute the USD value of their collateral
-        uint256 collateralValueInCommitmentAsset = _computeCollateralValue(_juniorTranche, _collateralBalance);
-        // Compute the maximum healthy commitment given the collateral value and the LCTV
-        uint256 maxCommitment = collateralValueInCommitmentAsset.mulDiv(_juniorTranche.lctv, ConstantsLib.WAD, Math.Rounding.Floor);
-        // Ensure the total commitments made by this user are less than the maximum
-        return maxCommitment >= _commitmentMade;
+    function liquidate(bytes32 _marketId, address _user, uint256 _commitmentRepaymentAmount, bytes calldata liquidationCallbackData) external {
+        Market storage market = marketIdToMarket[_marketId];
+        require(market.seniorTranche != address(0), ErrorsLib.NONEXISTANT_MARKET());
+
+        // Retrieve the user's position
+        JuniorTranchePosition storage position = market.juniorTranche.userToPosition[_user];
+
+        // Retrieve the collateral price
+        uint256 collateralPrice = IRoycoOracle(market.juniorTranche.collateralAssetPriceFeed).getPrice();
+
+        // Ensure that the user's position is liquidatable (unhealthy)
+        require(!_isHealthy(market.juniorTranche, position.collateralBalance, position.commitmentMade, collateralPrice), ErrorsLib.POSITION_IS_HEALTHY());
+
+        // Compute the collateral amount to free in proportion to the repayment on liquidation
+        // TODO: Add the liquidation incentive
+        uint256 collateralSeizedAmount = _commitmentRepaymentAmount.mulDiv(ConstantsLib.RAY, collateralPrice, Math.Rounding.Floor);
+
+        // Update the user's position: deduct from the collateral and add to the liquidated balance
+        position.collateralBalance -= collateralSeizedAmount;
+        position.liquidatedCommitmentBalance += _commitmentRepaymentAmount;
+
+        // Free the user's collateral to the liquidator
+        IERC20(market.juniorTranche.collateralAsset).safeTransfer(msg.sender, collateralSeizedAmount);
+
+        // Execute the callback if specified
+        if (liquidationCallbackData.length > 0) {
+            IRoycoLiquidator(msg.sender).onRoycoLiquidation(_commitmentRepaymentAmount, collateralSeizedAmount, liquidationCallbackData);
+        }
+
+        // Remit the liquidator for the repaid commitment assets
+        IERC20(market.juniorTranche.commitmentAsset).safeTransferFrom(msg.sender, address(this), _commitmentRepaymentAmount);
+
+        emit EventsLib.Liquidation(_marketId, _user, msg.sender, _commitmentRepaymentAmount, collateralSeizedAmount);
     }
 
-    function _computeCollateralValue(JuniorTranche storage _juniorTranche, uint256 _collateralAmount) internal returns (uint256) {
-        return _collateralAmount.mulDiv(IRoycoOracle(_juniorTranche.collateralAssetPriceFeed).getPrice(), ConstantsLib.RAY, Math.Rounding.Floor);
+    function _isHealthy(JuniorTranche storage _juniorTranche, uint256 _collateralBalance, uint256 _commitmentMade) internal view returns (bool) {
+        // Retrieve the collateral price in the commitment asset and return the health
+        uint256 collateralPrice = IRoycoOracle(_juniorTranche.collateralAssetPriceFeed).getPrice();
+        return _isHealthy(_juniorTranche, _collateralBalance, _commitmentMade, collateralPrice);
+    }
+
+    function _isHealthy(
+        JuniorTranche storage _juniorTranche,
+        uint256 _collateralBalance,
+        uint256 _commitmentMade,
+        uint256 _collateralPrice
+    )
+        internal
+        view
+        returns (bool)
+    {
+        // Compute the collateral value in the commitment asset given the price
+        uint256 collateralValue = _collateralBalance.mulDiv(_collateralPrice, ConstantsLib.RAY, Math.Rounding.Floor);
+        // Compute the maximum healthy commitment given the collateral value and the LCTV
+        uint256 maxCommitment = collateralValue.mulDiv(_juniorTranche.lctv, ConstantsLib.WAD, Math.Rounding.Floor);
+        // Ensure the total commitments made by this user are less than the maximum
+        return maxCommitment >= _commitmentMade;
     }
 }

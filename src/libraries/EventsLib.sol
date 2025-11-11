@@ -16,4 +16,7 @@ library EventsLib {
     event CollateralRemoved(bytes32 indexed marketId, address indexed user, uint256 collateralAmount);
     event CommitmentMade(bytes32 indexed marketId, address indexed user, uint256 commitmentAmount);
     event CommitmentWithdrawn(bytes32 indexed marketId, address indexed user, uint256 commitmentAmount);
+    event Liquidation(
+        bytes32 indexed marketId, address indexed user, address indexed _liquidator, uint256 commitmentRepaymentAmount, uint256 seizedCollateralAmount
+    );
 }

@@ -2,5 +2,5 @@
 pragma solidity ^0.8.28;
 
 interface IRoycoOracle {
-    function getPrice() external returns (uint256);
+    function getPrice() external view returns (uint256);
 }
