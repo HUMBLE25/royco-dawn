@@ -449,6 +449,11 @@ contract RoycoVault is Ownable2StepUpgradeable, ERC4626Upgradeable, CostBasisLed
         super._update(_from, _to, _amount);
     }
 
+    /// @dev The total liabilities of the vault is the max of the total cost basis and the total assets
+    function totalLiabilities() public view returns (uint256) {
+        return Math.max(totalCostBasis(), totalAssets());
+    }
+
     // =============================
     // Core ERC4626 view functions
     // =============================
