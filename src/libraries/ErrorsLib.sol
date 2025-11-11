@@ -7,4 +7,5 @@ library ErrorsLib {
     error EXPECTED_LOSS_EXCEEDS_MAX();
     error POSITION_IS_HEALTHY();
     error POSITION_IS_UNHEALTHY();
+    error CANNOT_REDEEM_MORE_THAN_OWNED();
 }

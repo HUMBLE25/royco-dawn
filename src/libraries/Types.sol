@@ -28,3 +28,31 @@ struct Market {
     address seniorTranche;
     JuniorTranche juniorTranche;
 }
+
+struct CreateMarketParams {
+    // General parameters
+    address commitmentAsset;
+    uint96 expectedLossWAD;
+    address ydm;
+
+    // Senior Tranche Specific Parameters
+    string stName;
+    string stSymbol;
+    address stOwner;
+    address stKernel;
+    address stFeeClaimant;
+    address stNavPriceFeed;
+    uint24 stYieldFeeBPS;
+    bytes stKernelInitParams;
+
+    // Junior Tranche Specific Parameters
+    address collateralAsset;
+    address collateralAssetPriceFeed;
+    uint96 lctv;
+}
+
+library TypesLib {
+    function hash(CreateMarketParams calldata _createMarketParams) internal pure returns (bytes32) {
+        return keccak256(abi.encode(_createMarketParams));
+    }
+}
