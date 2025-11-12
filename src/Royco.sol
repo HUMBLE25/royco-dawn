@@ -35,7 +35,7 @@ contract Royco is RoycoVaultFactory {
         market.expectedLossWAD = _params.expectedLossWAD;
 
         // TODO: Deploy the senior tranche configured with the specified kernel
-        market.seniorTranche = _deployVault(
+        address seniorTranche = market.seniorTranche = _deployVault(
             _params.stName,
             _params.stSymbol,
             _params.stOwner,
@@ -55,7 +55,7 @@ contract Royco is RoycoVaultFactory {
         market.juniorTranche.lctv = _params.lctv;
 
         emit EventsLib.MarketCreated(
-            _params.stKernel,
+            seniorTranche,
             _params.commitmentAsset,
             _params.collateralAsset,
             _params.expectedLossWAD,
@@ -148,7 +148,8 @@ contract Royco is RoycoVaultFactory {
         // TODO: Add the liquidation incentive
         uint256 collateralSeizedAmount = _commitmentRepaymentAmount.mulDiv(ConstantsLib.RAY, collateralPrice, Math.Rounding.Floor);
 
-        // Update the user's position: deduct from the collateral and add to the liquidated balance
+        // Update the user's position: Seize the liquidated collateral and add the corresponding repayment to their liquidated balance
+        // NOTE: The user and tranche's commitments remain unchanged following a liquidation
         position.collateralBalance -= collateralSeizedAmount;
         position.liquidatedCommitmentBalance += _commitmentRepaymentAmount;
 

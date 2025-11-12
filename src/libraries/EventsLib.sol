@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 library EventsLib {
     event MarketCreated(
-        address indexed kernel,
+        address indexed seniorTranche,
         address indexed commitmentAsset,
         address indexed collateralAsset,
         uint96 expectedLossWAD,
