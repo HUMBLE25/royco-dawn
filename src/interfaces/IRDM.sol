@@ -13,7 +13,7 @@ interface IRDM {
      * @param _jtCommitments The total commitment amount of loss capital from the junior tranche, denominated in the same asset as _stAssets
      * @param _expectedLossWAD The expected loss percentage for the senior tranche, scaled by WAD
      *                         This represents the percentage of senior tranche principal that is insured by the junior tranche at all times.
-     * @return jtRewardPercentageWAD The percentage of total rewards allocated to the junior tranche, scaled by WAD (1e18)
+     * @return jtRewardPercentageWAD The percentage of total rewards allocated to the junior tranche, scaled by WAD
      *                               It is implied that (WAD - jtRewardPercentageWAD) will be the percentage allocated to the senior tranche
      */
     function getRewardDistribution(

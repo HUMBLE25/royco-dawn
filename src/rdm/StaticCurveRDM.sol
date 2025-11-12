@@ -52,11 +52,10 @@ contract StaticCurveRDM is IRDM {
         if (_stPrincipalAmount == 0 || _jtCommitmentAmount == 0 || _expectedLossWAD == 0) return 0;
 
         // Compute the utilization of the market
-        // NOTE: _stPrincipalAmount and _jtCommitmentAmount are denominated in the same asset
         uint256 utilization = _stPrincipalAmount.mulDiv(_expectedLossWAD, _jtCommitmentAmount, Math.Rounding.Floor);
 
-        // Theoretically, this branch should never be hit for the greater than case, as it would imply a violation of the
-        // invariant: junior tranche commitments >= (senior tranche principal * expected loss percentage)
+        // Theoretically, this branch should never be hit for the purely greater than case, as it would imply a violation of the invariant:
+        // junior tranche commitments >= (senior tranche principal * expected loss percentage)
         if (utilization >= ConstantsLib.WAD) {
             return ConstantsLib.WAD;
         }
