@@ -10,9 +10,9 @@ import { ConstantsLib } from "./libraries/ConstantsLib.sol";
 import { ErrorsLib } from "./libraries/ErrorsLib.sol";
 import { EventsLib } from "./libraries/EventsLib.sol";
 import { CreateMarketParams, JuniorTranche, JuniorTranchePosition, Market, TypesLib } from "./libraries/Types.sol";
-import { RoycoVaultFactory } from "./vault/RoycoVaultFactory.sol";
+import { RoycoSeniorTrancheFactory } from "./vault/RoycoSeniorTrancheFactory.sol";
 
-contract Royco is RoycoVaultFactory {
+contract Royco is RoycoSeniorTrancheFactory {
     using SafeERC20 for IERC20;
     using Math for uint256;
     using TypesLib for CreateMarketParams;
@@ -21,7 +21,7 @@ contract Royco is RoycoVaultFactory {
 
     mapping(uint96 lctv => bool enabled) public lctvToEnabled;
 
-    constructor(address _owner, address _roycoVaultImplementation) RoycoVaultFactory(_roycoVaultImplementation) { }
+    constructor(address _owner, address _roycoSeniorTrancheImplementation) RoycoSeniorTrancheFactory(_roycoSeniorTrancheImplementation) { }
 
     function createMarket(CreateMarketParams calldata _params) external returns (bytes32 marketId) {
         marketId = _params.hash();

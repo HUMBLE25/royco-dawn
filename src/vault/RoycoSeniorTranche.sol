@@ -20,7 +20,7 @@ import { RoycoNetVaultStorageLib } from "../libraries/RoycoNetVaultStorageLib.so
 import { RoycoVaultKernelLib } from "../libraries/RoycoVaultKernelLib.sol";
 import { CostBasisLedger } from "./CostBasisLedger.sol";
 
-contract RoycoVault is Ownable2StepUpgradeable, ERC4626Upgradeable, CostBasisLedger, IERC7540, IERC7575, IERC7887 {
+contract RoycoSeniorTranche is Ownable2StepUpgradeable, ERC4626Upgradeable, CostBasisLedger, IERC7540, IERC7575, IERC7887 {
     /// @dev https://eips.ethereum.org/EIPS/eip-7540#request-ids
     /// @dev Returning the request ID as 0 signals that the requests must purely be discriminated by the controller
     uint256 private constant ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID = 0;

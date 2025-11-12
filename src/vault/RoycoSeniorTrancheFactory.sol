@@ -2,9 +2,9 @@
 pragma solidity ^0.8.28;
 
 import { BeaconProxy, IBeacon } from "../../lib/openzeppelin-contracts/contracts/proxy/beacon/BeaconProxy.sol";
-import { RoycoVault } from "./RoycoVault.sol";
+import { RoycoSeniorTranche } from "./RoycoSeniorTranche.sol";
 
-abstract contract RoycoVaultFactory is IBeacon {
+abstract contract RoycoSeniorTrancheFactory is IBeacon {
     // TODO: Setter
     address public roycoVaultImplementation;
 
@@ -33,7 +33,7 @@ abstract contract RoycoVaultFactory is IBeacon {
     {
         // Deploy a new beacon proxy for the vault
         bytes memory initData =
-            abi.encodeCall(RoycoVault.initialize, (_name, _symbol, _owner, _kernel, _asset, _feeClaimant, _yieldFeeBPS, _navOracle, _kernelParams));
+            abi.encodeCall(RoycoSeniorTranche.initialize, (_name, _symbol, _owner, _kernel, _asset, _feeClaimant, _yieldFeeBPS, _navOracle, _kernelParams));
         vault = address(new BeaconProxy(address(this), initData));
     }
 }
