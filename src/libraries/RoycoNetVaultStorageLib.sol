@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
+import { IERC4626 } from "../../lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 import { IRoycoOracle } from "../interfaces/IRoycoOracle.sol";
 import { IRoycoVaultKernel } from "../interfaces/IRoycoVaultKernel.sol";
 import { RoycoVaultKernelLib } from "./RoycoVaultKernelLib.sol";
@@ -9,13 +10,14 @@ import { RoycoVaultKernelLib } from "./RoycoVaultKernelLib.sol";
 struct RoycoNetVaultState {
     address factory;
     address kernel;
+    address jtVault;
     uint8 decimalsOffset;
     address feeClaimant;
     uint24 yieldFeeBPS;
+    uint24 jtTrancheCoverageFactorBPS; // The expected percentage of the senior tranche's total assets that will be insured by the junior tranche
     uint256 lastTotalAssets;
     IRoycoVaultKernel.ActionType DEPOSIT_TYPE;
     IRoycoVaultKernel.ActionType WITHDRAW_TYPE;
-    IRoycoOracle navOracle;
     bool SUPPORTS_DEPOSIT_CANCELLATION;
     bool SUPPORTS_REDEMPTION_CANCELLATION;
     mapping(address owner => mapping(address operator => bool isOperator)) isOperator;
@@ -42,8 +44,9 @@ library RoycoNetVaultStorageLib {
         address _kernel,
         address _feeClaimant,
         uint24 _yieldFeeBPS,
-        uint8 _decimalsOffset,
-        address _navOracle
+        address _jtVault,
+        uint24 _jtTrancheCoverageFactorBPS,
+        uint8 _decimalsOffset
     )
         internal
     {
@@ -54,7 +57,8 @@ library RoycoNetVaultStorageLib {
         $.decimalsOffset = _decimalsOffset;
         $.feeClaimant = _feeClaimant;
         $.yieldFeeBPS = _yieldFeeBPS;
-        $.navOracle = IRoycoOracle(_navOracle);
+        $.jtVault = _jtVault;
+        $.jtTrancheCoverageFactorBPS = _jtTrancheCoverageFactorBPS;
         $.SUPPORTS_DEPOSIT_CANCELLATION = RoycoVaultKernelLib._SUPPORTS_DEPOSIT_CANCELLATION(_kernel);
         $.SUPPORTS_REDEMPTION_CANCELLATION = RoycoVaultKernelLib._SUPPORTS_REDEMPTION_CANCELLATION(_kernel);
         $.DEPOSIT_TYPE = RoycoVaultKernelLib._DEPOSIT_TYPE(_kernel);
@@ -106,8 +110,12 @@ library RoycoNetVaultStorageLib {
         return _getRoycoNetVaultStorage().WITHDRAW_TYPE;
     }
 
-    function _getNavOracle() internal view returns (IRoycoOracle) {
-        return _getRoycoNetVaultStorage().navOracle;
+    function _getJuniorTrancheVault() internal view returns (IERC4626) {
+        return IERC4626(_getRoycoNetVaultStorage().jtVault);
+    }
+
+    function _getJuniorTrancheCoverageFactorBPS() internal view returns (uint24) {
+        return _getRoycoNetVaultStorage().jtTrancheCoverageFactorBPS;
     }
 
     function _SUPPORTS_DEPOSIT_CANCELLATION() internal view returns (bool) {

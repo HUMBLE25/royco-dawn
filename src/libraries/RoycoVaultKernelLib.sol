@@ -36,20 +36,24 @@ library RoycoVaultKernelLib {
         _delegateCallKernel(_kernel, abi.encodeCall(IRoycoVaultKernel.requestDeposit, (_asset, _controller, _amount)));
     }
 
-    function _pendingDepositRequest(address _kernel, address _asset, address _controller) internal view returns (uint256 pendingAssets) {
-        return IRoycoVaultKernel(_kernel).pendingDepositRequest(_asset, _controller);
+    function _pendingDepositRequest(address _kernel, address _asset, address _controller) internal returns (uint256 pendingAssets) {
+        bytes memory returnData = _delegateCallKernel(_kernel, abi.encodeCall(IRoycoVaultKernel.pendingDepositRequest, (_asset, _controller)));
+        return abi.decode(returnData, (uint256));
     }
 
-    function _claimableDepositRequest(address _kernel, address _asset, address _controller) internal view returns (uint256 claimableAssets) {
-        return IRoycoVaultKernel(_kernel).claimableDepositRequest(_asset, _controller);
+    function _claimableDepositRequest(address _kernel, address _asset, address _controller) internal returns (uint256 claimableAssets) {
+        bytes memory returnData = _delegateCallKernel(_kernel, abi.encodeCall(IRoycoVaultKernel.claimableDepositRequest, (_asset, _controller)));
+        return abi.decode(returnData, (uint256));
     }
 
-    function _pendingRedeemRequest(address _kernel, address _asset, address _controller) internal view returns (uint256 pendingShares) {
-        return IRoycoVaultKernel(_kernel).pendingRedeemRequest(_asset, _controller);
+    function _pendingRedeemRequest(address _kernel, address _asset, address _controller) internal returns (uint256 pendingShares) {
+        bytes memory returnData = _delegateCallKernel(_kernel, abi.encodeCall(IRoycoVaultKernel.pendingRedeemRequest, (_asset, _controller)));
+        return abi.decode(returnData, (uint256));
     }
 
-    function _claimableRedeemRequest(address _kernel, address _asset, address _controller) internal view returns (uint256 claimableShares) {
-        return IRoycoVaultKernel(_kernel).claimableRedeemRequest(_asset, _controller);
+    function _claimableRedeemRequest(address _kernel, address _asset, address _controller) internal returns (uint256 claimableShares) {
+        bytes memory returnData = _delegateCallKernel(_kernel, abi.encodeCall(IRoycoVaultKernel.claimableRedeemRequest, (_asset, _controller)));
+        return abi.decode(returnData, (uint256));
     }
 
     function _deposit(address _kernel, address _asset, address _controller, uint256 _amount) internal {
@@ -68,24 +72,28 @@ library RoycoVaultKernelLib {
         _delegateCallKernel(_kernel, abi.encodeCall(IRoycoVaultKernel.cancelDepositRequest, (_controller)));
     }
 
-    function _pendingCancelDepositRequest(address _kernel, address _asset, address _controller) internal view returns (bool isPending) {
-        return IRoycoVaultKernel(_kernel).pendingCancelDepositRequest(_asset, _controller);
+    function _pendingCancelDepositRequest(address _kernel, address _asset, address _controller) internal returns (bool isPending) {
+        bytes memory returnData = _delegateCallKernel(_kernel, abi.encodeCall(IRoycoVaultKernel.pendingCancelDepositRequest, (_asset, _controller)));
+        return abi.decode(returnData, (bool));
     }
 
-    function _claimableCancelDepositRequest(address _kernel, address _asset, address _controller) internal view returns (uint256 assets) {
-        return IRoycoVaultKernel(_kernel).claimableCancelDepositRequest(_asset, _controller);
+    function _claimableCancelDepositRequest(address _kernel, address _asset, address _controller) internal returns (uint256 assets) {
+        bytes memory returnData = _delegateCallKernel(_kernel, abi.encodeCall(IRoycoVaultKernel.claimableCancelDepositRequest, (_asset, _controller)));
+        return abi.decode(returnData, (uint256));
     }
 
     function _cancelRedeemRequest(address _kernel, address _controller) internal {
         _delegateCallKernel(_kernel, abi.encodeCall(IRoycoVaultKernel.cancelRedeemRequest, (_controller)));
     }
 
-    function _pendingCancelRedeemRequest(address _kernel, address _asset, address _controller) internal view returns (bool isPending) {
-        return IRoycoVaultKernel(_kernel).pendingCancelRedeemRequest(_asset, _controller);
+    function _pendingCancelRedeemRequest(address _kernel, address _asset, address _controller) internal returns (bool isPending) {
+        bytes memory returnData = _delegateCallKernel(_kernel, abi.encodeCall(IRoycoVaultKernel.pendingCancelRedeemRequest, (_asset, _controller)));
+        return abi.decode(returnData, (bool));
     }
 
-    function _claimableCancelRedeemRequest(address _kernel, address _asset, address _controller) internal view returns (uint256 shares) {
-        return IRoycoVaultKernel(_kernel).claimableCancelRedeemRequest(_asset, _controller);
+    function _claimableCancelRedeemRequest(address _kernel, address _asset, address _controller) internal returns (uint256 shares) {
+        bytes memory returnData = _delegateCallKernel(_kernel, abi.encodeCall(IRoycoVaultKernel.claimableCancelRedeemRequest, (_asset, _controller)));
+        return abi.decode(returnData, (uint256));
     }
 
     function _SUPPORTS_DEPOSIT_CANCELLATION(address _kernel) internal pure returns (bool) {

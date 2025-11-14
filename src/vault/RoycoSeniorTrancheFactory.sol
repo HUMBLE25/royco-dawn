@@ -25,15 +25,18 @@ abstract contract RoycoSeniorTrancheFactory is IBeacon {
         address _asset,
         address _feeClaimant,
         uint24 _yieldFeeBPS,
-        address _navOracle,
+        address _jtVault,
+        uint24 _jtTrancheCoverageFactorBPS,
         bytes calldata _kernelParams
     )
         internal
         returns (address vault)
     {
         // Deploy a new beacon proxy for the vault
-        bytes memory initData =
-            abi.encodeCall(RoycoSeniorTranche.initialize, (_name, _symbol, _owner, _kernel, _asset, _feeClaimant, _yieldFeeBPS, _navOracle, _kernelParams));
+        bytes memory initData = abi.encodeCall(
+            RoycoSeniorTranche.initialize,
+            (_name, _symbol, _owner, _kernel, _asset, _feeClaimant, _yieldFeeBPS, _jtVault, _jtTrancheCoverageFactorBPS, _kernelParams)
+        );
         vault = address(new BeaconProxy(address(this), initData));
     }
 }

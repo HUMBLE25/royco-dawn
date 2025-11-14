@@ -8,4 +8,5 @@ library ErrorsLib {
     error POSITION_IS_HEALTHY();
     error POSITION_IS_UNHEALTHY();
     error CANNOT_REDEEM_MORE_THAN_OWNED();
+    error JUNIOR_TRANCHE_HAS_INSUFFICIENT_COVERAGE();
 }

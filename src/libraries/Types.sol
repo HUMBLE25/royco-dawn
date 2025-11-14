@@ -41,8 +41,9 @@ struct CreateMarketParams {
     address stOwner;
     address stKernel;
     address stFeeClaimant;
-    address stNavPriceFeed;
     uint24 stYieldFeeBPS;
+    address jtVault;
+    uint24 jtTrancheCoverageFactorBPS;
     bytes stKernelInitParams;
 
     // Junior Tranche Specific Parameters

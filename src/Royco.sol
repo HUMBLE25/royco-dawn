@@ -43,7 +43,8 @@ contract Royco is RoycoSeniorTrancheFactory {
             _params.commitmentAsset,
             _params.stFeeClaimant,
             _params.stYieldFeeBPS,
-            _params.stNavPriceFeed,
+            _params.jtVault,
+            _params.jtTrancheCoverageFactorBPS,
             _params.stKernelInitParams
         );
 

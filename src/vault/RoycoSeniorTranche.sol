@@ -2,6 +2,7 @@
 pragma solidity ^0.8.28;
 
 import { Ownable2StepUpgradeable } from "../../lib/openzeppelin-contracts-upgradeable/contracts/access/Ownable2StepUpgradeable.sol";
+import { ERC20Upgradeable } from "../../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/ERC20Upgradeable.sol";
 import {
     ERC4626Upgradeable,
     IERC20,
@@ -16,6 +17,7 @@ import { IERC7575 } from "../interfaces/IERC7575.sol";
 import { IERC7887 } from "../interfaces/IERC7887.sol";
 import { IRoycoVaultKernel } from "../interfaces/IRoycoVaultKernel.sol";
 import { ConstantsLib } from "../libraries/ConstantsLib.sol";
+import { ErrorsLib } from "../libraries/ErrorsLib.sol";
 import { RoycoNetVaultStorageLib } from "../libraries/RoycoNetVaultStorageLib.sol";
 import { RoycoVaultKernelLib } from "../libraries/RoycoVaultKernelLib.sol";
 import { CostBasisLedger } from "./CostBasisLedger.sol";
@@ -75,7 +77,8 @@ contract RoycoSeniorTranche is Ownable2StepUpgradeable, ERC4626Upgradeable, Cost
         address _asset,
         address _feeClaimant,
         uint24 _yieldFeeBPS,
-        address _navOracle,
+        address _jtVault,
+        uint24 _jtTrancheCoverageFactorBPS,
         bytes calldata _kernelInitParams
     )
         external
@@ -91,7 +94,7 @@ contract RoycoSeniorTranche is Ownable2StepUpgradeable, ERC4626Upgradeable, Cost
         uint8 decimalsOffset = underlyingAssetDecimals >= 18 ? 0 : (18 - underlyingAssetDecimals);
 
         // Initialize the Royco Net Vault state
-        RoycoNetVaultStorageLib.__RoycoNetVault_init(msg.sender, _kernel, _feeClaimant, _yieldFeeBPS, decimalsOffset, _navOracle);
+        RoycoNetVaultStorageLib.__RoycoNetVault_init(msg.sender, _kernel, _feeClaimant, _yieldFeeBPS, _jtVault, _jtTrancheCoverageFactorBPS, decimalsOffset);
 
         // Initialize the kernel's state in the vault contract by delegating to the kernel
         RoycoVaultKernelLib._initialize(RoycoNetVaultStorageLib._getKernel(), _kernelInitParams);
@@ -110,6 +113,8 @@ contract RoycoSeniorTranche is Ownable2StepUpgradeable, ERC4626Upgradeable, Cost
     /// @inheritdoc IERC7540
     function deposit(uint256 _assets, address _receiver, address _controller) public override onlySelfOrOperator(_controller) returns (uint256 shares) {
         // TODO: Test fee logic
+        // Assert that the junior tranche has sufficient coverage for the total assets of the senior tranche
+        require(_checkSufficientJuniorTrancheCoverage(totalAssets() + _assets), ErrorsLib.JUNIOR_TRANCHE_HAS_INSUFFICIENT_COVERAGE());
 
         // Assert that the user's deposited assets fall under the max limit
         uint256 maxAssets = maxDeposit(_receiver);
@@ -149,6 +154,9 @@ contract RoycoSeniorTranche is Ownable2StepUpgradeable, ERC4626Upgradeable, Cost
 
         // TODO: Formally verify that this always matches the cost basis, even when shares are minted async
         assets = _previewMint(_shares);
+
+        // Assert that the junior tranche has sufficient coverage for the total assets of the senior tranche
+        require(_checkSufficientJuniorTrancheCoverage(totalAssets() + assets), ErrorsLib.JUNIOR_TRANCHE_HAS_INSUFFICIENT_COVERAGE());
 
         if (RoycoNetVaultStorageLib._getDepositType() == IRoycoVaultKernel.ActionType.SYNC) {
             // Transfer the tokens to the vault and mint the shares
@@ -274,13 +282,13 @@ contract RoycoSeniorTranche is Ownable2StepUpgradeable, ERC4626Upgradeable, Cost
 
     /// @inheritdoc IERC7540
     /// @notice The request id is ignored as the requests are controller-discriminated
-    function pendingDepositRequest(uint256, address _controller) external view override onlyWhenDepositsAreAsync returns (uint256) {
+    function pendingDepositRequest(uint256, address _controller) external override onlyWhenDepositsAreAsync returns (uint256) {
         return RoycoVaultKernelLib._pendingDepositRequest(RoycoNetVaultStorageLib._getKernel(), asset(), _controller);
     }
 
     /// @inheritdoc IERC7540
     /// @notice The request id is ignored as the requests are controller-discriminated
-    function claimableDepositRequest(uint256, address _controller) external view override onlyWhenDepositsAreAsync returns (uint256) {
+    function claimableDepositRequest(uint256, address _controller) external override onlyWhenDepositsAreAsync returns (uint256) {
         return RoycoVaultKernelLib._claimableDepositRequest(RoycoNetVaultStorageLib._getKernel(), asset(), _controller);
     }
 
@@ -308,13 +316,13 @@ contract RoycoSeniorTranche is Ownable2StepUpgradeable, ERC4626Upgradeable, Cost
 
     /// @inheritdoc IERC7540
     /// @notice The request id is ignored as the requests are controller-discriminated
-    function pendingRedeemRequest(uint256, address _controller) external view override onlyWhenWithdrawlsAreAsync returns (uint256 pendingShares) {
+    function pendingRedeemRequest(uint256, address _controller) external override onlyWhenWithdrawlsAreAsync returns (uint256 pendingShares) {
         return RoycoVaultKernelLib._pendingRedeemRequest(RoycoNetVaultStorageLib._getKernel(), asset(), _controller);
     }
 
     /// @inheritdoc IERC7540
     /// @notice The request id is ignored as the requests are controller-discriminated
-    function claimableRedeemRequest(uint256, address _controller) external view override onlyWhenWithdrawlsAreAsync returns (uint256 claimableShares) {
+    function claimableRedeemRequest(uint256, address _controller) external override onlyWhenWithdrawlsAreAsync returns (uint256 claimableShares) {
         return RoycoVaultKernelLib._claimableRedeemRequest(RoycoNetVaultStorageLib._getKernel(), asset(), _controller);
     }
 
@@ -345,19 +353,13 @@ contract RoycoSeniorTranche is Ownable2StepUpgradeable, ERC4626Upgradeable, Cost
 
     /// @inheritdoc IERC7887
     /// @dev The request id is ignored as the requests are controller-discriminated
-    function pendingCancelDepositRequest(uint256, address _controller) external view override onlyWhenDepositCancellationIsSupported returns (bool isPending) {
+    function pendingCancelDepositRequest(uint256, address _controller) external override onlyWhenDepositCancellationIsSupported returns (bool isPending) {
         return RoycoVaultKernelLib._pendingCancelDepositRequest(RoycoNetVaultStorageLib._getKernel(), asset(), _controller);
     }
 
     /// @inheritdoc IERC7887
     /// @dev The request id is ignored as the requests are controller-discriminated
-    function claimableCancelDepositRequest(uint256, address _controller)
-        external
-        view
-        override
-        onlyWhenDepositCancellationIsSupported
-        returns (uint256 assets)
-    {
+    function claimableCancelDepositRequest(uint256, address _controller) external override onlyWhenDepositCancellationIsSupported returns (uint256 assets) {
         return RoycoVaultKernelLib._claimableCancelDepositRequest(RoycoNetVaultStorageLib._getKernel(), asset(), _controller);
     }
 
@@ -393,28 +395,13 @@ contract RoycoSeniorTranche is Ownable2StepUpgradeable, ERC4626Upgradeable, Cost
 
     /// @inheritdoc IERC7887
     /// @dev The request id is ignored as the requests are controller-discriminated
-    function pendingCancelRedeemRequest(uint256, address _controller)
-        external
-        view
-        override
-        onlyWhenRedemptionCancellationIsSupported
-        returns (bool isPending)
-    {
+    function pendingCancelRedeemRequest(uint256, address _controller) external override onlyWhenRedemptionCancellationIsSupported returns (bool isPending) {
         return RoycoVaultKernelLib._pendingCancelRedeemRequest(RoycoNetVaultStorageLib._getKernel(), asset(), _controller);
     }
 
     /// @inheritdoc IERC7887
     /// @dev The request id is ignored as the requests are controller-discriminated
-    function claimableCancelRedeemRequest(
-        uint256,
-        address _controller
-    )
-        external
-        view
-        override
-        onlyWhenRedemptionCancellationIsSupported
-        returns (uint256 shares)
-    {
+    function claimableCancelRedeemRequest(uint256, address _controller) external override onlyWhenRedemptionCancellationIsSupported returns (uint256 shares) {
         return RoycoVaultKernelLib._claimableCancelRedeemRequest(RoycoNetVaultStorageLib._getKernel(), asset(), _controller);
     }
 
@@ -439,30 +426,13 @@ contract RoycoSeniorTranche is Ownable2StepUpgradeable, ERC4626Upgradeable, Cost
         emit CancelRedeemClaim(_owner, _receiver, ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, msg.sender, shares);
     }
 
-    /// @dev Override the ERC20 _update function to update the cost basis ledger
-    function _update(address _from, address _to, uint256 _amount) internal virtual override {
-        // If the transfer is not from the zero address to the zero address, it is a transfer between users
-        if (_from != address(0) && _to != address(0)) {
-            _updateCostBasisOnSharesTransferred(_from, _to, balanceOf(_from), _amount);
-        }
-
-        super._update(_from, _to, _amount);
-    }
-
-    /// @dev The total liabilities of the vault is the max of the total cost basis and the total assets
-    function totalLiabilities() public view returns (uint256) {
-        return Math.max(totalCostBasis(), totalAssets());
-    }
-
     // =============================
     // Core ERC4626 view functions
     // =============================
 
     /// @inheritdoc IERC4626
     function totalAssets() public view override returns (uint256) {
-        // TODO: Discuss/Test
-        // The total assets managed by the vault is simply the total supply of shares multiplied by the NAV of the asset
-        return Math.mulDiv(totalSupply(), RoycoNetVaultStorageLib._getNavOracle().getPrice(), ConstantsLib.RAY, Math.Rounding.Floor);
+        return RoycoVaultKernelLib._totalAssets(RoycoNetVaultStorageLib._getKernel(), asset());
     }
 
     /// @inheritdoc IERC4626
@@ -588,6 +558,20 @@ contract RoycoSeniorTranche is Ownable2StepUpgradeable, ERC4626Upgradeable, Cost
 
     function _decimalsOffset() internal view override returns (uint8) {
         return RoycoNetVaultStorageLib._getDecimalsOffset();
+    }
+
+    function _update(address _from, address _to, uint256 _amount) internal virtual override(CostBasisLedger, ERC20Upgradeable) {
+        CostBasisLedger._update(_from, _to, _amount);
+    }
+
+    /// @notice Verifies that the junior tranche has sufficient coverage for the total assets of the senior tranche
+    /// @dev Assumes that the senior tranche and junior tranche are both ERC4626 compatible, and
+    /// the assets are "inkind", ie. they're equivalent in value.
+    function _checkSufficientJuniorTrancheCoverage(uint256 _totalSeniorTrancheAssets) internal view returns (bool hasSufficientCoverage) {
+        uint256 totalJuniorTrancheAssets = RoycoNetVaultStorageLib._getJuniorTrancheVault().totalAssets();
+        uint256 jtTrancheCoverageFactorBPS = RoycoNetVaultStorageLib._getJuniorTrancheCoverageFactorBPS();
+        uint256 requiredJuniorTrancheAssets = _totalSeniorTrancheAssets.mulDiv(jtTrancheCoverageFactorBPS, RoycoNetVaultStorageLib.BPS_DENOMINATOR);
+        return totalJuniorTrancheAssets >= requiredJuniorTrancheAssets;
     }
 
     // TODO: Integrate
