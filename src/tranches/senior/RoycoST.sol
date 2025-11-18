@@ -235,7 +235,7 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
         override
         checkDepositSemantics(IRoycoKernel.ActionType.ASYNC)
         onlySelfOrOperator(_owner)
-        returns (uint256 requestId)
+        returns (uint256)
     {
         // Transfer the assets from the owner to the vault
         address asset = asset();
@@ -244,7 +244,9 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
         // Queue the deposit request
         RoycoKernelLib._requestDeposit(RoycoSTStorageLib._getKernel(), asset, _controller, _assets);
 
-        emit DepositRequest(_controller, _owner, requestId, msg.sender, _assets);
+        emit DepositRequest(_controller, _owner, ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, msg.sender, _assets);
+
+        return ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID;
     }
 
     /// @inheritdoc IERC7540
@@ -268,13 +270,10 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
         external
         override
         checkWithdrawalSemantics(IRoycoKernel.ActionType.ASYNC)
-        returns (uint256 requestId)
+        returns (uint256)
     {
         // Calculate the assets to redeem
         uint256 _assets = _previewRedeem(_shares);
-
-        // Update the cost basis ledger
-        // _updateCostBasisOnRedeem(_owner, balanceOf(_owner), _shares);
 
         // Burn the shares from the owner
         _burn(_owner, _shares);
@@ -282,9 +281,9 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
         // Queue the redeem request
         RoycoKernelLib._requestWithdraw(RoycoSTStorageLib._getKernel(), asset(), _controller, _assets);
 
-        emit RedeemRequest(_controller, _owner, requestId, msg.sender, _shares);
+        emit RedeemRequest(_controller, _owner, ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, msg.sender, _shares);
 
-        return requestId;
+        return ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID;
     }
 
     /// @inheritdoc IERC7540
