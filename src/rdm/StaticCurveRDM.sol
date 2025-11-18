@@ -15,6 +15,14 @@ import { ConstantsLib } from "../libraries/ConstantsLib.sol";
 contract StaticCurveRDM is IRDM {
     using Math for uint256;
 
+    /**
+     * @dev Constant for the target utilization of the junior tranche (90%)
+     * @dev Utilization = (senior tranche principal * expected loss percentage) / junior tranche commitments
+     * @dev Invariant: junior tranche commitments >= (senior tranche principal * expected loss percentage)
+     * @dev The above ensures that Utilization ∈ [0,1]
+     */
+    uint256 public constant TARGET_UTILIZATION = 0.9e18;
+
     /// @dev The slope when the market's utilization is less than the target utilization (scaled by WAD)
     uint256 public constant SLOPE_LT_TARGET_UTIL = 0.25e18;
 
@@ -29,7 +37,7 @@ contract StaticCurveRDM is IRDM {
         bytes32,
         uint256 _stPrincipalAmount,
         uint256 _jtCommitmentAmount,
-        uint256 _expectedLossWAD
+        uint256 _protectedLossWAD
     )
         external
         pure
@@ -49,10 +57,10 @@ contract StaticCurveRDM is IRDM {
          */
 
         // If any of these quantities is 0, the utilization is effectively 0, so the JT's percentage of rewards is 0%
-        if (_stPrincipalAmount == 0 || _jtCommitmentAmount == 0 || _expectedLossWAD == 0) return 0;
+        if (_stPrincipalAmount == 0 || _jtCommitmentAmount == 0 || _protectedLossWAD == 0) return 0;
 
         // Compute the utilization of the market
-        uint256 utilization = _stPrincipalAmount.mulDiv(_expectedLossWAD, _jtCommitmentAmount, Math.Rounding.Floor);
+        uint256 utilization = _stPrincipalAmount.mulDiv(_protectedLossWAD, _jtCommitmentAmount, Math.Rounding.Floor);
 
         // Theoretically, this branch should never be hit for the purely greater than case, as it would imply a violation of the invariant:
         // junior tranche commitments >= (senior tranche principal * expected loss percentage)
@@ -61,12 +69,11 @@ contract StaticCurveRDM is IRDM {
         }
 
         // If utilization is below the kink (target), apply the first leg of R(U)
-        if (utilization < ConstantsLib.TARGET_UTILIZATION) {
+        if (utilization < TARGET_UTILIZATION) {
             return SLOPE_LT_TARGET_UTIL.mulDiv(utilization, ConstantsLib.WAD, Math.Rounding.Floor);
         } else {
             // If utilization is at or above the kink (target), apply the second leg of R(U)
-            return
-                SLOPE_GTE_TARGET_UTIL.mulDiv((utilization - ConstantsLib.TARGET_UTILIZATION), ConstantsLib.WAD, Math.Rounding.Floor) + BASE_RATE_GTE_TARGET_UTIL;
+            return SLOPE_GTE_TARGET_UTIL.mulDiv((utilization - TARGET_UTILIZATION), ConstantsLib.WAD, Math.Rounding.Floor) + BASE_RATE_GTE_TARGET_UTIL;
         }
     }
 }

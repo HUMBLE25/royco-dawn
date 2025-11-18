@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import { IRoycoVaultKernel } from "../../interfaces/IRoycoVaultKernel.sol";
+import { IRoycoKernel } from "../../interfaces/IRoycoKernel.sol";
 
 /**
  * @title BaseKernel
  * @notice Base abstract contract for kernel implementations that provides delegate call protection
  * @dev Provides the foundational functionality for kernel contracts including delegatecall enforcement
  * @dev All kernel contracts should inherit from this base contract to ensure proper execution context
- *      and use the modifier as stipulated by the IRoycoVaultKernel interface.
+ *      and use the modifier as stipulated by the IRoycoKernel interface.
  */
-abstract contract BaseKernel is IRoycoVaultKernel {
+abstract contract BaseKernel is IRoycoKernel {
     /// @notice Thrown when a function is called directly instead of via delegate call
     error OnlyDelegateCall();
     /// @notice Thrown when a function is not implemented or disabled

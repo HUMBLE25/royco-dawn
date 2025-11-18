@@ -8,11 +8,6 @@ library ConstantsLib {
     /// @dev Constant for the RAY scaling factor
     uint256 constant RAY = 1e27;
 
-    /**
-     * @dev Constant for the target utilization of the junior tranche (90%)
-     * @dev Utilization = (senior tranche principal * expected loss percentage) / junior tranche commitments
-     * @dev Invariant: junior tranche commitments >= (senior tranche principal * expected loss percentage)
-     * @dev The above ensures Utilization ∈ [0,1]
-     */
-    uint256 constant TARGET_UTILIZATION = 0.9e18;
+    /// @dev The max protocol fee on yield
+    uint256 public constant MAX_YIELD_FEE_WAD = 0.33e18;
 }
