@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import { IPool, IPoolAddressesProvider } from "../../../lib/aave-v3-origin/src/contracts/interfaces/IPool.sol";
 import { IPoolDataProvider } from "../../../lib/aave-v3-origin/src/contracts/interfaces/IPoolDataProvider.sol";
 import { IERC20, SafeERC20 } from "../../../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
-import { IRoycoVaultKernel } from "../../interfaces/IRoycoVaultKernel.sol";
+import { IRoycoKernel } from "../../interfaces/IRoycoKernel.sol";
 import { BaseKernel } from "../base/BaseKernel.sol";
 
 /**
@@ -15,16 +15,16 @@ import { BaseKernel } from "../base/BaseKernel.sol";
 contract AaveV3Kernel is BaseKernel {
     using SafeERC20 for IERC20;
 
-    /// @inheritdoc IRoycoVaultKernel
+    /// @inheritdoc IRoycoKernel
     ActionType public constant override DEPOSIT_TYPE = ActionType.SYNC;
 
-    /// @inheritdoc IRoycoVaultKernel
+    /// @inheritdoc IRoycoKernel
     ActionType public constant override WITHDRAW_TYPE = ActionType.SYNC;
 
-    /// @inheritdoc IRoycoVaultKernel
+    /// @inheritdoc IRoycoKernel
     bool public constant override SUPPORTS_DEPOSIT_CANCELLATION = false;
 
-    /// @inheritdoc IRoycoVaultKernel
+    /// @inheritdoc IRoycoKernel
     bool public constant override SUPPORTS_REDEMPTION_CANCELLATION = false;
 
     /// @notice The Aave V3 Pool deployment
@@ -42,13 +42,14 @@ contract AaveV3Kernel is BaseKernel {
         POOL_ADDRESSES_PROVIDER = POOL.ADDRESSES_PROVIDER();
     }
 
-    /// @inheritdoc IRoycoVaultKernel
+    /// @inheritdoc IRoycoKernel
     function totalAssets(address _asset) external view override returns (uint256) {
-        // The caller's balance of the AToken is the total assets they can withdraw from the underlying protocol
-        return IERC20(POOL.getReserveAToken(_asset)).balanceOf(msg.sender);
+        // The tranche's balance of the AToken is the total assets it can withdraw from Aave
+        // In addition to any assets already in the tranche (in the case of a force withdrawal)
+        return IERC20(POOL.getReserveAToken(_asset)).balanceOf(msg.sender) + IERC20(_asset).balanceOf(msg.sender);
     }
 
-    /// @inheritdoc IRoycoVaultKernel
+    /// @inheritdoc IRoycoKernel
     function maxDeposit(address _asset) external view override returns (uint256) {
         // Retrieve the Pool data provider
         IPoolDataProvider poolDataProvider = IPoolDataProvider(POOL_ADDRESSES_PROVIDER.getPoolDataProvider());
@@ -72,7 +73,7 @@ contract AaveV3Kernel is BaseKernel {
         else return supplyCap - currentlySupplied;
     }
 
-    /// @inheritdoc IRoycoVaultKernel
+    /// @inheritdoc IRoycoKernel
     function maxWithdraw(address _asset) external view override returns (uint256) {
         // Retrieve the Pool data provider
         IPoolDataProvider poolDataProvider = IPoolDataProvider(POOL_ADDRESSES_PROVIDER.getPoolDataProvider());
@@ -85,50 +86,61 @@ contract AaveV3Kernel is BaseKernel {
         return IERC20(_asset).balanceOf((POOL).getReserveAToken(_asset));
     }
 
-    /// @inheritdoc IRoycoVaultKernel
+    /// @inheritdoc IRoycoKernel
     function deposit(address _asset, address, uint256 _amount) external override onlyDelegateCall {
         IERC20(_asset).forceApprove(address(POOL), _amount);
         POOL.supply(_asset, _amount, address(this), 0);
     }
 
-    /// @inheritdoc IRoycoVaultKernel
-    function withdraw(address _asset, address, uint256 _amount, address _recipient) external override onlyDelegateCall {
-        POOL.withdraw(_asset, _amount, _recipient);
+    /// @inheritdoc IRoycoKernel
+    function withdraw(address _asset, address, uint256 _amount, address _receiver) external override onlyDelegateCall {
+        // Retrieve the liquid reserves of the tranche
+        uint256 trancheReserves = IERC20(_asset).balanceOf(address(this));
+        // If any liquid reserves exist
+        if (trancheReserves > 0) {
+            // If the reserves can service the entire withdrawal, do so, and preemptively return
+            if (trancheReserves >= _amount) return IERC20(_asset).safeTransfer(_receiver, _amount);
+            // Else, service as much of the withdrawal as possible
+            else IERC20(_asset).safeTransfer(_receiver, trancheReserves);
+        }
+
+        // Only withdraw the assets that are still owed to the receiver
+        POOL.withdraw(_asset, (_amount - trancheReserves), _receiver);
     }
 
-    /// @inheritdoc IRoycoVaultKernel
+    /// @inheritdoc IRoycoKernel
     function requestDeposit(address, address, uint256) external view override disabled { }
 
-    /// @inheritdoc IRoycoVaultKernel
+    /// @inheritdoc IRoycoKernel
     function pendingDepositRequest(address, address) external view override disabled returns (uint256) { }
 
-    /// @inheritdoc IRoycoVaultKernel
+    /// @inheritdoc IRoycoKernel
     function claimableDepositRequest(address, address) external view override disabled returns (uint256) { }
 
-    /// @inheritdoc IRoycoVaultKernel
+    /// @inheritdoc IRoycoKernel
     function requestWithdraw(address, address, uint256) external view override disabled { }
 
-    /// @inheritdoc IRoycoVaultKernel
+    /// @inheritdoc IRoycoKernel
     function pendingRedeemRequest(address, address) external pure override disabled returns (uint256) { }
 
-    /// @inheritdoc IRoycoVaultKernel
+    /// @inheritdoc IRoycoKernel
     function claimableRedeemRequest(address, address) external pure override disabled returns (uint256) { }
 
-    /// @inheritdoc IRoycoVaultKernel
+    /// @inheritdoc IRoycoKernel
     function cancelDepositRequest(address _controller) external disabled { }
 
-    /// @inheritdoc IRoycoVaultKernel
+    /// @inheritdoc IRoycoKernel
     function cancelRedeemRequest(address _controller) external disabled { }
 
-    /// @inheritdoc IRoycoVaultKernel
+    /// @inheritdoc IRoycoKernel
     function claimableCancelDepositRequest(address _asset, address _controller) external view disabled returns (uint256 assets) { }
 
-    /// @inheritdoc IRoycoVaultKernel
+    /// @inheritdoc IRoycoKernel
     function claimableCancelRedeemRequest(address _asset, address _controller) external view disabled returns (uint256 shares) { }
 
-    /// @inheritdoc IRoycoVaultKernel
+    /// @inheritdoc IRoycoKernel
     function pendingCancelDepositRequest(address _asset, address _controller) external view disabled returns (bool isPending) { }
 
-    /// @inheritdoc IRoycoVaultKernel
+    /// @inheritdoc IRoycoKernel
     function pendingCancelRedeemRequest(address _asset, address _controller) external view disabled returns (bool isPending) { }
 }

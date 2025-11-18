@@ -1,59 +1,50 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-/// @notice Represents the state of a Junior Tranche in a Royco Market
-/// @custom:field commitmentAsset - The primary asset of the senior tranche
-struct JuniorTranche {
-    address commitmentAsset;
-    address collateralAsset;
-    address collateralAssetPriceFeed;
-    address ydm;
-    uint96 lctv;
-    uint256 totalCommitments;
-    mapping(address user => JuniorTranchePosition position) userToPosition;
-}
-
-/// @notice Represents a user's position in this junior tranche
-/// @custom:field collateralBalance - The user's balance of the collateral asset
-/// @custom:field liquidatedCommitmentBalance - The user's balance of the commitment asset (only non-zero after a liquidation has occured)
-/// @custom:field commitmentMade - The user's commitment to this tranche - backed by their collateral and commitment asset balances
-struct JuniorTranchePosition {
-    uint256 collateralBalance;
-    uint256 liquidatedCommitmentBalance;
-    uint256 commitmentMade;
-}
-
 struct Market {
-    uint96 expectedLossWAD;
+    uint64 coverageWAD;
     address seniorTranche;
-    JuniorTranche juniorTranche;
+    address juniorTranche;
 }
 
+/**
+ * @notice Parameters required for Royco market creation
+ * @custom:field owner - The owner of this market
+ * @custom:field asset - The markets deposit and withdrawal asset for senior and junior tranches
+ * @custom:field rewardFeeWAD - The percentage of the yield that is paid to the protocol (WAD = 100%)
+ * @custom:field feeClaimant - The fee claimant for the reward fee
+ * @custom:field rdm - The Reward Distribution Model (RDM) - Responsible for determing the yield split between junior and senior tranche
+ * @custom:field coverageWAD - The percentage of the senior tranche that is always insured by the junior tranche (WAD = 100%)
+ * @custom:field stParams - The deployment params for the senior tranche
+ * @custom:field jtParams - The deployment params for the junior tranche
+ */
 struct CreateMarketParams {
-    // General parameters
-    address commitmentAsset;
-    uint96 expectedLossWAD;
-    address ydm;
+    address owner;
+    address asset;
+    uint64 rewardFeeWAD;
+    address feeClaimant;
+    address rdm;
+    uint64 coverageWAD;
+    TrancheDeploymentParams stParams;
+    TrancheDeploymentParams jtParams;
+}
 
-    // Senior Tranche Specific Parameters
-    string stName;
-    string stSymbol;
-    address stOwner;
-    address stKernel;
-    address stFeeClaimant;
-    uint24 stYieldFeeBPS;
-    address jtVault;
-    uint24 jtTrancheCoverageFactorBPS;
-    bytes stKernelInitParams;
-
-    // Junior Tranche Specific Parameters
-    address collateralAsset;
-    address collateralAssetPriceFeed;
-    uint96 lctv;
+/**
+ * @custom:field name - The name of the tranche (should be prefixed with "Royco-ST" or "Royco-JT") share token
+ * @custom:field symbol - The symbol of the tranche (should be prefixed with "ST" or "JT") share token
+ * @custom:field kernel - The tranche kernel responsible for defining the execution logic and semantics of the senior tranche
+ *                          This kernel is required to have synchronous execution semantics and liquidity must be instantly depositable and withdrawable.
+ * @custom:field kernelInitParams - ABI encoded parameters to intialize the tranche kernel
+ */
+struct TrancheDeploymentParams {
+    string name;
+    string symbol;
+    address kernel;
+    bytes kernelInitParams;
 }
 
 library TypesLib {
-    function hash(CreateMarketParams calldata _createMarketParams) internal pure returns (bytes32) {
+    function Id(CreateMarketParams calldata _createMarketParams) internal pure returns (bytes32) {
         return keccak256(abi.encode(_createMarketParams));
     }
 }

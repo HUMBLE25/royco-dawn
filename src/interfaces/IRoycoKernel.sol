@@ -2,15 +2,15 @@
 pragma solidity ^0.8.28;
 
 /**
- * @title IRoycoVaultKernel
+ * @title IRoycoKernel
  * @notice Interface for kernel contracts that handle asset management operations to/from an underlying protocol
- * @dev Provides the logic for RoycoNetVaults to interact with external protocols (e.g., Aave, Compound)
+ * @dev Provides the logic for RoycoSTs to interact with external protocols (e.g., Aave, Compound)
  * @dev Kernels have no conception of shares, so its interactions and interface relate to assets exclusively
  * @dev Kernels support both synchronous and asynchronous operations via ActionType enum
  * @dev Asynchronous operations use a request/claim pattern for deposits and withdrawals
  * @dev Kernels may optionally support cancellation of pending requests (ERC-7887)
  */
-interface IRoycoVaultKernel {
+interface IRoycoKernel {
     /**
      * @title ActionType
      * @dev Defines the execution semantics for the deposit or withdrawal flow of a vault
@@ -160,9 +160,9 @@ interface IRoycoVaultKernel {
      * @param _asset The address of the asset to withdraw from the underlying protocol
      * @param _controller The controller that is allowed to operate the withdrawal. All accounting is done against the controller.
      * @param _amount The amount of the asset to withdraw from the underlying protocol
-     * @param _recipient The recipient of the withdrawn assets
+     * @param _receiver The recipient of the withdrawn assets
      */
-    function withdraw(address _asset, address _controller, uint256 _amount, address _recipient) external;
+    function withdraw(address _asset, address _controller, uint256 _amount, address _receiver) external;
 
     // =============================
     // Cancellation Operations
