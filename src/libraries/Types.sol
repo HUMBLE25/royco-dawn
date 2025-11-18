@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 struct Market {
-    uint64 protectedLossWAD;
+    uint64 coverageWAD;
     address seniorTranche;
     address juniorTranche;
 }
@@ -14,7 +14,7 @@ struct Market {
  * @custom:field rewardFeeWAD - The percentage of the yield that is paid to the protocol (WAD = 100%)
  * @custom:field feeClaimant - The fee claimant for the reward fee
  * @custom:field rdm - The Reward Distribution Model (RDM) - Responsible for determing the yield split between junior and senior tranche
- * @custom:field protectedLossWAD - The percentage of the senior tranche that is always insured by the junior tranche (WAD = 100%)
+ * @custom:field coverageWAD - The percentage of the senior tranche that is always insured by the junior tranche (WAD = 100%)
  * @custom:field stParams - The deployment params for the senior tranche
  * @custom:field jtParams - The deployment params for the junior tranche
  */
@@ -24,7 +24,7 @@ struct CreateMarketParams {
     uint64 rewardFeeWAD;
     address feeClaimant;
     address rdm;
-    uint64 protectedLossWAD;
+    uint64 coverageWAD;
     TrancheDeploymentParams stParams;
     TrancheDeploymentParams jtParams;
 }

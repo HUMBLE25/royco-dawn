@@ -93,13 +93,19 @@ contract AaveV3Kernel is BaseKernel {
     }
 
     /// @inheritdoc IRoycoKernel
-    function withdraw(address _asset, address, uint256 _amount, address _recipient) external override onlyDelegateCall {
-        // Check if the tranche already has enough assets to service the withdrawal
-        uint256 trancheBalance = IERC20(_asset).balanceOf(address(this));
-        if (trancheBalance >= _amount) return;
-        // Only withdraw assets that aren't already in the tranche
-        _amount -= trancheBalance;
-        POOL.withdraw(_asset, _amount, _recipient);
+    function withdraw(address _asset, address, uint256 _amount, address _receiver) external override onlyDelegateCall {
+        // Retrieve the liquid reserves of the tranche
+        uint256 trancheReserves = IERC20(_asset).balanceOf(address(this));
+        // If any liquid reserves exist
+        if (trancheReserves > 0) {
+            // If the reserves can service the entire withdrawal, do so, and preemptively return
+            if (trancheReserves >= _amount) return IERC20(_asset).safeTransfer(_receiver, _amount);
+            // Else, service as much of the withdrawal as possible
+            else IERC20(_asset).safeTransfer(_receiver, trancheReserves);
+        }
+
+        // Only withdraw the assets that are still owed to the receiver
+        POOL.withdraw(_asset, (_amount - trancheReserves), _receiver);
     }
 
     /// @inheritdoc IRoycoKernel

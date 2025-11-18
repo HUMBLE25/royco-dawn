@@ -23,15 +23,15 @@ contract Royco is RoycoSTFactory {
 
         Market storage market = marketIdToMarket[marketId];
         require(market.seniorTranche == address(0), ErrorsLib.MARKET_EXISTS());
-        require(_params.protectedLossWAD <= ConstantsLib.WAD, ErrorsLib.EXPECTED_LOSS_EXCEEDS_MAX());
+        require(_params.coverageWAD <= ConstantsLib.WAD, ErrorsLib.EXPECTED_LOSS_EXCEEDS_MAX());
 
         // Set the expected loss for this market
         // This set the minimum ratio between the junior and senior tranche
-        market.protectedLossWAD = _params.protectedLossWAD;
+        market.coverageWAD = _params.coverageWAD;
 
         // Deploy the senior tranche
         address seniorTranche = market.seniorTranche = _deploySeniorTranche(
-            _params.stParams, _params.asset, _params.owner, _params.rewardFeeWAD, _params.feeClaimant, _params.rdm, _params.protectedLossWAD, address(0)
+            _params.stParams, _params.asset, _params.owner, _params.rewardFeeWAD, _params.feeClaimant, _params.rdm, _params.coverageWAD, address(0)
         );
 
         // TODO: Deploy the junior tranche configured with the specified kernel
@@ -39,7 +39,7 @@ contract Royco is RoycoSTFactory {
         //     seniorTranche,
         //     _params.commitmentAsset,
         //     _params.collateralAsset,
-        //     _params.protectedLossWAD,
+        //     _params.coverageWAD,
         //     _params.collateralAssetPriceFeed,
         //     _params.rdm,
         //     _params.lctv,

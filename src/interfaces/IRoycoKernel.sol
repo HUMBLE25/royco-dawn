@@ -160,9 +160,9 @@ interface IRoycoKernel {
      * @param _asset The address of the asset to withdraw from the underlying protocol
      * @param _controller The controller that is allowed to operate the withdrawal. All accounting is done against the controller.
      * @param _amount The amount of the asset to withdraw from the underlying protocol
-     * @param _recipient The recipient of the withdrawn assets
+     * @param _receiver The recipient of the withdrawn assets
      */
-    function withdraw(address _asset, address _controller, uint256 _amount, address _recipient) external;
+    function withdraw(address _asset, address _controller, uint256 _amount, address _receiver) external;
 
     // =============================
     // Cancellation Operations

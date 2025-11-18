@@ -27,12 +27,12 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
     using SafeERC20 for IERC20;
 
     /// @dev https://eips.ethereum.org/EIPS/eip-7540#request-ids
-    /// @dev Returning the request ID as 0 signals that the requests must purely be discriminated by the controller
-    uint256 private constant ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID = 0;
+    /// @dev Returning the request ID as 0 signals that the requests must be discriminated purely by the controller
+    uint256 private constant ERC7540_CONTROLLER_DISCRIMINATED_REQUEST_ID = 0;
 
     error INVALID_CALLER();
     error UNSUPPORTED_OPERATION();
-    error JUNIOR_TRANCHE_INSUFFICIENT_ASSETS();
+    error INSUFFICIENT_ASSETS_IN_JUNIOR_TRANCHE();
 
     modifier checkDepositSemantics(IRoycoKernel.ActionType _actionType) {
         require(RoycoSTStorageLib._getDepositType() == _actionType, UNSUPPORTED_OPERATION());
@@ -59,12 +59,12 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
         _;
     }
 
-    modifier checkProtectedLossInvariant() {
+    modifier checkCoverageInvariant() {
         _;
         // TODO: Gas Optimize
         // Invariant: junior tranche controlled assets >= (senior tranche principal * protected loss percentage)
-        uint256 protectedAssets = RoycoSTStorageLib._getTotalPrincipalAssets().mulDiv(RoycoSTStorageLib._getProtectedLossWAD(), ConstantsLib.WAD);
-        require(RoycoSTStorageLib._getJuniorTranche().totalAssets() >= protectedAssets, JUNIOR_TRANCHE_INSUFFICIENT_ASSETS());
+        uint256 coverageAssets = _computeExpectedCoverageAssets(RoycoSTStorageLib._getTotalPrincipalAssets());
+        require(RoycoSTStorageLib._getJuniorTranche().totalAssets() >= coverageAssets, INSUFFICIENT_ASSETS_IN_JUNIOR_TRANCHE());
     }
 
     function initialize(
@@ -74,7 +74,7 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
         uint64 _rewardFeeWAD,
         address _feeClaimant,
         address _rdm,
-        uint64 _protectedLossWAD,
+        uint64 _coverageWAD,
         address _juniorTranche
     )
         external
@@ -90,7 +90,7 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
         uint8 decimalsOffset = underlyingAssetDecimals >= 18 ? 0 : (18 - underlyingAssetDecimals);
 
         // Initialize the senior tranche state
-        RoycoSTStorageLib.__RoycoST_init(msg.sender, _stParams.kernel, _rewardFeeWAD, _feeClaimant, _protectedLossWAD, _juniorTranche, decimalsOffset);
+        RoycoSTStorageLib.__RoycoST_init(msg.sender, _stParams.kernel, _rewardFeeWAD, _feeClaimant, _coverageWAD, _juniorTranche, decimalsOffset);
 
         // Initialize the kernel's state
         RoycoKernelLib.__Kernel_init(RoycoSTStorageLib._getKernel(), _stParams.kernelInitParams);
@@ -115,7 +115,7 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
         public
         override
         onlySelfOrOperator(_controller)
-        checkProtectedLossInvariant
+        checkCoverageInvariant
         returns (uint256 shares)
     {
         // TODO: Fee and yield accrual logic
@@ -123,12 +123,10 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
         uint256 maxDepositableAssets = maxDeposit(_receiver);
         require(_assets <= maxDepositableAssets, ERC4626ExceededMaxDeposit(_receiver, _assets, maxDepositableAssets));
 
-        shares = _previewDeposit(_assets);
-
         // Handle depositing assets and minting shares
-        _deposit(msg.sender, _receiver, _assets, shares);
+        _deposit(msg.sender, _receiver, _assets, (shares = _previewDeposit(_assets)));
 
-        // Process the deposit in the underlying protocol by calling the Kernel
+        // Process the deposit into the underlying investment opportunity by calling the kernel
         RoycoKernelLib._deposit(RoycoSTStorageLib._getKernel(), asset(), _controller, _assets);
     }
 
@@ -146,7 +144,7 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
         public
         override
         onlySelfOrOperator(_controller)
-        checkProtectedLossInvariant
+        checkCoverageInvariant
         returns (uint256 assets)
     {
         // TODO: Fee and yield accrual logic
@@ -154,13 +152,10 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
         uint256 maxMintableShares = maxMint(_receiver);
         require(_shares <= maxMintableShares, ERC4626ExceededMaxMint(_receiver, _shares, maxMintableShares));
 
-        // TODO: Formally verify that this always matches the cost basis, even when shares are minted async
-        assets = _previewMint(_shares);
-
         // Handle depositing assets and minting shares
-        _deposit(msg.sender, _receiver, assets, _shares);
+        _deposit(msg.sender, _receiver, (assets = _previewMint(_shares)), _shares);
 
-        // Process the deposit for the underlying protocol by calling the Kernel
+        // Process the deposit for the underlying investment opportunity by calling the kernel
         RoycoKernelLib._deposit(RoycoSTStorageLib._getKernel(), asset(), _controller, assets);
     }
 
@@ -176,19 +171,15 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
         returns (uint256 shares)
     {
         // TODO: Fee and yield accrual logic
-
         // Assert that the assets being withdrawn by the user fall under the permissible limits
         uint256 maxWithdrawableAssets = maxWithdraw(_controller);
         require(_assets <= maxWithdrawableAssets, ERC4626ExceededMaxWithdraw(_controller, _assets, maxWithdrawableAssets));
 
-        // Compute the shares to redeem on withdrawal
-        shares = _previewWithdraw(_assets);
-
         // Handle burning shares and principal accouting on withdrawal
-        _withdraw(msg.sender, _receiver, _controller, _assets, shares);
+        _withdraw(msg.sender, _receiver, _controller, _assets, (shares = _previewWithdraw(_assets)));
 
-        // Process the withdrawal from the underlying protocol by calling the kernel - it is expected that the kernel
-        // transfers the assets directly to the recipient
+        // Process the withdrawal from the underlying investment opportunity
+        // It is expected that the kernel transfers the assets directly to the receiver
         RoycoKernelLib._withdraw(RoycoSTStorageLib._getKernel(), asset(), _controller, _assets, _receiver);
     }
 
@@ -208,17 +199,12 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
         uint256 maxRedeemableShares = maxRedeem(_controller);
         require(_shares <= maxRedeemableShares, ERC4626ExceededMaxRedeem(_controller, _shares, maxRedeemableShares));
 
-        // Compute the assets to withdraw on redemption
-        assets = _previewRedeem(_shares);
-
         // Handle burning shares and principal accouting on withdrawal
-        _withdraw(msg.sender, _receiver, _controller, assets, _shares);
+        _withdraw(msg.sender, _receiver, _controller, (assets = _previewRedeem(_shares)), _shares);
 
-        // Process the withdrawal from the underlying protocol by calling the kernel - it is expected thtat the kernel
-        // transfers the assets directly to the recipient
+        // Process the withdrawal from the underlying investment opportunity
+        // It is expected that the kernel transfers the assets directly to the receiver
         RoycoKernelLib._withdraw(RoycoSTStorageLib._getKernel(), asset(), _controller, assets, _receiver);
-
-        emit Withdraw(msg.sender, _receiver, _controller, assets, _shares);
     }
 
     // =============================
@@ -244,9 +230,10 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
         // Queue the deposit request
         RoycoKernelLib._requestDeposit(RoycoSTStorageLib._getKernel(), asset, _controller, _assets);
 
-        emit DepositRequest(_controller, _owner, ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, msg.sender, _assets);
+        emit DepositRequest(_controller, _owner, ERC7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, msg.sender, _assets);
 
-        return ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID;
+        // This signals that all deposit requests will be solely discriminated by the controller
+        return ERC7540_CONTROLLER_DISCRIMINATED_REQUEST_ID;
     }
 
     /// @inheritdoc IERC7540
@@ -275,15 +262,16 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
         // Calculate the assets to redeem
         uint256 _assets = _previewRedeem(_shares);
 
-        // Burn the shares from the owner
-        _burn(_owner, _shares);
+        // Debit shares from the owner
+        _debitShares(_controller, _owner, _shares);
 
         // Queue the redeem request
         RoycoKernelLib._requestWithdraw(RoycoSTStorageLib._getKernel(), asset(), _controller, _assets);
 
-        emit RedeemRequest(_controller, _owner, ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, msg.sender, _shares);
+        emit RedeemRequest(_controller, _owner, ERC7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, msg.sender, _shares);
 
-        return ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID;
+        // This signals that all redemption requests will be solely discriminated by the controller
+        return ERC7540_CONTROLLER_DISCRIMINATED_REQUEST_ID;
     }
 
     /// @inheritdoc IERC7540
@@ -321,6 +309,7 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
 
     /// @inheritdoc IERC7540
     function setOperator(address _operator, bool _approved) external override returns (bool) {
+        // Set the operator's approval status for the caller and return true
         RoycoSTStorageLib._setOperator(msg.sender, _operator, _approved);
         emit OperatorSet(msg.sender, _operator, _approved);
         return true;
@@ -336,7 +325,7 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
         // Delegate call to kernel to handle deposit cancellation
         RoycoKernelLib._cancelDepositRequest(RoycoSTStorageLib._getKernel(), _controller);
 
-        emit CancelDepositRequest(_controller, ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, msg.sender);
+        emit CancelDepositRequest(_controller, ERC7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, msg.sender);
     }
 
     /// @inheritdoc IERC7887
@@ -369,7 +358,7 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
         // Transfer assets to receiver
         IERC20(asset()).safeTransfer(_receiver, assets);
 
-        emit CancelDepositClaim(_controller, _receiver, ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, msg.sender, assets);
+        emit CancelDepositClaim(_controller, _receiver, ERC7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, msg.sender, assets);
     }
 
     /// @inheritdoc IERC7887
@@ -378,7 +367,7 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
         // Delegate call to kernel to handle redeem cancellation
         RoycoKernelLib._cancelRedeemRequest(RoycoSTStorageLib._getKernel(), _controller);
 
-        emit CancelRedeemRequest(_controller, ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, msg.sender);
+        emit CancelRedeemRequest(_controller, ERC7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, msg.sender);
     }
 
     /// @inheritdoc IERC7887
@@ -411,7 +400,7 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
         // Mint shares to receiver
         _mint(_receiver, shares);
 
-        emit CancelRedeemClaim(_owner, _receiver, ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, msg.sender, shares);
+        emit CancelRedeemClaim(_owner, _receiver, ERC7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, msg.sender, shares);
     }
 
     // =============================
@@ -419,8 +408,26 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
     // =============================
 
     /// @inheritdoc IERC4626
+    /// @dev Returns the senior tranche's effective total assets after factoring in losses covered by the junior tranche
     function totalAssets() public view override returns (uint256) {
-        return RoycoKernelLib._totalAssets(RoycoSTStorageLib._getKernel(), asset());
+        // Get the NAV of the senior tranche and principal deployed into the investment
+        uint256 stAssets = RoycoKernelLib._totalAssets(RoycoSTStorageLib._getKernel(), asset());
+        uint256 stPrincipal = RoycoSTStorageLib._getTotalPrincipalAssets();
+
+        // Senior tranche is completely whole, without any coverage required from junior capital
+        if (stAssets >= stPrincipal) return stAssets;
+
+        // Senior tranche NAV has incurred a loss
+        // Compute the actual amount of coverage provided by the junior tranche as the minimum of what they committed to insuring and their current NAV
+        // This should always be equal to the expected coverage assets, unless the junior tranche has taken a loss
+        uint256 actualCoverageAssets = Math.min(_computeExpectedCoverageAssets(stPrincipal), RoycoSTStorageLib._getJuniorTranche().totalAssets());
+
+        // Compute the result of the senior tranche bucket in the loss waterfall:
+        // Case 1: Senior tranche has suffered a loss that junior can absorb fully
+        // The senior tranche principal is the effective NAV after partially or fully applying the coverage
+        // Case 2: Senior tranche has suffered a loss greater than what junior can absorb
+        // The actual assets controlled by the senior tranche in addition to all the coverage is the effective NAV
+        return Math.min(stPrincipal, stAssets + actualCoverageAssets);
     }
 
     /// @inheritdoc IERC4626
@@ -527,15 +534,12 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
     }
 
     /// @inheritdoc ERC4626Upgradeable
-    /// @dev Increases the total principal of assets deposited into the tranche
+    /// @dev Increases the total principal deposited into the tranche
     function _deposit(address _caller, address _receiver, uint256 _assets, uint256 _shares) internal override(ERC4626Upgradeable) {
-        if (RoycoSTStorageLib._getDepositType() == IRoycoKernel.ActionType.SYNC) {
-            // If deposits are synchronous, transfer the assets to the tranche and mint the shares
-            _deposit(_caller, _receiver, _assets, _shares);
-        } else {
-            // If deposits are asynchronous, only mint shares since assets were transfered in on the request
-            _mint(_receiver, _shares);
-        }
+        // If deposits are synchronous, transfer the assets to the tranche and mint the shares
+        if (RoycoSTStorageLib._getDepositType() == IRoycoKernel.ActionType.SYNC) _deposit(_caller, _receiver, _assets, _shares);
+        // If deposits are asynchronous, only mint shares since assets were transfered in on the request
+        else _mint(_receiver, _shares);
 
         // Increase the tranche's total principal by the assets being deposited
         RoycoSTStorageLib._increaseTotalPrincipal(_assets);
@@ -550,12 +554,18 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
         emit Withdraw(_caller, _receiver, _owner, _assets, _shares);
 
         // No need to burn shares if withdrawals are asynchronous since they were burned on request
-        if (RoycoSTStorageLib._getWithdrawType() == IRoycoKernel.ActionType.ASYNC) return;
+        if (RoycoSTStorageLib._getWithdrawType() == IRoycoKernel.ActionType.SYNC) _debitShares(_caller, _owner, _shares);
+    }
 
+    function _debitShares(address _caller, address _owner, uint256 _shares) internal {
         // Spend the caller's share allowance if the caller isn't the owner
         if (_caller != _owner) _spendAllowance(_owner, _caller, _shares);
         // Burn the shares being redeemed from the owner
         _burn(_owner, _shares);
+    }
+
+    function _computeExpectedCoverageAssets(uint256 _totalPrincipalAssets) internal view returns (uint256) {
+        return _totalPrincipalAssets.mulDiv(RoycoSTStorageLib._getCoverageWAD(), ConstantsLib.WAD);
     }
 
     // TODO: Integrate and handle losses

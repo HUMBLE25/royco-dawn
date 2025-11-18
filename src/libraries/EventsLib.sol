@@ -6,7 +6,7 @@ library EventsLib {
         address indexed seniorTranche,
         address indexed commitmentAsset,
         address indexed collateralAsset,
-        uint96 protectedLossWAD,
+        uint96 coverageWAD,
         address collateralAssetPriceFeed,
         address rdm,
         uint96 lctv,

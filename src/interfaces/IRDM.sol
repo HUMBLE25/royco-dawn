@@ -11,7 +11,7 @@ interface IRDM {
      * @param _marketID The unique identifier for the Royco market (may be used for market-specific logic)
      * @param _stPrincipalAmount The total principal amount committed by the senior tranche, denominated in the market's base asset
      * @param _jtCommitmentAmount The total commitment amount of loss capital from the junior tranche, denominated in the same asset as _stAssets
-     * @param _protectedLossWAD The expected loss percentage for the senior tranche, scaled by WAD
+     * @param _coverageWAD The expected loss percentage for the senior tranche, scaled by WAD
      *                         This represents the percentage of senior tranche principal that is insured by the junior tranche at all times.
      * @return jtRewardPercentageWAD The percentage of total rewards allocated to the junior tranche, scaled by WAD
      *                               It is implied that (WAD - jtRewardPercentageWAD) will be the percentage allocated to the senior tranche
@@ -20,7 +20,7 @@ interface IRDM {
         bytes32 _marketID,
         uint256 _stPrincipalAmount,
         uint256 _jtCommitmentAmount,
-        uint256 _protectedLossWAD
+        uint256 _coverageWAD
     )
         external
         returns (uint256 jtRewardPercentageWAD);

@@ -13,7 +13,7 @@ import { RoycoKernelLib } from "./RoycoKernelLib.sol";
  * @custom:field juniorTranche - The address of the paired junior tranche
  * @custom:field rewardFeeWAD - The percentage of yield paid to protocol (WAD = 100%)
  * @custom:field feeClaimant - The address authorized to claim protocol fees
- * @custom:field protectedLossWAD - The percentage of senior tranche assets insured by junior tranche (WAD = 100%)
+ * @custom:field coverageWAD - The percentage of senior tranche assets insured by junior tranche (WAD = 100%)
  * @custom:field decimalsOffset - Decimals offset for share token precision
  * @custom:field totalPrincipalAssets - The total principal currently deposited in the tranche (excludes PnL)
  * @custom:field lastTotalAssets - The last recorded total assets for yield calculation
@@ -29,7 +29,7 @@ struct RoycoSTState {
     address juniorTranche;
     uint64 rewardFeeWAD;
     address feeClaimant;
-    uint64 protectedLossWAD; // The percentage of the senior tranche's total assets that will be insured by the junior tranche
+    uint64 coverageWAD; // The percentage of the senior tranche's total assets that will be insured by the junior tranche
     uint8 decimalsOffset;
     uint256 totalPrincipalAssets;
     uint256 lastTotalAssets;
@@ -74,7 +74,7 @@ library RoycoSTStorageLib {
      * @param _kernel The address of the kernel contract handling strategy logic
      * @param _rewardFeeWAD The percentage of yield paid to protocol (WAD = 100%)
      * @param _feeClaimant The address authorized to claim protocol fees
-     * @param _protectedLossWAD The percentage of senior tranche assets insured by junior tranche (WAD = 100%)
+     * @param _coverageWAD The percentage of senior tranche assets insured by junior tranche (WAD = 100%)
      * @param _juniorTranche The address of the paired junior tranche vault
      * @param _decimalsOffset Decimals offset for share token precision
      */
@@ -83,7 +83,7 @@ library RoycoSTStorageLib {
         address _kernel,
         uint64 _rewardFeeWAD,
         address _feeClaimant,
-        uint64 _protectedLossWAD,
+        uint64 _coverageWAD,
         address _juniorTranche,
         uint8 _decimalsOffset
     )
@@ -99,7 +99,7 @@ library RoycoSTStorageLib {
         $.juniorTranche = _juniorTranche;
         $.feeClaimant = _feeClaimant;
         $.rewardFeeWAD = _rewardFeeWAD;
-        $.protectedLossWAD = _protectedLossWAD;
+        $.coverageWAD = _coverageWAD;
         $.decimalsOffset = _decimalsOffset;
         $.DEPOSIT_TYPE = RoycoKernelLib._DEPOSIT_TYPE(_kernel);
         $.WITHDRAW_TYPE = RoycoKernelLib._WITHDRAW_TYPE(_kernel);
@@ -237,8 +237,8 @@ library RoycoSTStorageLib {
      * @notice Returns the protected loss percentage
      * @return The percentage of senior tranche assets insured by junior tranche (WAD = 100%)
      */
-    function _getProtectedLossWAD() internal view returns (uint64) {
-        return _getRoycoSTStorage().protectedLossWAD;
+    function _getCoverageWAD() internal view returns (uint64) {
+        return _getRoycoSTStorage().coverageWAD;
     }
 
     /**

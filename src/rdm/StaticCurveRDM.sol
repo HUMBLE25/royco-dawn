@@ -33,16 +33,7 @@ contract StaticCurveRDM is IRDM {
     uint256 public constant BASE_RATE_GTE_TARGET_UTIL = 0.225e18;
 
     /// @inheritdoc IRDM
-    function getRewardDistribution(
-        bytes32,
-        uint256 _stPrincipalAmount,
-        uint256 _jtCommitmentAmount,
-        uint256 _protectedLossWAD
-    )
-        external
-        pure
-        returns (uint256)
-    {
+    function getRewardDistribution(bytes32, uint256 _stPrincipalAmount, uint256 _jtCommitmentAmount, uint256 _coverageWAD) external pure returns (uint256) {
         /**
          * Reward Distribution Model (piecewise curve):
          *
@@ -57,10 +48,10 @@ contract StaticCurveRDM is IRDM {
          */
 
         // If any of these quantities is 0, the utilization is effectively 0, so the JT's percentage of rewards is 0%
-        if (_stPrincipalAmount == 0 || _jtCommitmentAmount == 0 || _protectedLossWAD == 0) return 0;
+        if (_stPrincipalAmount == 0 || _jtCommitmentAmount == 0 || _coverageWAD == 0) return 0;
 
         // Compute the utilization of the market
-        uint256 utilization = _stPrincipalAmount.mulDiv(_protectedLossWAD, _jtCommitmentAmount, Math.Rounding.Floor);
+        uint256 utilization = _stPrincipalAmount.mulDiv(_coverageWAD, _jtCommitmentAmount, Math.Rounding.Floor);
 
         // Theoretically, this branch should never be hit for the purely greater than case, as it would imply a violation of the invariant:
         // junior tranche commitments >= (senior tranche principal * expected loss percentage)
