@@ -126,7 +126,7 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
         require(_assets <= maxDepositableAssets, ERC4626ExceededMaxDeposit(_receiver, _assets, maxDepositableAssets));
 
         // Handle depositing assets and minting shares
-        _deposit(msg.sender, _receiver, _assets, (shares = _previewDeposit(_assets)));
+        _deposit(msg.sender, _receiver, _assets, (shares = super.previewDeposit(_assets)));
 
         // Process the deposit into the underlying investment opportunity by calling the kernel
         RoycoKernelLib._deposit(RoycoSTStorageLib._getKernel(), asset(), _controller, _assets);
@@ -155,7 +155,7 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
         require(_shares <= maxMintableShares, ERC4626ExceededMaxMint(_receiver, _shares, maxMintableShares));
 
         // Handle depositing assets and minting shares
-        _deposit(msg.sender, _receiver, (assets = _previewMint(_shares)), _shares);
+        _deposit(msg.sender, _receiver, (assets = super.previewMint(_shares)), _shares);
 
         // Process the deposit for the underlying investment opportunity by calling the kernel
         RoycoKernelLib._deposit(RoycoSTStorageLib._getKernel(), asset(), _controller, assets);
@@ -178,7 +178,7 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
         require(_assets <= maxWithdrawableAssets, ERC4626ExceededMaxWithdraw(_controller, _assets, maxWithdrawableAssets));
 
         // Handle burning shares and principal accouting on withdrawal
-        _withdraw(msg.sender, _receiver, _controller, _assets, (shares = _previewWithdraw(_assets)));
+        _withdraw(msg.sender, _receiver, _controller, _assets, (shares = super.previewWithdraw(_assets)));
 
         // Process the withdrawal from the underlying investment opportunity
         // It is expected that the kernel transfers the assets directly to the receiver
@@ -202,7 +202,7 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
         require(_shares <= maxRedeemableShares, ERC4626ExceededMaxRedeem(_controller, _shares, maxRedeemableShares));
 
         // Handle burning shares and principal accouting on withdrawal
-        _withdraw(msg.sender, _receiver, _controller, (assets = _previewRedeem(_shares)), _shares);
+        _withdraw(msg.sender, _receiver, _controller, (assets = super.previewRedeem(_shares)), _shares);
 
         // Process the withdrawal from the underlying investment opportunity
         // It is expected that the kernel transfers the assets directly to the receiver
@@ -262,7 +262,7 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
         returns (uint256)
     {
         // Calculate the assets to redeem
-        uint256 _assets = _previewRedeem(_shares);
+        uint256 _assets = super.previewRedeem(_shares);
 
         // Debit shares from the owner
         _debitShares(_controller, _owner, _shares);
@@ -443,16 +443,15 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
     /// @dev We do not enforce per user caps on mints, so we can ignore the receiver param
     function maxMint(address) public view override returns (uint256) {
         // Get the max assets depositable
-        uint256 maxAssetsDepositable = maxDeposit(address(0));
-        // Preview deposit will handle computing the maximum mintable shares after applying the yield distribution and accrued fees
-        return _previewDeposit(maxAssetsDepositable);
+        // Preview deposit will handle computing the maximum mintable shares
+        return super.previewDeposit(maxDeposit(address(0)));
     }
 
     /// @inheritdoc IERC4626
     function maxWithdraw(address _owner) public view override returns (uint256) {
         // Return the minimum of the maximum globally withdrawable assets and the assets held by the owner
-        // Preview redeem will handle computing the max assets withdrawable by the owner after applying the yield distribution and accrued fees
-        return Math.min(RoycoKernelLib._maxWithdraw(RoycoSTStorageLib._getKernel(), asset()), _previewRedeem(balanceOf(_owner)));
+        // Preview redeem will handle computing the max assets withdrawable by the owner
+        return Math.min(RoycoKernelLib._maxWithdraw(RoycoSTStorageLib._getKernel(), asset()), super.previewRedeem(balanceOf(_owner)));
     }
 
     /// @inheritdoc IERC4626
@@ -460,27 +459,27 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
         // Get the maximum globally withdrawable assets
         uint256 maxAssetsWithdrawable = RoycoKernelLib._maxWithdraw(RoycoSTStorageLib._getKernel(), asset());
         // Return the minimum of the shares equating to the maximum globally withdrawable assets and the shares held by the owner
-        return Math.min(_previewWithdraw(maxAssetsWithdrawable), balanceOf(_owner));
+        return Math.min(super.previewWithdraw(maxAssetsWithdrawable), balanceOf(_owner));
     }
 
     /// @inheritdoc IERC4626
     function previewDeposit(uint256 _assets) public view override checkDepositSemantics(IRoycoKernel.ActionType.SYNC) returns (uint256) {
-        return _previewDeposit(_assets);
+        return super.previewDeposit(_assets);
     }
 
     /// @inheritdoc IERC4626
     function previewMint(uint256 _shares) public view override checkDepositSemantics(IRoycoKernel.ActionType.SYNC) returns (uint256) {
-        return _previewMint(_shares);
+        return super.previewMint(_shares);
     }
 
     /// @inheritdoc IERC4626
     function previewWithdraw(uint256 _assets) public view override checkWithdrawalSemantics(IRoycoKernel.ActionType.SYNC) returns (uint256) {
-        return _previewWithdraw(_assets);
+        return super.previewWithdraw(_assets);
     }
 
     /// @inheritdoc IERC4626
     function previewRedeem(uint256 _shares) public view override checkWithdrawalSemantics(IRoycoKernel.ActionType.SYNC) returns (uint256) {
-        return _previewRedeem(_shares);
+        return super.previewRedeem(_shares);
     }
 
     /// @inheritdoc IERC7575
@@ -499,39 +498,11 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
             || _interfaceId == type(IERC7887).interfaceId;
     }
 
-    function _previewDeposit(uint256 _assets) internal view returns (uint256) {
-        // Calculate the shares minted for depositing the assets after simulating minting the accrued fee shares
-        // Round in favor of the senior tranche
-        (uint256 currentTotalAssets, uint256 feeSharesAccrued) = _getTotalAssetsAndFeeSharesAccrued();
-        return _convertToShares(_assets, totalSupply() + feeSharesAccrued, currentTotalAssets, Math.Rounding.Floor);
-    }
-
-    function _previewMint(uint256 _shares) internal view returns (uint256) {
-        // Calculate the assets needed to mint the shares after simulating minting the accrued fee shares
-        // Round in favor of the senior tranche
-        (uint256 currentTotalAssets, uint256 feeSharesAccrued) = _getTotalAssetsAndFeeSharesAccrued();
-        return _convertToAssets(_shares, totalSupply() + feeSharesAccrued, currentTotalAssets, Math.Rounding.Ceil);
-    }
-
-    function _previewWithdraw(uint256 _assets) internal view returns (uint256) {
-        // Calculate the shares that must be redeemed to withdraw the assets after simulating minting the accrued fee shares
-        // Round in favor of the senior tranche
-        (uint256 currentTotalAssets, uint256 feeSharesAccrued) = _getTotalAssetsAndFeeSharesAccrued();
-        return _convertToShares(_assets, totalSupply() + feeSharesAccrued, currentTotalAssets, Math.Rounding.Ceil);
-    }
-
-    function _previewRedeem(uint256 _shares) internal view returns (uint256) {
-        // Calculate the assets withdrawn for redeeming the shares after simulating minting the accrued fee shares
-        // Round in favor of the senior tranche
-        (uint256 currentTotalAssets, uint256 feeSharesAccrued) = _getTotalAssetsAndFeeSharesAccrued();
-        return _convertToAssets(_shares, totalSupply() + feeSharesAccrued, currentTotalAssets, Math.Rounding.Floor);
-    }
-
     /// @inheritdoc ERC4626Upgradeable
     /// @dev Increases the total principal deposited into the tranche
     function _deposit(address _caller, address _receiver, uint256 _assets, uint256 _shares) internal override(ERC4626Upgradeable) {
         // If deposits are synchronous, transfer the assets to the tranche and mint the shares
-        if (RoycoSTStorageLib._getDepositType() == IRoycoKernel.ActionType.SYNC) _deposit(_caller, _receiver, _assets, _shares);
+        if (RoycoSTStorageLib._getDepositType() == IRoycoKernel.ActionType.SYNC) super._deposit(_caller, _receiver, _assets, _shares);
         // If deposits are asynchronous, only mint shares since assets were transfered in on the request
         else _mint(_receiver, _shares);
 
@@ -572,26 +543,6 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
         // x = (junior tranche controlled assets / coverage percentage) - senior tranche principal
         return RoycoSTStorageLib._getJuniorTranche().totalAssets().mulDiv(ConstantsLib.WAD, RoycoSTStorageLib._getCoverageWAD(), Math.Rounding.Floor) // Round down in favor of the senior tranche
             - RoycoSTStorageLib._getTotalPrincipalAssets();
-    }
-
-    // TODO: Write for yield/fee accrual and handling losses
-    function _getTotalAssetsAndFeeSharesAccrued() internal view returns (uint256 currentTotalAssets, uint256 feeSharesAccrued) {
-        // 1. Get total assets
-        // 2. Get highest NAV reached by the tranche
-        // 3. 1 > 2 -> senior tranche earned yield
-        // 4. yield = 1 - 2
-        // 5. Mint fee shares for protocolFee(yield)
-        // 6. yield = yield - protocolFee(yield)
-        // 7. Calculate yield split via RDM
-        // 8. Mint jt shares to junior tranche (rest goes to senior)
-    }
-
-    function _convertToShares(uint256 _assets, uint256 _newTotalShares, uint256 _newTotalAssets, Math.Rounding _rounding) internal view returns (uint256) {
-        return _assets.mulDiv(_newTotalShares + 10 ** _decimalsOffset(), _newTotalAssets + 1, _rounding);
-    }
-
-    function _convertToAssets(uint256 _shares, uint256 _newTotalShares, uint256 _newTotalAssets, Math.Rounding _rounding) internal view returns (uint256) {
-        return _shares.mulDiv(_newTotalAssets + 1, _newTotalShares + 10 ** _decimalsOffset(), _rounding);
     }
 
     function _decimalsOffset() internal view override returns (uint8) {
