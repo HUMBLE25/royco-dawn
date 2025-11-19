@@ -576,19 +576,14 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
 
     // TODO: Write for yield/fee accrual and handling losses
     function _getTotalAssetsAndFeeSharesAccrued() internal view returns (uint256 currentTotalAssets, uint256 feeSharesAccrued) {
-        // // Get the current and last checkpointed total assets
-        // currentTotalAssets = totalAssets();
-        // uint256 lastTotalAssets = RoycoSTStorageLib._getLastTotalAssets();
-
-        // // If the vault accrued any yield, compute the fee on the yield
-        // if (currentTotalAssets > lastTotalAssets) {
-        //     // Calculate the discrete yield accrued in assets
-        //     uint256 yield = currentTotalAssets - lastTotalAssets;
-        //     // Compute the fee deducted from the yield in assets
-        //     uint256 yieldFee = yield.mulDiv(RoycoSTStorageLib._getRewardFeeWAD(), RoycoSTStorageLib.BPS_DENOMINATOR);
-        //     // Convert the yield fee in assets to shares that will be minted to the fee recipient
-        //     feeSharesAccrued = _convertToShares(yieldFee, totalSupply(), currentTotalAssets, Math.Rounding.Floor);
-        // }
+        // 1. Get total assets
+        // 2. Get highest NAV reached by the tranche
+        // 3. 1 > 2 -> senior tranche earned yield
+        // 4. yield = 1 - 2
+        // 5. Mint fee shares for protocolFee(yield)
+        // 6. yield = yield - protocolFee(yield)
+        // 7. Calculate yield split via RDM
+        // 8. Mint jt shares to junior tranche (rest goes to senior)
     }
 
     function _convertToShares(uint256 _assets, uint256 _newTotalShares, uint256 _newTotalAssets, Math.Rounding _rounding) internal view returns (uint256) {
