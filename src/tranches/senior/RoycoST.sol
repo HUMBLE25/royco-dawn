@@ -60,9 +60,11 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
     }
 
     modifier checkCoverageInvariant() {
+        // Let the function body execute
         _;
         // TODO: Gas Optimize
-        // Invariant: junior tranche controlled assets >= (senior tranche principal * protected loss percentage)
+        // Check invariant after all state changes have been applied
+        // Invariant: junior tranche controlled assets >= (senior tranche principal * coverage percentage)
         uint256 coverageAssets = _computeExpectedCoverageAssets(RoycoSTStorageLib._getTotalPrincipalAssets());
         require(RoycoSTStorageLib._getJuniorTranche().totalAssets() >= coverageAssets, INSUFFICIENT_ASSETS_IN_JUNIOR_TRANCHE());
     }
@@ -433,42 +435,32 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
     /// @inheritdoc IERC4626
     /// @dev We do not enforce per user caps on deposits, so we can ignore the receiver param
     function maxDeposit(address) public view override returns (uint256) {
-        return _maxAssetsDepositableGlobally();
+        // Return the minimum of the asset capacity of the underlying investment opportunity and the senior tranche (to satisfy the coverage invariant)
+        return Math.min(RoycoKernelLib._maxDeposit(RoycoSTStorageLib._getKernel(), asset()), _computeAssetCapacity());
     }
 
     /// @inheritdoc IERC4626
     /// @dev We do not enforce per user caps on mints, so we can ignore the receiver param
     function maxMint(address) public view override returns (uint256) {
-        // NOTE: To prevent overflows on asset to share conversion
-        // Premeptively return max if the globally depositable amount of assets is uncapped
-        uint256 maxAssetsDepositableGlobally = _maxAssetsDepositableGlobally();
-        if (maxAssetsDepositableGlobally == type(uint256).max) {
-            return type(uint256).max;
-        }
-        // Preview deposit will handle computing the maximum mintable shares after applying accrued fees
-        return _previewDeposit(maxAssetsDepositableGlobally);
+        // Get the max assets depositable
+        uint256 maxAssetsDepositable = maxDeposit(address(0));
+        // Preview deposit will handle computing the maximum mintable shares after applying the yield distribution and accrued fees
+        return _previewDeposit(maxAssetsDepositable);
     }
 
     /// @inheritdoc IERC4626
     function maxWithdraw(address _owner) public view override returns (uint256) {
-        // Calculate the max assets withdrable by the owner as the min of those held by the owner and globally withdrawable
-        // Preview redeem will handle computing the max assets withdrawable by the owner after applying accrued fees
-        return Math.min(_previewRedeem(balanceOf(_owner)), _maxAssetsWithdrawableGlobally());
+        // Return the minimum of the maximum globally withdrawable assets and the assets held by the owner
+        // Preview redeem will handle computing the max assets withdrawable by the owner after applying the yield distribution and accrued fees
+        return Math.min(RoycoKernelLib._maxWithdraw(RoycoSTStorageLib._getKernel(), asset()), _previewRedeem(balanceOf(_owner)));
     }
 
     /// @inheritdoc IERC4626
     function maxRedeem(address _owner) public view override returns (uint256) {
-        // NOTE: To prevent overflows on asset to share conversion
-        // Premeptively return the owner's shares balance if the globally withdrawable amount of assets is uncapped
-        uint256 maxAssetsWithdrawableGlobally = _maxAssetsWithdrawableGlobally();
-        uint256 ownerSharesBalance = balanceOf(_owner);
-        if (maxAssetsWithdrawableGlobally == type(uint256).max) {
-            return ownerSharesBalance;
-        }
-
-        // Calculate the max shares redeemable by the owner as the minimum of globally redeemable and those held by the owner
-        // Preview withdraw will handle computing the max shares redeemable by the owner after applying accrued fees
-        return Math.min(previewWithdraw(maxAssetsWithdrawableGlobally), ownerSharesBalance);
+        // Get the maximum globally withdrawable assets
+        uint256 maxAssetsWithdrawable = RoycoKernelLib._maxWithdraw(RoycoSTStorageLib._getKernel(), asset());
+        // Return the minimum of the shares equating to the maximum globally withdrawable assets and the shares held by the owner
+        return Math.min(_previewWithdraw(maxAssetsWithdrawable), balanceOf(_owner));
     }
 
     /// @inheritdoc IERC4626
@@ -503,32 +495,34 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
 
     /// @inheritdoc IERC165
     function supportsInterface(bytes4 _interfaceId) public pure returns (bool) {
-        return (
-            _interfaceId == type(IERC7540).interfaceId || _interfaceId == type(IERC7575).interfaceId || _interfaceId == type(IERC7887).interfaceId
-                || _interfaceId == type(IERC4626).interfaceId
-        );
+        return _interfaceId == this.supportsInterface.selector || _interfaceId == type(IERC4626).interfaceId || _interfaceId == type(IERC7540).interfaceId
+            || _interfaceId == type(IERC7887).interfaceId;
     }
 
     function _previewDeposit(uint256 _assets) internal view returns (uint256) {
-        // Calculate the expected shares minted for depositing the assets after simulating minting the accrued fee shares
+        // Calculate the shares minted for depositing the assets after simulating minting the accrued fee shares
+        // Round in favor of the senior tranche
         (uint256 currentTotalAssets, uint256 feeSharesAccrued) = _getTotalAssetsAndFeeSharesAccrued();
         return _convertToShares(_assets, totalSupply() + feeSharesAccrued, currentTotalAssets, Math.Rounding.Floor);
     }
 
     function _previewMint(uint256 _shares) internal view returns (uint256) {
-        // Calculate the assets needed to mint the expected shares after simulating minting the accrued fee shares
+        // Calculate the assets needed to mint the shares after simulating minting the accrued fee shares
+        // Round in favor of the senior tranche
         (uint256 currentTotalAssets, uint256 feeSharesAccrued) = _getTotalAssetsAndFeeSharesAccrued();
         return _convertToAssets(_shares, totalSupply() + feeSharesAccrued, currentTotalAssets, Math.Rounding.Ceil);
     }
 
     function _previewWithdraw(uint256 _assets) internal view returns (uint256) {
-        // Calculate the assets withdrawn for redeeming the shares after simulating minting the accrued fee shares
+        // Calculate the shares that must be redeemed to withdraw the assets after simulating minting the accrued fee shares
+        // Round in favor of the senior tranche
         (uint256 currentTotalAssets, uint256 feeSharesAccrued) = _getTotalAssetsAndFeeSharesAccrued();
         return _convertToShares(_assets, totalSupply() + feeSharesAccrued, currentTotalAssets, Math.Rounding.Ceil);
     }
 
     function _previewRedeem(uint256 _shares) internal view returns (uint256) {
-        // Calculate the expected shares redeemed for withdrawing the assets after simulating minting the accrued fee shares
+        // Calculate the assets withdrawn for redeeming the shares after simulating minting the accrued fee shares
+        // Round in favor of the senior tranche
         (uint256 currentTotalAssets, uint256 feeSharesAccrued) = _getTotalAssetsAndFeeSharesAccrued();
         return _convertToAssets(_shares, totalSupply() + feeSharesAccrued, currentTotalAssets, Math.Rounding.Floor);
     }
@@ -565,10 +559,22 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
     }
 
     function _computeExpectedCoverageAssets(uint256 _totalPrincipalAssets) internal view returns (uint256) {
-        return _totalPrincipalAssets.mulDiv(RoycoSTStorageLib._getCoverageWAD(), ConstantsLib.WAD);
+        // Compute the assets required as coverage for the senior tranche
+        // Round in favor of the senior tranche
+        return _totalPrincipalAssets.mulDiv(RoycoSTStorageLib._getCoverageWAD(), ConstantsLib.WAD, Math.Rounding.Ceil);
     }
 
-    // TODO: Integrate and handle losses
+    function _computeAssetCapacity() internal view returns (uint256) {
+        // Invariant: (senior tranche principal * coverage percentage) <= junior tranche controlled assets
+        // This is maxed out when: (senior tranche principal * coverage percentage) == junior tranche controlled assets
+        // Solving for the max amount of assets we can deposit, x, to satisfy this inequality:
+        // ((senior tranche principal + x) * coverage percentage) == junior tranche controlled assets
+        // x = (junior tranche controlled assets / coverage percentage) - senior tranche principal
+        return RoycoSTStorageLib._getJuniorTranche().totalAssets().mulDiv(ConstantsLib.WAD, RoycoSTStorageLib._getCoverageWAD(), Math.Rounding.Floor) // Round down in favor of the senior tranche
+            - RoycoSTStorageLib._getTotalPrincipalAssets();
+    }
+
+    // TODO: Write for yield/fee accrual and handling losses
     function _getTotalAssetsAndFeeSharesAccrued() internal view returns (uint256 currentTotalAssets, uint256 feeSharesAccrued) {
         // // Get the current and last checkpointed total assets
         // currentTotalAssets = totalAssets();
@@ -591,14 +597,6 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
 
     function _convertToAssets(uint256 _shares, uint256 _newTotalShares, uint256 _newTotalAssets, Math.Rounding _rounding) internal view returns (uint256) {
         return _shares.mulDiv(_newTotalAssets + 1, _newTotalShares + 10 ** _decimalsOffset(), _rounding);
-    }
-
-    function _maxAssetsDepositableGlobally() internal view returns (uint256) {
-        return RoycoKernelLib._maxDeposit(RoycoSTStorageLib._getKernel(), asset());
-    }
-
-    function _maxAssetsWithdrawableGlobally() internal view returns (uint256) {
-        return RoycoKernelLib._maxWithdraw(RoycoSTStorageLib._getKernel(), asset());
     }
 
     function _decimalsOffset() internal view override returns (uint8) {

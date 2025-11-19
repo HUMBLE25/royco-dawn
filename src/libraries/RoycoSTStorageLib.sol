@@ -234,7 +234,7 @@ library RoycoSTStorageLib {
     }
 
     /**
-     * @notice Returns the protected loss percentage
+     * @notice Returns the coverage percentage
      * @return The percentage of senior tranche assets insured by junior tranche (WAD = 100%)
      */
     function _getCoverageWAD() internal view returns (uint64) {

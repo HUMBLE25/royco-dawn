@@ -3,8 +3,8 @@ pragma solidity ^0.8.28;
 
 /**
  * @title IRoycoKernel
- * @notice Interface for kernel contracts that handle asset management operations to/from an underlying protocol
- * @dev Provides the logic for RoycoSTs to interact with external protocols (e.g., Aave, Compound)
+ * @notice Interface for kernel contracts that handle asset management operations to/from an underlying investment opportunity
+ * @dev Provides the logic for RoycoSTs to interact with external investment opportunitys (e.g., Aave, Compound)
  * @dev Kernels have no conception of shares, so its interactions and interface relate to assets exclusively
  * @dev Kernels support both synchronous and asynchronous operations via ActionType enum
  * @dev Asynchronous operations use a request/claim pattern for deposits and withdrawals
@@ -55,24 +55,24 @@ interface IRoycoKernel {
     // =============================
 
     /**
-     * @notice Returns the total amount of a specific asset managed by the caller in the underlying protocol
+     * @notice Returns the total amount of a specific asset managed by the caller in the underlying investment opportunity
      * @dev Must be called via a call or staticcall (reliant on msg.sender)
-     * @param _asset The address of the asset to query the owner's balance in the underlying protocol for
+     * @param _asset The address of the asset to query the owner's balance in the underlying investment opportunity for
      * @return The total amount of the specified asset managed by the caller
      */
     function totalAssets(address _asset) external view returns (uint256);
 
     /**
-     * @notice Returns the maximum amount of a specific asset that can be deposited into the underlying protocol
+     * @notice Returns the maximum amount of a specific asset that can be deposited into the underlying investment opportunity
      * @param _asset The address of the asset to deposit
-     * @return The maximum amount of the asset that can be globally deposited into the underlying protocol
+     * @return The maximum amount of the asset that can be globally deposited into the underlying investment opportunity
      */
     function maxDeposit(address _asset) external view returns (uint256);
 
     /**
-     * @notice Returns the maximum amount of a specific asset that can be withdrawn from the underlying protocol
+     * @notice Returns the maximum amount of a specific asset that can be withdrawn from the underlying investment opportunity
      * @param _asset The address of the asset to withdraw
-     * @return The maximum amount of assets that can be globally withdrawn from the underlying protocol
+     * @return The maximum amount of assets that can be globally withdrawn from the underlying investment opportunity
      */
     function maxWithdraw(address _asset) external view returns (uint256);
 
@@ -81,13 +81,13 @@ interface IRoycoKernel {
     // =============================
 
     /**
-     * @notice Requests a deposit of a specified amount of an asset into the underlying protocol
+     * @notice Requests a deposit of a specified amount of an asset into the underlying investment opportunity
      * @dev This function is only callable if and only if the deposit type of the kernel is ASYNC
      * @dev Must be called via a delegatecall (reliant on address(this))
      * @dev The contract delegatecalling this function must hold the specified amount of assets to deposit
-     * @param _asset The address of the asset to deposit into the underlying protocol
+     * @param _asset The address of the asset to deposit into the underlying investment opportunity
      * @param _controller The controller that is allowed to operate the request. All accounting is done against the controller.
-     * @param _amount The amount of the asset to deposit into the underlying protocol
+     * @param _amount The amount of the asset to deposit into the underlying investment opportunity
      * @param _amount The request ID for the deposit request
      */
     function requestDeposit(address _asset, address _controller, uint256 _amount) external;
@@ -111,12 +111,12 @@ interface IRoycoKernel {
     function claimableDepositRequest(address _asset, address _controller) external view returns (uint256 claimableAssets);
 
     /**
-     * @notice Deposits a specified amount of an asset into the underlying protocol
+     * @notice Deposits a specified amount of an asset into the underlying investment opportunity
      * @dev Must be called via a delegatecall (reliant on address(this))
      * @dev The contract delegatecalling this function must hold the specified amount of assets to deposit
-     * @param _asset The address of the asset to deposit into the underlying protocol
+     * @param _asset The address of the asset to deposit into the underlying investment opportunity
      * @param _controller The controller that is allowed to operate the deposit. All accounting is done against the controller.
-     * @param _amount The amount of the asset to deposit into the underlying protocol
+     * @param _amount The amount of the asset to deposit into the underlying investment opportunity
      */
     function deposit(address _asset, address _controller, uint256 _amount) external;
 
@@ -125,13 +125,13 @@ interface IRoycoKernel {
     // =============================
 
     /**
-     * @notice Requests a withdrawal of a specified amount of an asset from the underlying protocol
+     * @notice Requests a withdrawal of a specified amount of an asset from the underlying investment opportunity
      * @dev This function is only callable if and only if the withdraw type of the kernel is ASYNC
      * @dev Must be called via a delegatecall (reliant on address(this))
-     * @dev The contract delegatecalling this function must have a balance greater than or equal to the specified amount of assets in the underlying protocol
-     * @param _asset The address of the asset to withdraw from the underlying protocol
+     * @dev The contract delegatecalling this function must have a balance greater than or equal to the specified amount of assets in the underlying investment opportunity
+     * @param _asset The address of the asset to withdraw from the underlying investment opportunity
      * @param _controller The controller that is allowed to operate the request. All accounting is done against the controller.
-     * @param _amount The amount of the asset to withdraw from the underlying protocol
+     * @param _amount The amount of the asset to withdraw from the underlying investment opportunity
      */
     function requestWithdraw(address _asset, address _controller, uint256 _amount) external;
 
@@ -154,12 +154,12 @@ interface IRoycoKernel {
     function claimableRedeemRequest(address _asset, address _controller) external view returns (uint256 claimableShares);
 
     /**
-     * @notice Withdraws a specified amount of an asset from the underlying protocol
+     * @notice Withdraws a specified amount of an asset from the underlying investment opportunity
      * @dev Must be called via a delegatecall (reliant on address(this))
-     * @dev The contract delegatecalling this function must have a balance greater than or equal to the specified amount of assets in the underlying protocol
-     * @param _asset The address of the asset to withdraw from the underlying protocol
+     * @dev The contract delegatecalling this function must have a balance greater than or equal to the specified amount of assets in the underlying investment opportunity
+     * @param _asset The address of the asset to withdraw from the underlying investment opportunity
      * @param _controller The controller that is allowed to operate the withdrawal. All accounting is done against the controller.
-     * @param _amount The amount of the asset to withdraw from the underlying protocol
+     * @param _amount The amount of the asset to withdraw from the underlying investment opportunity
      * @param _receiver The recipient of the withdrawn assets
      */
     function withdraw(address _asset, address _controller, uint256 _amount, address _receiver) external;
