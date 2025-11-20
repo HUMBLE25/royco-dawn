@@ -236,12 +236,13 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
         // Spend the caller's share allowance if the caller isn't the owner or an approved operator
         if (msg.sender != _owner && !RoycoSTStorageLib._isOperator(_owner, msg.sender)) _spendAllowance(_owner, msg.sender, _shares);
         // Transfer and lock the requested shares being redeemed from the owner to the tranche
+        // NOTE: We must not burn the shares so that total supply remains unchanged when calculating the principal to decrease on redemption
         _transfer(_owner, address(this), _shares);
 
         // Calculate the assets to redeem
         uint256 _assets = super.previewRedeem(_shares);
 
-        // Queue the redemption request
+        // Queue the redemption request and get the request ID from the kernel
         requestId = RoycoKernelLib._requestRedeem(RoycoSTStorageLib._getKernel(), _assets, _shares, _controller);
 
         emit RedeemRequest(_controller, _owner, requestId, msg.sender, _shares);
