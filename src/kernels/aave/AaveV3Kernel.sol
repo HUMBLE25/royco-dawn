@@ -3,8 +3,9 @@ pragma solidity ^0.8.28;
 
 import { IPool, IPoolAddressesProvider } from "../../../lib/aave-v3-origin/src/contracts/interfaces/IPool.sol";
 import { IPoolDataProvider } from "../../../lib/aave-v3-origin/src/contracts/interfaces/IPoolDataProvider.sol";
+import { Initializable } from "../../../lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/proxy/utils/Initializable.sol";
 import { IERC20, SafeERC20 } from "../../../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
-import { IRoycoKernel } from "../../interfaces/IRoycoKernel.sol";
+import { ActionType, IBaseKernel } from "../../interfaces/kernel/IBaseKernel.sol";
 import { BaseKernel } from "../base/BaseKernel.sol";
 
 /**
@@ -12,19 +13,19 @@ import { BaseKernel } from "../base/BaseKernel.sol";
  * @notice Kernel implementation for Aave V3
  * @dev Handles asset management operations for the Aave V3 lending pool
  */
-contract AaveV3Kernel is BaseKernel {
+contract AaveV3Kernel is Initializable, BaseKernel {
     using SafeERC20 for IERC20;
 
-    /// @inheritdoc IRoycoKernel
+    /// @inheritdoc IBaseKernel
     ActionType public constant override DEPOSIT_TYPE = ActionType.SYNC;
 
-    /// @inheritdoc IRoycoKernel
+    /// @inheritdoc IBaseKernel
     ActionType public constant override WITHDRAW_TYPE = ActionType.SYNC;
 
-    /// @inheritdoc IRoycoKernel
+    /// @inheritdoc IBaseKernel
     bool public constant override SUPPORTS_DEPOSIT_CANCELLATION = false;
 
-    /// @inheritdoc IRoycoKernel
+    /// @inheritdoc IBaseKernel
     bool public constant override SUPPORTS_REDEMPTION_CANCELLATION = false;
 
     /// @notice The Aave V3 Pool deployment
@@ -34,7 +35,7 @@ contract AaveV3Kernel is BaseKernel {
     IPoolAddressesProvider public immutable POOL_ADDRESSES_PROVIDER;
 
     /**
-     * @notice Initializes the Aave V3 Kernel with the specified Aave V3 Pool
+     * @notice Initializes the Aave V3 Kernel implementation with the specified Aave V3 Pool
      * @param _pool The Aave V3 Pool contract address
      */
     constructor(IPool _pool) {
@@ -42,15 +43,26 @@ contract AaveV3Kernel is BaseKernel {
         POOL_ADDRESSES_PROVIDER = POOL.ADDRESSES_PROVIDER();
     }
 
-    /// @inheritdoc IRoycoKernel
+    /**
+     * @notice Initializes a Royco tranche using the Aave V3 Kernel
+     * Must be called via delegatecall to effectuate the max approval in the context of the Royco Tranche
+     * @param _asset The base asset of the Royco tranche
+     */
+    function initialize(address _asset) external initializer onlyDelegateCall {
+        // TODO: Some tokens will revert here. Maybe type(uint96).max is sufficient.
+        IERC20(_asset).forceApprove(address(POOL), type(uint256).max);
+    }
+
+    /// @inheritdoc IBaseKernel
     function totalAssets(address _asset) external view override returns (uint256) {
         // The tranche's balance of the AToken is the total assets it can withdraw from Aave
         // In addition to any assets already in the tranche (in the case of a force withdrawal)
         return IERC20(POOL.getReserveAToken(_asset)).balanceOf(msg.sender) + IERC20(_asset).balanceOf(msg.sender);
     }
 
-    /// @inheritdoc IRoycoKernel
-    function maxDeposit(address _asset) external view override returns (uint256) {
+    /// @inheritdoc IBaseKernel
+    /// @dev Ignore the caller and receiver parameters as deposits aren't discriminated by address
+    function maxDeposit(address, address, address _asset) external view override returns (uint256) {
         // Retrieve the Pool data provider
         IPoolDataProvider poolDataProvider = IPoolDataProvider(POOL_ADDRESSES_PROVIDER.getPoolDataProvider());
 
@@ -73,8 +85,9 @@ contract AaveV3Kernel is BaseKernel {
         else return supplyCap - currentlySupplied;
     }
 
-    /// @inheritdoc IRoycoKernel
-    function maxWithdraw(address _asset) external view override returns (uint256) {
+    /// @inheritdoc IBaseKernel
+    /// @dev Ignore the caller and receiver parameters as withdrawals aren't discriminated by address
+    function maxWithdraw(address, address, address _asset) external view override returns (uint256) {
         // Retrieve the Pool data provider
         IPoolDataProvider poolDataProvider = IPoolDataProvider(POOL_ADDRESSES_PROVIDER.getPoolDataProvider());
 
@@ -86,61 +99,27 @@ contract AaveV3Kernel is BaseKernel {
         return IERC20(_asset).balanceOf((POOL).getReserveAToken(_asset));
     }
 
-    /// @inheritdoc IRoycoKernel
-    function deposit(address _asset, address, uint256 _amount) external override onlyDelegateCall {
-        IERC20(_asset).forceApprove(address(POOL), _amount);
-        POOL.supply(_asset, _amount, address(this), 0);
+    /// @inheritdoc IBaseKernel
+    /// @dev Ignore the controller param since this kernel employs the synchronous deposit flow
+    function deposit(address _asset, uint256 _assets, address) external override onlyDelegateCall {
+        // Max approval given to the pool on initialization
+        POOL.supply(_asset, _assets, address(this), 0);
     }
 
-    /// @inheritdoc IRoycoKernel
-    function withdraw(address _asset, address, uint256 _amount, address _receiver) external override onlyDelegateCall {
+    /// @inheritdoc IBaseKernel
+    /// @dev Ignore the controller param since this kernel employs the synchronous withdrawal flow
+    function withdraw(address _asset, uint256 _assets, address, address _receiver) external override onlyDelegateCall {
         // Retrieve the liquid reserves of the tranche
         uint256 trancheReserves = IERC20(_asset).balanceOf(address(this));
         // If any liquid reserves exist
         if (trancheReserves > 0) {
             // If the reserves can service the entire withdrawal, do so, and preemptively return
-            if (trancheReserves >= _amount) return IERC20(_asset).safeTransfer(_receiver, _amount);
+            if (trancheReserves >= _assets) return IERC20(_asset).safeTransfer(_receiver, _assets);
             // Else, service as much of the withdrawal as possible
             else IERC20(_asset).safeTransfer(_receiver, trancheReserves);
         }
 
         // Only withdraw the assets that are still owed to the receiver
-        POOL.withdraw(_asset, (_amount - trancheReserves), _receiver);
+        POOL.withdraw(_asset, (_assets - trancheReserves), _receiver);
     }
-
-    /// @inheritdoc IRoycoKernel
-    function requestDeposit(address, address, uint256) external view override disabled { }
-
-    /// @inheritdoc IRoycoKernel
-    function pendingDepositRequest(address, address) external view override disabled returns (uint256) { }
-
-    /// @inheritdoc IRoycoKernel
-    function claimableDepositRequest(address, address) external view override disabled returns (uint256) { }
-
-    /// @inheritdoc IRoycoKernel
-    function requestWithdraw(address, address, uint256) external view override disabled { }
-
-    /// @inheritdoc IRoycoKernel
-    function pendingRedeemRequest(address, address) external pure override disabled returns (uint256) { }
-
-    /// @inheritdoc IRoycoKernel
-    function claimableRedeemRequest(address, address) external pure override disabled returns (uint256) { }
-
-    /// @inheritdoc IRoycoKernel
-    function cancelDepositRequest(address _controller) external disabled { }
-
-    /// @inheritdoc IRoycoKernel
-    function cancelRedeemRequest(address _controller) external disabled { }
-
-    /// @inheritdoc IRoycoKernel
-    function claimableCancelDepositRequest(address _asset, address _controller) external view disabled returns (uint256 assets) { }
-
-    /// @inheritdoc IRoycoKernel
-    function claimableCancelRedeemRequest(address _asset, address _controller) external view disabled returns (uint256 shares) { }
-
-    /// @inheritdoc IRoycoKernel
-    function pendingCancelDepositRequest(address _asset, address _controller) external view disabled returns (bool isPending) { }
-
-    /// @inheritdoc IRoycoKernel
-    function pendingCancelRedeemRequest(address _asset, address _controller) external view disabled returns (bool isPending) { }
 }

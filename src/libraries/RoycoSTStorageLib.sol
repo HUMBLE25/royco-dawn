@@ -2,8 +2,7 @@
 pragma solidity ^0.8.28;
 
 import { IERC4626 } from "../../lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
-import { IRoycoKernel } from "../interfaces/IRoycoKernel.sol";
-import { RoycoKernelLib } from "./RoycoKernelLib.sol";
+import { ActionType, RoycoKernelLib } from "./RoycoKernelLib.sol";
 
 /**
  * @notice Storage state for Royco Senior Tranche contracts
@@ -33,8 +32,8 @@ struct RoycoSTState {
     uint8 decimalsOffset;
     uint256 totalPrincipalAssets;
     uint256 lastTotalAssets;
-    IRoycoKernel.ActionType DEPOSIT_TYPE;
-    IRoycoKernel.ActionType WITHDRAW_TYPE;
+    ActionType DEPOSIT_TYPE;
+    ActionType WITHDRAW_TYPE;
     bool SUPPORTS_DEPOSIT_CANCELLATION;
     bool SUPPORTS_REDEMPTION_CANCELLATION;
     mapping(address owner => mapping(address operator => bool isOperator)) isOperator;
@@ -213,7 +212,7 @@ library RoycoSTStorageLib {
      * @notice Returns the kernel action type for deposit operations
      * @return The deposit action type from the kernel
      */
-    function _getDepositType() internal view returns (IRoycoKernel.ActionType) {
+    function _getDepositType() internal view returns (ActionType) {
         return _getRoycoSTStorage().DEPOSIT_TYPE;
     }
 
@@ -221,7 +220,7 @@ library RoycoSTStorageLib {
      * @notice Returns the kernel action type for withdrawal operations
      * @return The withdrawal action type from the kernel
      */
-    function _getWithdrawType() internal view returns (IRoycoKernel.ActionType) {
+    function _getWithdrawType() internal view returns (ActionType) {
         return _getRoycoSTStorage().WITHDRAW_TYPE;
     }
 

@@ -4,8 +4,6 @@ pragma solidity ^0.8.28;
 import { IERC20, SafeERC20 } from "../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import { Math } from "../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 import { ConstantsLib } from "./libraries/ConstantsLib.sol";
-import { ErrorsLib } from "./libraries/ErrorsLib.sol";
-import { EventsLib } from "./libraries/EventsLib.sol";
 import { CreateMarketParams, Market, TypesLib } from "./libraries/Types.sol";
 import { RoycoSTFactory } from "./tranches/senior/RoycoSTFactory.sol";
 
@@ -16,14 +14,29 @@ contract Royco is RoycoSTFactory {
 
     mapping(bytes32 marketId => Market market) marketIdToMarket;
 
-    constructor(address _owner, address _RoycoSTImplementation) RoycoSTFactory(_RoycoSTImplementation) { }
+    event MarketCreated(
+        address indexed seniorTranche,
+        address indexed commitmentAsset,
+        address indexed collateralAsset,
+        uint96 coverageWAD,
+        address collateralAssetPriceFeed,
+        address rdm,
+        uint96 lctv,
+        bytes32 marketId
+    );
+
+    error MARKET_EXISTS();
+    error NONEXISTANT_MARKET();
+    error INVALID_COVERAGE();
+
+    constructor(address _owner, address _RoycoSTImplementation, address _RoycoJTImplementation) RoycoSTFactory(_RoycoSTImplementation) { }
 
     function createMarket(CreateMarketParams calldata _params) external returns (bytes32 marketId) {
         marketId = _params.Id();
 
         Market storage market = marketIdToMarket[marketId];
-        require(market.seniorTranche == address(0), ErrorsLib.MARKET_EXISTS());
-        require(_params.coverageWAD <= ConstantsLib.WAD, ErrorsLib.EXPECTED_LOSS_EXCEEDS_MAX());
+        require(market.seniorTranche == address(0), MARKET_EXISTS());
+        require(_params.coverageWAD > 0.01e18 && _params.coverageWAD <= ConstantsLib.WAD, INVALID_COVERAGE());
 
         // Set the expected loss for this market
         // This set the minimum ratio between the junior and senior tranche

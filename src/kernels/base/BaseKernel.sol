@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import { IRoycoKernel } from "../../interfaces/IRoycoKernel.sol";
+import { IBaseKernel } from "../../interfaces/kernel/IBaseKernel.sol";
 
 /**
  * @title BaseKernel
@@ -10,7 +10,7 @@ import { IRoycoKernel } from "../../interfaces/IRoycoKernel.sol";
  * @dev All kernel contracts should inherit from this base contract to ensure proper execution context
  *      and use the modifier as stipulated by the IRoycoKernel interface.
  */
-abstract contract BaseKernel is IRoycoKernel {
+abstract contract BaseKernel is IBaseKernel {
     /// @notice Thrown when a function is called directly instead of via delegate call
     error OnlyDelegateCall();
     /// @notice Thrown when a function is not implemented or disabled
@@ -34,7 +34,6 @@ abstract contract BaseKernel is IRoycoKernel {
      */
     modifier onlyDelegateCall() {
         require(address(this) != KERNEL_IMPLEMENTATION, OnlyDelegateCall());
-
         _;
     }
 
