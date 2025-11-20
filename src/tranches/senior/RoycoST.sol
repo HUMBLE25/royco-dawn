@@ -207,12 +207,11 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
     /// @inheritdoc IERC7540
     /// @dev Will revert if this tranche does not employ an async deposit flow
     function requestDeposit(uint256 _assets, address _controller, address _owner) external override onlySelfOrOperator(_owner) returns (uint256 requestId) {
-        // Transfer the assets from the owner to the vault
-        address asset = asset();
-        IERC20(asset).safeTransferFrom(_owner, address(this), _assets);
+        // Transfer the assets from the owner to the tranche
+        _transferIn(_owner, _assets);
 
         // Queue the deposit request and get the request ID from the kernel
-        requestId = RoycoKernelLib._requestDeposit(RoycoSTStorageLib._getKernel(), asset, _assets, _controller);
+        requestId = RoycoKernelLib._requestDeposit(RoycoSTStorageLib._getKernel(), _assets, _controller);
 
         emit DepositRequest(_controller, _owner, requestId, msg.sender, _assets);
     }
@@ -243,7 +242,7 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
         uint256 _assets = super.previewRedeem(_shares);
 
         // Queue the redemption request
-        requestId = RoycoKernelLib._requestRedeem(RoycoSTStorageLib._getKernel(), asset(), _assets, _shares, _controller);
+        requestId = RoycoKernelLib._requestRedeem(RoycoSTStorageLib._getKernel(), _assets, _shares, _controller);
 
         emit RedeemRequest(_controller, _owner, requestId, msg.sender, _shares);
     }

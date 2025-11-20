@@ -138,13 +138,12 @@ library RoycoKernelLib {
     /**
      * @notice Requests a deposit to the kernel
      * @param _kernel The address of the kernel contract
-     * @param _asset The address of the asset to deposit
      * @param _assets The amount of assets to deposit
      * @param _controller The address of the controller
      * @return requestId The request ID of this deposit request
      */
-    function _requestDeposit(address _kernel, address _asset, uint256 _assets, address _controller) internal returns (uint256 requestId) {
-        bytes memory returnData = _delegateCallKernel(_kernel, abi.encodeCall(IAsyncDepositKernel.requestDeposit, (_asset, _assets, _controller)));
+    function _requestDeposit(address _kernel, uint256 _assets, address _controller) internal returns (uint256 requestId) {
+        bytes memory returnData = _delegateCallKernel(_kernel, abi.encodeCall(IAsyncDepositKernel.requestDeposit, (_assets, _controller)));
         return abi.decode(returnData, (uint256));
     }
 
@@ -177,7 +176,6 @@ library RoycoKernelLib {
     /**
      * @notice Requests a withdrawal from the kernel
      * @param _kernel The address of the kernel contract
-     * @param _asset The address of the asset to withdraw
      * @param _expectedAssets The expected amount of assets to receive for the shares redeemed
      * @param _shares The amount of shares being requested to be redeemed
      * @param _controller The address of the controller
@@ -185,7 +183,6 @@ library RoycoKernelLib {
      */
     function _requestRedeem(
         address _kernel,
-        address _asset,
         uint256 _expectedAssets,
         uint256 _shares,
         address _controller
@@ -194,7 +191,7 @@ library RoycoKernelLib {
         returns (uint256 requestId)
     {
         return abi.decode(
-            _delegateCallKernel(_kernel, abi.encodeCall(IAsyncWithdrawalKernel.requestRedeem, (_asset, _expectedAssets, _shares, _controller))), (uint256)
+            _delegateCallKernel(_kernel, abi.encodeCall(IAsyncWithdrawalKernel.requestRedeem, (_expectedAssets, _shares, _controller))), (uint256)
         );
     }
 

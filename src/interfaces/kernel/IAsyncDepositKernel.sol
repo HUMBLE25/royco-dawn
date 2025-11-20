@@ -11,12 +11,11 @@ interface IAsyncDepositKernel {
      * @dev This function is only callable if and only if the deposit type of the kernel is ASYNC
      * @dev Must be called via a delegatecall (reliant on address(this))
      * @dev The tranche delegatecalling this function must hold the specified amount of assets to deposit
-     * @param _asset The address of the asset to deposit into the underlying investment opportunity
      * @param _assets The amount of the asset to deposit into the underlying investment opportunity
      * @param _controller The controller that is allowed to operate the lifecycle of the request.
      * @return requestId The request ID of this deposit request
      */
-    function requestDeposit(address _asset, uint256 _assets, address _controller) external returns (uint256 requestId);
+    function requestDeposit(uint256 _assets, address _controller) external returns (uint256 requestId);
 
     /**
      * @notice Returns the amount of assets pending deposit for a specific controller
