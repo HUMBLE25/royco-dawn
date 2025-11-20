@@ -15,7 +15,7 @@ import { IERC7540 } from "../../interfaces/IERC7540.sol";
 import { IERC7575 } from "../../interfaces/IERC7575.sol";
 import { IERC165, IERC7887 } from "../../interfaces/IERC7887.sol";
 import { ConstantsLib } from "../../libraries/ConstantsLib.sol";
-import { ActionType, RoycoKernelLib } from "../../libraries/RoycoKernelLib.sol";
+import { ExecutionModel, RoycoKernelLib } from "../../libraries/RoycoKernelLib.sol";
 import { RoycoSTStorageLib } from "../../libraries/RoycoSTStorageLib.sol";
 import { TrancheDeploymentParams } from "../../libraries/Types.sol";
 
@@ -23,31 +23,17 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
     using Math for uint256;
     using SafeERC20 for IERC20;
 
-    /// @dev https://eips.ethereum.org/EIPS/eip-7540#request-ids
-    /// @dev Returning the request ID as 0 signals that the requests must be discriminated purely by the controller
-    uint256 private constant ERC7540_CONTROLLER_DISCRIMINATED_REQUEST_ID = 0;
-
     error INVALID_CALLER();
     error UNSUPPORTED_OPERATION();
     error INSUFFICIENT_ASSETS_IN_JUNIOR_TRANCHE();
 
-    modifier checkDepositSemantics(ActionType _actionType) {
-        require(RoycoSTStorageLib._getDepositType() == _actionType, UNSUPPORTED_OPERATION());
+    modifier depositExecutionIsSync() {
+        require(RoycoSTStorageLib._getDepositExecutionModel() == ExecutionModel.SYNC, UNSUPPORTED_OPERATION());
         _;
     }
 
-    modifier checkWithdrawalSemantics(ActionType _actionType) {
-        require(RoycoSTStorageLib._getWithdrawType() == _actionType, UNSUPPORTED_OPERATION());
-        _;
-    }
-
-    modifier onlyWhenDepositCancellationIsSupported() {
-        require(RoycoSTStorageLib._SUPPORTS_DEPOSIT_CANCELLATION(), UNSUPPORTED_OPERATION());
-        _;
-    }
-
-    modifier onlyWhenRedemptionCancellationIsSupported() {
-        require(RoycoSTStorageLib._SUPPORTS_REDEMPTION_CANCELLATION(), UNSUPPORTED_OPERATION());
+    modifier withdrawalExecutionIsSync() {
+        require(RoycoSTStorageLib._getWithdrawalExecutionModel() == ExecutionModel.SYNC, UNSUPPORTED_OPERATION());
         _;
     }
 
@@ -219,17 +205,8 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
     }
 
     /// @inheritdoc IERC7540
-    function requestDeposit(
-        uint256 _assets,
-        address _controller,
-        address _owner
-    )
-        external
-        override
-        checkDepositSemantics(ActionType.ASYNC)
-        onlySelfOrOperator(_owner)
-        returns (uint256 requestId)
-    {
+    /// @dev Will revert if this tranche does not employ an async deposit flow
+    function requestDeposit(uint256 _assets, address _controller, address _owner) external override onlySelfOrOperator(_owner) returns (uint256 requestId) {
         // Transfer the assets from the owner to the vault
         address asset = asset();
         IERC20(asset).safeTransferFrom(_owner, address(this), _assets);
@@ -242,27 +219,21 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
 
     /// @inheritdoc IERC7540
     /// @dev This function's state visibility can't be restricted to view since we need to delegatecall the kernel to read state
-    function pendingDepositRequest(uint256 _requestId, address _controller) external override checkDepositSemantics(ActionType.ASYNC) returns (uint256) {
+    /// @dev Will revert if this tranche does not employ an async deposit flow
+    function pendingDepositRequest(uint256 _requestId, address _controller) external override returns (uint256) {
         return RoycoKernelLib._pendingDepositRequest(RoycoSTStorageLib._getKernel(), _requestId, _controller);
     }
 
     /// @inheritdoc IERC7540
     /// @dev This function's state visibility can't be restricted to view since we need to delegatecall the kernel to read state
-    function claimableDepositRequest(uint256 _requestId, address _controller) external override checkDepositSemantics(ActionType.ASYNC) returns (uint256) {
+    /// @dev Will revert if this tranche does not employ an async deposit flow
+    function claimableDepositRequest(uint256 _requestId, address _controller) external override returns (uint256) {
         return RoycoKernelLib._claimableDepositRequest(RoycoSTStorageLib._getKernel(), _requestId, _controller);
     }
 
     /// @inheritdoc IERC7540
-    function requestRedeem(
-        uint256 _shares,
-        address _controller,
-        address _owner
-    )
-        external
-        override
-        checkWithdrawalSemantics(ActionType.ASYNC)
-        returns (uint256 requestId)
-    {
+    /// @dev Will revert if this tranche does not employ an async deposit flow
+    function requestRedeem(uint256 _shares, address _controller, address _owner) external override returns (uint256 requestId) {
         // Spend the caller's share allowance if the caller isn't the owner or an approved operator
         if (msg.sender != _owner && !RoycoSTStorageLib._isOperator(_owner, msg.sender)) _spendAllowance(_owner, msg.sender, _shares);
         // Transfer and lock the requested shares being redeemed from the owner to the tranche
@@ -279,29 +250,15 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
 
     /// @inheritdoc IERC7540
     /// @dev This function's state visibility can't be restricted to view since we need to delegatecall the kernel to read state
-    function pendingRedeemRequest(
-        uint256 _requestId,
-        address _controller
-    )
-        external
-        override
-        checkWithdrawalSemantics(ActionType.ASYNC)
-        returns (uint256 pendingShares)
-    {
+    /// @dev Will revert if this tranche does not employ an async deposit flow
+    function pendingRedeemRequest(uint256 _requestId, address _controller) external override returns (uint256 pendingShares) {
         return RoycoKernelLib._pendingRedeemRequest(RoycoSTStorageLib._getKernel(), _requestId, _controller);
     }
 
     /// @inheritdoc IERC7540
     /// @dev This function's state visibility can't be restricted to view since we need to delegatecall the kernel to read state
-    function claimableRedeemRequest(
-        uint256 _requestId,
-        address _controller
-    )
-        external
-        override
-        checkWithdrawalSemantics(ActionType.ASYNC)
-        returns (uint256 claimableShares)
-    {
+    /// @dev Will revert if this tranche does not employ an async deposit flow
+    function claimableRedeemRequest(uint256 _requestId, address _controller) external override returns (uint256 claimableShares) {
         return RoycoKernelLib._claimableRedeemRequest(RoycoSTStorageLib._getKernel(), _requestId, _controller);
     }
 
@@ -310,15 +267,8 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
     // =============================
 
     /// @inheritdoc IERC7887
-    function cancelDepositRequest(
-        uint256 _requestId,
-        address _controller
-    )
-        external
-        override
-        onlyWhenDepositCancellationIsSupported
-        onlySelfOrOperator(_controller)
-    {
+    /// @dev Will revert if this tranche does not support async deposit request cancellation
+    function cancelDepositRequest(uint256 _requestId, address _controller) external override onlySelfOrOperator(_controller) {
         // Delegate call to kernel to handle deposit cancellation
         RoycoKernelLib._cancelDepositRequest(RoycoSTStorageLib._getKernel(), _requestId, _controller);
 
@@ -327,43 +277,21 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
 
     /// @inheritdoc IERC7887
     /// @dev This function's state visibility can't be restricted to view since we need to delegatecall the kernel to read state
-    function pendingCancelDepositRequest(
-        uint256 _requestId,
-        address _controller
-    )
-        external
-        override
-        onlyWhenDepositCancellationIsSupported
-        returns (bool isPending)
-    {
+    /// @dev Will revert if this tranche does not support async deposit request cancellation
+    function pendingCancelDepositRequest(uint256 _requestId, address _controller) external override returns (bool isPending) {
         return RoycoKernelLib._pendingCancelDepositRequest(RoycoSTStorageLib._getKernel(), _requestId, _controller);
     }
 
     /// @inheritdoc IERC7887
     /// @dev This function's state visibility can't be restricted to view since we need to delegatecall the kernel to read state
-    function claimableCancelDepositRequest(
-        uint256 _requestId,
-        address _controller
-    )
-        external
-        override
-        onlyWhenDepositCancellationIsSupported
-        returns (uint256 assets)
-    {
+    /// @dev Will revert if this tranche does not support async deposit request cancellation
+    function claimableCancelDepositRequest(uint256 _requestId, address _controller) external override returns (uint256 assets) {
         return RoycoKernelLib._claimableCancelDepositRequest(RoycoSTStorageLib._getKernel(), _requestId, _controller);
     }
 
     /// @inheritdoc IERC7887
-    function claimCancelDepositRequest(
-        uint256 _requestId,
-        address _receiver,
-        address _controller
-    )
-        external
-        override
-        onlyWhenDepositCancellationIsSupported
-        onlySelfOrOperator(_controller)
-    {
+    /// @dev Will revert if this tranche does not support async deposit request cancellation
+    function claimCancelDepositRequest(uint256 _requestId, address _receiver, address _controller) external override onlySelfOrOperator(_controller) {
         // Get the claimable amount before claiming
         uint256 assets = RoycoKernelLib._claimableCancelDepositRequest(RoycoSTStorageLib._getKernel(), _requestId, _controller);
 
@@ -374,15 +302,8 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
     }
 
     /// @inheritdoc IERC7887
-    function cancelRedeemRequest(
-        uint256 _requestId,
-        address _controller
-    )
-        external
-        override
-        onlyWhenRedemptionCancellationIsSupported
-        onlySelfOrOperator(_controller)
-    {
+    /// @dev Will revert if this tranche does not support async redemption request cancellation
+    function cancelRedeemRequest(uint256 _requestId, address _controller) external override onlySelfOrOperator(_controller) {
         // Delegate call to kernel to handle redeem cancellation
         RoycoKernelLib._cancelRedeemRequest(RoycoSTStorageLib._getKernel(), _requestId, _controller);
 
@@ -391,47 +312,25 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
 
     /// @inheritdoc IERC7887
     /// @dev This function's state visibility can't be restricted to view since we need to delegatecall the kernel to read state
-    function pendingCancelRedeemRequest(
-        uint256 _requestId,
-        address _controller
-    )
-        external
-        override
-        onlyWhenRedemptionCancellationIsSupported
-        returns (bool isPending)
-    {
+    /// @dev Will revert if this tranche does not support async redemption request cancellation
+    function pendingCancelRedeemRequest(uint256 _requestId, address _controller) external override returns (bool isPending) {
         return RoycoKernelLib._pendingCancelRedeemRequest(RoycoSTStorageLib._getKernel(), _requestId, _controller);
     }
 
     /// @inheritdoc IERC7887
     /// @dev This function's state visibility can't be restricted to view since we need to delegatecall the kernel to read state
-    function claimableCancelRedeemRequest(
-        uint256 _requestId,
-        address _controller
-    )
-        external
-        override
-        onlyWhenRedemptionCancellationIsSupported
-        returns (uint256 shares)
-    {
+    /// @dev Will revert if this tranche does not support async redemption request cancellation
+    function claimableCancelRedeemRequest(uint256 _requestId, address _controller) external override returns (uint256 shares) {
         return RoycoKernelLib._claimableCancelRedeemRequest(RoycoSTStorageLib._getKernel(), _requestId, _controller);
     }
 
     /// @inheritdoc IERC7887
-    function claimCancelRedeemRequest(
-        uint256 _requestId,
-        address _receiver,
-        address _owner
-    )
-        external
-        override
-        onlyWhenRedemptionCancellationIsSupported
-        onlySelfOrOperator(_owner)
-    {
+    /// @dev Will revert if this tranche does not support async redemption request cancellation
+    function claimCancelRedeemRequest(uint256 _requestId, address _receiver, address _owner) external override onlySelfOrOperator(_owner) {
         // Get the claimable amount before claiming
         uint256 shares = RoycoKernelLib._claimableCancelRedeemRequest(RoycoSTStorageLib._getKernel(), _requestId, _owner);
 
-        // Transfer the previously locked shares to the receiver
+        // Transfer the previously locked shares (on request) to the receiver
         _transfer(address(this), _receiver, shares);
 
         emit CancelRedeemClaim(_owner, _receiver, _requestId, msg.sender, shares);
@@ -495,22 +394,22 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
     }
 
     /// @inheritdoc IERC4626
-    function previewDeposit(uint256 _assets) public view override checkDepositSemantics(ActionType.SYNC) returns (uint256) {
+    function previewDeposit(uint256 _assets) public view override depositExecutionIsSync returns (uint256) {
         return super.previewDeposit(_assets);
     }
 
     /// @inheritdoc IERC4626
-    function previewMint(uint256 _shares) public view override checkDepositSemantics(ActionType.SYNC) returns (uint256) {
+    function previewMint(uint256 _shares) public view override depositExecutionIsSync returns (uint256) {
         return super.previewMint(_shares);
     }
 
     /// @inheritdoc IERC4626
-    function previewWithdraw(uint256 _assets) public view override checkWithdrawalSemantics(ActionType.SYNC) returns (uint256) {
+    function previewWithdraw(uint256 _assets) public view override withdrawalExecutionIsSync returns (uint256) {
         return super.previewWithdraw(_assets);
     }
 
     /// @inheritdoc IERC4626
-    function previewRedeem(uint256 _shares) public view override checkWithdrawalSemantics(ActionType.SYNC) returns (uint256) {
+    function previewRedeem(uint256 _shares) public view override withdrawalExecutionIsSync returns (uint256) {
         return super.previewRedeem(_shares);
     }
 
@@ -534,7 +433,7 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
     /// @dev Increases the total principal deposited into the tranche
     function _deposit(address _caller, address _receiver, uint256 _assets, uint256 _shares) internal override(ERC4626Upgradeable) {
         // If deposits are synchronous, transfer the assets to the tranche and mint the shares
-        if (RoycoSTStorageLib._getDepositType() == ActionType.SYNC) super._deposit(_caller, _receiver, _assets, _shares);
+        if (RoycoSTStorageLib._getDepositExecutionModel() == ExecutionModel.SYNC) super._deposit(_caller, _receiver, _assets, _shares);
         // If deposits are asynchronous, only mint shares since assets were transfered in on the request
         else _mint(_receiver, _shares);
 
@@ -551,7 +450,7 @@ contract RoycoST is Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7
         RoycoSTStorageLib._decreaseTotalPrincipal(principalAssetsWithdrawn);
 
         // If withdrawals are synchronous, burn the shares from the owner
-        if (RoycoSTStorageLib._getWithdrawType() == ActionType.SYNC) {
+        if (RoycoSTStorageLib._getWithdrawalExecutionModel() == ExecutionModel.SYNC) {
             // Spend the caller's share allowance if the caller isn't the owner
             if (_caller != _owner) _spendAllowance(_owner, _caller, _shares);
             // Burn the shares being redeemed from the owner

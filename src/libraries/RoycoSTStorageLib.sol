@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import { IERC4626 } from "../../lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
-import { ActionType, RoycoKernelLib } from "./RoycoKernelLib.sol";
+import { ExecutionModel, RoycoKernelLib } from "./RoycoKernelLib.sol";
 
 /**
  * @notice Storage state for Royco Senior Tranche contracts
@@ -16,10 +16,8 @@ import { ActionType, RoycoKernelLib } from "./RoycoKernelLib.sol";
  * @custom:field decimalsOffset - Decimals offset for share token precision
  * @custom:field totalPrincipalAssets - The total principal currently deposited in the tranche (excludes PnL)
  * @custom:field lastTotalAssets - The last recorded total assets for yield calculation
- * @custom:field DEPOSIT_TYPE - The kernel action type for deposit operations
- * @custom:field WITHDRAW_TYPE - The kernel action type for withdrawal operations
- * @custom:field SUPPORTS_DEPOSIT_CANCELLATION - Whether the kernel supports deposit cancellation
- * @custom:field SUPPORTS_REDEMPTION_CANCELLATION - Whether the kernel supports redemption cancellation
+ * @custom:field DEPOSIT_EXECUTION_MODEL - The kernel execution model for deposit operations
+ * @custom:field WITHDRAWAL_EXECUTION_MODEL - The kernel execution model for withdrawal operations
  * @custom:field isOperator - Nested mapping tracking operator approvals for owners
  */
 struct RoycoSTState {
@@ -32,10 +30,8 @@ struct RoycoSTState {
     uint8 decimalsOffset;
     uint256 totalPrincipalAssets;
     uint256 lastTotalAssets;
-    ActionType DEPOSIT_TYPE;
-    ActionType WITHDRAW_TYPE;
-    bool SUPPORTS_DEPOSIT_CANCELLATION;
-    bool SUPPORTS_REDEMPTION_CANCELLATION;
+    ExecutionModel DEPOSIT_EXECUTION_MODEL;
+    ExecutionModel WITHDRAWAL_EXECUTION_MODEL;
     mapping(address owner => mapping(address operator => bool isOperator)) isOperator;
 }
 
@@ -100,10 +96,8 @@ library RoycoSTStorageLib {
         $.rewardFeeWAD = _rewardFeeWAD;
         $.coverageWAD = _coverageWAD;
         $.decimalsOffset = _decimalsOffset;
-        $.DEPOSIT_TYPE = RoycoKernelLib._DEPOSIT_TYPE(_kernel);
-        $.WITHDRAW_TYPE = RoycoKernelLib._WITHDRAW_TYPE(_kernel);
-        $.SUPPORTS_DEPOSIT_CANCELLATION = RoycoKernelLib._SUPPORTS_DEPOSIT_CANCELLATION(_kernel);
-        $.SUPPORTS_REDEMPTION_CANCELLATION = RoycoKernelLib._SUPPORTS_REDEMPTION_CANCELLATION(_kernel);
+        $.DEPOSIT_EXECUTION_MODEL = RoycoKernelLib._DEPOSIT_EXECUTION_MODEL(_kernel);
+        $.WITHDRAWAL_EXECUTION_MODEL = RoycoKernelLib._WITHDRAWAL_EXECUTION_MODEL(_kernel);
     }
 
     /**
@@ -209,19 +203,19 @@ library RoycoSTStorageLib {
     }
 
     /**
-     * @notice Returns the kernel action type for deposit operations
-     * @return The deposit action type from the kernel
+     * @notice Returns the kernel execution model for deposit operations
+     * @return The deposit execution model from the kernel
      */
-    function _getDepositType() internal view returns (ActionType) {
-        return _getRoycoSTStorage().DEPOSIT_TYPE;
+    function _getDepositExecutionModel() internal view returns (ExecutionModel) {
+        return _getRoycoSTStorage().DEPOSIT_EXECUTION_MODEL;
     }
 
     /**
-     * @notice Returns the kernel action type for withdrawal operations
-     * @return The withdrawal action type from the kernel
+     * @notice Returns the kernel execution model for withdrawal operations
+     * @return The withdrawal execution model from the kernel
      */
-    function _getWithdrawType() internal view returns (ActionType) {
-        return _getRoycoSTStorage().WITHDRAW_TYPE;
+    function _getWithdrawalExecutionModel() internal view returns (ExecutionModel) {
+        return _getRoycoSTStorage().WITHDRAWAL_EXECUTION_MODEL;
     }
 
     /**
@@ -238,21 +232,5 @@ library RoycoSTStorageLib {
      */
     function _getCoverageWAD() internal view returns (uint64) {
         return _getRoycoSTStorage().coverageWAD;
-    }
-
-    /**
-     * @notice Returns whether the kernel supports deposit cancellation
-     * @return True if deposit cancellation is supported, false otherwise
-     */
-    function _SUPPORTS_DEPOSIT_CANCELLATION() internal view returns (bool) {
-        return _getRoycoSTStorage().SUPPORTS_DEPOSIT_CANCELLATION;
-    }
-
-    /**
-     * @notice Returns whether the kernel supports redemption cancellation
-     * @return True if redemption cancellation is supported, false otherwise
-     */
-    function _SUPPORTS_REDEMPTION_CANCELLATION() internal view returns (bool) {
-        return _getRoycoSTStorage().SUPPORTS_REDEMPTION_CANCELLATION;
     }
 }

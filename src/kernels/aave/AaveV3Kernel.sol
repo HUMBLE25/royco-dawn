@@ -5,7 +5,7 @@ import { IPool, IPoolAddressesProvider } from "../../../lib/aave-v3-origin/src/c
 import { IPoolDataProvider } from "../../../lib/aave-v3-origin/src/contracts/interfaces/IPoolDataProvider.sol";
 import { Initializable } from "../../../lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/proxy/utils/Initializable.sol";
 import { IERC20, SafeERC20 } from "../../../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
-import { ActionType, IBaseKernel } from "../../interfaces/kernel/IBaseKernel.sol";
+import { ExecutionModel, IBaseKernel } from "../../interfaces/kernel/IBaseKernel.sol";
 import { BaseKernel } from "../base/BaseKernel.sol";
 
 /**
@@ -17,10 +17,10 @@ contract AaveV3Kernel is Initializable, BaseKernel {
     using SafeERC20 for IERC20;
 
     /// @inheritdoc IBaseKernel
-    ActionType public constant override DEPOSIT_TYPE = ActionType.SYNC;
+    ExecutionModel public constant override DEPOSIT_EXECUTION_MODEL = ExecutionModel.SYNC;
 
     /// @inheritdoc IBaseKernel
-    ActionType public constant override WITHDRAW_TYPE = ActionType.SYNC;
+    ExecutionModel public constant override WITHDRAWAL_EXECUTION_MODEL = ExecutionModel.SYNC;
 
     /// @inheritdoc IBaseKernel
     bool public constant override SUPPORTS_DEPOSIT_CANCELLATION = false;

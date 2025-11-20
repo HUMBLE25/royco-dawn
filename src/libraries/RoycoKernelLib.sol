@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import { IAsyncDepositKernel } from "../interfaces/kernel/IAsyncDepositKernel.sol";
 import { IAsyncWithdrawalKernel } from "../interfaces/kernel/IAsyncWithdrawalKernel.sol";
-import { ActionType, IBaseKernel } from "../interfaces/kernel/IBaseKernel.sol";
+import { ExecutionModel, IBaseKernel } from "../interfaces/kernel/IBaseKernel.sol";
 import { ICancellableKernel } from "../interfaces/kernel/ICancellableKernel.sol";
 
 /**
@@ -69,21 +69,21 @@ library RoycoKernelLib {
     // =============================
 
     /**
-     * @notice Gets the deposit action type constant from the kernel
+     * @notice Gets the deposit execution model constant from the kernel
      * @param _kernel The address of the kernel contract
      * @return The execution semantics of depositing into this tranche (SYNC or ASYNC)
      */
-    function _DEPOSIT_TYPE(address _kernel) internal pure returns (ActionType) {
-        return IBaseKernel(_kernel).DEPOSIT_TYPE();
+    function _DEPOSIT_EXECUTION_MODEL(address _kernel) internal pure returns (ExecutionModel) {
+        return IBaseKernel(_kernel).DEPOSIT_EXECUTION_MODEL();
     }
 
     /**
-     * @notice Gets the withdrawal action type constant from the kernel
+     * @notice Gets the withdrawal execution model constant from the kernel
      * @param _kernel The address of the kernel contract
      * @return The execution semantics of withdrawing from this tranche (SYNC or ASYNC)
      */
-    function _WITHDRAW_TYPE(address _kernel) internal pure returns (ActionType) {
-        return IBaseKernel(_kernel).WITHDRAW_TYPE();
+    function _WITHDRAWAL_EXECUTION_MODEL(address _kernel) internal pure returns (ExecutionModel) {
+        return IBaseKernel(_kernel).WITHDRAWAL_EXECUTION_MODEL();
     }
 
     /**

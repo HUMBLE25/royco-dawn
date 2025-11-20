@@ -2,12 +2,12 @@
 pragma solidity ^0.8.28;
 
 /**
- * @title ActionType
+ * @title ExecutionModel
  * @dev Defines the execution semantics for the deposit or withdrawal flow of a vault
  * @custom:type SYNC Refers to the flow being synchronous (the vault uses ERC4626 for this flow)
  * @custom:type ASYNC Refers to the flow being asynchronous (the vault uses ERC7540 for this flow)
  */
-enum ActionType {
+enum ExecutionModel {
     SYNC,
     ASYNC
 }
@@ -16,7 +16,7 @@ enum ActionType {
  * @title IBaseKernel
  * @notice Base interface for Royco kernel contracts that handle asset management operations to/from an underlying investment opportunity
  * @dev Provides the logic for Royco Tranches to interact with external investment opportunities (e.g., Aave, Ethena, RWAs, etc.)
- * @dev Kernels support both synchronous and asynchronous flows for deposits and withdrawals via ActionType enum
+ * @dev Kernels support both synchronous and asynchronous flows for deposits and withdrawals via ExecutionModel enum
  * @dev Asynchronous operations use a request/claim pattern for deposits and withdrawals (ERC7540).
  *       Must implement IAsyncDepostKernel and/or IAsyncWithdrawalKernel if using asynchronous flows.
  * @dev Kernels may optionally support cancellation of pending requests (ERC7887). Must implement ICancellableKernel if supported.
@@ -30,13 +30,13 @@ interface IBaseKernel {
      * @notice Returns the deposit type of the kernel
      * @return The deposit type of the kernel
      */
-    function DEPOSIT_TYPE() external pure returns (ActionType);
+    function DEPOSIT_EXECUTION_MODEL() external pure returns (ExecutionModel);
 
     /**
      * @notice Returns the withdraw type of the kernel
      * @return The withdraw type of the kernel
      */
-    function WITHDRAW_TYPE() external pure returns (ActionType);
+    function WITHDRAWAL_EXECUTION_MODEL() external pure returns (ExecutionModel);
 
     /**
      * @notice Returns whether the kernel supports deposit cancellation
