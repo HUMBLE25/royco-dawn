@@ -24,7 +24,6 @@ import { ActionType, TrancheDeploymentParams } from "../libraries/Types.sol";
  * @dev This contract provides common tranche operations including ERC4626 vault functionality,
  *      asynchronous deposit/withdrawal support via ERC7540, and request cancellation via ERC7887
  *      All asset management and investment operations are delegated to the configured kernel
- *      Concrete implementations should inherit from this to create senior or junior tranches
  */
 abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ERC4626Upgradeable {
     using Math for uint256;
@@ -35,6 +34,9 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
 
     /// @notice Thrown when the caller is not the expected account or an approved operator
     error ONLY_CALLER_OR_OPERATOR();
+
+    /// @notice Thrown when configuring this Royco market with an invalid coverage requirement
+    error INVALID_COVERAGE_REQUIREMENT();
 
     /// @notice Thrown when junior tranche coverage is insufficient for the operation
     error INSUFFICIENT_JUNIOR_TRANCHE_COVERAGE();
@@ -61,6 +63,23 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
     modifier onlyCallerOrOperator(address _account) {
         require(msg.sender == _account || RoycoTrancheStorageLib._isOperator(_account, msg.sender), ONLY_CALLER_OR_OPERATOR());
         _;
+    }
+
+    /**
+     * @notice Post-condition that enforces the market's coverage requirement
+     * @dev Coverage condition: JT_NAV >= (JT_NAV + ST_Principal) * Coverage_%
+     *      If this fails, junior capital is insufficient to meet the coverage requirement for the senior principal
+     * @dev Failure Modes:
+     *      1. Synchronous:  Junior capital is insufficient purely because of too many senior deposits or junior withdrawals
+     *      2. Asynchronous: Junior capital is insufficient because it incurred a loss proportionally greater than what senior capital did
+     *                       Theoretically, this should not happen since junior will be deployed into the RFR or the same opportunity as senior
+     */
+    modifier checkCoverage() {
+        // Coverage must be checked after all state changes have been applied
+        _;
+        uint256 jtNAV = _getJuniorTrancheNAV();
+        uint256 requiredCoverageAssets = (jtNAV + _getSeniorTranchePrincipal()).mulDiv(RoycoTrancheStorageLib._getCoverageWAD(), ConstantsLib.WAD);
+        require(jtNAV >= requiredCoverageAssets, INSUFFICIENT_JUNIOR_TRANCHE_COVERAGE());
     }
 
     /**
@@ -110,17 +129,24 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
         internal
         onlyInitializing
     {
-        require(_coverageWAD >= ConstantsLib.MIN_COVERAGE_WAD && _coverageWAD >= ConstantsLib.MIN_COVERAGE_WAD);
+        // Check that the coverage requirement is valid
+        require(_coverageWAD >= ConstantsLib.MIN_COVERAGE_WAD && _coverageWAD < ConstantsLib.WAD, INVALID_COVERAGE_REQUIREMENT());
 
         // Calculate the vault's decimal offset (curb inflation attacks)
         uint8 underlyingAssetDecimals = IERC20Metadata(_asset).decimals();
         uint8 decimalsOffset = underlyingAssetDecimals >= 18 ? 0 : (18 - underlyingAssetDecimals);
 
-        // Initialize the senior tranche state
+        // Initialize the tranche's state
         RoycoTrancheStorageLib.__RoycoTranche_init(msg.sender, _kernel, _coverageWAD, _complementTranche, decimalsOffset);
 
         // Initialize the kernel's state
         RoycoKernelLib.__Kernel_init(_kernel, _kernelInitCallData);
+    }
+
+    /// @inheritdoc ERC4626Upgradeable
+    /// @dev Should be overridden by senior and junior tranches to account for loss coverage and yield accrual
+    function totalAssets() public view virtual override(ERC4626Upgradeable) returns (uint256) {
+        return RoycoKernelLib._getNAV(RoycoTrancheStorageLib._getKernel(), asset());
     }
 
     /// @inheritdoc IERC4626
@@ -345,7 +371,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
         // Spend the caller's share allowance if the caller isn't the owner or an approved operator
         if (msg.sender != _owner && !RoycoTrancheStorageLib._isOperator(_owner, msg.sender)) _spendAllowance(_owner, msg.sender, _shares);
         // Transfer and lock the requested shares being redeemed from the owner to the tranche
-        // NOTE: We must not burn the shares so that total supply remains unchanged while this request is unclaimed
+        /// @dev Don't burn the shares so that total supply remains unchanged while this request is unclaimed
         _transfer(_owner, address(this), _shares);
 
         // Calculate the assets to redeem
@@ -466,8 +492,8 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
 
     /// @inheritdoc IERC165
     function supportsInterface(bytes4 _interfaceId) public pure virtual override(IERC165) returns (bool) {
-        return _interfaceId == type(IERC165).interfaceId || _interfaceId == type(IERC7540).interfaceId || _interfaceId == type(IERC7575).interfaceId
-            || _interfaceId == type(IERC7887).interfaceId || _interfaceId == type(IRoycoTranche).interfaceId;
+        return _interfaceId == type(IERC165).interfaceId || _interfaceId == type(IERC4626).interfaceId || _interfaceId == type(IERC7540).interfaceId
+            || _interfaceId == type(IERC7575).interfaceId || _interfaceId == type(IERC7887).interfaceId || _interfaceId == type(IRoycoTranche).interfaceId;
     }
 
     /// @inheritdoc ERC4626Upgradeable
@@ -496,6 +522,14 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
 
         emit Withdraw(_caller, _receiver, _owner, _assets, _shares);
     }
+
+    /// @dev Returns the net asset value of the junior tranche in the junior tranche's base asset
+    /// @dev Must be overriden by junior and senior tranche implementations
+    function _getJuniorTrancheNAV() internal view virtual returns (uint256);
+
+    /// @dev Returns the total principal assets for the senior tranche
+    /// @dev Must be overriden by junior and senior tranche implementations
+    function _getSeniorTranchePrincipal() internal virtual returns (uint256);
 
     /// @inheritdoc ERC4626Upgradeable
     function _decimalsOffset() internal view virtual override(ERC4626Upgradeable) returns (uint8) {

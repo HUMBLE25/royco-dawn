@@ -16,24 +16,6 @@ contract RoycoST is BaseRoycoTranche, IRoycoSeniorTranche {
     using SafeERC20 for IERC20;
 
     /**
-     * @notice Post-condition that enforces the coverage requirement for new senior capital
-     * @dev Coverage condition: JT_NAV >= (JT_NAV + ST_Principal) * Coverage_%
-     *      If this fails, junior capital is insufficient to meet the coverage requirement for the post-deposit senior principal
-     * @dev Failure Modes:
-     *      1. Synchronous:  Junior capital is insufficient because of too many senior deposits proportional to junior NAV
-     *      2. Asynchronous: Junior capital is insufficient because it incurred a loss proportionally greater than what senior capital did
-     *                       Theoretically, this should not happen since junior will be deployed into the RFR or the same opportunity as senior
-     */
-    modifier checkCoverage() {
-        // Safety must be checked after all state changes have been applied
-        _;
-        uint256 jtNAV = _getJuniorTrancheNAV();
-        uint256 requiredCoverageAssets =
-            (jtNAV + RoycoTrancheStorageLib._getTotalPrincipalAssets()).mulDiv(RoycoTrancheStorageLib._getCoverageWAD(), ConstantsLib.WAD);
-        require(jtNAV >= requiredCoverageAssets, INSUFFICIENT_JUNIOR_TRANCHE_COVERAGE());
-    }
-
-    /**
      * @notice Initializes the Royco senior tranche
      * @param _stParams Deployment parameters including name, symbol, kernel, and kernel initialization data for the senior tranche
      * @param _asset The underlying asset for the tranche
@@ -61,72 +43,8 @@ contract RoycoST is BaseRoycoTranche, IRoycoSeniorTranche {
     }
 
     /// @inheritdoc BaseRoycoTranche
-    function maxDeposit(address _receiver) public view override(BaseRoycoTranche) returns (uint256) {
-        // Return the minimum of the asset capacity of the underlying investment opportunity and the senior tranche (to satisfy the coverage condition)
-        return Math.min(super.maxDeposit(_receiver), _computeDepositCapacity());
-    }
-
-    /// @inheritdoc BaseRoycoTranche
-    /// @dev Post-checks the coverage condition, ensuring that the senior capital isn't undercovered
-    function deposit(uint256 _assets, address _receiver, address _controller) public override(BaseRoycoTranche) checkCoverage returns (uint256 shares) {
-        return super.deposit(_assets, _receiver, _controller);
-    }
-
-    /// @inheritdoc BaseRoycoTranche
-    /// @dev Post-checks the coverage condition, ensuring that the senior capital isn't undercovered
-    function mint(uint256 _shares, address _receiver, address _controller) public override(BaseRoycoTranche) checkCoverage returns (uint256 assets) {
-        return super.mint(_shares, _receiver, _controller);
-    }
-
-    /// @inheritdoc BaseRoycoTranche
-    function withdraw(
-        uint256 _assets,
-        address _receiver,
-        address _controller
-    )
-        public
-        override(BaseRoycoTranche)
-        onlySelfOrOperator(_controller)
-        returns (uint256 shares)
-    {
-        // Assert that the assets being withdrawn by the user fall under the permissible limits
-        uint256 maxWithdrawableAssets = maxWithdraw(_controller);
-        require(_assets <= maxWithdrawableAssets, ERC4626ExceededMaxWithdraw(_controller, _assets, maxWithdrawableAssets));
-
-        // Handle burning shares and principal accouting on withdrawal
-        _withdraw(msg.sender, _receiver, _controller, _assets, (shares = super.previewWithdraw(_assets)));
-
-        // Process the withdrawal from the underlying investment opportunity
-        // It is expected that the kernel transfers the assets directly to the receiver
-        RoycoKernelLib._withdraw(RoycoTrancheStorageLib._getKernel(), asset(), _assets, _controller, _receiver);
-    }
-
-    /// @inheritdoc BaseRoycoTranche
-    function redeem(
-        uint256 _shares,
-        address _receiver,
-        address _controller
-    )
-        public
-        override(BaseRoycoTranche)
-        onlySelfOrOperator(_controller)
-        returns (uint256 assets)
-    {
-        // Assert that the shares being redeeemed by the user fall under the permissible limits
-        uint256 maxRedeemableShares = maxRedeem(_controller);
-        require(_shares <= maxRedeemableShares, ERC4626ExceededMaxRedeem(_controller, _shares, maxRedeemableShares));
-
-        // Handle burning shares and principal accouting on withdrawal
-        _withdraw(msg.sender, _receiver, _controller, (assets = super.previewRedeem(_shares)), _shares);
-
-        // Process the withdrawal from the underlying investment opportunity
-        // It is expected that the kernel transfers the assets directly to the receiver
-        RoycoKernelLib._withdraw(RoycoTrancheStorageLib._getKernel(), asset(), assets, _controller, _receiver);
-    }
-
-    /// @inheritdoc ERC4626Upgradeable
-    /// @dev Returns the senior tranche's effective total assets after factoring in losses covered by the junior tranche
-    function totalAssets() public view override(ERC4626Upgradeable) returns (uint256) {
+    /// @dev Returns the senior tranche's effective total assets after factoring in any covered losses and yield distribution
+    function totalAssets() public view override(BaseRoycoTranche) returns (uint256) {
         // TODO: Yield distribution and fee accrual
         // Get the NAV of the senior tranche and the total principal deployed into the investment
         uint256 stAssets = RoycoKernelLib._getNAV(RoycoTrancheStorageLib._getKernel(), asset());
@@ -150,6 +68,70 @@ contract RoycoST is BaseRoycoTranche, IRoycoSeniorTranche {
         // Case 2: Senior tranche has suffered a loss greater than what junior can absorb
         // The actual assets controlled by the senior tranche in addition to all the coverage is the effective NAV for senior depositors
         return Math.min(stPrincipal, stAssets + actualCoverageAssets);
+    }
+
+    /// @inheritdoc BaseRoycoTranche
+    function maxDeposit(address _receiver) public view override(BaseRoycoTranche) returns (uint256) {
+        // Return the minimum of the asset capacity of the underlying investment opportunity and the senior tranche (to satisfy the coverage condition)
+        return Math.min(super.maxDeposit(_receiver), _computeDepositCapacity());
+    }
+
+    /// @inheritdoc BaseRoycoTranche
+    /// @dev Post-checks the coverage condition, ensuring that the new senior capital isn't undercovered
+    function deposit(uint256 _assets, address _receiver, address _controller) public override(BaseRoycoTranche) checkCoverage returns (uint256 shares) {
+        return super.deposit(_assets, _receiver, _controller);
+    }
+
+    /// @inheritdoc BaseRoycoTranche
+    /// @dev Post-checks the coverage condition, ensuring that the new senior capital isn't undercovered
+    function mint(uint256 _shares, address _receiver, address _controller) public override(BaseRoycoTranche) checkCoverage returns (uint256 assets) {
+        return super.mint(_shares, _receiver, _controller);
+    }
+
+    /// @inheritdoc BaseRoycoTranche
+    function withdraw(
+        uint256 _assets,
+        address _receiver,
+        address _controller
+    )
+        public
+        override(BaseRoycoTranche)
+        onlyCallerOrOperator(_controller)
+        returns (uint256 shares)
+    {
+        // Assert that the assets being withdrawn by the user fall under the permissible limits
+        uint256 maxWithdrawableAssets = maxWithdraw(_controller);
+        require(_assets <= maxWithdrawableAssets, ERC4626ExceededMaxWithdraw(_controller, _assets, maxWithdrawableAssets));
+
+        // Handle burning shares and principal accouting on withdrawal
+        _withdraw(msg.sender, _receiver, _controller, _assets, (shares = super.previewWithdraw(_assets)));
+
+        // Process the withdrawal from the underlying investment opportunity
+        // It is expected that the kernel transfers the assets directly to the receiver
+        RoycoKernelLib._withdraw(RoycoTrancheStorageLib._getKernel(), asset(), _assets, _controller, _receiver);
+    }
+
+    /// @inheritdoc BaseRoycoTranche
+    function redeem(
+        uint256 _shares,
+        address _receiver,
+        address _controller
+    )
+        public
+        override(BaseRoycoTranche)
+        onlyCallerOrOperator(_controller)
+        returns (uint256 assets)
+    {
+        // Assert that the shares being redeeemed by the user fall under the permissible limits
+        uint256 maxRedeemableShares = maxRedeem(_controller);
+        require(_shares <= maxRedeemableShares, ERC4626ExceededMaxRedeem(_controller, _shares, maxRedeemableShares));
+
+        // Handle burning shares and principal accouting on withdrawal
+        _withdraw(msg.sender, _receiver, _controller, (assets = super.previewRedeem(_shares)), _shares);
+
+        // Process the withdrawal from the underlying investment opportunity
+        // It is expected that the kernel transfers the assets directly to the receiver
+        RoycoKernelLib._withdraw(RoycoTrancheStorageLib._getKernel(), asset(), assets, _controller, _receiver);
     }
 
     /// @inheritdoc BaseRoycoTranche
@@ -197,8 +179,15 @@ contract RoycoST is BaseRoycoTranche, IRoycoSeniorTranche {
         return Math.saturatingSub(totalCoveredNAV, jtNAV).saturatingSub(stPrincipalAssets);
     }
 
-    /// @dev Returns the net asset value of the junior tranche
-    function _getJuniorTrancheNAV() internal returns (uint256) {
+    /// @inheritdoc BaseRoycoTranche
+    /// @dev Returns the net asset value of the junior tranche in the junior tranche's base asset
+    function _getJuniorTrancheNAV() internal view override(BaseRoycoTranche) returns (uint256) {
         return IRoycoJuniorTranche(RoycoTrancheStorageLib._getComplementTranche()).getNAV();
+    }
+
+    /// @inheritdoc BaseRoycoTranche
+    /// @dev Returns the total principal assets for the senior tranche
+    function _getSeniorTranchePrincipal() internal view override(BaseRoycoTranche) returns (uint256) {
+        return RoycoTrancheStorageLib._getTotalPrincipalAssets();
     }
 }
