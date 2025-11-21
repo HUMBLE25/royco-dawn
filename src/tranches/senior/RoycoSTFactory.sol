@@ -34,7 +34,7 @@ abstract contract RoycoSTFactory is IBeacon {
         returns (address seniorTranche)
     {
         // Marshal the initialization parameters for the senior tranche deployment
-        bytes memory initData = abi.encodeCall(RoycoST.initialize, (_stParams, _asset, _owner, _rewardFeeWAD, _feeClaimant, _rdm, _coverageWAD, _juniorTranche));
+        bytes memory initData = abi.encodeCall(RoycoST.initialize, (_stParams, _asset, _owner, _coverageWAD, _juniorTranche));
 
         // Deploy a new beacon proxy for the senior tranche
         seniorTranche = address(new BeaconProxy(address(this), initData));

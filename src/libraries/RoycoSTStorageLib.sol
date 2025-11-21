@@ -2,6 +2,7 @@
 pragma solidity ^0.8.28;
 
 import { IERC4626 } from "../../lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
+import { IRoycoTranche } from "../interfaces/IRoycoTranche.sol";
 import { ExecutionModel, RoycoKernelLib } from "./RoycoKernelLib.sol";
 
 /**
@@ -10,12 +11,9 @@ import { ExecutionModel, RoycoKernelLib } from "./RoycoKernelLib.sol";
  * @custom:field royco - The address of the Royco factory contract
  * @custom:field kernel - The address of the kernel contract handling strategy logic
  * @custom:field juniorTranche - The address of the paired junior tranche
- * @custom:field rewardFeeWAD - The percentage of yield paid to protocol (WAD = 100%)
- * @custom:field feeClaimant - The address authorized to claim protocol fees
  * @custom:field coverageWAD - The percentage of senior tranche assets insured by junior tranche (WAD = 100%)
  * @custom:field decimalsOffset - Decimals offset for share token precision
  * @custom:field totalPrincipalAssets - The total principal currently deposited in the tranche (excludes PnL)
- * @custom:field lastTotalAssets - The last recorded total assets for yield calculation
  * @custom:field DEPOSIT_EXECUTION_MODEL - The kernel execution model for deposit operations
  * @custom:field WITHDRAWAL_EXECUTION_MODEL - The kernel execution model for withdrawal operations
  * @custom:field isOperator - Nested mapping tracking operator approvals for owners
@@ -24,12 +22,9 @@ struct RoycoSTState {
     address royco;
     address kernel;
     address juniorTranche;
-    uint64 rewardFeeWAD;
-    address feeClaimant;
-    uint64 coverageWAD; // The percentage of the senior tranche's total assets that will be insured by the junior tranche
+    uint64 coverageWAD;
     uint8 decimalsOffset;
     uint256 totalPrincipalAssets;
-    uint256 lastTotalAssets;
     ExecutionModel DEPOSIT_EXECUTION_MODEL;
     ExecutionModel WITHDRAWAL_EXECUTION_MODEL;
     mapping(address owner => mapping(address operator => bool isOperator)) isOperator;
@@ -41,12 +36,6 @@ struct RoycoSTState {
  * @dev Provides functions to safely access and modify senior tranche state
  */
 library RoycoSTStorageLib {
-    /// @notice Maximum allowed yield fee (33% in WAD format)
-    uint256 public constant MAX_YIELD_FEE_WAD = 0.33e18;
-
-    /// @notice Thrown when attempting to set a fee above the maximum allowed
-    error MAX_FEE_EXCEEDED();
-
     /// @dev Storage slot for RoycoSTState using ERC-7201 pattern
     // keccak256(abi.encode(uint256(keccak256("Royco.storage.RoycoSTState")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant ROYCO_ST_STORAGE_SLOT = 0xa4d46a7bacf3e69f1abf7878cb359b2a17fd12d74cdcac0353bddb5de76ff800;
@@ -67,33 +56,16 @@ library RoycoSTStorageLib {
      * @dev Sets up all initial parameters and validates fee constraints
      * @param _royco The address of the Royco factory contract
      * @param _kernel The address of the kernel contract handling strategy logic
-     * @param _rewardFeeWAD The percentage of yield paid to protocol (WAD = 100%)
-     * @param _feeClaimant The address authorized to claim protocol fees
      * @param _coverageWAD The percentage of senior tranche assets insured by junior tranche (WAD = 100%)
      * @param _juniorTranche The address of the paired junior tranche vault
      * @param _decimalsOffset Decimals offset for share token precision
      */
-    function __RoycoST_init(
-        address _royco,
-        address _kernel,
-        uint64 _rewardFeeWAD,
-        address _feeClaimant,
-        uint64 _coverageWAD,
-        address _juniorTranche,
-        uint8 _decimalsOffset
-    )
-        internal
-    {
-        // Check the protocol fee isn't greater than the max
-        require(_rewardFeeWAD <= MAX_YIELD_FEE_WAD, MAX_FEE_EXCEEDED());
-
+    function __RoycoST_init(address _royco, address _kernel, uint64 _coverageWAD, address _juniorTranche, uint8 _decimalsOffset) internal {
         // Set the initial state of the tranche
         RoycoSTState storage $ = _getRoycoSTStorage();
         $.royco = _royco;
         $.kernel = _kernel;
         $.juniorTranche = _juniorTranche;
-        $.feeClaimant = _feeClaimant;
-        $.rewardFeeWAD = _rewardFeeWAD;
         $.coverageWAD = _coverageWAD;
         $.decimalsOffset = _decimalsOffset;
         $.DEPOSIT_EXECUTION_MODEL = RoycoKernelLib._DEPOSIT_EXECUTION_MODEL(_kernel);
@@ -117,29 +89,19 @@ library RoycoSTStorageLib {
     }
 
     /**
-     * @notice Returns the decimals offset for share token precision
-     * @return The decimals offset value
+     * @notice Returns the junior tranche corresponding to this senior tranche
+     * @return The corresponding junior tranche
      */
-    function _getDecimalsOffset() internal view returns (uint8) {
-        return _getRoycoSTStorage().decimalsOffset;
+    function _getJuniorTranche() internal view returns (IRoycoTranche) {
+        return IRoycoTranche(_getRoycoSTStorage().juniorTranche);
     }
 
     /**
-     * @notice Returns the current reward fee percentage
-     * @return The reward fee in WAD format (WAD = 100%)
+     * @notice Returns the coverage percentage
+     * @return The percentage of senior tranche assets insured by junior tranche (WAD = 100%)
      */
-    function _getRewardFeeWAD() internal view returns (uint64) {
-        return _getRoycoSTStorage().rewardFeeWAD;
-    }
-
-    /**
-     * @notice Sets the yield fee percentage
-     * @dev Validates that the fee does not exceed the maximum allowed
-     * @param _rewardFeeWAD The new reward fee in WAD format (WAD = 100%)
-     */
-    function _setYieldFeeBPS(uint24 _rewardFeeWAD) internal {
-        require(_rewardFeeWAD <= MAX_YIELD_FEE_WAD, MAX_FEE_EXCEEDED());
-        _getRoycoSTStorage().rewardFeeWAD = _rewardFeeWAD;
+    function _getCoverageWAD() internal view returns (uint64) {
+        return _getRoycoSTStorage().coverageWAD;
     }
 
     /**
@@ -164,22 +126,6 @@ library RoycoSTStorageLib {
      */
     function _decreaseTotalPrincipal(uint256 _assets) internal {
         _getRoycoSTStorage().totalPrincipalAssets -= _assets;
-    }
-
-    /**
-     * @notice Returns the last recorded total assets for yield calculation
-     * @return The last total assets amount
-     */
-    function _getLastTotalAssets() internal view returns (uint256) {
-        return _getRoycoSTStorage().lastTotalAssets;
-    }
-
-    /**
-     * @notice Updates the last recorded total assets
-     * @param _newLastTotalAssets The new total assets amount to record
-     */
-    function _setLastTotalAssets(uint256 _newLastTotalAssets) internal {
-        _getRoycoSTStorage().lastTotalAssets = _newLastTotalAssets;
     }
 
     /**
@@ -219,18 +165,10 @@ library RoycoSTStorageLib {
     }
 
     /**
-     * @notice Returns the junior tranche vault as an ERC4626 interface
-     * @return The junior tranche vault contract
+     * @notice Returns the decimals offset for share token precision
+     * @return The decimals offset value
      */
-    function _getJuniorTranche() internal view returns (IERC4626) {
-        return IERC4626(_getRoycoSTStorage().juniorTranche);
-    }
-
-    /**
-     * @notice Returns the coverage percentage
-     * @return The percentage of senior tranche assets insured by junior tranche (WAD = 100%)
-     */
-    function _getCoverageWAD() internal view returns (uint64) {
-        return _getRoycoSTStorage().coverageWAD;
+    function _getDecimalsOffset() internal view returns (uint8) {
+        return _getRoycoSTStorage().decimalsOffset;
     }
 }

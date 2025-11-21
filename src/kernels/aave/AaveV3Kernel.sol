@@ -54,7 +54,7 @@ contract AaveV3Kernel is Initializable, BaseKernel {
     }
 
     /// @inheritdoc IBaseKernel
-    function totalAssets(address _asset) external view override returns (uint256) {
+    function getNAV(address _asset) external view override returns (uint256) {
         // The tranche's balance of the AToken is the total assets it can withdraw from Aave
         // In addition to any assets already in the tranche (in the case of a force withdrawal)
         return IERC20(POOL.getReserveAToken(_asset)).balanceOf(msg.sender) + IERC20(_asset).balanceOf(msg.sender);

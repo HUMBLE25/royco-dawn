@@ -55,12 +55,12 @@ interface IBaseKernel {
     // =============================
 
     /**
-     * @notice Returns the total amount of a specific asset managed by the caller in the underlying investment opportunity
+     * @notice Returns the net asset value managed by the caller in the underlying investment opportunity
      * @dev Must be called via a call or staticcall (reliant on msg.sender)
      * @param _asset The address of the asset to query the owner's balance in the underlying investment opportunity for
      * @return The total amount of the specified asset managed by the caller
      */
-    function totalAssets(address _asset) external view returns (uint256);
+    function getNAV(address _asset) external view returns (uint256);
 
     /**
      * @notice Returns the maximum amount of a specific asset that can be deposited into the underlying investment opportunity

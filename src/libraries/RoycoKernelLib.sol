@@ -40,8 +40,8 @@ library RoycoKernelLib {
      * @param _asset The address of the asset
      * @return The total amount of assets (NAV) of this Royco tranche
      */
-    function _totalAssets(address _kernel, address _asset) internal view returns (uint256) {
-        return IBaseKernel(_kernel).totalAssets(_asset);
+    function _getNAV(address _kernel, address _asset) internal view returns (uint256) {
+        return IBaseKernel(_kernel).getNAV(_asset);
     }
 
     /**
@@ -88,24 +88,6 @@ library RoycoKernelLib {
      */
     function _WITHDRAWAL_EXECUTION_MODEL(address _kernel) internal pure returns (ExecutionModel) {
         return IBaseKernel(_kernel).WITHDRAWAL_EXECUTION_MODEL();
-    }
-
-    /**
-     * @notice Checks if the kernel supports deposit cancellation
-     * @param _kernel The address of the kernel contract
-     * @return True if deposit cancellation is supported
-     */
-    function _SUPPORTS_DEPOSIT_CANCELLATION(address _kernel) internal pure returns (bool) {
-        return IBaseKernel(_kernel).SUPPORTS_DEPOSIT_CANCELLATION();
-    }
-
-    /**
-     * @notice Checks if the kernel supports redemption cancellation
-     * @param _kernel The address of the kernel contract
-     * @return True if redemption cancellation is supported
-     */
-    function _SUPPORTS_REDEMPTION_CANCELLATION(address _kernel) internal pure returns (bool) {
-        return IBaseKernel(_kernel).SUPPORTS_REDEMPTION_CANCELLATION();
     }
 
     // =============================
@@ -295,7 +277,7 @@ library RoycoKernelLib {
         if (!success) {
             if (returnData.length == 0) revert KERNEL_DELEGATECALL_FAILED(_callData, returnData);
             assembly ("memory-safe") {
-                revert(add(32, returnData), mload(returnData))
+                revert(add(0x20, returnData), mload(returnData))
             }
         }
         return returnData;
