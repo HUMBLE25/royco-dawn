@@ -48,7 +48,7 @@ contract RoycoST is IRoycoTranche, Ownable2StepUpgradeable, ERC4626Upgradeable, 
      * @dev Safety Condition: JT_NAV >= (JT_NAV + ST_Principal) * Coverage_%
      *      If this fails, junior capital is insufficient to meet the coverage requirement for the post-deposit senior principal
      * @dev Failure Modes:
-     *      1. Synchronous: Junior capital is insufficient because of too many senior deposits proportional to junior deposits
+     *      1. Synchronous:  Junior capital is insufficient because of too many senior deposits proportional to junior NAV
      *      2. Asynchronous: Junior capital is insufficient because it incurred a loss proportionally greater than what senior capital did
      *                       Theoretically, this should not happen since junior will be deployed into the RFR or the same opportunity as senior
      */
