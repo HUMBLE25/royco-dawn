@@ -20,6 +20,7 @@ import { ExecutionModel, RoycoKernelLib } from "../../libraries/RoycoKernelLib.s
 import { RoycoSTStorageLib } from "../../libraries/RoycoSTStorageLib.sol";
 import { ActionType, TrancheDeploymentParams } from "../../libraries/Types.sol";
 
+// TODO: ST and JT base asset can have different decimals
 contract RoycoST is IRoycoTranche, Ownable2StepUpgradeable, ERC4626Upgradeable, IERC7540, IERC7575, IERC7887 {
     using Math for uint256;
     using SafeERC20 for IERC20;
@@ -42,12 +43,18 @@ contract RoycoST is IRoycoTranche, Ownable2StepUpgradeable, ERC4626Upgradeable, 
         _;
     }
 
-    modifier checkCoverageInvariant() {
-        // Invariant must be post-checked, after all state changes have been applied
+    /**
+     * @notice Post-condition that enforces the target coverage requirement for new senior capital
+     * @dev Safety Condition: JT_NAV >= (JT_NAV + ST_Principal) * Coverage_%
+     *      If this fails, junior capital is insufficient to meet the coverage requirement for the post-deposit senior principal
+     * @dev Failure Modes:
+     *      1. Synchronous: Junior capital is insufficient because of too many senior deposits proportional to junior deposits
+     *      2. Asynchronous: Junior capital is insufficient because it incurred a loss proportionally greater than what senior capital did
+     *                       Theoretically, this should not happen since junior will be deployed into the RFR or the same opportunity as senior
+     */
+    modifier checkCoverageSafety() {
+        // Safety must be checked after all state changes have been applied
         _;
-        // TODO: Might be redundant because maxDeposit and maxMint accounts for this invariant check
-        /// @dev Invariant: JT_NAV >= (JT_NAV + ST_Principal) * Coverage_%
-        /// @dev This invariant can be asynchronously violated if the junior tranche suffers losses
         uint256 jtNAV = RoycoSTStorageLib._getJuniorTranche().getNAV();
         uint256 requiredCoverageAssets = (jtNAV + RoycoSTStorageLib._getTotalPrincipalAssets()).mulDiv(RoycoSTStorageLib._getCoverageWAD(), ConstantsLib.WAD);
         require(jtNAV >= requiredCoverageAssets, INSUFFICIENT_JUNIOR_TRANCHE_COVERAGE());
@@ -97,7 +104,7 @@ contract RoycoST is IRoycoTranche, Ownable2StepUpgradeable, ERC4626Upgradeable, 
         public
         override(IERC7540)
         onlySelfOrOperator(_controller)
-        checkCoverageInvariant
+        checkCoverageSafety
         returns (uint256 shares)
     {
         // Assert that the user's deposited assets fall under the max limit
@@ -125,7 +132,7 @@ contract RoycoST is IRoycoTranche, Ownable2StepUpgradeable, ERC4626Upgradeable, 
         public
         override(IERC7540)
         onlySelfOrOperator(_controller)
-        checkCoverageInvariant
+        checkCoverageSafety
         returns (uint256 assets)
     {
         // Assert that the shares minted to the user fall under the max limit
@@ -379,21 +386,22 @@ contract RoycoST is IRoycoTranche, Ownable2StepUpgradeable, ERC4626Upgradeable, 
         uint256 expectedCoverageAssets = stPrincipal.mulDiv(RoycoSTStorageLib._getCoverageWAD(), ConstantsLib.WAD, Math.Rounding.Ceil);
 
         // Compute the actual amount of coverage provided by the junior tranche as the minimum of what they committed to insuring and their current NAV
-        // This will equal the expected coverage amount except when junior experiences losses large enough that its NAV falls below the required coverage budget
-        // Given the market's invariant for new deposits and withdrawals, This can only happen if junior’s losses are proportionally greater than senior’s losses
+        // This will always equal the expected coverage amount unless junior experiences losses large enough that its NAV falls below the required coverage budget
+        // Given the market's safety check for new deposits, this can only happen if junior’s losses are proportionally greater than senior’s losses
+        // Theoretically, this should never happen since junior will always be deployed into the RFR or the same opportunity as senior
         uint256 actualCoverageAssets = Math.min(expectedCoverageAssets, RoycoSTStorageLib._getJuniorTranche().getNAV());
 
         // Compute the result of the senior tranche bucket in the loss waterfall:
         // Case 1: Senior tranche has suffered a loss that junior can absorb fully
         // The senior tranche principal is the effective NAV after partially or fully applying the coverage
         // Case 2: Senior tranche has suffered a loss greater than what junior can absorb
-        // The actual assets controlled by the senior tranche in addition to all the coverage is the effective NAV
+        // The actual assets controlled by the senior tranche in addition to all the coverage is the effective NAV for senior depositors
         return Math.min(stPrincipal, stAssets + actualCoverageAssets);
     }
 
     /// @inheritdoc IERC4626
     function maxDeposit(address _receiver) public view override(ERC4626Upgradeable) returns (uint256) {
-        // Return the minimum of the asset capacity of the underlying investment opportunity and the senior tranche (to satisfy the coverage invariant)
+        // Return the minimum of the asset capacity of the underlying investment opportunity and the senior tranche (to satisfy the coverage safety check)
         return Math.min(RoycoKernelLib._maxDeposit(RoycoSTStorageLib._getKernel(), msg.sender, _receiver, asset()), _computeSTDepositCapacity());
     }
 
@@ -495,7 +503,7 @@ contract RoycoST is IRoycoTranche, Ownable2StepUpgradeable, ERC4626Upgradeable, 
 
     function _computeSTDepositCapacity() internal view returns (uint256) {
         /**
-         * @dev Invariant: JT_NAV >= (JT_NAV + ST_Principal) * Coverage_%
+         * @dev Coverage safety condition: JT_NAV >= (JT_NAV + ST_Principal) * Coverage_%
          *      This is capped out when: JT_NAV == (JT_NAV + ST_Principal) * Coverage_%
          * @dev Solving for the max amount of assets we can deposit into the senior tranche, x:
          *      JT_NAV = (JT_NAV + (ST_Principal + x)) * Coverage_%
