@@ -65,22 +65,20 @@ interface IBaseKernel {
     /**
      * @notice Returns the maximum amount of a specific asset that can be deposited into the underlying investment opportunity
      * @dev Must be called via a call or staticcall (reliant on msg.sender)
-     * @param _caller The address that will be depositing the assets
      * @param _reciever The address that will be asserting ownership over the deposited assets
      * @param _asset The address of the asset to deposit
      * @return The maximum amount of the asset that can be globally deposited into the underlying investment opportunity
      */
-    function maxDeposit(address _caller, address _reciever, address _asset) external view returns (uint256);
+    function maxDeposit(address _reciever, address _asset) external view returns (uint256);
 
     /**
      * @notice Returns the maximum amount of a specific asset that can be withdrawn from the underlying investment opportunity
      * @dev Must be called via a call or staticcall (reliant on msg.sender)
-     * @param _caller The address that will be depositing the assets
      * @param _owner The address that holds ownership over the deposited assets
      * @param _asset The address of the asset to withdraw
      * @return The maximum amount of assets that can be globally withdrawn from the underlying investment opportunity
      */
-    function maxWithdraw(address _caller, address _owner, address _asset) external view returns (uint256);
+    function maxWithdraw(address _owner, address _asset) external view returns (uint256);
 
     // =============================
     // Deposit and Withdrawal Operations

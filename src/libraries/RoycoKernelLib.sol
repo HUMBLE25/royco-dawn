@@ -47,25 +47,23 @@ library RoycoKernelLib {
     /**
      * @notice Gets the maximum deposit amount for a specific asset
      * @param _kernel The address of the kernel contract
-     * @param _caller The address that will be depositing the assets
-     * @param _reciever The address that will be asserting ownership over the deposited assets
+     * @param _reciever The address that will assert ownership over the deposited assets
      * @param _asset The address of the asset
      * @return The maximum assets depositable into this Royco tranche
      */
-    function _maxDeposit(address _kernel, address _caller, address _reciever, address _asset) internal view returns (uint256) {
-        return IBaseKernel(_kernel).maxDeposit(_caller, _reciever, _asset);
+    function _maxDeposit(address _kernel, address _reciever, address _asset) internal view returns (uint256) {
+        return IBaseKernel(_kernel).maxDeposit(_reciever, _asset);
     }
 
     /**
      * @notice Gets the maximum withdrawal amount for a specific asset
      * @param _kernel The address of the kernel contract
-     * @param _caller The address that will be depositing the assets
      * @param _owner The address that holds ownership over the deposited assets
      * @param _asset The address of the asset
      * @return The maximum assets withdrawable from this Royco tranche
      */
-    function _maxWithdraw(address _kernel, address _caller, address _owner, address _asset) internal view returns (uint256) {
-        return IBaseKernel(_kernel).maxWithdraw(_caller, _owner, _asset);
+    function _maxWithdraw(address _kernel, address _owner, address _asset) internal view returns (uint256) {
+        return IBaseKernel(_kernel).maxWithdraw(_owner, _asset);
     }
 
     // =============================

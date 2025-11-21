@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import { IERC165 } from "../../lib/openzeppelin-contracts/contracts/utils/introspection/IERC165.sol";
-
 /// @title ERC-7887: Cancelation for ERC-7540 Tokenized Vaults (Draft)
 /// @notice Interface extending ERC-7540 asynchronous vaults with cancelation flows.
 /// @dev Contracts implementing this interface MUST also implement ERC-165.
-interface IERC7887 is IERC165 {
+interface IERC7887 {
     // =============================
     // Events
     // =============================

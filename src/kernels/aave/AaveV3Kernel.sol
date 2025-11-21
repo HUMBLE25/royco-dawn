@@ -61,8 +61,8 @@ contract AaveV3Kernel is Initializable, BaseKernel {
     }
 
     /// @inheritdoc IBaseKernel
-    /// @dev Ignore the caller and receiver parameters as deposits aren't discriminated by address
-    function maxDeposit(address, address, address _asset) external view override returns (uint256) {
+    /// @dev Ignore the receiver parameter as deposits aren't discriminated by address
+    function maxDeposit(address, address _asset) external view override returns (uint256) {
         // Retrieve the Pool data provider
         IPoolDataProvider poolDataProvider = IPoolDataProvider(POOL_ADDRESSES_PROVIDER.getPoolDataProvider());
 
@@ -86,8 +86,8 @@ contract AaveV3Kernel is Initializable, BaseKernel {
     }
 
     /// @inheritdoc IBaseKernel
-    /// @dev Ignore the caller and receiver parameters as withdrawals aren't discriminated by address
-    function maxWithdraw(address, address, address _asset) external view override returns (uint256) {
+    /// @dev Ignore the owner parameter as withdrawals aren't discriminated by address
+    function maxWithdraw(address, address _asset) external view override returns (uint256) {
         // Retrieve the Pool data provider
         IPoolDataProvider poolDataProvider = IPoolDataProvider(POOL_ADDRESSES_PROVIDER.getPoolDataProvider());
 
