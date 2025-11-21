@@ -11,7 +11,7 @@ import {
     Math
 } from "../../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import { SafeERC20 } from "../../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
-import { IERC165, IERC7540, IERC7575, IERC7887, IRoycoTranche } from "../interfaces/IRoycoTranche.sol";
+import { IERC165, IERC7540, IERC7575, IERC7887, IRoycoTranche } from "../interfaces/tranche/IRoycoTranche.sol";
 import { ConstantsLib } from "../libraries/ConstantsLib.sol";
 import { ExecutionModel, RoycoKernelLib } from "../libraries/RoycoKernelLib.sol";
 import { RoycoTrancheStorageLib } from "../libraries/RoycoTrancheStorageLib.sol";
@@ -78,11 +78,6 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
 
         // Initialize the kernel's state
         RoycoKernelLib.__Kernel_init(_kernel, _kernelInitCallData);
-    }
-
-    /// @inheritdoc IRoycoTranche
-    function getNAV() external view virtual override(IRoycoTranche) returns (uint256) {
-        return RoycoKernelLib._getNAV(RoycoTrancheStorageLib._getKernel(), asset());
     }
 
     /// @inheritdoc IERC4626

@@ -2,7 +2,6 @@
 pragma solidity ^0.8.28;
 
 import { IERC4626 } from "../../lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
-import { IRoycoTranche } from "../interfaces/IRoycoTranche.sol";
 import { ExecutionModel, RoycoKernelLib } from "./RoycoKernelLib.sol";
 
 /**
@@ -92,8 +91,8 @@ library RoycoTrancheStorageLib {
      * @notice Returns the junior complement tranche (junior if senior, if junior)
      * @return The complement tranche
      */
-    function _getComplementTranche() internal view returns (IRoycoTranche) {
-        return IRoycoTranche(_getRoycoTrancheStorage().complementTranche);
+    function _getComplementTranche() internal view returns (address) {
+        return _getRoycoTrancheStorage().complementTranche;
     }
 
     /**

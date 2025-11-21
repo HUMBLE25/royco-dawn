@@ -2,14 +2,16 @@
 pragma solidity ^0.8.28;
 
 import { SafeERC20 } from "../../../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+
+import { IRoycoJuniorTranche, IRoycoSeniorTranche, IRoycoTranche } from "../../interfaces/tranche/IRoycoTranche.sol";
 import { ConstantsLib } from "../../libraries/ConstantsLib.sol";
 import { ExecutionModel, RoycoKernelLib } from "../../libraries/RoycoKernelLib.sol";
 import { RoycoTrancheStorageLib } from "../../libraries/RoycoTrancheStorageLib.sol";
 import { ActionType, TrancheDeploymentParams } from "../../libraries/Types.sol";
-import { BaseRoycoTranche, ERC4626Upgradeable, IERC20, IRoycoTranche, Math } from "../BaseRoycoTranche.sol";
+import { BaseRoycoTranche, ERC4626Upgradeable, IERC20, Math } from "../BaseRoycoTranche.sol";
 
 // TODO: ST and JT base asset can have different decimals
-contract RoycoST is BaseRoycoTranche {
+contract RoycoST is BaseRoycoTranche, IRoycoSeniorTranche {
     using Math for uint256;
     using SafeERC20 for IERC20;
 
@@ -25,7 +27,7 @@ contract RoycoST is BaseRoycoTranche {
     modifier checkCoverage() {
         // Safety must be checked after all state changes have been applied
         _;
-        uint256 jtNAV = RoycoTrancheStorageLib._getComplementTranche().getNAV();
+        uint256 jtNAV = IRoycoJuniorTranche(RoycoTrancheStorageLib._getComplementTranche()).getNAV();
         uint256 requiredCoverageAssets =
             (jtNAV + RoycoTrancheStorageLib._getTotalPrincipalAssets()).mulDiv(RoycoTrancheStorageLib._getCoverageWAD(), ConstantsLib.WAD);
         require(jtNAV >= requiredCoverageAssets, INSUFFICIENT_JUNIOR_TRANCHE_COVERAGE());
@@ -45,6 +47,11 @@ contract RoycoST is BaseRoycoTranche {
         __RoycoTranche_init(_stParams, _asset, _owner, _coverageWAD, _juniorTranche);
     }
 
+    /// @inheritdoc IRoycoSeniorTranche
+    function getTotalPrincipalAssets() external view virtual override(IRoycoSeniorTranche) returns (uint256) {
+        return RoycoKernelLib._getNAV(RoycoTrancheStorageLib._getKernel(), asset());
+    }
+
     /// @inheritdoc BaseRoycoTranche
     function maxDeposit(address _receiver) public view override(BaseRoycoTranche) returns (uint256) {
         // Return the minimum of the asset capacity of the underlying investment opportunity and the senior tranche (to satisfy the coverage condition)
@@ -52,13 +59,13 @@ contract RoycoST is BaseRoycoTranche {
     }
 
     /// @inheritdoc BaseRoycoTranche
-    /// @dev Post-checks the coverage condition, ensuring that the new senior captial isn't undercovered
+    /// @dev Post-checks the coverage condition, ensuring that the senior capital isn't undercovered
     function deposit(uint256 _assets, address _receiver, address _controller) public override(BaseRoycoTranche) checkCoverage returns (uint256 shares) {
         return super.deposit(_assets, _receiver, _controller);
     }
 
     /// @inheritdoc BaseRoycoTranche
-    /// @dev Post-checks the coverage condition, ensuring that the new senior captial isn't undercovered
+    /// @dev Post-checks the coverage condition, ensuring that the senior capital isn't undercovered
     function mint(uint256 _shares, address _receiver, address _controller) public override(BaseRoycoTranche) checkCoverage returns (uint256 assets) {
         return super.mint(_shares, _receiver, _controller);
     }
@@ -117,17 +124,17 @@ contract RoycoST is BaseRoycoTranche {
         uint256 stAssets = RoycoKernelLib._getNAV(RoycoTrancheStorageLib._getKernel(), asset());
         uint256 stPrincipal = RoycoTrancheStorageLib._getTotalPrincipalAssets();
 
-        // Senior tranche is completely whole, without any coverage required from junior capital
+        // Senior tranche is whole without any coverage required from junior capital
         if (stAssets >= stPrincipal) return stAssets;
 
         // Senior tranche NAV has incurred a loss
-        // Compute the assets required as coverage for the senior tranche
+        // Compute the assets expected as coverage for the senior tranche
         // Round in favor of the senior tranche
         uint256 expectedCoverageAssets = stPrincipal.mulDiv(RoycoTrancheStorageLib._getCoverageWAD(), ConstantsLib.WAD, Math.Rounding.Ceil);
 
         // Compute the actual amount of coverage provided by the junior tranche as the minimum of what they committed to insuring and their current NAV
         // This will always equal the expected coverage amount unless junior experiences losses large enough that its NAV falls below the required coverage budget
-        uint256 actualCoverageAssets = Math.min(expectedCoverageAssets, RoycoTrancheStorageLib._getComplementTranche().getNAV());
+        uint256 actualCoverageAssets = Math.min(expectedCoverageAssets, IRoycoJuniorTranche(RoycoTrancheStorageLib._getComplementTranche()).getNAV());
 
         // Compute the result of the senior tranche bucket in the loss waterfall:
         // Case 1: Senior tranche has suffered a loss that junior can absorb fully
@@ -169,7 +176,7 @@ contract RoycoST is BaseRoycoTranche {
      */
     function _computeDepositCapacity() internal view returns (uint256) {
         // Retrieve the junior tranche net asset value
-        uint256 jtNAV = RoycoTrancheStorageLib._getComplementTranche().getNAV();
+        uint256 jtNAV = IRoycoJuniorTranche(RoycoTrancheStorageLib._getComplementTranche()).getNAV();
         if (jtNAV == 0) return 0;
 
         // Compute the total assets currently covered by the junior tranche
