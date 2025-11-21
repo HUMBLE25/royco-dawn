@@ -54,13 +54,13 @@ contract RoycoST is BaseRoycoTranche {
     /// @inheritdoc BaseRoycoTranche
     /// @dev Post-checks the coverage condition, ensuring that the new senior captial isn't undercovered
     function deposit(uint256 _assets, address _receiver, address _controller) public override(BaseRoycoTranche) checkCoverage returns (uint256 shares) {
-        super.deposit(_assets, _receiver, _controller);
+        return super.deposit(_assets, _receiver, _controller);
     }
 
     /// @inheritdoc BaseRoycoTranche
     /// @dev Post-checks the coverage condition, ensuring that the new senior captial isn't undercovered
     function mint(uint256 _shares, address _receiver, address _controller) public override(BaseRoycoTranche) checkCoverage returns (uint256 assets) {
-        super.mint(_shares, _receiver, _controller);
+        return super.mint(_shares, _receiver, _controller);
     }
 
     /// @inheritdoc BaseRoycoTranche
@@ -159,15 +159,15 @@ contract RoycoST is BaseRoycoTranche {
         super._withdraw(_caller, _receiver, _owner, _assets, _shares);
     }
 
+    /**
+     * @notice Computes the assets that can be deposited into the senior tranche without violating the coverage condition
+     * @dev Coverage condition: JT_NAV >= (JT_NAV + ST_Principal) * Coverage_%
+     *      This is capped out when: JT_NAV == (JT_NAV + ST_Principal) * Coverage_%
+     * @dev Solving for the max amount of assets we can deposit into the senior tranche, x:
+     *      JT_NAV = (JT_NAV + (ST_Principal + x)) * Coverage_%
+     *      x = (JT_NAV / Coverage_%) - JT_NAV - ST_Principal
+     */
     function _computeDepositCapacity() internal view returns (uint256) {
-        /**
-         * @dev Coverage condition: JT_NAV >= (JT_NAV + ST_Principal) * Coverage_%
-         *      This is capped out when: JT_NAV == (JT_NAV + ST_Principal) * Coverage_%
-         * @dev Solving for the max amount of assets we can deposit into the senior tranche, x:
-         *      JT_NAV = (JT_NAV + (ST_Principal + x)) * Coverage_%
-         *      x = (JT_NAV / Coverage_%) - JT_NAV - ST_Principal
-         */
-
         // Retrieve the junior tranche net asset value
         uint256 jtNAV = RoycoTrancheStorageLib._getComplementTranche().getNAV();
         if (jtNAV == 0) return 0;
