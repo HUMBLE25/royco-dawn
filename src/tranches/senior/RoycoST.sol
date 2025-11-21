@@ -387,8 +387,6 @@ contract RoycoST is IRoycoTranche, Ownable2StepUpgradeable, ERC4626Upgradeable, 
 
         // Compute the actual amount of coverage provided by the junior tranche as the minimum of what they committed to insuring and their current NAV
         // This will always equal the expected coverage amount unless junior experiences losses large enough that its NAV falls below the required coverage budget
-        // Given the market's coverage condition for new deposits, this can only happen if junior’s losses are proportionally greater than senior’s losses
-        // Theoretically, this should never happen since junior will always be deployed into the RFR or the same opportunity as senior
         uint256 actualCoverageAssets = Math.min(expectedCoverageAssets, RoycoSTStorageLib._getJuniorTranche().getNAV());
 
         // Compute the result of the senior tranche bucket in the loss waterfall:
