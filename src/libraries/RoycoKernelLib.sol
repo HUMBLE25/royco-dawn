@@ -4,7 +4,6 @@ pragma solidity ^0.8.28;
 import { IAsyncDepositKernel } from "../interfaces/kernel/IAsyncDepositKernel.sol";
 import { IAsyncWithdrawalKernel } from "../interfaces/kernel/IAsyncWithdrawalKernel.sol";
 import { ExecutionModel, IBaseKernel } from "../interfaces/kernel/IBaseKernel.sol";
-import { ICancellableKernel } from "../interfaces/kernel/ICancellableKernel.sol";
 
 /**
  * @title RoycoKernelLib
@@ -203,7 +202,7 @@ library RoycoKernelLib {
      * @param _controller The address of the controller
      */
     function _cancelDepositRequest(address _kernel, uint256 _requestId, address _controller) internal {
-        _delegateCallKernel(_kernel, abi.encodeCall(ICancellableKernel.cancelDepositRequest, (_requestId, _controller)));
+        _delegateCallKernel(_kernel, abi.encodeCall(IAsyncDepositKernel.cancelDepositRequest, (_requestId, _controller)));
     }
 
     /**
@@ -214,7 +213,7 @@ library RoycoKernelLib {
      * @return isPending True if cancellation request is pending
      */
     function _pendingCancelDepositRequest(address _kernel, uint256 _requestId, address _controller) internal returns (bool isPending) {
-        return abi.decode(_delegateCallKernel(_kernel, abi.encodeCall(ICancellableKernel.pendingCancelDepositRequest, (_requestId, _controller))), (bool));
+        return abi.decode(_delegateCallKernel(_kernel, abi.encodeCall(IAsyncDepositKernel.pendingCancelDepositRequest, (_requestId, _controller))), (bool));
     }
 
     /**
@@ -225,7 +224,7 @@ library RoycoKernelLib {
      * @return assets The amount of assets claimable from the deposit cancellation
      */
     function _claimableCancelDepositRequest(address _kernel, uint256 _requestId, address _controller) internal returns (uint256 assets) {
-        return abi.decode(_delegateCallKernel(_kernel, abi.encodeCall(ICancellableKernel.claimableCancelDepositRequest, (_requestId, _controller))), (uint256));
+        return abi.decode(_delegateCallKernel(_kernel, abi.encodeCall(IAsyncDepositKernel.claimableCancelDepositRequest, (_requestId, _controller))), (uint256));
     }
 
     /**
@@ -235,7 +234,7 @@ library RoycoKernelLib {
      * @param _controller The address of the controller
      */
     function _cancelRedeemRequest(address _kernel, uint256 _requestId, address _controller) internal {
-        _delegateCallKernel(_kernel, abi.encodeCall(ICancellableKernel.cancelRedeemRequest, (_requestId, _controller)));
+        _delegateCallKernel(_kernel, abi.encodeCall(IAsyncWithdrawalKernel.cancelRedeemRequest, (_requestId, _controller)));
     }
 
     /**
@@ -246,7 +245,7 @@ library RoycoKernelLib {
      * @return isPending True if cancellation request is pending
      */
     function _pendingCancelRedeemRequest(address _kernel, uint256 _requestId, address _controller) internal returns (bool isPending) {
-        return abi.decode(_delegateCallKernel(_kernel, abi.encodeCall(ICancellableKernel.pendingCancelRedeemRequest, (_requestId, _controller))), (bool));
+        return abi.decode(_delegateCallKernel(_kernel, abi.encodeCall(IAsyncWithdrawalKernel.pendingCancelRedeemRequest, (_requestId, _controller))), (bool));
     }
 
     /**
@@ -257,7 +256,8 @@ library RoycoKernelLib {
      * @return shares The amount of shares claimable from the redeem cancellation
      */
     function _claimableCancelRedeemRequest(address _kernel, uint256 _requestId, address _controller) internal returns (uint256 shares) {
-        return abi.decode(_delegateCallKernel(_kernel, abi.encodeCall(ICancellableKernel.claimableCancelRedeemRequest, (_requestId, _controller))), (uint256));
+        return
+            abi.decode(_delegateCallKernel(_kernel, abi.encodeCall(IAsyncWithdrawalKernel.claimableCancelRedeemRequest, (_requestId, _controller))), (uint256));
     }
 
     // =============================

@@ -81,8 +81,7 @@ contract AaveV3Kernel is Initializable, BaseKernel {
         supplyCap = supplyCap * (10 ** decimals);
 
         // If supply cap hit, no incremental supplies are permitted. Else, return the max suppliable amount within the cap.
-        if (currentlySupplied >= supplyCap) return 0;
-        else return supplyCap - currentlySupplied;
+        return (currentlySupplied >= supplyCap) ? 0 : (supplyCap - currentlySupplied);
     }
 
     /// @inheritdoc IBaseKernel

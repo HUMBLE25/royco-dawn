@@ -37,7 +37,7 @@ struct RoycoTrancheState {
 library RoycoTrancheStorageLib {
     /// @dev Storage slot for RoycoTrancheState using ERC-7201 pattern
     // keccak256(abi.encode(uint256(keccak256("Royco.storage.RoycoTrancheState")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant ROYCO_TRANCHE_STORAGE_SLOT = 0xa4d46a7bacf3e69f1abf7878cb359b2a17fd12d74cdcac0353bddb5de76ff800;
+    bytes32 private constant ROYCO_TRANCHE_STORAGE_SLOT = 0x25265df6fdb5acadb02f38e62cea4bba666d308120ed42c208a4ef005c50ec00;
 
     /**
      * @notice Returns a reference to the RoycoTrancheState storage
