@@ -49,7 +49,7 @@ library RoycoSTStorageLib {
 
     /// @dev Storage slot for RoycoSTState using ERC-7201 pattern
     // keccak256(abi.encode(uint256(keccak256("Royco.storage.RoycoSTState")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant ROYCO_ST_STORAGE_SLOT = 0x9aae6b709d857af2bed67bb686f14d35450d93e0187f3ff0787ddf0bec656100;
+    bytes32 private constant ROYCO_ST_STORAGE_SLOT = 0xa4d46a7bacf3e69f1abf7878cb359b2a17fd12d74cdcac0353bddb5de76ff800;
 
     /**
      * @notice Returns a reference to the RoycoSTState storage

@@ -17,8 +17,8 @@ contract StaticCurveRDM is IRDM {
 
     /**
      * @dev Constant for the target utilization of the junior tranche (90%)
-     * @dev Utilization = (senior tranche principal * expected loss percentage) / junior tranche commitments
-     * @dev Invariant: junior tranche commitments >= (senior tranche principal * expected loss percentage)
+     * @dev Utilization = (senior tranche principal * coverage percentage) / junior tranche assets
+     * @dev Invariant: junior tranche assets >= (senior tranche principal * coverage percentage)
      * @dev The above ensures that Utilization ∈ [0,1]
      */
     uint256 public constant TARGET_UTILIZATION = 0.9e18;
@@ -40,11 +40,11 @@ contract StaticCurveRDM is IRDM {
          *   R(U) = 0.25 * U                   if U < 0.9
          *        = 7.75 * (U - 0.9) + 0.225   if U ≥ 0.9
          *
-         * U ∈ [0, 1] → Utilization = (senior tranche principal * expected loss percentage) / junior tranche commitments
+         * U ∈ [0, 1] → Utilization = (senior tranche principal * coverage percentage) / junior tranche assets
          * R(U)       → Reward percentage paid to the junior tranche
          *
          * Below 90% utilization, rate rises slowly (0.25 slope).
-         * Above 90%, rate rises sharply (7.75 slope) to penalize high utilization and incentivize additional junior commitments.
+         * Above 90%, rate rises sharply (7.75 slope) to penalize high utilization and incentivize additional junior assets.
          */
 
         // If any of these quantities is 0, the utilization is effectively 0, so the JT's percentage of rewards is 0%
@@ -54,7 +54,7 @@ contract StaticCurveRDM is IRDM {
         uint256 utilization = _stPrincipalAmount.mulDiv(_coverageWAD, _jtTotalAssets, Math.Rounding.Floor);
 
         // Theoretically, this branch should never be hit for the purely greater than case, as it would imply a violation of the invariant:
-        // junior tranche commitments >= (senior tranche principal * expected loss percentage)
+        // junior tranche assets >= (senior tranche principal * coverage percentage)
         if (utilization >= ConstantsLib.WAD) {
             return ConstantsLib.WAD;
         }
