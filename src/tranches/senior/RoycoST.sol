@@ -13,7 +13,6 @@ import { BaseRoycoTranche, ERC4626Upgradeable, IERC20, Math } from "../BaseRoyco
 // TODO: ST and JT base asset can have different decimals
 contract RoycoST is BaseRoycoTranche, IRoycoSeniorTranche {
     using Math for uint256;
-    using SafeERC20 for IERC20;
 
     /**
      * @notice Initializes the Royco senior tranche
@@ -38,8 +37,8 @@ contract RoycoST is BaseRoycoTranche, IRoycoSeniorTranche {
     }
 
     /// @inheritdoc IRoycoSeniorTranche
-    function getTotalPrincipalAssets() external view virtual override(IRoycoSeniorTranche) returns (uint256) {
-        return RoycoTrancheStorageLib._getTotalPrincipalAssets();
+    function getTotalPrincipalAssets() external view override(IRoycoSeniorTranche) returns (uint256) {
+        return _getSeniorTranchePrincipal();
     }
 
     /// @inheritdoc BaseRoycoTranche
@@ -48,7 +47,7 @@ contract RoycoST is BaseRoycoTranche, IRoycoSeniorTranche {
         // TODO: Yield distribution and fee accrual
         // Get the NAV of the senior tranche and the total principal deployed into the investment
         uint256 stAssets = RoycoKernelLib._getNAV(RoycoTrancheStorageLib._getKernel(), asset());
-        uint256 stPrincipal = RoycoTrancheStorageLib._getTotalPrincipalAssets();
+        uint256 stPrincipal = _getSeniorTranchePrincipal();
 
         // Senior tranche is whole without any coverage required from junior capital
         if (stAssets >= stPrincipal) return stAssets;
@@ -68,12 +67,6 @@ contract RoycoST is BaseRoycoTranche, IRoycoSeniorTranche {
         // Case 2: Senior tranche has suffered a loss greater than what junior can absorb
         // The actual assets controlled by the senior tranche in addition to all the coverage is the effective NAV for senior depositors
         return Math.min(stPrincipal, stAssets + actualCoverageAssets);
-    }
-
-    /// @inheritdoc BaseRoycoTranche
-    function maxDeposit(address _receiver) public view override(BaseRoycoTranche) returns (uint256) {
-        // Return the minimum of the asset capacity of the underlying investment opportunity and the senior tranche (to satisfy the coverage condition)
-        return Math.min(super.maxDeposit(_receiver), _computeDepositCapacity());
     }
 
     /// @inheritdoc BaseRoycoTranche
@@ -149,7 +142,7 @@ contract RoycoST is BaseRoycoTranche, IRoycoSeniorTranche {
     /// @dev NOTE: Doesn't transfer assets to the receiver. This is the responsibility of the kernel.
     function _withdraw(address _caller, address _receiver, address _owner, uint256 _assets, uint256 _shares) internal override(BaseRoycoTranche) {
         // Decrease the tranche's total principal by the proportion of shares being withdrawn
-        uint256 principalAssetsWithdrawn = RoycoTrancheStorageLib._getTotalPrincipalAssets().mulDiv(_shares, totalSupply(), Math.Rounding.Ceil);
+        uint256 principalAssetsWithdrawn = _getSeniorTranchePrincipal().mulDiv(_shares, totalSupply(), Math.Rounding.Ceil);
         RoycoTrancheStorageLib._decreaseTotalPrincipal(principalAssetsWithdrawn);
 
         // Handle burning shares
@@ -157,6 +150,7 @@ contract RoycoST is BaseRoycoTranche, IRoycoSeniorTranche {
     }
 
     /**
+     * @inheritdoc BaseRoycoTranche
      * @notice Computes the assets that can be deposited into the senior tranche without violating the coverage condition
      * @dev Coverage condition: JT_NAV >= (JT_NAV + ST_Principal) * Coverage_%
      *      This is capped out when: JT_NAV == (JT_NAV + ST_Principal) * Coverage_%
@@ -164,29 +158,33 @@ contract RoycoST is BaseRoycoTranche, IRoycoSeniorTranche {
      *      JT_NAV = (JT_NAV + (ST_Principal + x)) * Coverage_%
      *      x = (JT_NAV / Coverage_%) - JT_NAV - ST_Principal
      */
-    function _computeDepositCapacity() internal view returns (uint256) {
+    function _getTrancheDepositCapacity() internal view override(BaseRoycoTranche) returns (uint256) {
         // Retrieve the junior tranche net asset value
         uint256 jtNAV = _getJuniorTrancheNAV();
         if (jtNAV == 0) return 0;
 
         // Compute the total assets currently covered by the junior tranche
         // Round down in favor of the senior tranche
-        uint256 totalCoveredNAV = jtNAV.mulDiv(ConstantsLib.WAD, RoycoTrancheStorageLib._getCoverageWAD(), Math.Rounding.Floor);
+        uint256 totalCoveredAssets = jtNAV.mulDiv(ConstantsLib.WAD, RoycoTrancheStorageLib._getCoverageWAD(), Math.Rounding.Floor);
         // Get the current principal assets of the senior tranche
-        uint256 stPrincipalAssets = RoycoTrancheStorageLib._getTotalPrincipalAssets();
+        uint256 stPrincipalAssets = _getSeniorTranchePrincipal();
 
         // Compute x, clipped to 0 to prevent underflow
-        return Math.saturatingSub(totalCoveredNAV, jtNAV).saturatingSub(stPrincipalAssets);
+        return Math.saturatingSub(totalCoveredAssets, jtNAV).saturatingSub(stPrincipalAssets);
     }
 
     /// @inheritdoc BaseRoycoTranche
-    /// @dev Returns the net asset value of the junior tranche in the junior tranche's base asset
+    /// @dev No inherent tranche enforced cap on senior tranche withdrawals
+    function _getTrancheWithdrawalCapacity() internal pure override(BaseRoycoTranche) returns (uint256) {
+        return type(uint256).max;
+    }
+
+    /// @inheritdoc BaseRoycoTranche
     function _getJuniorTrancheNAV() internal view override(BaseRoycoTranche) returns (uint256) {
         return IRoycoJuniorTranche(RoycoTrancheStorageLib._getComplementTranche()).getNAV();
     }
 
     /// @inheritdoc BaseRoycoTranche
-    /// @dev Returns the total principal assets for the senior tranche
     function _getSeniorTranchePrincipal() internal view override(BaseRoycoTranche) returns (uint256) {
         return RoycoTrancheStorageLib._getTotalPrincipalAssets();
     }

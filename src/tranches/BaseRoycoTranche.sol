@@ -149,65 +149,64 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
         return RoycoKernelLib._getNAV(RoycoTrancheStorageLib._getKernel(), asset());
     }
 
-    /// @inheritdoc IERC4626
-    /// @dev Should be overridden by senior tranches to check for deposit capacity
-    function maxDeposit(address _receiver) public view virtual override(ERC4626Upgradeable) returns (uint256) {
-        // Return the maximum depositable assets into the underlying investment opportunity
-        return RoycoKernelLib._maxDeposit(RoycoTrancheStorageLib._getKernel(), _receiver, asset());
+    /// @inheritdoc ERC4626Upgradeable
+    function maxDeposit(address _receiver) public view override(ERC4626Upgradeable) returns (uint256) {
+        // Return the minimum of the deposit capacity of the underlying investment opportunity and the tranche
+        return Math.min(RoycoKernelLib._maxDeposit(RoycoTrancheStorageLib._getKernel(), _receiver, asset()), _getTrancheDepositCapacity());
     }
 
-    /// @inheritdoc IERC4626
+    /// @inheritdoc ERC4626Upgradeable
     function maxMint(address _receiver) public view virtual override(ERC4626Upgradeable) returns (uint256) {
         // Preview deposit will handle computing the maximum mintable shares for the max assets depositable
         return super.previewDeposit(maxDeposit(_receiver));
     }
 
-    /// @inheritdoc IERC4626
+    /// @inheritdoc ERC4626Upgradeable
     function maxWithdraw(address _owner) public view virtual override(ERC4626Upgradeable) returns (uint256) {
-        // Preview redeem will handle computing the maximum withdrawable assets for the max redeemable shares
-        return super.previewRedeem(maxRedeem(_owner));
-    }
-
-    /// @inheritdoc IERC4626
-    /// @dev Should be overridden by junior tranches to check for withdrawal capacity
-    function maxRedeem(address _owner) public view virtual override(ERC4626Upgradeable) returns (uint256) {
         // Get the maximum globally withdrawable assets
         uint256 maxAssetsWithdrawable = RoycoKernelLib._maxWithdraw(RoycoTrancheStorageLib._getKernel(), _owner, asset());
-        // Return the minimum of the shares equating to the maximum globally withdrawable assets and the shares held by the owner
-        return Math.min(super.previewWithdraw(maxAssetsWithdrawable), balanceOf(_owner));
+        // Return the minimum of the globally withdrawable assets, assets owned by the owner, and the tranche's withdrawal capacity
+        return Math.min(maxAssetsWithdrawable, super.previewRedeem(balanceOf(_owner))).min(_getTrancheWithdrawalCapacity());
     }
 
-    /// @inheritdoc IERC4626
+    /// @inheritdoc ERC4626Upgradeable
+    /// @dev Should be overridden by junior tranches to check for withdrawal capacity
+    function maxRedeem(address _owner) public view virtual override(ERC4626Upgradeable) returns (uint256) {
+        // Preview withdraw will handle computing the maximum mintable shares for the max assets withdrawable by the owner
+        return super.previewWithdraw(maxWithdraw(_owner));
+    }
+
+    /// @inheritdoc ERC4626Upgradeable
     /// @dev Disabled if deposit execution is asynchronous as per ERC7540
     function previewDeposit(uint256 _assets) public view virtual override(ERC4626Upgradeable) executionIsSync(ActionType.DEPOSIT) returns (uint256) {
         return super.previewDeposit(_assets);
     }
 
-    /// @inheritdoc IERC4626
+    /// @inheritdoc ERC4626Upgradeable
     /// @dev Disabled if deposit execution is asynchronous as per ERC7540
     function previewMint(uint256 _shares) public view virtual override(ERC4626Upgradeable) executionIsSync(ActionType.DEPOSIT) returns (uint256) {
         return super.previewMint(_shares);
     }
 
-    /// @inheritdoc IERC4626
+    /// @inheritdoc ERC4626Upgradeable
     /// @dev Disabled if withdrawal execution is asynchronous as per ERC7540
     function previewWithdraw(uint256 _assets) public view virtual override(ERC4626Upgradeable) executionIsSync(ActionType.WITHDRAWAL) returns (uint256) {
         return super.previewWithdraw(_assets);
     }
 
-    /// @inheritdoc IERC4626
+    /// @inheritdoc ERC4626Upgradeable
     /// @dev Disabled if withdrawal execution is asynchronous as per ERC7540
     function previewRedeem(uint256 _shares) public view virtual override(ERC4626Upgradeable) executionIsSync(ActionType.WITHDRAWAL) returns (uint256) {
         return super.previewRedeem(_shares);
     }
 
-    /// @inheritdoc IERC4626
+    /// @inheritdoc ERC4626Upgradeable
     function deposit(uint256 _assets, address _receiver) public virtual override(ERC4626Upgradeable) returns (uint256) {
         return deposit(_assets, _receiver, msg.sender);
     }
 
     /// @inheritdoc IERC7540
-    /// @dev Should be overriden by senior tranches to check the coverage condition
+    /// @dev Should be overridden by senior tranches to check the coverage condition
     function deposit(
         uint256 _assets,
         address _receiver,
@@ -230,13 +229,13 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
         RoycoKernelLib._deposit(RoycoTrancheStorageLib._getKernel(), asset(), _assets, _controller);
     }
 
-    /// @inheritdoc IERC4626
+    /// @inheritdoc ERC4626Upgradeable
     function mint(uint256 _shares, address _receiver) public virtual override(ERC4626Upgradeable) returns (uint256) {
         return mint(_shares, _receiver, msg.sender);
     }
 
     /// @inheritdoc IERC7540
-    /// @dev Should be overriden by senior tranches to check the coverage condition
+    /// @dev Should be overridden by senior tranches to check the coverage condition
     function mint(
         uint256 _shares,
         address _receiver,
@@ -260,7 +259,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
     }
 
     /// @inheritdoc IERC7540
-    /// @dev Should be overriden by junior tranches to check the coverage condition
+    /// @dev Should be overridden by junior tranches to check the coverage condition
     function withdraw(
         uint256 _assets,
         address _receiver,
@@ -285,7 +284,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
     }
 
     /// @inheritdoc IERC7540
-    /// @dev Should be overriden by junior tranches to check the coverage condition
+    /// @dev Should be overridden by junior tranches to check the coverage condition
     function redeem(
         uint256 _shares,
         address _receiver,
@@ -492,12 +491,12 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
 
     /// @inheritdoc IERC165
     function supportsInterface(bytes4 _interfaceId) public pure virtual override(IERC165) returns (bool) {
-        return _interfaceId == type(IERC165).interfaceId || _interfaceId == type(IERC4626).interfaceId || _interfaceId == type(IERC7540).interfaceId
+        return _interfaceId == type(IERC165).interfaceId || _interfaceId == type(ERC4626Upgradeable).interfaceId || _interfaceId == type(IERC7540).interfaceId
             || _interfaceId == type(IERC7575).interfaceId || _interfaceId == type(IERC7887).interfaceId || _interfaceId == type(IRoycoTranche).interfaceId;
     }
 
     /// @inheritdoc ERC4626Upgradeable
-    /// @dev Should be overriden by the senior tranche to handle principal accounting
+    /// @dev Should be overridden by the senior tranche to handle principal accounting
     function _deposit(address _caller, address _receiver, uint256 _assets, uint256 _shares) internal virtual override(ERC4626Upgradeable) {
         // If deposits are synchronous, transfer the assets to the tranche and mint the shares
         if (RoycoTrancheStorageLib._getDepositExecutionModel() == ExecutionModel.SYNC) super._deposit(_caller, _receiver, _assets, _shares);
@@ -506,7 +505,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
     }
 
     /// @inheritdoc ERC4626Upgradeable
-    /// @dev Should be overriden by the senior tranche to handle principal accounting
+    /// @dev Should be overridden by the senior tranche to handle principal accounting
     /// @dev Doesn't transfer assets to the receiver. This is the responsibility of the kernel.
     function _withdraw(address _caller, address _receiver, address _owner, uint256 _assets, uint256 _shares) internal virtual override(ERC4626Upgradeable) {
         // If withdrawals are synchronous, burn the shares from the owner
@@ -523,13 +522,17 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
         emit Withdraw(_caller, _receiver, _owner, _assets, _shares);
     }
 
+    /// @dev Returns the deposit capacity in assets based on the coverage requirement
+    function _getTrancheDepositCapacity() internal view virtual returns (uint256);
+
+    /// @dev Returns the withdrawal capacity in assets based on the coverage requirement
+    function _getTrancheWithdrawalCapacity() internal view virtual returns (uint256);
+
     /// @dev Returns the net asset value of the junior tranche in the junior tranche's base asset
-    /// @dev Must be overriden by junior and senior tranche implementations
     function _getJuniorTrancheNAV() internal view virtual returns (uint256);
 
     /// @dev Returns the total principal assets for the senior tranche
-    /// @dev Must be overriden by junior and senior tranche implementations
-    function _getSeniorTranchePrincipal() internal virtual returns (uint256);
+    function _getSeniorTranchePrincipal() internal view virtual returns (uint256);
 
     /// @inheritdoc ERC4626Upgradeable
     function _decimalsOffset() internal view virtual override(ERC4626Upgradeable) returns (uint8) {
