@@ -38,8 +38,8 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
     /// @notice Thrown when configuring this Royco market with an invalid coverage requirement
     error INVALID_COVERAGE_REQUIREMENT();
 
-    /// @notice Thrown when junior tranche coverage is insufficient for the operation
-    error INSUFFICIENT_JUNIOR_TRANCHE_COVERAGE();
+    /// @notice Thrown when junior tranche provided coverage is insufficient for the senior tranche
+    error INSUFFICIENT_SENIOR_TRANCHE_COVERAGE();
 
     /**
      * @notice Modifier to ensure the specified action type uses a synchronous execution model
@@ -68,6 +68,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
     /**
      * @notice Post-condition that enforces the market's coverage requirement
      * @dev Coverage condition: JT_NAV >= (JT_NAV + ST_Principal) * Coverage_%
+     *      Simplified condition: JT_NAV >= (ST_Principal * Coverage_%) / (100% - Coverage_%)
      *      If this fails, junior capital is insufficient to meet the coverage requirement for the senior principal
      * @dev Failure Modes:
      *      1. Synchronous:  Junior capital is insufficient purely because of too many senior deposits or junior withdrawals
@@ -77,9 +78,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
     modifier checkCoverage() {
         // Coverage must be checked after all state changes have been applied
         _;
-        uint256 jtNAV = _getJuniorTrancheNAV();
-        uint256 requiredCoverageAssets = (jtNAV + _getSeniorTranchePrincipal()).mulDiv(RoycoTrancheStorageLib._getCoverageWAD(), ConstantsLib.WAD);
-        require(jtNAV >= requiredCoverageAssets, INSUFFICIENT_JUNIOR_TRANCHE_COVERAGE());
+        require(_getJuniorTrancheNAV() >= _getMinJuniorTrancheNAV(), INSUFFICIENT_SENIOR_TRANCHE_COVERAGE());
     }
 
     /**
@@ -526,6 +525,13 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
         }
 
         emit Withdraw(_caller, _receiver, _owner, _assets, _shares);
+    }
+
+    /// @dev Returns the minimum amount of assets required by the junior tranche to satisfy the coverage condition
+    function _getMinJuniorTrancheNAV() internal view returns (uint256) {
+        // Round up in favor of the senior tranche
+        uint256 coverageWAD = RoycoTrancheStorageLib._getCoverageWAD();
+        return _getSeniorTranchePrincipal().mulDiv(coverageWAD, (ConstantsLib.WAD - coverageWAD), Math.Rounding.Ceil);
     }
 
     /// @dev Returns the deposit capacity in assets based on the coverage requirement

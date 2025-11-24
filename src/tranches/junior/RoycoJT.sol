@@ -123,13 +123,9 @@ contract RoycoJT is BaseRoycoTranche {
      *      x = JT_NAV - ((ST_Principal * Coverage_%) / (100% - Coverage_%))
      */
     function _getTrancheWithdrawalCapacity() internal view override(BaseRoycoTranche) returns (uint256) {
-        // Cache the market's coverage percentage
-        uint256 coverageWAD = RoycoTrancheStorageLib._getCoverageWAD();
-        // Compute the minimum required junior tranche NAV to satisfy the coverage condition
-        // Round up in favor of the senior tranche
-        uint256 minCoverageAssets = _getSeniorTranchePrincipal().mulDiv(coverageWAD, (ConstantsLib.WAD - coverageWAD), Math.Rounding.Floor);
+        uint256 minJuniorTrancheNAV = _getMinJuniorTrancheNAV();
         // Compute x, clipped to 0 to prevent underflow
-        return Math.saturatingSub(_getJuniorTrancheNAV(), minCoverageAssets);
+        return Math.saturatingSub(_getJuniorTrancheNAV(), minJuniorTrancheNAV);
     }
 
     /// @inheritdoc BaseRoycoTranche
