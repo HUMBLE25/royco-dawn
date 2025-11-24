@@ -123,9 +123,8 @@ contract RoycoJT is BaseRoycoTranche {
      *      x = JT_NAV - ((ST_Principal * Coverage_%) / (100% - Coverage_%))
      */
     function _getTrancheWithdrawalCapacity() internal view override(BaseRoycoTranche) returns (uint256) {
-        uint256 minJuniorTrancheNAV = _getMinJuniorTrancheNAV();
         // Compute x, clipped to 0 to prevent underflow
-        return Math.saturatingSub(_getJuniorTrancheNAV(), minJuniorTrancheNAV);
+        return Math.saturatingSub(_getJuniorTrancheNAV(), _getMinJuniorTrancheNAV());
     }
 
     /// @inheritdoc BaseRoycoTranche
