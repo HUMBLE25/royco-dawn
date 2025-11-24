@@ -143,10 +143,16 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
         RoycoKernelLib.__Kernel_init(_kernel, _kernelInitCallData);
     }
 
-    /// @inheritdoc ERC4626Upgradeable
-    /// @dev Should be overridden by senior and junior tranches to account for loss coverage and yield accrual
-    function totalAssets() public view virtual override(ERC4626Upgradeable) returns (uint256) {
+    /// @inheritdoc IRoycoTranche
+    function getNAV() external view override(IRoycoTranche) returns (uint256) {
         return RoycoKernelLib._getNAV(RoycoTrancheStorageLib._getKernel(), asset());
+    }
+
+    /// @inheritdoc ERC4626Upgradeable
+    /// @dev Must be overridden by senior and junior tranches to account for loss coverage and yield accrual
+    function totalAssets() public view virtual override(ERC4626Upgradeable) returns (uint256) {
+        // Ensures all tranche operations is disabled unless overriden
+        revert DISABLED();
     }
 
     /// @inheritdoc ERC4626Upgradeable
@@ -172,7 +178,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
     /// @inheritdoc ERC4626Upgradeable
     /// @dev Should be overridden by junior tranches to check for withdrawal capacity
     function maxRedeem(address _owner) public view virtual override(ERC4626Upgradeable) returns (uint256) {
-        // Preview withdraw will handle computing the maximum mintable shares for the max assets withdrawable by the owner
+        // Preview withdraw will handle computing the maximum redeemable shares for the max assets withdrawable by the owner
         return super.previewWithdraw(maxWithdraw(_owner));
     }
 

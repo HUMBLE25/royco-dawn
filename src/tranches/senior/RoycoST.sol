@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import { SafeERC20 } from "../../../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import { IRoycoJuniorTranche, IRoycoSeniorTranche, IRoycoTranche } from "../../interfaces/tranche/IRoycoTranche.sol";
+import { IRoycoSeniorTranche, IRoycoTranche } from "../../interfaces/tranche/IRoycoTranche.sol";
 import { ConstantsLib } from "../../libraries/ConstantsLib.sol";
 import { ExecutionModel, RoycoKernelLib } from "../../libraries/RoycoKernelLib.sol";
 import { RoycoTrancheStorageLib } from "../../libraries/RoycoTrancheStorageLib.sol";
@@ -46,27 +46,26 @@ contract RoycoST is BaseRoycoTranche, IRoycoSeniorTranche {
     function totalAssets() public view override(BaseRoycoTranche) returns (uint256) {
         // TODO: Yield distribution and fee accrual
         // Get the NAV of the senior tranche and the total principal deployed into the investment
-        uint256 stAssets = RoycoKernelLib._getNAV(RoycoTrancheStorageLib._getKernel(), asset());
+        uint256 stNAV = RoycoKernelLib._getNAV(RoycoTrancheStorageLib._getKernel(), asset());
         uint256 stPrincipal = _getSeniorTranchePrincipal();
 
         // Senior tranche is whole without any coverage required from junior capital
-        if (stAssets >= stPrincipal) return stAssets;
+        if (stNAV >= stPrincipal) return stNAV;
 
         // Senior tranche NAV has incurred a loss
-        // Compute the assets expected as coverage for the senior tranche
+        // Compute the coverage commitment provided by the junior tranche
         // Round in favor of the senior tranche
-        uint256 expectedCoverageAssets = stPrincipal.mulDiv(RoycoTrancheStorageLib._getCoverageWAD(), ConstantsLib.WAD, Math.Rounding.Ceil);
-
+        uint256 jtCoverageCommitment = stPrincipal.mulDiv(RoycoTrancheStorageLib._getCoverageWAD(), ConstantsLib.WAD, Math.Rounding.Ceil);
         // Compute the actual amount of coverage provided by the junior tranche as the minimum of what they committed to insuring and their current NAV
         // This will always equal the expected coverage amount unless junior experiences losses large enough that its NAV falls below the required coverage budget
-        uint256 actualCoverageAssets = Math.min(expectedCoverageAssets, _getJuniorTrancheNAV());
+        uint256 actualCoverageAssets = Math.min(jtCoverageCommitment, _getJuniorTrancheNAV());
 
         // Compute the result of the senior tranche bucket in the loss waterfall:
         // Case 1: Senior tranche has suffered a loss that junior can absorb fully
         // The senior tranche principal is the effective NAV after partially or fully applying the coverage
         // Case 2: Senior tranche has suffered a loss greater than what junior can absorb
         // The actual assets controlled by the senior tranche in addition to all the coverage is the effective NAV for senior depositors
-        return Math.min(stPrincipal, stAssets + actualCoverageAssets);
+        return Math.min(stPrincipal, stNAV + actualCoverageAssets);
     }
 
     /// @inheritdoc BaseRoycoTranche
@@ -181,7 +180,7 @@ contract RoycoST is BaseRoycoTranche, IRoycoSeniorTranche {
 
     /// @inheritdoc BaseRoycoTranche
     function _getJuniorTrancheNAV() internal view override(BaseRoycoTranche) returns (uint256) {
-        return IRoycoJuniorTranche(RoycoTrancheStorageLib._getComplementTranche()).getNAV();
+        return IRoycoTranche(RoycoTrancheStorageLib._getComplementTranche()).getNAV();
     }
 
     /// @inheritdoc BaseRoycoTranche

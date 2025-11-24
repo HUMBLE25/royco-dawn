@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import { SafeERC20 } from "../../../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
-import { IRoycoJuniorTranche, IRoycoSeniorTranche, IRoycoTranche } from "../../interfaces/tranche/IRoycoTranche.sol";
+import { IRoycoSeniorTranche, IRoycoTranche } from "../../interfaces/tranche/IRoycoTranche.sol";
 import { ConstantsLib } from "../../libraries/ConstantsLib.sol";
 import { ExecutionModel, RoycoKernelLib } from "../../libraries/RoycoKernelLib.sol";
 import { RoycoTrancheStorageLib } from "../../libraries/RoycoTrancheStorageLib.sol";
@@ -10,7 +10,7 @@ import { ActionType, TrancheDeploymentParams } from "../../libraries/Types.sol";
 import { BaseRoycoTranche, ERC4626Upgradeable, IERC20, Math } from "../BaseRoycoTranche.sol";
 
 // TODO: ST and JT base asset can have different decimals
-contract RoycoJT is BaseRoycoTranche, IRoycoJuniorTranche {
+contract RoycoJT is BaseRoycoTranche {
     using Math for uint256;
     using SafeERC20 for IERC20;
 
@@ -36,14 +36,30 @@ contract RoycoJT is BaseRoycoTranche, IRoycoJuniorTranche {
         __RoycoTranche_init(_jtParams, _asset, _owner, _coverageWAD, _seniorTranche);
     }
 
-    /// @inheritdoc IRoycoJuniorTranche
-    function getNAV() external view override(IRoycoJuniorTranche) returns (uint256) {
-        return _getJuniorTrancheNAV();
-    }
-
     /// @inheritdoc BaseRoycoTranche
     /// @dev Returns the junior tranche's effective total assets after factoring in any covered losses and yield distribution
-    function totalAssets() public view override(BaseRoycoTranche) returns (uint256) { }
+    function totalAssets() public view override(BaseRoycoTranche) returns (uint256) {
+        // TODO: Yield distribution and fee accrual
+        // Get the NAV of the senior tranche and the total principal deployed into the investment
+        uint256 stNAV = IRoycoTranche(RoycoTrancheStorageLib._getComplementTranche()).getNAV();
+        uint256 stPrincipal = _getSeniorTranchePrincipal();
+
+        // Junior tranche doesn't need to absorb any losses from senior if they are in profit
+        uint256 jtNAV = _getJuniorTrancheNAV();
+        if (stNAV >= stPrincipal) return jtNAV;
+
+        // Senior tranche has incurred a loss
+        // Calculate the loss relative to the principal
+        uint256 stLoss = stPrincipal - stNAV;
+        // Compute the coverage commitment provided by the junior tranche
+        // Round up in favor of the senior tranche
+        uint256 jtCoverageCommitment = stPrincipal.mulDiv(RoycoTrancheStorageLib._getCoverageWAD(), ConstantsLib.WAD, Math.Rounding.Ceil);
+        // The loss absorbed by JT cannot exceed their coverage commitment amount
+        uint256 jtLoss = Math.min(stLoss, jtCoverageCommitment);
+
+        // Return the total assets held by the junior tranche after absorbing losses, clipped to 0
+        return Math.saturatingSub(jtNAV, jtLoss);
+    }
 
     /// @inheritdoc BaseRoycoTranche
     function withdraw(
@@ -107,18 +123,13 @@ contract RoycoJT is BaseRoycoTranche, IRoycoJuniorTranche {
      *      x = JT_NAV - ((ST_Principal * Coverage_%) / (100% - Coverage_%))
      */
     function _getTrancheWithdrawalCapacity() internal view override(BaseRoycoTranche) returns (uint256) {
-        // Retrieve the junior tranche net asset value
-        uint256 jtNAV = _getJuniorTrancheNAV();
-        if (jtNAV == 0) return 0;
-
+        // Cache the market's coverage percentage
+        uint256 coverageWAD = RoycoTrancheStorageLib._getCoverageWAD();
         // Compute the minimum required junior tranche NAV to satisfy the coverage condition
         // Round up in favor of the senior tranche
-        uint256 minCoverageAssets = _getSeniorTranchePrincipal().mulDiv(
-            RoycoTrancheStorageLib._getCoverageWAD(), (ConstantsLib.WAD - RoycoTrancheStorageLib._getCoverageWAD()), Math.Rounding.Floor
-        );
-
+        uint256 minCoverageAssets = _getSeniorTranchePrincipal().mulDiv(coverageWAD, (ConstantsLib.WAD - coverageWAD), Math.Rounding.Floor);
         // Compute x, clipped to 0 to prevent underflow
-        return Math.saturatingSub(jtNAV, minCoverageAssets);
+        return Math.saturatingSub(_getJuniorTrancheNAV(), minCoverageAssets);
     }
 
     /// @inheritdoc BaseRoycoTranche
