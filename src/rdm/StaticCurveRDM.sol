@@ -53,20 +53,19 @@ contract StaticCurveRDM is IRDM {
         if (_stTotalAssets == 0 || _jtTotalAssets == 0 || _coverageWAD == 0) return 0;
 
         // Compute the utilization of the market
+        // Round in favor the senior tranche
         uint256 utilization = (_stTotalAssets + _jtTotalAssets).mulDiv(_coverageWAD, _jtTotalAssets, Math.Rounding.Floor);
 
-        // If utilization is greater than or equal to 1, apply the third leg of R(U)
-        // JT gets 100% of ST yield allocated to it
+        // Compute R(U), rounding in favor the senior tranche
         if (utilization >= ConstantsLib.WAD) {
+            // If utilization is greater than or equal to 1, apply the third leg of R(U)
             return ConstantsLib.WAD;
-        }
-
-        // If utilization is below the kink (target), apply the first leg of R(U)
-        if (utilization < TARGET_UTILIZATION) {
-            return SLOPE_LT_TARGET_UTIL.mulDiv(utilization, ConstantsLib.WAD, Math.Rounding.Floor);
-        } else {
+        } else if (utilization >= TARGET_UTILIZATION) {
             // If utilization is at or above the kink (target), apply the second leg of R(U)
             return SLOPE_GTE_TARGET_UTIL.mulDiv((utilization - TARGET_UTILIZATION), ConstantsLib.WAD, Math.Rounding.Floor) + BASE_RATE_GTE_TARGET_UTIL;
+        } else {
+            // If utilization is below the kink (target), apply the first leg of R(U)
+            return SLOPE_LT_TARGET_UTIL.mulDiv(utilization, ConstantsLib.WAD, Math.Rounding.Floor);
         }
     }
 }
