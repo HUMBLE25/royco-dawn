@@ -12,7 +12,7 @@ import { ExecutionModel, RoycoKernelLib } from "./RoycoKernelLib.sol";
  * @custom:field complementTranche - The address of the paired junior tranche
  * @custom:field coverageWAD - The percentage of tranche assets insured by junior tranche (WAD = 100%)
  * @custom:field decimalsOffset - Decimals offset for share token precision
- * @custom:field lastNAV - The last recorded NAV of the tranche
+ * @custom:field lastRawNAV - The last recorded NAV of the tranche
  * @custom:field DEPOSIT_EXECUTION_MODEL - The kernel execution model for deposit operations
  * @custom:field WITHDRAW_EXECUTION_MODEL - The kernel execution model for withdrawal operations
  * @custom:field isOperator - Nested mapping tracking operator approvals for owners
@@ -23,7 +23,7 @@ struct RoycoTrancheState {
     address complementTranche;
     uint64 coverageWAD;
     uint8 decimalsOffset;
-    uint256 lastNAV;
+    uint256 lastRawNAV;
     ExecutionModel DEPOSIT_EXECUTION_MODEL;
     ExecutionModel WITHDRAW_EXECUTION_MODEL;
     mapping(address owner => mapping(address operator => bool isOperator)) isOperator;
@@ -107,8 +107,8 @@ library RoycoTrancheStorageLib {
      * @notice Returns the last recorded NAV for this tranche
      * @return The last recorded NAV for this tranche in its base asset
      */
-    function _getLastNAV() internal view returns (uint256) {
-        return _getRoycoTrancheStorage().lastNAV;
+    function _getLastRawNAV() internal view returns (uint256) {
+        return _getRoycoTrancheStorage().lastRawNAV;
     }
 
     /**

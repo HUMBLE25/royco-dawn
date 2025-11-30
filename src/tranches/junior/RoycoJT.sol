@@ -44,23 +44,23 @@ contract RoycoJT is IRoycoJuniorTranche, BaseRoycoTranche {
     function totalAssets() public view override(BaseRoycoTranche) returns (uint256) {
         // // TODO: Yield distribution and fee accrual
         // // Get the NAV of the senior tranche and the total principal deployed into the investment
-        // uint256 stNAV = IRoycoTranche(RoycoTrancheStorageLib._getComplementTranche()).getNAV();
+        // uint256 stRawNAV = IRoycoTranche(RoycoTrancheStorageLib._getComplementTranche()).getNAV();
         // uint256 stPrincipal = _getSeniorTranchePrincipal();
 
         // // Junior tranche doesn't need to absorb any losses from senior if they are in profit
-        // uint256 jtNAV = _getSelfNAV();
-        // if (stNAV >= stPrincipal) return jtNAV;
+        // uint256 jtRawNAV = _getSelfNAV();
+        // if (stRawNAV >= stPrincipal) return jtRawNAV;
 
         // // Senior tranche has incurred a loss
         // // Calculate the loss relative to the principal
-        // uint256 stLoss = stPrincipal - stNAV;
+        // uint256 stLoss = stPrincipal - stRawNAV;
         // // Compute the coverage commitment provided by the junior tranche
         // uint256 jtcoverageCommitment = _computeJuniorTranchecoverageCommitment(stPrincipal);
         // // The loss absorbed by JT cannot exceed their coverage commitment amount
         // uint256 jtLoss = Math.min(stLoss, jtcoverageCommitment);
 
         // // Return the total assets held by the junior tranche after absorbing losses, clipped to 0
-        // return Math.saturatingSub(jtNAV, jtLoss);
+        // return Math.saturatingSub(jtRawNAV, jtLoss);
     }
 
     /// @inheritdoc BaseRoycoTranche

@@ -35,7 +35,7 @@ contract StaticCurveRDM is IRDM {
     uint256 public constant BASE_RATE_GTE_TARGET_UTIL = 0.225e18;
 
     /// @inheritdoc IRDM
-    function getRewardDistribution(bytes32, uint256 _stNAV, uint256 _jtNAV, uint256 _coverageWAD) external pure returns (uint256) {
+    function getJTYieldShare(bytes32, uint256 _stRawNAV, uint256 _jtRawNAV, uint256 _coverageWAD) external pure returns (uint256) {
         /**
          * Reward Distribution Model (piecewise curve):
          *
@@ -51,10 +51,10 @@ contract StaticCurveRDM is IRDM {
          */
 
         // If any of these quantities is 0, the utilization is effectively 0, so the JT's percentage of ST yield is 0%
-        if (_stNAV == 0 || _jtNAV == 0 || _coverageWAD == 0) return 0;
+        if (_stRawNAV == 0 || _jtRawNAV == 0 || _coverageWAD == 0) return 0;
 
         // Compute the utilization of the market
-        uint256 utilization = UtilsLib.computeUtilization(_stNAV, _jtNAV, _coverageWAD);
+        uint256 utilization = UtilsLib.computeUtilization(_stRawNAV, _jtRawNAV, _coverageWAD);
 
         // Compute R(U), rounding in favor the senior tranche
         if (utilization >= ConstantsLib.WAD) {

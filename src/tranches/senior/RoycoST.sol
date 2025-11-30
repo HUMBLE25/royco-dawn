@@ -41,12 +41,12 @@ contract RoycoST is BaseRoycoTranche {
     function totalAssets() public view override(BaseRoycoTranche) returns (uint256) {
         // TODO: Yield distribution and fee accrual
         // Get the NAV of the senior tranche and the total principal deployed into the investment
-        uint256 stNAV = _getSelfNAV();
-        uint256 jtNAV = _getJuniorTrancheNAV();
+        uint256 stRawNAV = _getSelfNAV();
+        uint256 jtRawNAV = _getJuniorTrancheNAV();
 
         uint256 coverageProvided = _computeSeniorTrancheCoverage();
 
-        return Math.max(stNAV, coverageProvided);
+        return Math.max(stRawNAV, coverageProvided);
     }
 
     /// @inheritdoc BaseRoycoTranche
@@ -118,15 +118,15 @@ contract RoycoST is BaseRoycoTranche {
      */
     function _getTrancheDepositCapacity() internal view override(BaseRoycoTranche) returns (uint256) {
         // Retrieve the junior tranche net asset value
-        uint256 jtNAV = _getJuniorTrancheNAV();
-        if (jtNAV == 0) return 0;
+        uint256 jtRawNAV = _getJuniorTrancheNAV();
+        if (jtRawNAV == 0) return 0;
 
         // Compute the total assets currently covered by the junior tranche
         // Round in favor of the senior tranche
-        uint256 totalCoveredAssets = jtNAV.mulDiv(ConstantsLib.WAD, RoycoTrancheStorageLib._getCoverageRatioWAD(), Math.Rounding.Floor);
+        uint256 totalCoveredAssets = jtRawNAV.mulDiv(ConstantsLib.WAD, RoycoTrancheStorageLib._getCoverageRatioWAD(), Math.Rounding.Floor);
 
         // Compute x, clipped to 0 to prevent underflow
-        return Math.saturatingSub(totalCoveredAssets, jtNAV).saturatingSub(_getSelfNAV());
+        return Math.saturatingSub(totalCoveredAssets, jtRawNAV).saturatingSub(_getSelfNAV());
     }
 
     /// @inheritdoc BaseRoycoTranche

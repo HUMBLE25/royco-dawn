@@ -10,8 +10,8 @@ struct Market {
     uint256 lastJuniorNAV;
     uint256 lastSeniorProtectedNAV;
     uint256 lastJuniorProtectedNAV;
-    uint256 lastTWAU;
-    uint256 lastUtilUpdateTimestamp;
+    uint256 jtYieldShareAccrued;
+    uint256 lastJTYieldShareAccrualTimestamp;
 }
 
 /**
