@@ -17,9 +17,10 @@ contract StaticCurveRDM is IRDM {
 
     /**
      * @dev Constant for the target utilization of the junior tranche (90%)
-     * @dev Utilization = (senior tranche principal * coverage percentage) / junior tranche assets
-     * @dev Invariant: junior tranche assets >= (senior tranche principal * coverage percentage)
-     * @dev The above ensures that Utilization ∈ [0,1]
+     * @dev Utilization = ((ST_NAV + JT_NAV) * COV_%) / JT_NAV
+     * @dev Coverage Condition: JT_NAV >= (JT_NAV + ST_NAV) * COV_%
+     * @dev The above attempts to keep utilization ∈ [0,1]
+     * @dev However, utilization can be greater than 1 if JT experiences a loss proportionally greater than ST
      */
     uint256 public constant TARGET_UTILIZATION = 0.9e18;
 
@@ -39,22 +40,23 @@ contract StaticCurveRDM is IRDM {
          *
          *   R(U) = 0.25 * U                   if U < 0.9
          *        = 7.75 * (U - 0.9) + 0.225   if U ≥ 0.9
+         *        = 1                          if U ≥ 1
          *
-         * U ∈ [0, 1] → Utilization = ((senior tranche principal + junior tranche principal) * coverage percentage) / junior tranche principal
-         * R(U)       → Reward percentage paid to the junior tranche
+         * U    → Utilization = ((ST_NAV + JT_NAV) * COV_%) / JT_NAV
+         * R(U) → Percentage of ST yield paid to the junior tranche
          *
-         * Below 90% utilization, rate rises slowly (0.25 slope).
-         * Above 90%, rate rises sharply (7.75 slope) to penalize high utilization and incentivize additional junior assets.
+         * Below 90% utilization, JT yield allocation rises slowly (0.25 slope).
+         * Above 90% utilization, JT yield allocation rises sharply (7.75 slope), penalizing high utilization and incentivizing additional junior deposits or senior withdrawals.
          */
 
-        // If any of these quantities is 0, the utilization is effectively 0, so the JT's percentage of rewards is 0%
+        // If any of these quantities is 0, the utilization is effectively 0, so the JT's percentage of ST yield is 0%
         if (_stTotalAssets == 0 || _jtTotalAssets == 0 || _coverageWAD == 0) return 0;
 
         // Compute the utilization of the market
-        uint256 utilization = _stTotalAssets.mulDiv(_coverageWAD, _jtTotalAssets, Math.Rounding.Floor);
+        uint256 utilization = (_stTotalAssets + _jtTotalAssets).mulDiv(_coverageWAD, _jtTotalAssets, Math.Rounding.Floor);
 
-        // Theoretically, this branch should never be hit for the purely greater than case, as it would imply a violation of the invariant:
-        // junior tranche assets >= (senior tranche principal * coverage percentage)
+        // If utilization is greater than or equal to 1, apply the third leg of R(U)
+        // JT gets 100% of ST yield allocated to it
         if (utilization >= ConstantsLib.WAD) {
             return ConstantsLib.WAD;
         }

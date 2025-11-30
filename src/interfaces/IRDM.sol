@@ -9,8 +9,8 @@ interface IRDM {
     /**
      * @notice Computes the distribution of total rewards that should be allocated to the senior and junior tranches of a Royco market
      * @param _marketID The unique identifier for the Royco market (may be used for market-specific logic)
-     * @param _stTotalAssets The total assets in the senior tranche
-     * @param _jtTotalAssets The total assets in the junior tranche, serving as first loss capital
+     * @param _stTotalAssets The total assets controlled by the senior tranche (including coverage and yield distribution events)
+     * @param _jtTotalAssets The total assets by the junior tranche (including coverage and yield distribution events)
      * @param _coverageWAD The percentage of the total NAV that is expected to be covered by the junior tranche, scaled by WAD
      * @return jtRewardPercentageWAD The percentage of the senior's NAV appreciation allocated to the junior tranche, scaled by WAD
      *                               It is implied that (WAD - jtRewardPercentageWAD) will be the percentage allocated to the senior tranche

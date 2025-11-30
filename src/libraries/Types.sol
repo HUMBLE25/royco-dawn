@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 struct Market {
     uint64 coverageWAD;
+    address rdm;
     address seniorTranche;
     address juniorTranche;
     uint256 lastSeniorNAV;
