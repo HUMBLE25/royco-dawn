@@ -41,7 +41,7 @@ contract Royco is RoycoSTFactory {
         );
     }
 
-    function updateTrancheAccounting(bytes32 _marketId) external returns (uint256 stNAV, uint256 jtNAV, uint256 stTotalAssets, uint256 jtTotalAssets) {
+    function updateTrancheAccounting(bytes32 _marketId) external returns (uint256 stNAV, uint256 jtNAV, uint256 stProtectedNAV, uint256 jtProtectedNAV) {
         Market storage market = marketIdToMarket[_marketId];
 
         // _accrueYield();
@@ -51,13 +51,13 @@ contract Royco is RoycoSTFactory {
         jtNAV = IRoycoTranche(market.juniorTranche).getNAV();
 
         // Cache the total assets for each tranche as their last recorded total assets
-        stTotalAssets = market.lastSeniorTotalAssets;
-        jtTotalAssets = market.lastJuniorTotalAssets;
+        stProtectedNAV = market.lastSeniorProtectedNAV;
+        jtProtectedNAV = market.lastJuniorProtectedNAV;
 
         // Compute and apply any losses for the junior tranche to its total assets
         uint256 jtLoss = Math.saturatingSub(market.lastJuniorNAV, jtNAV);
         if (jtLoss > 0) {
-            jtTotalAssets = Math.saturatingSub(jtTotalAssets, jtLoss);
+            jtProtectedNAV = Math.saturatingSub(jtProtectedNAV, jtLoss);
         }
 
         // Compute the delta in the seior tranche NAV
@@ -66,11 +66,11 @@ contract Royco is RoycoSTFactory {
         if (deltaST < 0) {
             // Apply the loss to the senior tranche's total assets
             uint256 loss = uint256(-deltaST);
-            stTotalAssets -= loss;
+            stProtectedNAV -= loss;
             // Compute and apply the coverage provided by the junior tranche to the senior tranche
-            uint256 coverage = Math.min(loss, jtTotalAssets);
-            stTotalAssets += coverage;
-            jtTotalAssets -= coverage;
+            uint256 coverage = Math.min(loss, jtProtectedNAV);
+            stProtectedNAV += coverage;
+            jtProtectedNAV -= coverage;
         } else {
             // Senior tranche accrued yield
             // Apply the yield distribution via the RDM
@@ -79,7 +79,9 @@ contract Royco is RoycoSTFactory {
         // Set the tranche checkpoints in persistent storage
         market.lastSeniorNAV = stNAV;
         market.lastJuniorNAV = jtNAV;
-        market.lastSeniorTotalAssets = stTotalAssets;
-        market.lastJuniorTotalAssets = jtTotalAssets;
+        market.lastSeniorProtectedNAV = stProtectedNAV;
+        market.lastJuniorProtectedNAV = jtProtectedNAV;
     }
+
+    function _accrueUtilization() internal { }
 }

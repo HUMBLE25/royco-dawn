@@ -8,8 +8,10 @@ struct Market {
     address juniorTranche;
     uint256 lastSeniorNAV;
     uint256 lastJuniorNAV;
-    uint256 lastSeniorTotalAssets;
-    uint256 lastJuniorTotalAssets;
+    uint256 lastSeniorProtectedNAV;
+    uint256 lastJuniorProtectedNAV;
+    uint256 lastTWAU;
+    uint256 lastUtilUpdateTimestamp;
 }
 
 /**

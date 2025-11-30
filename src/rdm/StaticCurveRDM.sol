@@ -5,6 +5,7 @@ import { IRDM } from "../interfaces/IRDM.sol";
 
 import { Math } from "../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 import { ConstantsLib } from "../libraries/ConstantsLib.sol";
+import { UtilsLib } from "../libraries/UtilsLib.sol";
 
 /**
  * @title StaticCurveRDM
@@ -30,11 +31,11 @@ contract StaticCurveRDM is IRDM {
     /// @dev The slope when the market's utilization is greater than or equal to the target utilization (scaled by WAD)
     uint256 public constant SLOPE_GTE_TARGET_UTIL = 7.75e18;
 
-    /// @dev The base rate paid to the junior tranche when the utilization is exactly at the target
+    /// @dev The base rate paid to the junior tranche when the utilization is exactly at the target (scaled by WAD)
     uint256 public constant BASE_RATE_GTE_TARGET_UTIL = 0.225e18;
 
     /// @inheritdoc IRDM
-    function getRewardDistribution(bytes32, uint256 _stTotalAssets, uint256 _jtTotalAssets, uint256 _coverageWAD) external pure returns (uint256) {
+    function getRewardDistribution(bytes32, uint256 _stNAV, uint256 _jtNAV, uint256 _coverageWAD) external pure returns (uint256) {
         /**
          * Reward Distribution Model (piecewise curve):
          *
@@ -50,11 +51,10 @@ contract StaticCurveRDM is IRDM {
          */
 
         // If any of these quantities is 0, the utilization is effectively 0, so the JT's percentage of ST yield is 0%
-        if (_stTotalAssets == 0 || _jtTotalAssets == 0 || _coverageWAD == 0) return 0;
+        if (_stNAV == 0 || _jtNAV == 0 || _coverageWAD == 0) return 0;
 
         // Compute the utilization of the market
-        // Round in favor the senior tranche
-        uint256 utilization = (_stTotalAssets + _jtTotalAssets).mulDiv(_coverageWAD, _jtTotalAssets, Math.Rounding.Floor);
+        uint256 utilization = UtilsLib.computeUtilization(_stNAV, _jtNAV, _coverageWAD);
 
         // Compute R(U), rounding in favor the senior tranche
         if (utilization >= ConstantsLib.WAD) {
