@@ -5,6 +5,10 @@ struct Market {
     uint64 coverageWAD;
     address seniorTranche;
     address juniorTranche;
+    uint256 lastSeniorNAV;
+    uint256 lastJuniorNAV;
+    uint256 lastSeniorTotalAssets;
+    uint256 lastJuniorTotalAssets;
 }
 
 /**
@@ -32,8 +36,7 @@ struct CreateMarketParams {
 /**
  * @custom:field name - The name of the tranche (should be prefixed with "Royco-ST" or "Royco-JT") share token
  * @custom:field symbol - The symbol of the tranche (should be prefixed with "ST" or "JT") share token
- * @custom:field kernel - The tranche kernel responsible for defining the execution logic and semantics of the senior tranche
- *                          This kernel is required to have synchronous execution semantics and liquidity must be instantly depositable and withdrawable.
+ * @custom:field kernel - The tranche kernel responsible for defining the execution model and logic of the tranche
  * @custom:field kernelInitCallData - ABI encoded parameters to intialize the tranche kernel
  */
 struct TrancheDeploymentParams {
@@ -44,14 +47,14 @@ struct TrancheDeploymentParams {
 }
 
 /**
- * @title ActionType
+ * @title Action
  * @dev Defines the action being executed by the user
  * @custom:type DEPOSIT Depositing assets into the tranche
- * @custom:type WITHDRAWAL Withdrawing assets from the tranche
+ * @custom:type WITHDRAW Withdrawing assets from the tranche
  */
-enum ActionType {
+enum Action {
     DEPOSIT,
-    WITHDRAWAL
+    WITHDRAW
 }
 
 /**

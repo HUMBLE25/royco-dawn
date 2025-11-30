@@ -20,7 +20,7 @@ contract AaveV3Kernel is Initializable, BaseKernel {
     ExecutionModel public constant override DEPOSIT_EXECUTION_MODEL = ExecutionModel.SYNC;
 
     /// @inheritdoc IBaseKernel
-    ExecutionModel public constant override WITHDRAWAL_EXECUTION_MODEL = ExecutionModel.SYNC;
+    ExecutionModel public constant override WITHDRAW_EXECUTION_MODEL = ExecutionModel.SYNC;
 
     /// @inheritdoc IBaseKernel
     bool public constant override SUPPORTS_DEPOSIT_CANCELLATION = false;

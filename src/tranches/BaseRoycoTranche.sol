@@ -15,7 +15,7 @@ import { IERC165, IERC7540, IERC7575, IERC7887, IRoycoTranche } from "../interfa
 import { ConstantsLib } from "../libraries/ConstantsLib.sol";
 import { ExecutionModel, RoycoKernelLib } from "../libraries/RoycoKernelLib.sol";
 import { RoycoTrancheStorageLib } from "../libraries/RoycoTrancheStorageLib.sol";
-import { ActionType, TrancheDeploymentParams } from "../libraries/Types.sol";
+import { Action, TrancheDeploymentParams } from "../libraries/Types.sol";
 
 // TODO: ST and JT base asset can have different decimals
 /**
@@ -39,19 +39,15 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
     error INVALID_COVERAGE_REQUIREMENT();
 
     /// @notice Thrown when junior tranche provided coverage is insufficient for the senior tranche
-    error INSUFFICIENT_SENIOR_TRANCHE_COVERAGE();
+    error INSUFFICIENT_COVERAGE();
 
     /**
-     * @notice Modifier to ensure the specified action type uses a synchronous execution model
-     * @param _actionType The action type to check (DEPOSIT or WITHDRAWAL)
-     * @dev Reverts if the execution model is asynchronous
+     * @notice Modifier to ensure the specified action uses a synchronous execution model
+     * @param _action The action to check (DEPOSIT or WITHDRAW)
+     * @dev Reverts if the execution model for the action is asynchronous
      */
-    modifier executionIsSync(ActionType _actionType) {
-        require(
-            (_actionType == ActionType.DEPOSIT ? RoycoTrancheStorageLib._getDepositExecutionModel() : RoycoTrancheStorageLib._getWithdrawalExecutionModel())
-                == ExecutionModel.SYNC,
-            DISABLED()
-        );
+    modifier executionIsSync(Action _action) {
+        require(_isSync(_action), DISABLED());
         _;
     }
 
@@ -67,20 +63,20 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
 
     /**
      * @notice Post-condition that enforces the market's coverage requirement
-     * @dev Junior capital should be able to absorb losses up to the coverage ratio of the market
+     * @dev Junior capital should be able to absorb losses up to the coverage ratio of the market, based on the current total NAV
      *      It should be able to do so while incurring a loss proportionally equal to or less than the senior tranche
-     * @dev Coverage condition: JT_NAV >= (JT_NAV + ST_Principal) * Coverage_%
-     *      Simplified condition: JT_NAV >= (ST_Principal * Coverage_%) / (100% - Coverage_%)
-     *      If this fails, junior capital is insufficient to meet the coverage requirement for the senior principal
+     * @dev Coverage condition: JT_NAV >= (JT_NAV + ST_NAV) * COV_%
+     *      Simplified condition: JT_NAV >= (ST_NAV * COV_%) / (100% - COV_%)
+     *      If this fails, the current junior capital is insufficient to meet the coverage requirement for the total NAV
      * @dev Failure Modes:
      *      1. Synchronous:  Junior capital is insufficient purely because of too many senior deposits or junior withdrawals
      *      2. Asynchronous: Junior capital is insufficient because it incurred a loss proportionally greater than what senior capital did
-     *                       This should not occur if both tranches are deployed into the same opportunity or junior is deployed into a strictly safer (RFR) source.
+     *                       This should not occur if both tranches are deployed into the same opportunity or junior is deployed into a strictly safer (eg. RFR) source
      */
     modifier checkCoverage() {
         // Coverage must be checked after all state changes have been applied
         _;
-        require(_getJuniorTrancheNAV() >= _getMinJuniorTrancheNAV(), INSUFFICIENT_SENIOR_TRANCHE_COVERAGE());
+        require(_getJuniorTrancheNAV() >= _computeMinJuniorTrancheNAV(), INSUFFICIENT_COVERAGE());
     }
 
     /**
@@ -89,7 +85,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
      * @param _trancheParams Deployment parameters including name, symbol, kernel, and kernel initialization data
      * @param _asset The underlying asset for the tranche
      * @param _owner The initial owner of the tranche
-     * @param _coverageWAD The coverage ratio in WAD format (1e18 = 100%)
+     * @param _coverageWAD The coverage condition in WAD format (1e18 = 100%)
      * @param _complementTranche The address of the paired tranche (junior for senior, senior for junior)
      */
     function __RoycoTranche_init(
@@ -117,7 +113,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
      * @param _asset The underlying asset for the tranche
      * @param _kernel The kernel that handles strategy logic
      * @param _kernelInitCallData Initialization data for the kernel
-     * @param _coverageWAD The coverage ratio in WAD format (1e18 = 100%)
+     * @param _coverageWAD The coverage condition in WAD format (1e18 = 100%)
      * @param _complementTranche The address of the paired tranche
      */
     function __RoycoTranche_init_unchained(
@@ -146,13 +142,13 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
 
     /// @inheritdoc IRoycoTranche
     function getNAV() external view override(IRoycoTranche) returns (uint256) {
-        return RoycoKernelLib._getNAV(RoycoTrancheStorageLib._getKernel(), asset());
+        return _getSelfNAV();
     }
 
     /// @inheritdoc ERC4626Upgradeable
     /// @dev Must be overridden by senior and junior tranches to account for loss coverage and yield accrual
     function totalAssets() public view virtual override(ERC4626Upgradeable) returns (uint256) {
-        // Ensures all tranche operations is disabled unless overriden
+        // Ensures all tranche operations are disabled unless overriden
         revert DISABLED();
     }
 
@@ -170,9 +166,9 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
 
     /// @inheritdoc ERC4626Upgradeable
     function maxWithdraw(address _owner) public view virtual override(ERC4626Upgradeable) returns (uint256) {
-        // Get the maximum globally withdrawable assets
+        // Get the maximum withdrawable assets
         uint256 maxAssetsWithdrawable = RoycoKernelLib._maxWithdraw(RoycoTrancheStorageLib._getKernel(), _owner, asset());
-        // Return the minimum of the globally withdrawable assets, assets owned by the owner, and the tranche's withdrawal capacity
+        // Return the minimum of the withdrawable assets, assets owned by the owner, and the tranche's withdrawal capacity
         return Math.min(maxAssetsWithdrawable, super.previewRedeem(balanceOf(_owner))).min(_getTrancheWithdrawalCapacity());
     }
 
@@ -185,25 +181,25 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
 
     /// @inheritdoc ERC4626Upgradeable
     /// @dev Disabled if deposit execution is asynchronous as per ERC7540
-    function previewDeposit(uint256 _assets) public view virtual override(ERC4626Upgradeable) executionIsSync(ActionType.DEPOSIT) returns (uint256) {
+    function previewDeposit(uint256 _assets) public view virtual override(ERC4626Upgradeable) executionIsSync(Action.DEPOSIT) returns (uint256) {
         return super.previewDeposit(_assets);
     }
 
     /// @inheritdoc ERC4626Upgradeable
     /// @dev Disabled if deposit execution is asynchronous as per ERC7540
-    function previewMint(uint256 _shares) public view virtual override(ERC4626Upgradeable) executionIsSync(ActionType.DEPOSIT) returns (uint256) {
+    function previewMint(uint256 _shares) public view virtual override(ERC4626Upgradeable) executionIsSync(Action.DEPOSIT) returns (uint256) {
         return super.previewMint(_shares);
     }
 
     /// @inheritdoc ERC4626Upgradeable
     /// @dev Disabled if withdrawal execution is asynchronous as per ERC7540
-    function previewWithdraw(uint256 _assets) public view virtual override(ERC4626Upgradeable) executionIsSync(ActionType.WITHDRAWAL) returns (uint256) {
+    function previewWithdraw(uint256 _assets) public view virtual override(ERC4626Upgradeable) executionIsSync(Action.WITHDRAW) returns (uint256) {
         return super.previewWithdraw(_assets);
     }
 
     /// @inheritdoc ERC4626Upgradeable
     /// @dev Disabled if withdrawal execution is asynchronous as per ERC7540
-    function previewRedeem(uint256 _shares) public view virtual override(ERC4626Upgradeable) executionIsSync(ActionType.WITHDRAWAL) returns (uint256) {
+    function previewRedeem(uint256 _shares) public view virtual override(ERC4626Upgradeable) executionIsSync(Action.WITHDRAW) returns (uint256) {
         return super.previewRedeem(_shares);
     }
 
@@ -282,7 +278,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
         uint256 maxWithdrawableAssets = maxWithdraw(_controller);
         require(_assets <= maxWithdrawableAssets, ERC4626ExceededMaxWithdraw(_controller, _assets, maxWithdrawableAssets));
 
-        // Handle burning shares and principal accouting on withdrawal
+        // Account for the withdrawal
         _withdraw(msg.sender, _receiver, _controller, _assets, (shares = super.previewWithdraw(_assets)));
 
         // Process the withdrawal from the underlying investment opportunity
@@ -307,7 +303,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
         uint256 maxRedeemableShares = maxRedeem(_controller);
         require(_shares <= maxRedeemableShares, ERC4626ExceededMaxRedeem(_controller, _shares, maxRedeemableShares));
 
-        // Handle burning shares and principal accouting on withdrawal
+        // Account for the withdrawal
         _withdraw(msg.sender, _receiver, _controller, (assets = super.previewRedeem(_shares)), _shares);
 
         // Process the withdrawal from the underlying investment opportunity
@@ -503,20 +499,18 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
     }
 
     /// @inheritdoc ERC4626Upgradeable
-    /// @dev Should be overridden by the senior tranche to handle principal accounting
     function _deposit(address _caller, address _receiver, uint256 _assets, uint256 _shares) internal virtual override(ERC4626Upgradeable) {
         // If deposits are synchronous, transfer the assets to the tranche and mint the shares
-        if (RoycoTrancheStorageLib._getDepositExecutionModel() == ExecutionModel.SYNC) super._deposit(_caller, _receiver, _assets, _shares);
+        if (_isSync(Action.DEPOSIT)) super._deposit(_caller, _receiver, _assets, _shares);
         // If deposits are asynchronous, only mint shares since assets were transfered in on the request
         else _mint(_receiver, _shares);
     }
 
     /// @inheritdoc ERC4626Upgradeable
-    /// @dev Should be overridden by the senior tranche to handle principal accounting
     /// @dev Doesn't transfer assets to the receiver. This is the responsibility of the kernel.
     function _withdraw(address _caller, address _receiver, address _owner, uint256 _assets, uint256 _shares) internal virtual override(ERC4626Upgradeable) {
         // If withdrawals are synchronous, burn the shares from the owner
-        if (RoycoTrancheStorageLib._getWithdrawalExecutionModel() == ExecutionModel.SYNC) {
+        if (_isSync(Action.WITHDRAW)) {
             // Spend the caller's share allowance if the caller isn't the owner
             if (_caller != _owner) _spendAllowance(_owner, _caller, _shares);
             // Burn the shares being redeemed from the owner
@@ -529,24 +523,42 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
         emit Withdraw(_caller, _receiver, _owner, _assets, _shares);
     }
 
-    /// @dev Returns the minimum amount of assets held by the junior tranche to satisfy the coverage condition
-    function _getMinJuniorTrancheNAV() internal view returns (uint256) {
-        // Round up in favor of the senior tranche
-        uint256 coverageWAD = RoycoTrancheStorageLib._getCoverageWAD();
-        return _getSeniorTranchePrincipal().mulDiv(coverageWAD, (ConstantsLib.WAD - coverageWAD), Math.Rounding.Ceil);
+    /// @dev Returns the minimum NAV of the junior tranche to satisfy the market's coverage condition
+    function _computeMinJuniorTrancheNAV() internal view returns (uint256) {
+        uint256 coverageWAD = RoycoTrancheStorageLib._getCoverageRatioWAD();
+        // Round in favor of the senior tranche
+        return _getSeniorTrancheNAV().mulDiv(coverageWAD, (ConstantsLib.WAD - coverageWAD), Math.Rounding.Ceil);
     }
 
-    /// @dev Returns the deposit capacity in assets based on the coverage requirement
+    /// @dev Returns the minimum NAV of the junior tranche to satisfy the market's coverage condition
+    function _computeSeniorTrancheCoverage() internal view returns (uint256) {
+        uint256 coverageWAD = RoycoTrancheStorageLib._getCoverageRatioWAD();
+        // Round in favor of the senior tranche
+        return _getJuniorTrancheNAV().mulDiv((ConstantsLib.WAD - coverageWAD), coverageWAD, Math.Rounding.Floor);
+    }
+
+    /// @dev Returns the NAV of this tranche
+    function _getSelfNAV() internal view returns (uint256) {
+        return RoycoKernelLib._getNAV(RoycoTrancheStorageLib._getKernel(), asset());
+    }
+
+    /// @dev Returns the deposit capacity in assets based on the coverage condition
     function _getTrancheDepositCapacity() internal view virtual returns (uint256);
 
-    /// @dev Returns the withdrawal capacity in assets based on the coverage requirement
+    /// @dev Returns the withdrawal capacity in assets based on the coverage condition
     function _getTrancheWithdrawalCapacity() internal view virtual returns (uint256);
 
-    /// @dev Returns the net asset value of the junior tranche in the junior tranche's base asset
+    /// @dev Returns the net asset value for the junior tranche
     function _getJuniorTrancheNAV() internal view virtual returns (uint256);
 
-    /// @dev Returns the total principal assets for the senior tranche
-    function _getSeniorTranchePrincipal() internal view virtual returns (uint256);
+    /// @dev Returns the net asset value for the senior tranche
+    function _getSeniorTrancheNAV() internal view virtual returns (uint256);
+
+    /// @dev Returns if the specified action employs a synchronous execution model
+    function _isSync(Action _action) internal view returns (bool) {
+        return (_action == Action.DEPOSIT ? RoycoTrancheStorageLib._getDepositExecutionModel() : RoycoTrancheStorageLib._getWithdrawalExecutionModel())
+            == ExecutionModel.SYNC;
+    }
 
     /// @inheritdoc ERC4626Upgradeable
     function _decimalsOffset() internal view virtual override(ERC4626Upgradeable) returns (uint8) {

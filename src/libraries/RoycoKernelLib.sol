@@ -83,8 +83,8 @@ library RoycoKernelLib {
      * @param _kernel The address of the kernel contract
      * @return The execution semantics of withdrawing from this tranche (SYNC or ASYNC)
      */
-    function _WITHDRAWAL_EXECUTION_MODEL(address _kernel) internal pure returns (ExecutionModel) {
-        return IBaseKernel(_kernel).WITHDRAWAL_EXECUTION_MODEL();
+    function _WITHDRAW_EXECUTION_MODEL(address _kernel) internal pure returns (ExecutionModel) {
+        return IBaseKernel(_kernel).WITHDRAW_EXECUTION_MODEL();
     }
 
     // =============================
