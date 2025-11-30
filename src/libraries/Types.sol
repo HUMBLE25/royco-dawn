@@ -8,10 +8,10 @@ struct Market {
     address juniorTranche;
     uint256 lastSeniorNAV;
     uint256 lastJuniorNAV;
-    uint256 lastSeniorProtectedNAV;
-    uint256 lastJuniorProtectedNAV;
-    uint256 jtYieldShareAccrued;
-    uint256 lastJTYieldShareAccrualTimestamp;
+    uint256 lastSeniorEffectiveNAV;
+    uint256 lastJuniorEffectiveNAV;
+    uint216 jtYieldShareAccrued;
+    uint40 lastJTYieldShareAccrualTimestamp;
 }
 
 /**
