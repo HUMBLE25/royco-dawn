@@ -35,6 +35,7 @@ contract Royco is RoycoSTFactory {
         // Set the expected loss for this market
         // This set the minimum ratio between the junior and senior tranche
         market.coverageWAD = _params.coverageWAD;
+        market.rdm = _params.rdm;
 
         // Deploy the senior tranche
         address seniorTranche = market.seniorTranche = _deploySeniorTranche(
@@ -43,36 +44,43 @@ contract Royco is RoycoSTFactory {
     }
 
     function syncTrancheNAVs(bytes32 _marketId) external returns (uint256 stRawNAV, uint256 jtRawNAV, uint256 stEffectiveNAV, uint256 jtEffectiveNAV) {
-        // Get the raw and coverage adjusted (effective) NAVs of each tranche depending on the mark to market values of each tranche
-        (stRawNAV, jtRawNAV, stEffectiveNAV, jtEffectiveNAV) = computeEffecitveNAVs(_marketId);
         // Set the tranche NAV checkpoints in persistent storage
         Market storage market = marketIdToMarket[_marketId];
-        market.lastSeniorNAV = stRawNAV;
-        market.lastJuniorNAV = jtRawNAV;
+
+        // Accrue the yield distribution owed to JT since the last tranche interaction
+        _accrueJTYieldShare(_marketId, market);
+
+        // Get the raw and coverage adjusted (effective) NAVs of each tranche
+        (stRawNAV, jtRawNAV, stEffectiveNAV, jtEffectiveNAV) = _computeEffecitveNAVs(market);
+
+        // Write the updated tranche NAV checkpoints to persistent storage
+        market.lastSeniorRawNAV = stRawNAV;
+        market.lastJuniorRawNAV = jtRawNAV;
         market.lastSeniorEffectiveNAV = stEffectiveNAV;
         market.lastJuniorEffectiveNAV = jtEffectiveNAV;
     }
 
-    function computeEffecitveNAVs(bytes32 _marketId) public view returns (uint256 stRawNAV, uint256 jtRawNAV, uint256 stEffectiveNAV, uint256 jtEffectiveNAV) {
-        Market storage market = marketIdToMarket[_marketId];
-
+    function _computeEffecitveNAVs(Market storage _market)
+        internal
+        returns (uint256 stRawNAV, uint256 jtRawNAV, uint256 stEffectiveNAV, uint256 jtEffectiveNAV)
+    {
         // Get the current NAVs of each tranche
-        stRawNAV = IRoycoTranche(market.seniorTranche).getNAV();
-        jtRawNAV = IRoycoTranche(market.juniorTranche).getNAV();
+        stRawNAV = IRoycoTranche(_market.seniorTranche).getNAV();
+        jtRawNAV = IRoycoTranche(_market.juniorTranche).getNAV();
 
         // Cache the effective NAV for each tranche as their last recorded effective NAV
-        stEffectiveNAV = market.lastSeniorEffectiveNAV;
-        jtEffectiveNAV = market.lastJuniorEffectiveNAV;
+        stEffectiveNAV = _market.lastSeniorEffectiveNAV;
+        jtEffectiveNAV = _market.lastJuniorEffectiveNAV;
 
         // Compute the delta in the junior tranche NAV
-        int256 deltaJT = int256(jtRawNAV) - int256(market.lastJuniorNAV);
+        int256 deltaJT = int256(jtRawNAV) - int256(_market.lastJuniorRawNAV);
         // Apply the loss to the junior tranche's effective NAV
         if (deltaJT < 0) jtEffectiveNAV = Math.saturatingSub(jtEffectiveNAV, uint256(-deltaJT));
-        // Junior tranche always keeps 100% of its appreciation
+        // Junior tranche always keeps all of its appreciation
         else jtEffectiveNAV += uint256(deltaJT);
 
         // Compute the delta in the senior tranche NAV
-        int256 deltaST = int256(stRawNAV) - int256(market.lastSeniorNAV);
+        int256 deltaST = int256(stRawNAV) - int256(_market.lastSeniorRawNAV);
         if (deltaST < 0) {
             // Senior tranche incurred a loss
             // Apply the loss to the senior tranche's effective NAV
@@ -84,28 +92,39 @@ contract Royco is RoycoSTFactory {
             jtEffectiveNAV -= coverage;
         } else {
             // Senior tranche accrued yield
-            // TODO: Apply the yield distribution via the RDM
+            // Compute the time weighted average JT share of yield
+            uint256 elapsed = block.timestamp - _market.lastDistributionTimestamp;
+            // Preemptively return if last yield distribution was in the same block
+            if (elapsed == 0) return (stRawNAV, jtRawNAV, stEffectiveNAV, jtEffectiveNAV);
+            uint256 jtYieldShareWAD = _market.twJTYieldShareAccruedWAD / elapsed;
+            // Apply the yield split: adding each tranche's share of earnings to their effective NAVs
+            uint256 yield = uint256(deltaST);
+            uint256 jtYield = yield.mulDiv(jtYieldShareWAD, ConstantsLib.WAD, Math.Rounding.Floor);
+            jtEffectiveNAV += jtYield;
+            stEffectiveNAV += (yield - jtYield);
+            // Reset the accumulator and update the last yield distribution timestamp
+            delete _market.twJTYieldShareAccruedWAD;
+            _market.lastDistributionTimestamp = uint32(block.timestamp);
         }
     }
 
-    function _accrueJTYieldShare(bytes32 _marketID, Market storage _market, uint256 _stRawNAV, uint256 _jtRawNAV) internal {
+    function _accrueJTYieldShare(bytes32 _marketId, Market storage _market) internal {
         // Get the last update timestamp
-        uint256 lastUpdate = _market.lastJTYieldShareAccrualTimestamp;
+        uint256 lastUpdate = _market.lastAccrualTimestamp;
         if (lastUpdate == 0) {
-            _market.lastJTYieldShareAccrualTimestamp = uint40(block.timestamp);
+            _market.lastAccrualTimestamp = uint32(block.timestamp);
             return;
         }
 
         // Compute the elapsed time since the last update
         uint256 elapsed = block.timestamp - lastUpdate;
-        // Premptively return if last updated in the same block
+        // Preemptively return if last accrual was in the same block
         if (elapsed == 0) return;
 
-        // Get instantaneous JT yield share, scaled by WAD
-        uint256 jtYieldShareWAD = IRDM(_market.rdm).getJTYieldShare(_marketID, _stRawNAV, _jtRawNAV, _market.coverageWAD);
-
-        // Apply the accural of JT yield share to the accumulator, elapsed by the amount of time elapsed
-        _market.jtYieldShareAccrued += uint216(jtYieldShareWAD * elapsed);
-        _market.lastJTYieldShareAccrualTimestamp = uint40(block.timestamp);
+        // Get the instantaneous JT yield share, scaled by WAD
+        uint256 jtYieldShareWAD = IRDM(_market.rdm).getJTYieldShare(_marketId, _market.lastSeniorRawNAV, _market.lastJuniorRawNAV, _market.coverageWAD);
+        // Apply the accural of JT yield share to the accumulator, weighted by the amount of time elapsed
+        _market.twJTYieldShareAccruedWAD += uint192(jtYieldShareWAD * elapsed);
+        _market.lastAccrualTimestamp = uint32(block.timestamp);
     }
 }

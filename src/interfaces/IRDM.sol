@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 /**
  * @title IRDM - Reward Distribution Model Interface
- * @notice Interface for reward distribution models that determine how rewards are allocated between senior and junior tranches in Royco markets
+ * @notice Interface for reward distribution models that determine how ST yield is allocated between tranches in Royco markets
  */
 interface IRDM {
     /**
@@ -15,5 +15,5 @@ interface IRDM {
      * @return jtYieldShareWAD The percentage of the senior's NAV appreciation allocated to the junior tranche, scaled by WAD
      *                         It is implied that (WAD - jtRewardPercentageWAD) will be the percentage allocated to the senior tranche
      */
-    function getJTYieldShare(bytes32 _marketID, uint256 _stRawNAV, uint256 _jtRawNAV, uint256 _coverageWAD) external returns (uint256 jtYieldShareWAD);
+    function getJTYieldShare(bytes32 _marketID, uint256 _stRawNAV, uint256 _jtRawNAV, uint256 _coverageWAD) external view returns (uint256 jtYieldShareWAD);
 }
