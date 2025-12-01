@@ -19,6 +19,7 @@ contract RoycoST is BaseRoycoTranche {
      * @param _stParams Deployment parameters including name, symbol, kernel, and kernel initialization data for the senior tranche
      * @param _asset The underlying asset for the tranche
      * @param _owner The initial owner of the tranche
+     * @param _marketId The identifier of the Royco market this tranche is linked to
      * @param _coverageWAD The coverage condition in WAD format (1e18 = 100%)
      * @param _juniorTranche The address of the junior tranche corresponding to this senior tranche
      */
@@ -26,6 +27,7 @@ contract RoycoST is BaseRoycoTranche {
         TrancheDeploymentParams calldata _stParams,
         address _asset,
         address _owner,
+        bytes32 _marketId,
         uint64 _coverageWAD,
         address _juniorTranche
     )
@@ -33,20 +35,13 @@ contract RoycoST is BaseRoycoTranche {
         initializer
     {
         // Initialize the Royco Senior Tranche
-        __RoycoTranche_init(_stParams, _asset, _owner, _coverageWAD, _juniorTranche);
+        __RoycoTranche_init(_stParams, _asset, _owner, _marketId, _coverageWAD, _juniorTranche);
     }
 
     /// @inheritdoc BaseRoycoTranche
     /// @dev Returns the senior tranche's effective total assets after factoring in any covered losses and yield distribution
-    function totalAssets() public view override(BaseRoycoTranche) returns (uint256) {
-        // TODO: Yield distribution and fee accrual
-        // Get the NAV of the senior tranche and the total principal deployed into the investment
-        uint256 stRawNAV = _getSelfNAV();
-        uint256 jtRawNAV = _getJuniorTrancheNAV();
-
-        uint256 coverageProvided = _computeSeniorTrancheCoverage();
-
-        return Math.max(stRawNAV, coverageProvided);
+    function totalAssets() public view override(BaseRoycoTranche) returns (uint256 stEffectiveNAV) {
+        (,, stEffectiveNAV,) = _previewSyncTrancheNAVs();
     }
 
     /// @inheritdoc BaseRoycoTranche

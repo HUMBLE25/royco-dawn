@@ -21,7 +21,7 @@ contract Royco is RoycoSTFactory {
 
     error MARKET_EXISTS();
     error NONEXISTANT_MARKET();
-    error ONLY_TRANCHE();
+    error ONLY_MARKET_TRANCHE();
     error INVALID_COVERAGE();
 
     constructor(address _owner, address _RoycoSTImplementation, address _RoycoJTImplementation) RoycoSTFactory(_RoycoSTImplementation) { }
@@ -39,9 +39,23 @@ contract Royco is RoycoSTFactory {
         market.rdm = _params.rdm;
 
         // Deploy the senior tranche
-        address seniorTranche = market.seniorTranche = _deploySeniorTranche(
-            _params.stParams, _params.asset, _params.owner, _params.rewardFeeWAD, _params.feeClaimant, _params.rdm, _params.coverageWAD, address(0)
-        );
+        address seniorTranche =
+            market.seniorTranche = _deploySeniorTranche(_params.stParams, _params.asset, _params.owner, marketId, _params.coverageWAD, address(0));
+    }
+
+    function previewSyncTrancheNAVs(bytes32 _marketId)
+        public
+        view
+        returns (uint256 stRawNAV, uint256 jtRawNAV, uint256 stEffectiveNAV, uint256 jtEffectiveNAV)
+    {
+        // Get the market by its ID
+        Market storage market = marketIdToMarket[_marketId];
+
+        // Preview the accrual of the yield distribution owed to JT since the last tranche interaction
+        uint256 twJTYieldShareAccruedWAD = _previewJTYieldShareAccrual(_marketId, market);
+
+        // Preview the raw and coverage adjusted (effective) NAVs of each tranche
+        (stRawNAV, jtRawNAV, stEffectiveNAV, jtEffectiveNAV,) = _previewEffecitveNAVs(market, twJTYieldShareAccruedWAD);
     }
 
     function syncTrancheNAVs(
@@ -51,15 +65,15 @@ contract Royco is RoycoSTFactory {
         external
         returns (uint256 stRawNAV, uint256 jtRawNAV, uint256 stEffectiveNAV, uint256 jtEffectiveNAV)
     {
-        // Get the market via its ID
+        // Get the market by its ID
         Market storage market = marketIdToMarket[_marketId];
 
         // Check that the caller is one of the market's tranches if they are asserting a NAV delta
         bool stSyncing;
-        require(msg.sender == market.juniorTranche || (stSyncing = (msg.sender == market.seniorTranche)) || _rawNAVDelta == 0, ONLY_TRANCHE());
+        require(msg.sender == market.juniorTranche || (stSyncing = (msg.sender == market.seniorTranche)) || _rawNAVDelta == 0, ONLY_MARKET_TRANCHE());
 
         // Accrue the yield distribution owed to JT since the last tranche interaction
-        uint256 twJTYieldShareAccruedWAD = market.twJTYieldShareAccruedWAD = _previewAccrueJTYieldShare(_marketId, market);
+        uint256 twJTYieldShareAccruedWAD = market.twJTYieldShareAccruedWAD = _previewJTYieldShareAccrual(_marketId, market);
         market.lastAccrualTimestamp = uint32(block.timestamp);
 
         // Preview the raw and coverage adjusted (effective) NAVs of each tranche
@@ -76,21 +90,6 @@ contract Royco is RoycoSTFactory {
         market.lastJuniorRawNAV = !stSyncing ? _applyDelta(jtRawNAV, _rawNAVDelta) : jtRawNAV;
         market.lastSeniorEffectiveNAV = stSyncing ? _applyDelta(stEffectiveNAV, _rawNAVDelta) : stEffectiveNAV;
         market.lastJuniorEffectiveNAV = !stSyncing ? _applyDelta(jtEffectiveNAV, _rawNAVDelta) : jtEffectiveNAV;
-    }
-
-    function previewSyncTrancheNAVs(bytes32 _marketId)
-        public
-        view
-        returns (uint256 stRawNAV, uint256 jtRawNAV, uint256 stEffectiveNAV, uint256 jtEffectiveNAV)
-    {
-        // Get the market via its ID
-        Market storage market = marketIdToMarket[_marketId];
-
-        // Preview the accrual of the yield distribution owed to JT since the last tranche interaction
-        uint256 twJTYieldShareAccruedWAD = _previewAccrueJTYieldShare(_marketId, market);
-
-        // Preview the raw and coverage adjusted (effective) NAVs of each tranche
-        (stRawNAV, jtRawNAV, stEffectiveNAV, jtEffectiveNAV,) = _previewEffecitveNAVs(market, twJTYieldShareAccruedWAD);
     }
 
     function _previewEffecitveNAVs(
@@ -143,7 +142,7 @@ contract Royco is RoycoSTFactory {
         }
     }
 
-    function _previewAccrueJTYieldShare(bytes32 _marketId, Market storage _market) internal view returns (uint192) {
+    function _previewJTYieldShareAccrual(bytes32 _marketId, Market storage _market) internal view returns (uint192) {
         // Get the last update timestamp
         uint256 lastUpdate = _market.lastAccrualTimestamp;
         if (lastUpdate == 0) return _market.twJTYieldShareAccruedWAD;

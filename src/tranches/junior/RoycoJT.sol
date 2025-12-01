@@ -22,6 +22,7 @@ contract RoycoJT is IRoycoJuniorTranche, BaseRoycoTranche {
      * @param _jtParams Deployment parameters including name, symbol, kernel, and kernel initialization data for the junior tranche
      * @param _asset The underlying asset for the tranche
      * @param _owner The initial owner of the tranche
+     * @param _marketId The identifier of the Royco market this tranche is linked to
      * @param _coverageWAD The coverage condition in WAD format (1e18 = 100%)
      * @param _seniorTranche The address of the senior tranche corresponding to this junior tranche
      */
@@ -29,6 +30,7 @@ contract RoycoJT is IRoycoJuniorTranche, BaseRoycoTranche {
         TrancheDeploymentParams calldata _jtParams,
         address _asset,
         address _owner,
+        bytes32 _marketId,
         uint64 _coverageWAD,
         address _seniorTranche
     )
@@ -36,31 +38,13 @@ contract RoycoJT is IRoycoJuniorTranche, BaseRoycoTranche {
         initializer
     {
         // Initialize the Royco Junior Tranche
-        __RoycoTranche_init(_jtParams, _asset, _owner, _coverageWAD, _seniorTranche);
+        __RoycoTranche_init(_jtParams, _asset, _owner, _marketId, _coverageWAD, _seniorTranche);
     }
 
     /// @inheritdoc BaseRoycoTranche
     /// @dev Returns the junior tranche's effective total assets after factoring in any covered losses and yield distribution
-    function totalAssets() public view override(BaseRoycoTranche) returns (uint256) {
-        // // TODO: Yield distribution and fee accrual
-        // // Get the NAV of the senior tranche and the total principal deployed into the investment
-        // uint256 stRawNAV = IRoycoTranche(RoycoTrancheStorageLib._getComplementTranche()).getNAV();
-        // uint256 stPrincipal = _getSeniorTranchePrincipal();
-
-        // // Junior tranche doesn't need to absorb any losses from senior if they are in profit
-        // uint256 jtRawNAV = _getSelfNAV();
-        // if (stRawNAV >= stPrincipal) return jtRawNAV;
-
-        // // Senior tranche has incurred a loss
-        // // Calculate the loss relative to the principal
-        // uint256 stLoss = stPrincipal - stRawNAV;
-        // // Compute the coverage commitment provided by the junior tranche
-        // uint256 jtcoverageCommitment = _computeJuniorTranchecoverageCommitment(stPrincipal);
-        // // The loss absorbed by JT cannot exceed their coverage commitment amount
-        // uint256 jtLoss = Math.min(stLoss, jtcoverageCommitment);
-
-        // // Return the total assets held by the junior tranche after absorbing losses, clipped to 0
-        // return Math.saturatingSub(jtRawNAV, jtLoss);
+    function totalAssets() public view override(BaseRoycoTranche) returns (uint256 jtEffectiveNAV) {
+        (,,, jtEffectiveNAV) = _previewSyncTrancheNAVs();
     }
 
     /// @inheritdoc BaseRoycoTranche

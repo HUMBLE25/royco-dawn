@@ -9,6 +9,7 @@ import { ExecutionModel, RoycoKernelLib } from "./RoycoKernelLib.sol";
  * @custom:storage-location erc7201:Royco.storage.RoycoTrancheState
  * @custom:field royco - The address of the Royco factory contract
  * @custom:field kernel - The address of the kernel contract handling strategy logic
+ * @custom:field marketId - The identifier of the Royco market this tranche is linked to
  * @custom:field complementTranche - The address of the paired junior tranche
  * @custom:field coverageWAD - The percentage of tranche assets insured by junior tranche (WAD = 100%)
  * @custom:field decimalsOffset - Decimals offset for share token precision
@@ -20,6 +21,7 @@ import { ExecutionModel, RoycoKernelLib } from "./RoycoKernelLib.sol";
 struct RoycoTrancheState {
     address royco;
     address kernel;
+    bytes32 marketId;
     address complementTranche;
     uint64 coverageWAD;
     uint8 decimalsOffset;
@@ -55,15 +57,26 @@ library RoycoTrancheStorageLib {
      * @dev Sets up all initial parameters and validates fee constraints
      * @param _royco The address of the Royco factory contract
      * @param _kernel The address of the kernel contract handling strategy logic
+     * @param _marketId The identifier of the Royco market this tranche is linked to
      * @param _coverageWAD The percentage of tranche assets insured by junior tranche (WAD = 100%)
      * @param _complementTranche The address of the paired junior tranche vault
      * @param _decimalsOffset Decimals offset for share token precision
      */
-    function __RoycoTranche_init(address _royco, address _kernel, uint64 _coverageWAD, address _complementTranche, uint8 _decimalsOffset) internal {
+    function __RoycoTranche_init(
+        address _royco,
+        address _kernel,
+        bytes32 _marketId,
+        uint64 _coverageWAD,
+        address _complementTranche,
+        uint8 _decimalsOffset
+    )
+        internal
+    {
         // Set the initial state of the tranche
         RoycoTrancheState storage $ = _getRoycoTrancheStorage();
         $.royco = _royco;
         $.kernel = _kernel;
+        $.marketId = _marketId;
         $.complementTranche = _complementTranche;
         $.coverageWAD = _coverageWAD;
         $.decimalsOffset = _decimalsOffset;
@@ -85,6 +98,14 @@ library RoycoTrancheStorageLib {
      */
     function _getKernel() internal view returns (address) {
         return _getRoycoTrancheStorage().kernel;
+    }
+
+    /**
+     * @notice Returns the identifier of the Royco market this tranche is linked to
+     * @return The Royco market's ID
+     */
+    function _getMarketId() internal view returns (bytes32) {
+        return _getRoycoTrancheStorage().marketId;
     }
 
     /**

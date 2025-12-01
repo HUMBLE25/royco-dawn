@@ -11,6 +11,8 @@ import {
     Math
 } from "../../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import { SafeERC20 } from "../../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+
+import { IRoyco } from "../interfaces/IRoyco.sol";
 import { IERC165, IERC7540, IERC7575, IERC7887, IRoycoTranche } from "../interfaces/tranche/IRoycoTranche.sol";
 import { ConstantsLib } from "../libraries/ConstantsLib.sol";
 import { ExecutionModel, RoycoKernelLib } from "../libraries/RoycoKernelLib.sol";
@@ -85,6 +87,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
      * @param _trancheParams Deployment parameters including name, symbol, kernel, and kernel initialization data
      * @param _asset The underlying asset for the tranche
      * @param _owner The initial owner of the tranche
+     * @param _marketId The identifier of the Royco market this tranche is linked to
      * @param _coverageWAD The coverage condition in WAD format (1e18 = 100%)
      * @param _complementTranche The address of the paired tranche (junior for senior, senior for junior)
      */
@@ -92,6 +95,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
         TrancheDeploymentParams calldata _trancheParams,
         address _asset,
         address _owner,
+        bytes32 _marketId,
         uint64 _coverageWAD,
         address _complementTranche
     )
@@ -104,7 +108,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
         __Ownable_init_unchained(_owner);
 
         // Initialize the Royco Tranche state
-        __RoycoTranche_init_unchained(_asset, _trancheParams.kernel, _trancheParams.kernelInitCallData, _coverageWAD, _complementTranche);
+        __RoycoTranche_init_unchained(_asset, _trancheParams.kernel, _trancheParams.kernelInitCallData, _marketId, _coverageWAD, _complementTranche);
     }
 
     /**
@@ -113,6 +117,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
      * @param _asset The underlying asset for the tranche
      * @param _kernel The kernel that handles strategy logic
      * @param _kernelInitCallData Initialization data for the kernel
+     * @param _marketId The identifier of the Royco market this tranche is linked to
      * @param _coverageWAD The coverage condition in WAD format (1e18 = 100%)
      * @param _complementTranche The address of the paired tranche
      */
@@ -120,6 +125,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
         address _asset,
         address _kernel,
         bytes calldata _kernelInitCallData,
+        bytes32 _marketId,
         uint64 _coverageWAD,
         address _complementTranche
     )
@@ -134,7 +140,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
         uint8 decimalsOffset = underlyingAssetDecimals >= 18 ? 0 : (18 - underlyingAssetDecimals);
 
         // Initialize the tranche's state
-        RoycoTrancheStorageLib.__RoycoTranche_init(msg.sender, _kernel, _coverageWAD, _complementTranche, decimalsOffset);
+        RoycoTrancheStorageLib.__RoycoTranche_init(msg.sender, _kernel, _marketId, _coverageWAD, _complementTranche, decimalsOffset);
 
         // Initialize the kernel's state
         RoycoKernelLib.__Kernel_init(_kernel, _kernelInitCallData);
@@ -540,6 +546,14 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
     /// @dev Returns the NAV of this tranche
     function _getSelfNAV() internal view returns (uint256) {
         return RoycoKernelLib._getNAV(RoycoTrancheStorageLib._getKernel(), asset());
+    }
+
+    function _syncTrancheNAVs(int256 _rawNAVDelta) internal returns (uint256, uint256, uint256, uint256) {
+        return IRoyco(RoycoTrancheStorageLib._getRoyco()).syncTrancheNAVs(RoycoTrancheStorageLib._getMarketId(), _rawNAVDelta);
+    }
+
+    function _previewSyncTrancheNAVs() internal view returns (uint256, uint256, uint256, uint256) {
+        return IRoyco(RoycoTrancheStorageLib._getRoyco()).previewSyncTrancheNAVs(RoycoTrancheStorageLib._getMarketId());
     }
 
     /// @dev Returns the deposit capacity in assets based on the coverage condition
