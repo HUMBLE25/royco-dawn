@@ -2,11 +2,11 @@
 pragma solidity ^0.8.28;
 
 /**
- * @notice A struct representing a Royco Market and its state
- * @custom:field coverageWAD - The expected minimum coverage provided by the junior tranche to the senior tranche at all times (scaled by WAD)
- * @custom:field rdm - The market's Reward Distributin Model (RDM), responsible for determining the allocation of the ST's yield between ST and JT
+ * @notice A struct representing a Royco market and its state
  * @custom:field seniorTranche - The market's senior tranche
  * @custom:field juniorTranche - The market's junior tranche
+ * @custom:field rdm - The market's Reward Distribution Model (RDM), responsible for determining the allocation of the ST's yield between ST and JT
+ * @custom:field coverageWAD - The expected minimum coverage provided by the junior tranche to the senior tranche at all times (scaled by WAD)
  * @custom:field lastSeniorRawNAV - The last recorded raw NAV (excluding any losses, coverage, and yield accrual) of the senior tranche
  * @custom:field lastJuniorRawNAV - The last recorded raw NAV (excluding any losses, coverage, and yield accrual) of the junior tranche
  * @custom:field lastSeniorEffectiveNAV - The last recorded effective NAV (including any losses, coverage, and yield accrual) of the senior tranche
@@ -16,10 +16,10 @@ pragma solidity ^0.8.28;
  * @custom:field lastDistributionTimestamp - The last time a yield distribution occurred
  */
 struct Market {
-    uint64 coverageWAD;
-    address rdm;
     address seniorTranche;
     address juniorTranche;
+    address rdm;
+    uint64 coverageWAD;
     uint256 lastSeniorRawNAV;
     uint256 lastJuniorRawNAV;
     uint256 lastSeniorEffectiveNAV;

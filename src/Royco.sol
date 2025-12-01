@@ -6,7 +6,7 @@ import { Math } from "../lib/openzeppelin-contracts/contracts/utils/math/Math.so
 import { IRDM } from "./interfaces/IRDM.sol";
 import { IRoycoTranche } from "./interfaces/tranche/IRoycoTranche.sol";
 import { ConstantsLib } from "./libraries/ConstantsLib.sol";
-import { CreateMarketParams, Market, TypesLib } from "./libraries/Types.sol";
+import { CreateMarketParams, Market, TrancheType, TypesLib } from "./libraries/Types.sol";
 import { UtilsLib } from "./libraries/UtilsLib.sol";
 import { RoycoSTFactory } from "./tranches/senior/RoycoSTFactory.sol";
 
@@ -21,7 +21,8 @@ contract Royco is RoycoSTFactory {
 
     error MARKET_EXISTS();
     error NONEXISTANT_MARKET();
-    error INVALID_coverage();
+    error ONLY_TRANCHE();
+    error INVALID_COVERAGE();
 
     constructor(address _owner, address _RoycoSTImplementation, address _RoycoJTImplementation) RoycoSTFactory(_RoycoSTImplementation) { }
 
@@ -30,7 +31,7 @@ contract Royco is RoycoSTFactory {
 
         Market storage market = marketIdToMarket[marketId];
         require(market.seniorTranche == address(0), MARKET_EXISTS());
-        require(_params.coverageWAD > 0.01e18 && _params.coverageWAD <= ConstantsLib.WAD, INVALID_coverage());
+        require(_params.coverageWAD > 0.01e18 && _params.coverageWAD <= ConstantsLib.WAD, INVALID_COVERAGE());
 
         // Set the expected loss for this market
         // This set the minimum ratio between the junior and senior tranche
@@ -43,26 +44,62 @@ contract Royco is RoycoSTFactory {
         );
     }
 
-    function syncTrancheNAVs(bytes32 _marketId) external returns (uint256 stRawNAV, uint256 jtRawNAV, uint256 stEffectiveNAV, uint256 jtEffectiveNAV) {
-        // Set the tranche NAV checkpoints in persistent storage
+    function syncTrancheNAVs(
+        bytes32 _marketId,
+        int256 _rawNAVDelta
+    )
+        external
+        returns (uint256 stRawNAV, uint256 jtRawNAV, uint256 stEffectiveNAV, uint256 jtEffectiveNAV)
+    {
+        // Get the market via its ID
         Market storage market = marketIdToMarket[_marketId];
 
+        // Check that the caller is one of the market's tranches if they are asserting a NAV delta
+        bool stSyncing;
+        require(msg.sender == market.juniorTranche || (stSyncing = (msg.sender == market.seniorTranche)) || _rawNAVDelta == 0, ONLY_TRANCHE());
+
         // Accrue the yield distribution owed to JT since the last tranche interaction
-        _accrueJTYieldShare(_marketId, market);
+        uint256 twJTYieldShareAccruedWAD = market.twJTYieldShareAccruedWAD = _previewAccrueJTYieldShare(_marketId, market);
+        market.lastAccrualTimestamp = uint32(block.timestamp);
 
-        // Get the raw and coverage adjusted (effective) NAVs of each tranche
-        (stRawNAV, jtRawNAV, stEffectiveNAV, jtEffectiveNAV) = _computeEffecitveNAVs(market);
+        // Preview the raw and coverage adjusted (effective) NAVs of each tranche
+        bool yieldDistributed;
+        (stRawNAV, jtRawNAV, stEffectiveNAV, jtEffectiveNAV, yieldDistributed) = _previewEffecitveNAVs(market, twJTYieldShareAccruedWAD);
+        // If yield was distributed, reset the accumulator and update the last yield distribution timestamp
+        if (yieldDistributed) {
+            delete market.twJTYieldShareAccruedWAD;
+            market.lastDistributionTimestamp = uint32(block.timestamp);
+        }
 
-        // Write the updated tranche NAV checkpoints to persistent storage
-        market.lastSeniorRawNAV = stRawNAV;
-        market.lastJuniorRawNAV = jtRawNAV;
-        market.lastSeniorEffectiveNAV = stEffectiveNAV;
-        market.lastJuniorEffectiveNAV = jtEffectiveNAV;
+        // Apply the effect of any deposit or withdrawal after this sync to ensure the checkpoints reflect the post-op tranche state
+        market.lastSeniorRawNAV = stSyncing ? _applyDelta(stRawNAV, _rawNAVDelta) : stRawNAV;
+        market.lastJuniorRawNAV = !stSyncing ? _applyDelta(jtRawNAV, _rawNAVDelta) : jtRawNAV;
+        market.lastSeniorEffectiveNAV = stSyncing ? _applyDelta(stEffectiveNAV, _rawNAVDelta) : stEffectiveNAV;
+        market.lastJuniorEffectiveNAV = !stSyncing ? _applyDelta(jtEffectiveNAV, _rawNAVDelta) : jtEffectiveNAV;
     }
 
-    function _computeEffecitveNAVs(Market storage _market)
-        internal
+    function previewSyncTrancheNAVs(bytes32 _marketId)
+        public
+        view
         returns (uint256 stRawNAV, uint256 jtRawNAV, uint256 stEffectiveNAV, uint256 jtEffectiveNAV)
+    {
+        // Get the market via its ID
+        Market storage market = marketIdToMarket[_marketId];
+
+        // Preview the accrual of the yield distribution owed to JT since the last tranche interaction
+        uint256 twJTYieldShareAccruedWAD = _previewAccrueJTYieldShare(_marketId, market);
+
+        // Preview the raw and coverage adjusted (effective) NAVs of each tranche
+        (stRawNAV, jtRawNAV, stEffectiveNAV, jtEffectiveNAV,) = _previewEffecitveNAVs(market, twJTYieldShareAccruedWAD);
+    }
+
+    function _previewEffecitveNAVs(
+        Market storage _market,
+        uint256 _twJTYieldShareAccruedWAD
+    )
+        internal
+        view
+        returns (uint256 stRawNAV, uint256 jtRawNAV, uint256 stEffectiveNAV, uint256 jtEffectiveNAV, bool yieldDistributed)
     {
         // Get the current NAVs of each tranche
         stRawNAV = IRoycoTranche(_market.seniorTranche).getNAV();
@@ -95,36 +132,35 @@ contract Royco is RoycoSTFactory {
             // Compute the time weighted average JT share of yield
             uint256 elapsed = block.timestamp - _market.lastDistributionTimestamp;
             // Preemptively return if last yield distribution was in the same block
-            if (elapsed == 0) return (stRawNAV, jtRawNAV, stEffectiveNAV, jtEffectiveNAV);
-            uint256 jtYieldShareWAD = _market.twJTYieldShareAccruedWAD / elapsed;
+            if (elapsed == 0) return (stRawNAV, jtRawNAV, stEffectiveNAV, jtEffectiveNAV, false);
+            uint256 jtYieldShareWAD = _twJTYieldShareAccruedWAD / elapsed;
             // Apply the yield split: adding each tranche's share of earnings to their effective NAVs
             uint256 yield = uint256(deltaST);
             uint256 jtYield = yield.mulDiv(jtYieldShareWAD, ConstantsLib.WAD, Math.Rounding.Floor);
             jtEffectiveNAV += jtYield;
             stEffectiveNAV += (yield - jtYield);
-            // Reset the accumulator and update the last yield distribution timestamp
-            delete _market.twJTYieldShareAccruedWAD;
-            _market.lastDistributionTimestamp = uint32(block.timestamp);
+            yieldDistributed = true;
         }
     }
 
-    function _accrueJTYieldShare(bytes32 _marketId, Market storage _market) internal {
+    function _previewAccrueJTYieldShare(bytes32 _marketId, Market storage _market) internal view returns (uint192) {
         // Get the last update timestamp
         uint256 lastUpdate = _market.lastAccrualTimestamp;
-        if (lastUpdate == 0) {
-            _market.lastAccrualTimestamp = uint32(block.timestamp);
-            return;
-        }
+        if (lastUpdate == 0) return _market.twJTYieldShareAccruedWAD;
 
         // Compute the elapsed time since the last update
         uint256 elapsed = block.timestamp - lastUpdate;
         // Preemptively return if last accrual was in the same block
-        if (elapsed == 0) return;
+        if (elapsed == 0) return _market.twJTYieldShareAccruedWAD;
 
         // Get the instantaneous JT yield share, scaled by WAD
         uint256 jtYieldShareWAD = IRDM(_market.rdm).getJTYieldShare(_marketId, _market.lastSeniorRawNAV, _market.lastJuniorRawNAV, _market.coverageWAD);
-        // Apply the accural of JT yield share to the accumulator, weighted by the amount of time elapsed
-        _market.twJTYieldShareAccruedWAD += uint192(jtYieldShareWAD * elapsed);
-        _market.lastAccrualTimestamp = uint32(block.timestamp);
+        // Apply the accural of JT yield share to the accumulator, weighted by the time elapsed
+        return (_market.twJTYieldShareAccruedWAD + uint192(jtYieldShareWAD * elapsed));
+    }
+
+    function _applyDelta(uint256 _nav, int256 _delta) internal pure returns (uint256) {
+        if (_delta == 0) return _nav;
+        return _delta > 0 ? _nav + uint256(_delta) : Math.saturatingSub(_nav, uint256(_delta));
     }
 }
