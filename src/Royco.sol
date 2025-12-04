@@ -160,6 +160,6 @@ contract Royco is RoycoSTFactory {
 
     function _applyDelta(uint256 _nav, int256 _delta) internal pure returns (uint256) {
         if (_delta == 0) return _nav;
-        return _delta > 0 ? _nav + uint256(_delta) : Math.saturatingSub(_nav, uint256(_delta));
+        return _delta > 0 ? _nav + uint256(_delta) : Math.saturatingSub(_nav, uint256(-_delta));
     }
 }
