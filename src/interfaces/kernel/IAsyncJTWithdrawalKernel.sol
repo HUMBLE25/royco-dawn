@@ -11,11 +11,12 @@ interface IAsyncJTWithdrawalKernel {
     /**
      * @notice Requests a redemption for a specified amount of shares from the underlying investment opportunity
      * @param _caller The address of the user requesting the withdrawal for the junior tranche
-     * @param _assets The amount of assets being requested to be redeemed
+     * @param _shares The amount of shares being requested to be redeemed
+     * @param _totalShares The total number of shares in the tranche at the time of the request
      * @param _controller The controller that is allowed to operate the lifecycle of the request.
      * @return requestId The request ID of this withdrawal request
      */
-    function jtRequestWithdrawal(address _caller, uint256 _assets, address _controller) external returns (uint256 requestId);
+    function jtRequestWithdrawal(address _caller, uint256 _shares, uint256 _totalShares, address _controller) external returns (uint256 requestId);
 
     /**
      * @notice Returns the amount of assets pending redemption for a specific controller

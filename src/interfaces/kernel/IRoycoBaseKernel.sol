@@ -14,7 +14,8 @@ enum ExecutionModel {
 
 /**
  * @title IRoycoBaseKernel
- *
+ * @notice NAV refers to the total value of the tranche in terms of the asset being insured (say USD)
+ * @notice Total Assets refers to the total value of the tranche in terms of the asset being deposited (say BTC)
  */
 interface IRoycoBaseKernel {
     function getDepositExecutionModel() external view returns (ExecutionModel);
@@ -26,10 +27,14 @@ interface IRoycoBaseKernel {
     function getSTEffectiveNAV() external view returns (uint256);
     function getJTEffectiveNAV() external view returns (uint256);
 
+    function getSTTotalEffectiveAssets() external view returns (uint256);
+    function getJTTotalEffectiveAssets() external view returns (uint256);
+
     function syncTrancheNAVs() external returns (uint256 stRawNAV, uint256 jtRawNAV, uint256 stEffectiveNAV, uint256 jtEffectiveNAV);
 
     function previewSyncTrancheNAVs() external returns (uint256 stRawNAV, uint256 jtRawNAV, uint256 stEffectiveNAV, uint256 jtEffectiveNAV);
 
+    // TODO: Assume that the following functions also enforce the invariants
     function stMaxDeposit(address _receiver) external view returns (uint256);
     function stMaxWithdraw(address _owner) external view returns (uint256);
     function stDeposit(uint256 _assets, address _caller, address _receiver) external returns (uint256 fractionOfTotalAssetsAllocatedWAD);

@@ -99,13 +99,11 @@ contract RoycoTrancheFactory {
         stParams.kernel = kernel;
         jtParams.kernel = kernel;
 
-        // Deploy senior tranche proxy first with placeholder for junior tranche
-        // Note: ST will have complementTranche = address(0) initially
-        // This may need to be updated later if ST requires JT address for operations
-        seniorTranche = _deployTranche(roycoSTImplementation, abi.encodeCall(RoycoST.initialize, (stParams, _asset, _owner, _marketId, address(0))));
+        // Deploy senior tranche proxy first
+        seniorTranche = _deployTranche(roycoSTImplementation, abi.encodeCall(RoycoST.initialize, (stParams, _asset, _owner, _marketId)));
 
-        // Deploy junior tranche proxy with senior tranche address
-        juniorTranche = _deployTranche(roycoJTImplementation, abi.encodeCall(RoycoJT.initialize, (jtParams, _asset, _owner, _marketId, seniorTranche)));
+        // Deploy junior tranche proxy
+        juniorTranche = _deployTranche(roycoJTImplementation, abi.encodeCall(RoycoJT.initialize, (jtParams, _asset, _owner, _marketId)));
 
         emit MarketDeployed(seniorTranche, juniorTranche, kernel, _marketId, _asset, _owner);
 
