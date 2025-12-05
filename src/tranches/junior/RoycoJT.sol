@@ -6,10 +6,9 @@ import { IAsyncJTDepositKernel } from "../../interfaces/kernel/IAsyncJTDepositKe
 import { IAsyncJTWithdrawalKernel } from "../../interfaces/kernel/IAsyncJTWithdrawalKernel.sol";
 import { IRoycoBaseKernel } from "../../interfaces/kernel/IRoycoBaseKernel.sol";
 import { IRoycoJuniorTranche, IRoycoTranche } from "../../interfaces/tranche/IRoycoTranche.sol";
-import { ConstantsLib } from "../../libraries/ConstantsLib.sol";
 import { RoycoTrancheStorageLib } from "../../libraries/RoycoTrancheStorageLib.sol";
-import { Action, TrancheDeploymentParams } from "../../libraries/Types.sol";
-import { BaseRoycoTranche, ERC4626Upgradeable, IERC20, Math } from "../BaseRoycoTranche.sol";
+import { TrancheDeploymentParams } from "../../libraries/Types.sol";
+import { BaseRoycoTranche, IERC20, Math } from "../BaseRoycoTranche.sol";
 
 // TODO: ST and JT base asset can have different decimals
 contract RoycoJT is IRoycoJuniorTranche, BaseRoycoTranche {

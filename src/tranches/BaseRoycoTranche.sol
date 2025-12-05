@@ -2,22 +2,17 @@
 pragma solidity ^0.8.28;
 
 import { Ownable2StepUpgradeable } from "../../lib/openzeppelin-contracts-upgradeable/contracts/access/Ownable2StepUpgradeable.sol";
-import { ERC20Upgradeable } from "../../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/ERC20Upgradeable.sol";
+import { UUPSUpgradeable } from "../../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
 import {
     ERC4626Upgradeable,
     IERC20,
     IERC20Metadata,
-    IERC4626,
     Math
 } from "../../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import { SafeERC20 } from "../../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
-
 import { IRoyco } from "../interfaces/IRoyco.sol";
-import { IAsyncJTDepositKernel } from "../interfaces/kernel/IAsyncJTDepositKernel.sol";
-import { IAsyncSTDepositKernel } from "../interfaces/kernel/IAsyncSTDepositKernel.sol";
-import { IAsyncSTWithdrawalKernel } from "../interfaces/kernel/IAsyncSTWithdrawalKernel.sol";
 import { ExecutionModel, IRoycoBaseKernel } from "../interfaces/kernel/IRoycoBaseKernel.sol";
-import { IERC165, IERC7540, IERC7575, IERC7887, IRoycoJuniorTranche, IRoycoTranche } from "../interfaces/tranche/IRoycoTranche.sol";
+import { IERC165, IERC7540, IERC7575, IERC7887, IRoycoTranche } from "../interfaces/tranche/IRoycoTranche.sol";
 import { ConstantsLib } from "../libraries/ConstantsLib.sol";
 import { RoycoTrancheStorageLib } from "../libraries/RoycoTrancheStorageLib.sol";
 import { Action, TrancheDeploymentParams } from "../libraries/Types.sol";
@@ -30,7 +25,7 @@ import { Action, TrancheDeploymentParams } from "../libraries/Types.sol";
  *      asynchronous deposit/withdrawal support via ERC7540, and request cancellation via ERC7887
  *      All asset management and investment operations are delegated to the configured kernel
  */
-abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ERC4626Upgradeable {
+abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UUPSUpgradeable, ERC4626Upgradeable {
     using Math for uint256;
     using SafeERC20 for IERC20;
 
@@ -513,17 +508,14 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
         return IRoyco(RoycoTrancheStorageLib._getRoycoTrancheStorage().royco).previewSyncTrancheNAVs(RoycoTrancheStorageLib._getRoycoTrancheStorage().marketId);
     }
 
+    /// @inheritdoc UUPSUpgradeable
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
+        // Upgrade authorization is currently restricted to the owner
+        // TODO: Replace onlyOwner with role-based access control (e.g., UPGRADER_ROLE)
+    }
+
     /// @dev Returns the deposit capacity in assets based on the coverage condition
     function _getTrancheDepositCapacity() internal view virtual returns (uint256);
-
-    /// @dev Returns the withdrawal capacity in assets based on the coverage condition
-    function _getTrancheWithdrawalCapacity() internal view virtual returns (uint256);
-
-    /// @dev Returns the net asset value for the junior tranche
-    function _getJuniorTrancheNAV() internal view virtual returns (uint256);
-
-    /// @dev Returns the net asset value for the senior tranche
-    function _getSeniorTrancheNAV() internal view virtual returns (uint256);
 
     /// @dev Returns if the specified action employs a synchronous execution model
     function _isSync(Action _action) internal view returns (bool) {
@@ -536,6 +528,15 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
     function _decimalsOffset() internal view virtual override(ERC4626Upgradeable) returns (uint8) {
         return RoycoTrancheStorageLib._getRoycoTrancheStorage().decimalsOffset;
     }
+
+    /// @dev Returns the withdrawal capacity in assets based on the coverage condition
+    function _getTrancheWithdrawalCapacity() internal view virtual returns (uint256);
+
+    /// @dev Returns the net asset value for the junior tranche
+    function _getJuniorTrancheNAV() internal view virtual returns (uint256);
+
+    /// @dev Returns the net asset value for the senior tranche
+    function _getSeniorTrancheNAV() internal view virtual returns (uint256);
 
     /// @dev Calls the appropriate kernel maxDeposit method
     function _callKernelMaxDeposit(address _receiver) internal view virtual returns (uint256);
