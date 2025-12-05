@@ -103,7 +103,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
 
     /// @inheritdoc IRoycoTranche
     function getNAV() external view override(IRoycoTranche) returns (uint256) {
-        return _getSelfNAV();
+        return _callKernelGetNAV();
     }
 
     /// @inheritdoc ERC4626Upgradeable
@@ -171,7 +171,6 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
     }
 
     /// @inheritdoc IERC7540
-    /// @dev Should be overridden by senior tranches to check the coverage condition
     function deposit(
         uint256 _assets,
         address _receiver,
@@ -187,11 +186,21 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         uint256 maxDepositableAssets = maxDeposit(_receiver);
         require(_assets <= maxDepositableAssets, ERC4626ExceededMaxDeposit(_receiver, _assets, maxDepositableAssets));
 
-        // Handle depositing assets and minting shares
-        _deposit(msg.sender, _receiver, _assets, (shares = super.previewDeposit(_assets)));
+        // Deposit the assets into the underlying investment opportunity and get the fraction of total assets allocated
+        uint256 fractionOfTotalAssetsAllocatedWAD = _callKernelDeposit(_assets, _controller, _receiver);
+        uint256 sharesToMint;
 
-        // Process the deposit into the underlying investment opportunity by calling the kernel
-        _callKernelDeposit(_assets, msg.sender, _receiver);
+        // Handle positing assets and minting shares
+        if (_isSync(Action.DEPOSIT)) {
+            // If the deposit is synchronous, mint the shares directly
+            sharesToMint = super.previewDeposit(_assets);
+        } else {
+            // If the deposit is asynchronous, mint the shares based on the fraction of total assets allocated in the underlying investment opportunity
+            // TODO: Explain formula
+            sharesToMint = totalSupply().mulDiv(fractionOfTotalAssetsAllocatedWAD, ConstantsLib.WAD - fractionOfTotalAssetsAllocatedWAD, Math.Rounding.Floor);
+        }
+
+        _deposit(msg.sender, _receiver, _assets, sharesToMint);
     }
 
     /// @inheritdoc ERC4626Upgradeable
@@ -200,7 +209,6 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
     }
 
     /// @inheritdoc IERC7540
-    /// @dev Should be overridden by senior tranches to check the coverage condition
     function mint(
         uint256 _shares,
         address _receiver,
@@ -216,15 +224,11 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         uint256 maxMintableShares = maxMint(_receiver);
         require(_shares <= maxMintableShares, ERC4626ExceededMaxMint(_receiver, _shares, maxMintableShares));
 
-        // Handle depositing assets and minting shares
-        _deposit(msg.sender, _receiver, (assets = super.previewMint(_shares)), _shares);
-
-        // Process the deposit for the underlying investment opportunity by calling the kernel
-        _callKernelDeposit(assets, msg.sender, _receiver);
+        // TODO
+        revert("Not yet implemented");
     }
 
     /// @inheritdoc IERC7540
-    /// @dev Should be overridden by junior tranches to check the coverage condition
     function withdraw(
         uint256 _assets,
         address _receiver,
@@ -240,12 +244,18 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         uint256 maxWithdrawableAssets = maxWithdraw(_controller);
         require(_assets <= maxWithdrawableAssets, ERC4626ExceededMaxWithdraw(_controller, _assets, maxWithdrawableAssets));
 
-        // Account for the withdrawal
-        _withdraw(msg.sender, _receiver, _controller, _assets, (shares = super.previewWithdraw(_assets)));
-
         // Process the withdrawal from the underlying investment opportunity
         // It is expected that the kernel transfers the assets directly to the receiver
-        _callKernelWithdraw(_assets, msg.sender, _receiver);
+        uint256 fractionOfTotalAssetsRedeemedWAD = _callKernelWithdraw(_assets, _controller, _receiver);
+
+        if (_isSync(Action.WITHDRAW)) {
+            shares = super.previewWithdraw(_assets);
+        } else {
+            shares = totalSupply().mulDiv(fractionOfTotalAssetsRedeemedWAD, ConstantsLib.WAD, Math.Rounding.Floor);
+        }
+
+        // Account for the withdrawal
+        _withdraw(msg.sender, _receiver, _controller, _assets, shares);
     }
 
     /// @inheritdoc IERC7540
@@ -265,12 +275,13 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         uint256 maxRedeemableShares = maxRedeem(_controller);
         require(_shares <= maxRedeemableShares, ERC4626ExceededMaxRedeem(_controller, _shares, maxRedeemableShares));
 
-        // Account for the withdrawal
-        _withdraw(msg.sender, _receiver, _controller, (assets = super.previewRedeem(_shares)), _shares);
-
         // Process the withdrawal from the underlying investment opportunity
         // It is expected that the kernel transfers the assets directly to the receiver
-        _callKernelWithdraw(assets, msg.sender, _receiver);
+        (uint256 fractionOfTotalAssetsRedeemedWAD, uint256 assetsRedeemed) = _callKernelWithdraw(_shares, _controller, _receiver);
+        assets = assetsRedeemed;
+
+        // Account for the withdrawal
+        _withdraw(msg.sender, _receiver, _controller, assets, _shares);
     }
 
     // =============================
@@ -342,7 +353,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         uint256 _assets = super.previewRedeem(_shares);
 
         // Queue the redemption request and get the request ID from the kernel
-        requestId = _callKernelRequestRedeem(_assets, _shares, _controller);
+        requestId = _callKernelRequestRedeem(_assets, _controller);
 
         emit RedeemRequest(_controller, _owner, requestId, msg.sender, _shares);
     }
@@ -493,11 +504,6 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         return _getJuniorTrancheNAV().mulDiv((ConstantsLib.WAD - coverageWAD), coverageWAD, Math.Rounding.Floor);
     }
 
-    /// @dev Returns the NAV of this tranche
-    function _getSelfNAV() internal view returns (uint256) {
-        return _callKernelGetNAV();
-    }
-
     function _syncTrancheNAVs(int256 _rawNAVDelta) internal returns (uint256, uint256, uint256, uint256) {
         return
             IRoyco(RoycoTrancheStorageLib._getRoycoTrancheStorage().royco)
@@ -548,10 +554,17 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
     function _callKernelGetNAV() internal view virtual returns (uint256);
 
     /// @dev Calls the appropriate kernel deposit method
-    function _callKernelDeposit(uint256 _assets, address _caller, address _receiver) internal virtual;
+    function _callKernelDeposit(uint256 _assets, address _caller, address _receiver) internal virtual returns (uint256 fractionOfTotalAssetsAllocatedWAD);
 
     /// @dev Calls the appropriate kernel withdraw method
-    function _callKernelWithdraw(uint256 _assets, address _caller, address _receiver) internal virtual;
+    function _callKernelWithdraw(
+        uint256 _assets,
+        address _caller,
+        address _receiver
+    )
+        internal
+        virtual
+        returns (uint256 fractionOfTotalAssetsRedeemedWAD, uint256 assetsRedeemed);
 
     /// @dev Calls the appropriate kernel requestDeposit method
     function _callKernelRequestDeposit(uint256 _assets, address _controller) internal virtual returns (uint256 requestId);
@@ -563,7 +576,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
     function _callKernelClaimableDepositRequest(uint256 _requestId, address _controller) internal view virtual returns (uint256);
 
     /// @dev Calls the appropriate kernel requestRedeem method
-    function _callKernelRequestRedeem(uint256 _assets, uint256 _shares, address _controller) internal virtual returns (uint256 requestId);
+    function _callKernelRequestRedeem(uint256 _assets, address _controller) internal virtual returns (uint256 requestId);
 
     /// @dev Calls the appropriate kernel pendingRedeemRequest method
     function _callKernelPendingRedeemRequest(uint256 _requestId, address _controller) internal view virtual returns (uint256);

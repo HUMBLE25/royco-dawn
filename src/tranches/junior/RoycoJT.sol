@@ -8,7 +8,7 @@ import { IRoycoBaseKernel } from "../../interfaces/kernel/IRoycoBaseKernel.sol";
 import { IRoycoJuniorTranche, IRoycoTranche } from "../../interfaces/tranche/IRoycoTranche.sol";
 import { RoycoTrancheStorageLib } from "../../libraries/RoycoTrancheStorageLib.sol";
 import { TrancheDeploymentParams } from "../../libraries/Types.sol";
-import { BaseRoycoTranche, IERC20, Math } from "../BaseRoycoTranche.sol";
+import { Action, BaseRoycoTranche, IERC20, Math } from "../BaseRoycoTranche.sol";
 
 // TODO: ST and JT base asset can have different decimals
 contract RoycoJT is IRoycoJuniorTranche, BaseRoycoTranche {
@@ -46,56 +46,18 @@ contract RoycoJT is IRoycoJuniorTranche, BaseRoycoTranche {
         (,,, jtEffectiveNAV) = _previewSyncTrancheNAVs();
     }
 
-    /// @inheritdoc BaseRoycoTranche
-    function withdraw(
-        uint256 _assets,
-        address _receiver,
-        address _controller
-    )
-        public
-        override(BaseRoycoTranche)
-        onlyCallerOrOperator(_controller)
-        returns (uint256 shares)
-    {
-        // Assert that the assets being withdrawn by the user fall under the permissible limits
-        uint256 maxWithdrawableAssets = maxWithdraw(_controller);
-        require(_assets <= maxWithdrawableAssets, ERC4626ExceededMaxWithdraw(_controller, _assets, maxWithdrawableAssets));
-
-        // Handle burning shares and principal accouting on withdrawal
-        _withdraw(msg.sender, _receiver, _controller, _assets, (shares = super.previewWithdraw(_assets)));
-
-        // Process the withdrawal from the underlying investment opportunity
-        // It is expected that the kernel transfers the assets directly to the receiver
-        _callKernelWithdraw(_assets, msg.sender, _receiver);
-    }
-
-    /// @inheritdoc BaseRoycoTranche
-    function redeem(
-        uint256 _shares,
-        address _receiver,
-        address _controller
-    )
-        public
-        override(BaseRoycoTranche)
-        onlyCallerOrOperator(_controller)
-        returns (uint256 assets)
-    {
-        // Assert that the shares being redeeemed by the user fall under the permissible limits
-        uint256 maxRedeemableShares = maxRedeem(_controller);
-        require(_shares <= maxRedeemableShares, ERC4626ExceededMaxRedeem(_controller, _shares, maxRedeemableShares));
-
-        // Handle burning shares and principal accouting on withdrawal
-        _withdraw(msg.sender, _receiver, _controller, (assets = super.previewRedeem(_shares)), _shares);
-
-        // Process the withdrawal from the underlying investment opportunity
-        // It is expected that the kernel transfers the assets directly to the receiver
-        _callKernelWithdraw(assets, msg.sender, _receiver);
-    }
-
     /// @inheritdoc IRoycoJuniorTranche
-    function coverLosses(uint256 _assets, address _receiver) external returns (uint256 requestId) {
-        // Ensure the caller is the senio
+    function coverLosses(
+        uint256, /* _assets */
+        address /* _receiver */
+    )
+        external
+        returns (uint256)
+    {
+        // Ensure the caller is the senior tranche
         require(msg.sender == RoycoTrancheStorageLib._getRoycoTrancheStorage().complementTranche, ONLY_SENIOR_TRANCHE());
+        // TODO: Implement coverLosses functionality
+        revert("Not yet implemented");
     }
 
     /// @inheritdoc BaseRoycoTranche
@@ -120,7 +82,7 @@ contract RoycoJT is IRoycoJuniorTranche, BaseRoycoTranche {
 
     /// @inheritdoc BaseRoycoTranche
     function _getJuniorTrancheNAV() internal view override(BaseRoycoTranche) returns (uint256) {
-        return _getSelfNAV();
+        return _callKernelGetNAV();
     }
 
     /// @inheritdoc BaseRoycoTranche
@@ -144,18 +106,44 @@ contract RoycoJT is IRoycoJuniorTranche, BaseRoycoTranche {
     }
 
     /// @inheritdoc BaseRoycoTranche
-    function _callKernelDeposit(uint256 _assets, address _caller, address _receiver) internal override(BaseRoycoTranche) {
-        IRoycoBaseKernel(RoycoTrancheStorageLib._getRoycoTrancheStorage().kernel).jtDeposit(_assets, _caller, _receiver);
+    function _callKernelDeposit(
+        uint256 _assets,
+        address _caller,
+        address _receiver
+    )
+        internal
+        override(BaseRoycoTranche)
+        returns (uint256 fractionOfTotalAssetsAllocatedWAD)
+    {
+        IRoycoBaseKernel kernel = IRoycoBaseKernel(RoycoTrancheStorageLib._getRoycoTrancheStorage().kernel);
+        // If the deposit is synchronous, the assets are expected to be transferred from the caller to the tranche now.
+        if (_isSync(Action.DEPOSIT)) {
+            IERC20(asset()).approve(address(kernel), _assets);
+        }
+        return kernel.jtDeposit(_assets, _caller, _receiver);
     }
 
     /// @inheritdoc BaseRoycoTranche
-    function _callKernelWithdraw(uint256 _assets, address _caller, address _receiver) internal override(BaseRoycoTranche) {
-        IRoycoBaseKernel(RoycoTrancheStorageLib._getRoycoTrancheStorage().kernel).jtWithdraw(_assets, _caller, _receiver);
+    function _callKernelWithdraw(
+        uint256 _assets,
+        address _caller,
+        address _receiver
+    )
+        internal
+        override(BaseRoycoTranche)
+        returns (uint256 fractionOfTotalAssetsRedeemedWAD, uint256 assetsRedeemed)
+    {
+        (fractionOfTotalAssetsRedeemedWAD, assetsRedeemed) =
+            IRoycoBaseKernel(RoycoTrancheStorageLib._getRoycoTrancheStorage().kernel).jtWithdraw(_assets, _caller, _receiver);
+        return (fractionOfTotalAssetsRedeemedWAD, assetsRedeemed);
     }
 
     /// @inheritdoc BaseRoycoTranche
     function _callKernelRequestDeposit(uint256 _assets, address _controller) internal override(BaseRoycoTranche) returns (uint256 requestId) {
-        return IAsyncJTDepositKernel(RoycoTrancheStorageLib._getRoycoTrancheStorage().kernel).jtRequestDeposit(msg.sender, _assets, _controller);
+        IAsyncJTDepositKernel kernel = IAsyncJTDepositKernel(RoycoTrancheStorageLib._getRoycoTrancheStorage().kernel);
+        // If the deposit is asynchronous, the assets are expected to be transferred from the caller to the tranche on the request.
+        IERC20(asset()).approve(address(kernel), _assets);
+        return kernel.jtRequestDeposit(msg.sender, _assets, _controller);
     }
 
     /// @inheritdoc BaseRoycoTranche
@@ -169,7 +157,7 @@ contract RoycoJT is IRoycoJuniorTranche, BaseRoycoTranche {
     }
 
     /// @inheritdoc BaseRoycoTranche
-    function _callKernelRequestRedeem(uint256 _assets, uint256 _shares, address _controller) internal override(BaseRoycoTranche) returns (uint256 requestId) {
+    function _callKernelRequestRedeem(uint256 _assets, address _controller) internal override(BaseRoycoTranche) returns (uint256 requestId) {
         return IAsyncJTWithdrawalKernel(RoycoTrancheStorageLib._getRoycoTrancheStorage().kernel).jtRequestWithdrawal(msg.sender, _assets, _controller);
     }
 
