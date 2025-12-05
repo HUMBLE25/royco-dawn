@@ -23,7 +23,7 @@ interface IAsyncSTDepositKernel {
      * @param _controller The controller corresponding to this request
      * @return pendingAssets The amount of assets pending deposit for the controller
      */
-    function stPendingDepositRequest(uint256 _requestId, address _controller) external returns (uint256 pendingAssets);
+    function stPendingDepositRequest(uint256 _requestId, address _controller) external view returns (uint256 pendingAssets);
 
     /**
      * @notice Returns the amount of assets claimable from a processed deposit request for a specified controller
@@ -31,7 +31,7 @@ interface IAsyncSTDepositKernel {
      * @param _controller The controller corresponding to this request
      * @return claimableAssets The amount of assets claimable from processed deposit request
      */
-    function stClaimableDepositRequest(uint256 _requestId, address _controller) external returns (uint256 claimableAssets);
+    function stClaimableDepositRequest(uint256 _requestId, address _controller) external view returns (uint256 claimableAssets);
 
     /**
      * @notice Cancels a pending deposit request for the specified controller

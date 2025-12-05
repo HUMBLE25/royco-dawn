@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import { IERC4626 } from "../../lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
-import { ExecutionModel, RoycoKernelLib } from "./RoycoKernelLib.sol";
+import { ExecutionModel, IRoycoBaseKernel } from "../interfaces/kernel/IRoycoBaseKernel.sol";
 
 /**
  * @notice Storage state for Royco Tranche contracts
@@ -58,121 +58,18 @@ library RoycoTrancheStorageLib {
      * @param _royco The address of the Royco factory contract
      * @param _kernel The address of the kernel contract handling strategy logic
      * @param _marketId The identifier of the Royco market this tranche is linked to
-     * @param _coverageWAD The percentage of tranche assets insured by junior tranche (WAD = 100%)
      * @param _complementTranche The address of the paired junior tranche vault
      * @param _decimalsOffset Decimals offset for share token precision
      */
-    function __RoycoTranche_init(
-        address _royco,
-        address _kernel,
-        bytes32 _marketId,
-        uint64 _coverageWAD,
-        address _complementTranche,
-        uint8 _decimalsOffset
-    )
-        internal
-    {
+    function __RoycoTranche_init(address _royco, address _kernel, bytes32 _marketId, address _complementTranche, uint8 _decimalsOffset) internal {
         // Set the initial state of the tranche
         RoycoTrancheState storage $ = _getRoycoTrancheStorage();
         $.royco = _royco;
         $.kernel = _kernel;
         $.marketId = _marketId;
         $.complementTranche = _complementTranche;
-        $.coverageWAD = _coverageWAD;
         $.decimalsOffset = _decimalsOffset;
-        $.DEPOSIT_EXECUTION_MODEL = RoycoKernelLib._DEPOSIT_EXECUTION_MODEL(_kernel);
-        $.WITHDRAW_EXECUTION_MODEL = RoycoKernelLib._WITHDRAW_EXECUTION_MODEL(_kernel);
-    }
-
-    /**
-     * @notice Returns the address of the Royco factory contract
-     * @return The factory contract address
-     */
-    function _getRoyco() internal view returns (address) {
-        return _getRoycoTrancheStorage().royco;
-    }
-
-    /**
-     * @notice Returns the address of the kernel contract
-     * @return The kernel contract address handling strategy logic
-     */
-    function _getKernel() internal view returns (address) {
-        return _getRoycoTrancheStorage().kernel;
-    }
-
-    /**
-     * @notice Returns the identifier of the Royco market this tranche is linked to
-     * @return The Royco market's ID
-     */
-    function _getMarketId() internal view returns (bytes32) {
-        return _getRoycoTrancheStorage().marketId;
-    }
-
-    /**
-     * @notice Returns the junior complement tranche (junior if senior, if junior)
-     * @return The complement tranche
-     */
-    function _getComplementTranche() internal view returns (address) {
-        return _getRoycoTrancheStorage().complementTranche;
-    }
-
-    /**
-     * @notice Returns the coverage percentage
-     * @return The percentage of tranche assets insured by junior tranche (WAD = 100%)
-     */
-    function _getCoverageRatioWAD() internal view returns (uint64) {
-        return _getRoycoTrancheStorage().coverageWAD;
-    }
-
-    /**
-     * @notice Returns the last recorded NAV for this tranche
-     * @return The last recorded NAV for this tranche in its base asset
-     */
-    function _getLastRawNAV() internal view returns (uint256) {
-        return _getRoycoTrancheStorage().lastRawNAV;
-    }
-
-    /**
-     * @notice Checks if an operator is approved for a given owner
-     * @param _owner The owner address
-     * @param _operator The operator address to check
-     * @return True if the operator is approved, false otherwise
-     */
-    function _isOperator(address _owner, address _operator) internal view returns (bool) {
-        return _getRoycoTrancheStorage().isOperator[_owner][_operator];
-    }
-
-    /**
-     * @notice Sets operator approval for an owner
-     * @param _owner The owner address
-     * @param _operator The operator address
-     * @param _approved Whether the operator is approved
-     */
-    function _setOperator(address _owner, address _operator, bool _approved) internal {
-        _getRoycoTrancheStorage().isOperator[_owner][_operator] = _approved;
-    }
-
-    /**
-     * @notice Returns the kernel execution model for deposit operations
-     * @return The deposit execution model from the kernel
-     */
-    function _getDepositExecutionModel() internal view returns (ExecutionModel) {
-        return _getRoycoTrancheStorage().DEPOSIT_EXECUTION_MODEL;
-    }
-
-    /**
-     * @notice Returns the kernel execution model for withdrawal operations
-     * @return The withdrawal execution model from the kernel
-     */
-    function _getWithdrawalExecutionModel() internal view returns (ExecutionModel) {
-        return _getRoycoTrancheStorage().WITHDRAW_EXECUTION_MODEL;
-    }
-
-    /**
-     * @notice Returns the decimals offset for share token precision
-     * @return The decimals offset value
-     */
-    function _getDecimalsOffset() internal view returns (uint8) {
-        return _getRoycoTrancheStorage().decimalsOffset;
+        $.DEPOSIT_EXECUTION_MODEL = IRoycoBaseKernel(_kernel).getDepositExecutionModel();
+        $.WITHDRAW_EXECUTION_MODEL = IRoycoBaseKernel(_kernel).getWithdrawExecutionModel();
     }
 }

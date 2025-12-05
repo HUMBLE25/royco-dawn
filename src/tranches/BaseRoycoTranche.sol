@@ -13,9 +13,12 @@ import {
 import { SafeERC20 } from "../../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import { IRoyco } from "../interfaces/IRoyco.sol";
-import { IERC165, IERC7540, IERC7575, IERC7887, IRoycoTranche } from "../interfaces/tranche/IRoycoTranche.sol";
+import { IAsyncJTDepositKernel } from "../interfaces/kernel/IAsyncJTDepositKernel.sol";
+import { IAsyncSTDepositKernel } from "../interfaces/kernel/IAsyncSTDepositKernel.sol";
+import { IAsyncSTWithdrawalKernel } from "../interfaces/kernel/IAsyncSTWithdrawalKernel.sol";
+import { ExecutionModel, IRoycoBaseKernel } from "../interfaces/kernel/IRoycoBaseKernel.sol";
+import { IERC165, IERC7540, IERC7575, IERC7887, IRoycoJuniorTranche, IRoycoTranche } from "../interfaces/tranche/IRoycoTranche.sol";
 import { ConstantsLib } from "../libraries/ConstantsLib.sol";
-import { ExecutionModel, RoycoKernelLib } from "../libraries/RoycoKernelLib.sol";
 import { RoycoTrancheStorageLib } from "../libraries/RoycoTrancheStorageLib.sol";
 import { Action, TrancheDeploymentParams } from "../libraries/Types.sol";
 
@@ -37,12 +40,6 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
     /// @notice Thrown when the caller is not the expected account or an approved operator
     error ONLY_CALLER_OR_OPERATOR();
 
-    /// @notice Thrown when configuring this Royco market with an invalid coverage requirement
-    error INVALID_COVERAGE_REQUIREMENT();
-
-    /// @notice Thrown when junior tranche provided coverage is insufficient for the senior tranche
-    error INSUFFICIENT_COVERAGE();
-
     /**
      * @notice Modifier to ensure the specified action uses a synchronous execution model
      * @param _action The action to check (DEPOSIT or WITHDRAW)
@@ -59,36 +56,18 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
      * @dev Reverts if caller is neither the address nor an approved operator
      */
     modifier onlyCallerOrOperator(address _account) {
-        require(msg.sender == _account || RoycoTrancheStorageLib._isOperator(_account, msg.sender), ONLY_CALLER_OR_OPERATOR());
+        require(msg.sender == _account || RoycoTrancheStorageLib._getRoycoTrancheStorage().isOperator[_account][msg.sender], ONLY_CALLER_OR_OPERATOR());
         _;
     }
 
     /**
-     * @notice Post-condition that enforces the market's coverage requirement
-     * @dev Junior capital should be able to absorb losses up to the coverage ratio of the market, based on the current total NAV
-     *      It should be able to do so while incurring a loss proportionally equal to or less than the senior tranche
-     * @dev Coverage condition: JT_NAV >= (JT_NAV + ST_NAV) * COV_%
-     *      Simplified condition: JT_NAV >= (ST_NAV * COV_%) / (100% - COV_%)
-     *      If this fails, the current junior capital is insufficient to meet the coverage requirement for the total NAV
-     * @dev Failure Modes:
-     *      1. Synchronous:  Junior capital is insufficient purely because of too many senior deposits or junior withdrawals
-     *      2. Asynchronous: Junior capital is insufficient because it incurred a loss proportionally greater than what senior capital did
-     *                       This should not occur if both tranches are deployed into the same opportunity or junior is deployed into a strictly safer (eg. RFR) source
-     */
-    modifier checkCoverage() {
-        // Coverage must be checked after all state changes have been applied
-        _;
-        require(_getJuniorTrancheNAV() >= _computeMinJuniorTrancheNAV(), INSUFFICIENT_COVERAGE());
-    }
-
-    /**
+     **
      * @notice Initializes the Royco tranche
      * @dev This function initializes parent contracts and the tranche-specific state
      * @param _trancheParams Deployment parameters including name, symbol, kernel, and kernel initialization data
      * @param _asset The underlying asset for the tranche
      * @param _owner The initial owner of the tranche
      * @param _marketId The identifier of the Royco market this tranche is linked to
-     * @param _coverageWAD The coverage condition in WAD format (1e18 = 100%)
      * @param _complementTranche The address of the paired tranche (junior for senior, senior for junior)
      */
     function __RoycoTranche_init(
@@ -96,7 +75,6 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
         address _asset,
         address _owner,
         bytes32 _marketId,
-        uint64 _coverageWAD,
         address _complementTranche
     )
         internal
@@ -108,7 +86,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
         __Ownable_init_unchained(_owner);
 
         // Initialize the Royco Tranche state
-        __RoycoTranche_init_unchained(_asset, _trancheParams.kernel, _trancheParams.kernelInitCallData, _marketId, _coverageWAD, _complementTranche);
+        __RoycoTranche_init_unchained(_asset, _trancheParams.kernel, _marketId, _complementTranche);
     }
 
     /**
@@ -116,34 +94,16 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
      * @dev This function sets up the tranche storage and initializes the kernel
      * @param _asset The underlying asset for the tranche
      * @param _kernel The kernel that handles strategy logic
-     * @param _kernelInitCallData Initialization data for the kernel
      * @param _marketId The identifier of the Royco market this tranche is linked to
-     * @param _coverageWAD The coverage condition in WAD format (1e18 = 100%)
      * @param _complementTranche The address of the paired tranche
      */
-    function __RoycoTranche_init_unchained(
-        address _asset,
-        address _kernel,
-        bytes calldata _kernelInitCallData,
-        bytes32 _marketId,
-        uint64 _coverageWAD,
-        address _complementTranche
-    )
-        internal
-        onlyInitializing
-    {
-        // Check that the coverage requirement is valid
-        require(_coverageWAD >= ConstantsLib.MIN_COVERAGE_WAD && _coverageWAD < ConstantsLib.WAD, INVALID_COVERAGE_REQUIREMENT());
-
+    function __RoycoTranche_init_unchained(address _asset, address _kernel, bytes32 _marketId, address _complementTranche) internal onlyInitializing {
         // Calculate the vault's decimal offset (curb inflation attacks)
         uint8 underlyingAssetDecimals = IERC20Metadata(_asset).decimals();
         uint8 decimalsOffset = underlyingAssetDecimals >= 18 ? 0 : (18 - underlyingAssetDecimals);
 
         // Initialize the tranche's state
-        RoycoTrancheStorageLib.__RoycoTranche_init(msg.sender, _kernel, _marketId, _coverageWAD, _complementTranche, decimalsOffset);
-
-        // Initialize the kernel's state
-        RoycoKernelLib.__Kernel_init(_kernel, _kernelInitCallData);
+        RoycoTrancheStorageLib.__RoycoTranche_init(msg.sender, _kernel, _marketId, _complementTranche, decimalsOffset);
     }
 
     /// @inheritdoc IRoycoTranche
@@ -161,7 +121,8 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
     /// @inheritdoc ERC4626Upgradeable
     function maxDeposit(address _receiver) public view override(ERC4626Upgradeable) returns (uint256) {
         // Return the minimum of the deposit capacity of the underlying investment opportunity and the tranche
-        return Math.min(RoycoKernelLib._maxDeposit(RoycoTrancheStorageLib._getKernel(), _receiver, asset()), _getTrancheDepositCapacity());
+        uint256 kernelMaxDeposit = _callKernelMaxDeposit(_receiver);
+        return Math.min(kernelMaxDeposit, _getTrancheDepositCapacity());
     }
 
     /// @inheritdoc ERC4626Upgradeable
@@ -173,7 +134,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
     /// @inheritdoc ERC4626Upgradeable
     function maxWithdraw(address _owner) public view virtual override(ERC4626Upgradeable) returns (uint256) {
         // Get the maximum withdrawable assets
-        uint256 maxAssetsWithdrawable = RoycoKernelLib._maxWithdraw(RoycoTrancheStorageLib._getKernel(), _owner, asset());
+        uint256 maxAssetsWithdrawable = _callKernelMaxWithdraw(_owner);
         // Return the minimum of the withdrawable assets, assets owned by the owner, and the tranche's withdrawal capacity
         return Math.min(maxAssetsWithdrawable, super.previewRedeem(balanceOf(_owner))).min(_getTrancheWithdrawalCapacity());
     }
@@ -235,7 +196,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
         _deposit(msg.sender, _receiver, _assets, (shares = super.previewDeposit(_assets)));
 
         // Process the deposit into the underlying investment opportunity by calling the kernel
-        RoycoKernelLib._deposit(RoycoTrancheStorageLib._getKernel(), asset(), _assets, _controller);
+        _callKernelDeposit(_assets, msg.sender, _receiver);
     }
 
     /// @inheritdoc ERC4626Upgradeable
@@ -264,7 +225,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
         _deposit(msg.sender, _receiver, (assets = super.previewMint(_shares)), _shares);
 
         // Process the deposit for the underlying investment opportunity by calling the kernel
-        RoycoKernelLib._deposit(RoycoTrancheStorageLib._getKernel(), asset(), assets, _controller);
+        _callKernelDeposit(assets, msg.sender, _receiver);
     }
 
     /// @inheritdoc IERC7540
@@ -289,7 +250,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
 
         // Process the withdrawal from the underlying investment opportunity
         // It is expected that the kernel transfers the assets directly to the receiver
-        RoycoKernelLib._withdraw(RoycoTrancheStorageLib._getKernel(), asset(), _assets, _controller, _receiver);
+        _callKernelWithdraw(_assets, msg.sender, _receiver);
     }
 
     /// @inheritdoc IERC7540
@@ -314,7 +275,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
 
         // Process the withdrawal from the underlying investment opportunity
         // It is expected that the kernel transfers the assets directly to the receiver
-        RoycoKernelLib._withdraw(RoycoTrancheStorageLib._getKernel(), asset(), assets, _controller, _receiver);
+        _callKernelWithdraw(assets, msg.sender, _receiver);
     }
 
     // =============================
@@ -323,13 +284,13 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
 
     /// @inheritdoc IERC7540
     function isOperator(address _controller, address _operator) external view virtual override(IERC7540) returns (bool) {
-        return RoycoTrancheStorageLib._isOperator(_controller, _operator);
+        return RoycoTrancheStorageLib._getRoycoTrancheStorage().isOperator[_controller][_operator];
     }
 
     /// @inheritdoc IERC7540
     function setOperator(address _operator, bool _approved) external virtual override(IERC7540) returns (bool) {
         // Set the operator's approval status for the caller
-        RoycoTrancheStorageLib._setOperator(msg.sender, _operator, _approved);
+        RoycoTrancheStorageLib._getRoycoTrancheStorage().isOperator[msg.sender][_operator] = _approved;
         emit OperatorSet(msg.sender, _operator, _approved);
 
         // Must return true as per ERC7540
@@ -354,30 +315,30 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
         _transferIn(_owner, _assets);
 
         // Queue the deposit request and get the request ID from the kernel
-        requestId = RoycoKernelLib._requestDeposit(RoycoTrancheStorageLib._getKernel(), _assets, _controller);
+        requestId = _callKernelRequestDeposit(_assets, _controller);
 
         emit DepositRequest(_controller, _owner, requestId, msg.sender, _assets);
     }
 
     /// @inheritdoc IERC7540
-    /// @dev This function's state visibility can't be restricted to view since we need to delegatecall the kernel to read state
     /// @dev Will revert if this tranche does not employ an asynchronous deposit flow
-    function pendingDepositRequest(uint256 _requestId, address _controller) external virtual override(IERC7540) returns (uint256) {
-        return RoycoKernelLib._pendingDepositRequest(RoycoTrancheStorageLib._getKernel(), _requestId, _controller);
+    function pendingDepositRequest(uint256 _requestId, address _controller) external view virtual override(IERC7540) returns (uint256) {
+        return _callKernelPendingDepositRequest(_requestId, _controller);
     }
 
     /// @inheritdoc IERC7540
-    /// @dev This function's state visibility can't be restricted to view since we need to delegatecall the kernel to read state
     /// @dev Will revert if this tranche does not employ an asynchronous deposit flow
-    function claimableDepositRequest(uint256 _requestId, address _controller) external virtual override(IERC7540) returns (uint256) {
-        return RoycoKernelLib._claimableDepositRequest(RoycoTrancheStorageLib._getKernel(), _requestId, _controller);
+    function claimableDepositRequest(uint256 _requestId, address _controller) external view virtual override(IERC7540) returns (uint256) {
+        return _callKernelClaimableDepositRequest(_requestId, _controller);
     }
 
     /// @inheritdoc IERC7540
     /// @dev Will revert if this tranche does not employ an asynchronous withdrawal flow
     function requestRedeem(uint256 _shares, address _controller, address _owner) external virtual override(IERC7540) returns (uint256 requestId) {
         // Spend the caller's share allowance if the caller isn't the owner or an approved operator
-        if (msg.sender != _owner && !RoycoTrancheStorageLib._isOperator(_owner, msg.sender)) _spendAllowance(_owner, msg.sender, _shares);
+        if (msg.sender != _owner && !RoycoTrancheStorageLib._getRoycoTrancheStorage().isOperator[_owner][msg.sender]) {
+            _spendAllowance(_owner, msg.sender, _shares);
+        }
         // Transfer and lock the requested shares being redeemed from the owner to the tranche
         /// @dev Don't burn the shares so that total supply remains unchanged while this request is unclaimed
         _transfer(_owner, address(this), _shares);
@@ -386,23 +347,21 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
         uint256 _assets = super.previewRedeem(_shares);
 
         // Queue the redemption request and get the request ID from the kernel
-        requestId = RoycoKernelLib._requestRedeem(RoycoTrancheStorageLib._getKernel(), _assets, _shares, _controller);
+        requestId = _callKernelRequestRedeem(_assets, _shares, _controller);
 
         emit RedeemRequest(_controller, _owner, requestId, msg.sender, _shares);
     }
 
     /// @inheritdoc IERC7540
-    /// @dev This function's state visibility can't be restricted to view since we need to delegatecall the kernel to read state
     /// @dev Will revert if this tranche does not employ an asynchronous withdrawal flow
-    function pendingRedeemRequest(uint256 _requestId, address _controller) external virtual override(IERC7540) returns (uint256 pendingShares) {
-        return RoycoKernelLib._pendingRedeemRequest(RoycoTrancheStorageLib._getKernel(), _requestId, _controller);
+    function pendingRedeemRequest(uint256 _requestId, address _controller) external view virtual override(IERC7540) returns (uint256 pendingShares) {
+        return _callKernelPendingRedeemRequest(_requestId, _controller);
     }
 
     /// @inheritdoc IERC7540
-    /// @dev This function's state visibility can't be restricted to view since we need to delegatecall the kernel to read state
     /// @dev Will revert if this tranche does not employ an asynchronous withdrawal flow
-    function claimableRedeemRequest(uint256 _requestId, address _controller) external virtual override(IERC7540) returns (uint256 claimableShares) {
-        return RoycoKernelLib._claimableRedeemRequest(RoycoTrancheStorageLib._getKernel(), _requestId, _controller);
+    function claimableRedeemRequest(uint256 _requestId, address _controller) external view virtual override(IERC7540) returns (uint256 claimableShares) {
+        return _callKernelClaimableRedeemRequest(_requestId, _controller);
     }
 
     // =============================
@@ -413,23 +372,21 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
     /// @dev Will revert if this tranche does not employ an asynchronous deposit flow
     function cancelDepositRequest(uint256 _requestId, address _controller) external virtual override(IERC7887) onlyCallerOrOperator(_controller) {
         // Delegate call to kernel to handle deposit cancellation
-        RoycoKernelLib._cancelDepositRequest(RoycoTrancheStorageLib._getKernel(), _requestId, _controller);
+        _callKernelCancelDepositRequest(_requestId, _controller);
 
         emit CancelDepositRequest(_controller, _requestId, msg.sender);
     }
 
     /// @inheritdoc IERC7887
-    /// @dev This function's state visibility can't be restricted to view since we need to delegatecall the kernel to read state
     /// @dev Will revert if this tranche does not employ an asynchronous deposit flow
-    function pendingCancelDepositRequest(uint256 _requestId, address _controller) external virtual override(IERC7887) returns (bool isPending) {
-        return RoycoKernelLib._pendingCancelDepositRequest(RoycoTrancheStorageLib._getKernel(), _requestId, _controller);
+    function pendingCancelDepositRequest(uint256 _requestId, address _controller) external view virtual override(IERC7887) returns (bool isPending) {
+        return _callKernelPendingCancelDepositRequest(_requestId, _controller);
     }
 
     /// @inheritdoc IERC7887
-    /// @dev This function's state visibility can't be restricted to view since we need to delegatecall the kernel to read state
     /// @dev Will revert if this tranche does not employ an asynchronous deposit flow
-    function claimableCancelDepositRequest(uint256 _requestId, address _controller) external virtual override(IERC7887) returns (uint256 assets) {
-        return RoycoKernelLib._claimableCancelDepositRequest(RoycoTrancheStorageLib._getKernel(), _requestId, _controller);
+    function claimableCancelDepositRequest(uint256 _requestId, address _controller) external view virtual override(IERC7887) returns (uint256 assets) {
+        return _callKernelClaimableCancelDepositRequest(_requestId, _controller);
     }
 
     /// @inheritdoc IERC7887
@@ -445,7 +402,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
         onlyCallerOrOperator(_controller)
     {
         // Get the claimable amount before claiming
-        uint256 assets = RoycoKernelLib._claimableCancelDepositRequest(RoycoTrancheStorageLib._getKernel(), _requestId, _controller);
+        uint256 assets = _callKernelClaimableCancelDepositRequest(_requestId, _controller);
 
         // Transfer cancelled deposit assets to receiver
         _transferOut(_receiver, assets);
@@ -457,30 +414,28 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
     /// @dev Will revert if this tranche does not employ an asynchronous withdrawal flow
     function cancelRedeemRequest(uint256 _requestId, address _controller) external virtual override(IERC7887) onlyCallerOrOperator(_controller) {
         // Delegate call to kernel to handle redeem cancellation
-        RoycoKernelLib._cancelRedeemRequest(RoycoTrancheStorageLib._getKernel(), _requestId, _controller);
+        _callKernelCancelRedeemRequest(_requestId, _controller);
 
         emit CancelRedeemRequest(_controller, _requestId, msg.sender);
     }
 
     /// @inheritdoc IERC7887
-    /// @dev This function's state visibility can't be restricted to view since we need to delegatecall the kernel to read state
     /// @dev Will revert if this tranche does not employ an asynchronous withdrawal flow
-    function pendingCancelRedeemRequest(uint256 _requestId, address _controller) external virtual override(IERC7887) returns (bool isPending) {
-        return RoycoKernelLib._pendingCancelRedeemRequest(RoycoTrancheStorageLib._getKernel(), _requestId, _controller);
+    function pendingCancelRedeemRequest(uint256 _requestId, address _controller) external view virtual override(IERC7887) returns (bool isPending) {
+        return _callKernelPendingCancelRedeemRequest(_requestId, _controller);
     }
 
     /// @inheritdoc IERC7887
-    /// @dev This function's state visibility can't be restricted to view since we need to delegatecall the kernel to read state
     /// @dev Will revert if this tranche does not employ an asynchronous withdrawal flow
-    function claimableCancelRedeemRequest(uint256 _requestId, address _controller) external virtual override(IERC7887) returns (uint256 shares) {
-        return RoycoKernelLib._claimableCancelRedeemRequest(RoycoTrancheStorageLib._getKernel(), _requestId, _controller);
+    function claimableCancelRedeemRequest(uint256 _requestId, address _controller) external view virtual override(IERC7887) returns (uint256 shares) {
+        return _callKernelClaimableCancelRedeemRequest(_requestId, _controller);
     }
 
     /// @inheritdoc IERC7887
     /// @dev Will revert if this tranche does not employ an asynchronous withdrawal flow
     function claimCancelRedeemRequest(uint256 _requestId, address _receiver, address _owner) external virtual override(IERC7887) onlyCallerOrOperator(_owner) {
         // Get the claimable amount before claiming
-        uint256 shares = RoycoKernelLib._claimableCancelRedeemRequest(RoycoTrancheStorageLib._getKernel(), _requestId, _owner);
+        uint256 shares = _callKernelClaimableCancelRedeemRequest(_requestId, _owner);
 
         // Transfer the previously locked shares (on request) to the receiver
         _transfer(address(this), _receiver, shares);
@@ -531,29 +486,31 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
 
     /// @dev Returns the minimum NAV of the junior tranche to satisfy the market's coverage condition
     function _computeMinJuniorTrancheNAV() internal view returns (uint256) {
-        uint256 coverageWAD = RoycoTrancheStorageLib._getCoverageRatioWAD();
+        uint256 coverageWAD = RoycoTrancheStorageLib._getRoycoTrancheStorage().coverageWAD;
         // Round in favor of the senior tranche
         return _getSeniorTrancheNAV().mulDiv(coverageWAD, (ConstantsLib.WAD - coverageWAD), Math.Rounding.Ceil);
     }
 
     /// @dev Returns the minimum NAV of the junior tranche to satisfy the market's coverage condition
     function _computeSeniorTrancheCoverage() internal view returns (uint256) {
-        uint256 coverageWAD = RoycoTrancheStorageLib._getCoverageRatioWAD();
+        uint256 coverageWAD = RoycoTrancheStorageLib._getRoycoTrancheStorage().coverageWAD;
         // Round in favor of the senior tranche
         return _getJuniorTrancheNAV().mulDiv((ConstantsLib.WAD - coverageWAD), coverageWAD, Math.Rounding.Floor);
     }
 
     /// @dev Returns the NAV of this tranche
     function _getSelfNAV() internal view returns (uint256) {
-        return RoycoKernelLib._getNAV(RoycoTrancheStorageLib._getKernel(), asset());
+        return _callKernelGetNAV();
     }
 
     function _syncTrancheNAVs(int256 _rawNAVDelta) internal returns (uint256, uint256, uint256, uint256) {
-        return IRoyco(RoycoTrancheStorageLib._getRoyco()).syncTrancheNAVs(RoycoTrancheStorageLib._getMarketId(), _rawNAVDelta);
+        return
+            IRoyco(RoycoTrancheStorageLib._getRoycoTrancheStorage().royco)
+                .syncTrancheNAVs(RoycoTrancheStorageLib._getRoycoTrancheStorage().marketId, _rawNAVDelta);
     }
 
     function _previewSyncTrancheNAVs() internal view returns (uint256, uint256, uint256, uint256) {
-        return IRoyco(RoycoTrancheStorageLib._getRoyco()).previewSyncTrancheNAVs(RoycoTrancheStorageLib._getMarketId());
+        return IRoyco(RoycoTrancheStorageLib._getRoycoTrancheStorage().royco).previewSyncTrancheNAVs(RoycoTrancheStorageLib._getRoycoTrancheStorage().marketId);
     }
 
     /// @dev Returns the deposit capacity in assets based on the coverage condition
@@ -570,12 +527,64 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, ER
 
     /// @dev Returns if the specified action employs a synchronous execution model
     function _isSync(Action _action) internal view returns (bool) {
-        return (_action == Action.DEPOSIT ? RoycoTrancheStorageLib._getDepositExecutionModel() : RoycoTrancheStorageLib._getWithdrawalExecutionModel())
-            == ExecutionModel.SYNC;
+        return (_action == Action.DEPOSIT
+                    ? RoycoTrancheStorageLib._getRoycoTrancheStorage().DEPOSIT_EXECUTION_MODEL
+                    : RoycoTrancheStorageLib._getRoycoTrancheStorage().WITHDRAW_EXECUTION_MODEL) == ExecutionModel.SYNC;
     }
 
     /// @inheritdoc ERC4626Upgradeable
     function _decimalsOffset() internal view virtual override(ERC4626Upgradeable) returns (uint8) {
-        return RoycoTrancheStorageLib._getDecimalsOffset();
+        return RoycoTrancheStorageLib._getRoycoTrancheStorage().decimalsOffset;
     }
+
+    /// @dev Calls the appropriate kernel maxDeposit method
+    function _callKernelMaxDeposit(address _receiver) internal view virtual returns (uint256);
+
+    /// @dev Calls the appropriate kernel maxWithdraw method
+    function _callKernelMaxWithdraw(address _owner) internal view virtual returns (uint256);
+
+    /// @dev Calls the appropriate kernel getNAV method
+    function _callKernelGetNAV() internal view virtual returns (uint256);
+
+    /// @dev Calls the appropriate kernel deposit method
+    function _callKernelDeposit(uint256 _assets, address _caller, address _receiver) internal virtual;
+
+    /// @dev Calls the appropriate kernel withdraw method
+    function _callKernelWithdraw(uint256 _assets, address _caller, address _receiver) internal virtual;
+
+    /// @dev Calls the appropriate kernel requestDeposit method
+    function _callKernelRequestDeposit(uint256 _assets, address _controller) internal virtual returns (uint256 requestId);
+
+    /// @dev Calls the appropriate kernel pendingDepositRequest method
+    function _callKernelPendingDepositRequest(uint256 _requestId, address _controller) internal view virtual returns (uint256);
+
+    /// @dev Calls the appropriate kernel claimableDepositRequest method
+    function _callKernelClaimableDepositRequest(uint256 _requestId, address _controller) internal view virtual returns (uint256);
+
+    /// @dev Calls the appropriate kernel requestRedeem method
+    function _callKernelRequestRedeem(uint256 _assets, uint256 _shares, address _controller) internal virtual returns (uint256 requestId);
+
+    /// @dev Calls the appropriate kernel pendingRedeemRequest method
+    function _callKernelPendingRedeemRequest(uint256 _requestId, address _controller) internal view virtual returns (uint256);
+
+    /// @dev Calls the appropriate kernel claimableRedeemRequest method
+    function _callKernelClaimableRedeemRequest(uint256 _requestId, address _controller) internal view virtual returns (uint256);
+
+    /// @dev Calls the appropriate kernel cancelDepositRequest method
+    function _callKernelCancelDepositRequest(uint256 _requestId, address _controller) internal virtual;
+
+    /// @dev Calls the appropriate kernel pendingCancelDepositRequest method
+    function _callKernelPendingCancelDepositRequest(uint256 _requestId, address _controller) internal view virtual returns (bool);
+
+    /// @dev Calls the appropriate kernel claimableCancelDepositRequest method
+    function _callKernelClaimableCancelDepositRequest(uint256 _requestId, address _controller) internal view virtual returns (uint256);
+
+    /// @dev Calls the appropriate kernel cancelRedeemRequest method
+    function _callKernelCancelRedeemRequest(uint256 _requestId, address _controller) internal virtual;
+
+    /// @dev Calls the appropriate kernel pendingCancelRedeemRequest method
+    function _callKernelPendingCancelRedeemRequest(uint256 _requestId, address _controller) internal view virtual returns (bool);
+
+    /// @dev Calls the appropriate kernel claimableCancelRedeemRequest method
+    function _callKernelClaimableCancelRedeemRequest(uint256 _requestId, address _controller) internal view virtual returns (uint256);
 }

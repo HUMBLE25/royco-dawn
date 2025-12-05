@@ -13,10 +13,13 @@ enum ExecutionModel {
 }
 
 /**
- * @title IRoycoKernel
+ * @title IRoycoBaseKernel
  *
  */
 interface IRoycoBaseKernel {
+    function getDepositExecutionModel() external view returns (ExecutionModel);
+    function getWithdrawExecutionModel() external view returns (ExecutionModel);
+
     function getSTRawNAV() external view returns (uint256);
     function getJTRawNAV() external view returns (uint256);
 
