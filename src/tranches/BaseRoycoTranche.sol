@@ -246,7 +246,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
 
         // Process the withdrawal from the underlying investment opportunity
         // It is expected that the kernel transfers the assets directly to the receiver
-        uint256 fractionOfTotalAssetsRedeemedWAD = _callKernelWithdraw(_assets, _controller, _receiver);
+        (uint256 fractionOfTotalAssetsRedeemedWAD,) = _callKernelWithdraw(_assets, _controller, _receiver);
 
         if (_isSync(Action.WITHDRAW)) {
             shares = super.previewWithdraw(_assets);

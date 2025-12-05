@@ -38,5 +38,5 @@ interface IRoycoBaseKernel {
     function jtMaxDeposit(address _receiver) external view returns (uint256);
     function jtMaxWithdraw(address _owner) external view returns (uint256);
     function jtDeposit(uint256 _assets, address _caller, address _receiver) external returns (uint256 fractionOfTotalAssetsAllocatedWAD);
-    function jtWithdraw(uint256 _assets, address _caller, address _receiver) external returns (uint256 fractionOfTotalAssetsRedeemedWAD);
+    function jtWithdraw(uint256 _assets, address _caller, address _receiver) external returns (uint256 fractionOfTotalAssetsRedeemedWAD, uint256 assetsRedeemed);
 }
