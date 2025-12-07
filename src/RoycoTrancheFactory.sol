@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import { ERC1967Proxy } from "../lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import { ExecutionModel, IRoycoBaseKernel } from "./interfaces/kernel/IRoycoBaseKernel.sol";
+import { ExecutionModel, IBaseKernel } from "./interfaces/kernel/IBaseKernel.sol";
 import { TrancheDeploymentParams } from "./libraries/Types.sol";
 import { RoycoJT } from "./tranches/junior/RoycoJT.sol";
 import { RoycoST } from "./tranches/senior/RoycoST.sol";
@@ -87,10 +87,10 @@ contract RoycoTrancheFactory {
             require(kernel == _jtParams.kernel, KernelMismatch());
         }
 
-        // Verify kernel implements IRoycoBaseKernel by checking it returns valid execution models
+        // Verify kernel implements IBaseKernel by checking it returns valid execution models
         // This will revert if the kernel doesn't implement the interface
-        ExecutionModel depositModel = IRoycoBaseKernel(kernel).getDepositExecutionModel();
-        ExecutionModel withdrawModel = IRoycoBaseKernel(kernel).getWithdrawExecutionModel();
+        ExecutionModel depositModel = IBaseKernel(kernel).getDepositExecutionModel();
+        ExecutionModel withdrawModel = IBaseKernel(kernel).getWithdrawExecutionModel();
         require(depositModel == ExecutionModel.SYNC || depositModel == ExecutionModel.ASYNC, InvalidDepositModel());
         require(withdrawModel == ExecutionModel.SYNC || withdrawModel == ExecutionModel.ASYNC, InvalidWithdrawModel());
 
@@ -100,13 +100,11 @@ contract RoycoTrancheFactory {
         stParams.kernel = kernel;
         jtParams.kernel = kernel;
 
-        // Deploy senior tranche proxy first with placeholder for junior tranche
-        // Note: ST will have complementTranche = address(0) initially
-        // This may need to be updated later if ST requires JT address for operations
-        seniorTranche = _deployTranche(roycoSTImplementation, abi.encodeCall(RoycoST.initialize, (stParams, _asset, _owner, _marketId, address(0))));
+        // Deploy senior tranche proxy first
+        seniorTranche = _deployTranche(roycoSTImplementation, abi.encodeCall(RoycoST.initialize, (stParams, _asset, _owner, _marketId)));
 
-        // Deploy junior tranche proxy with senior tranche address
-        juniorTranche = _deployTranche(roycoJTImplementation, abi.encodeCall(RoycoJT.initialize, (jtParams, _asset, _owner, _marketId, seniorTranche)));
+        // Deploy junior tranche proxy
+        juniorTranche = _deployTranche(roycoJTImplementation, abi.encodeCall(RoycoJT.initialize, (jtParams, _asset, _owner, _marketId)));
 
         emit MarketDeployed(seniorTranche, juniorTranche, kernel, _marketId, _asset, _owner);
 

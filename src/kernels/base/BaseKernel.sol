@@ -12,7 +12,7 @@ import { ConstantsLib, Math, UtilsLib } from "../../libraries/UtilsLib.sol";
  * @notice Base abstract contract for kernel implementations that provides delegate call protection
  * @dev Provides the foundational functionality for kernel contracts including delegatecall enforcement
  * @dev All kernel contracts should inherit from this base contract to ensure proper execution context
- *      and use the modifier as stipulated by the IRoycoBaseKernel interface.
+ *      and use the modifier as stipulated by the IBaseKernel interface.
  */
 abstract contract BaseKernel is Initializable, IBaseKernel {
     using Math for uint256;

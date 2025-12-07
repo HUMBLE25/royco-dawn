@@ -11,13 +11,3 @@ interface IRoycoTranche is IERC165, IERC7540, IERC7575, IERC7887 {
     /// @dev The NAV is expressed in the tranche's base asset
     function getNAV() external view returns (uint256);
 }
-
-interface IRoycoJuniorTranche {
-    /**
-     * @notice Called the senior tranche when the junior tranche needs to cover a loss for a withdrawing senior tranche depositor
-     * @param _assets The loss to cover in the junior tranche's base asset
-     * @param _receiver The receiver of the loss payout
-     * @return The request ID if the junior tranche employs an asynchronous withdrawal model
-     */
-    function coverLosses(uint256 _assets, address _receiver) external returns (uint256);
-}
