@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import { IERC20 } from "../../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { IAsyncSTDepositKernel } from "../../interfaces/kernel/IAsyncSTDepositKernel.sol";
 import { IAsyncSTWithdrawalKernel } from "../../interfaces/kernel/IAsyncSTWithdrawalKernel.sol";
-import { IRoycoBaseKernel } from "../../interfaces/kernel/IRoycoBaseKernel.sol";
+import { IBaseKernel } from "../../interfaces/kernel/IBaseKernel.sol";
 import { IRoycoTranche } from "../../interfaces/tranche/IRoycoTranche.sol";
 import { ConstantsLib } from "../../libraries/ConstantsLib.sol";
 import { RoycoTrancheStorageLib } from "../../libraries/RoycoTrancheStorageLib.sol";

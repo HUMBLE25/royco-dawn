@@ -30,6 +30,7 @@ contract RoycoTrancheFactory {
     /// @notice Thrown when the kernel has an invalid withdraw execution model
     error InvalidWithdrawModel();
     /// @notice Emitted when a new market is deployed
+
     event MarketDeployed(address indexed seniorTranche, address indexed juniorTranche, address indexed kernel, bytes32 marketId, address asset, address owner);
 
     /// @notice The implementation address for RoycoST
@@ -133,4 +134,3 @@ contract RoycoTrancheFactory {
         proxy = address(new ERC1967Proxy(_implementation, _initData));
     }
 }
-

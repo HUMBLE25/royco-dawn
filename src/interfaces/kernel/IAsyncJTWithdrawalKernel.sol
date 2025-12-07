@@ -61,4 +61,3 @@ interface IAsyncJTWithdrawalKernel {
      */
     function jtClaimableCancelWithdrawalRequest(uint256 _requestId, address _controller) external view returns (uint256 shares);
 }
-

@@ -11,7 +11,7 @@ import {
 } from "../../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import { SafeERC20 } from "../../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IRoyco } from "../interfaces/IRoyco.sol";
-import { ExecutionModel, IRoycoBaseKernel } from "../interfaces/kernel/IRoycoBaseKernel.sol";
+import { ExecutionModel, IBaseKernel } from "../interfaces/kernel/IBaseKernel.sol";
 import { IERC165, IERC7540, IERC7575, IERC7887, IRoycoTranche } from "../interfaces/tranche/IRoycoTranche.sol";
 import { ConstantsLib } from "../libraries/ConstantsLib.sol";
 import { RoycoTrancheStorageLib } from "../libraries/RoycoTrancheStorageLib.sol";
@@ -56,7 +56,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
     }
 
     /**
-     **
+     *
      * @notice Initializes the Royco tranche
      * @dev This function initializes parent contracts and the tranche-specific state
      * @param _trancheParams Deployment parameters including name, symbol, kernel, and kernel initialization data
@@ -505,9 +505,9 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
     }
 
     function _syncTrancheNAVs(int256 _rawNAVDelta) internal returns (uint256, uint256, uint256, uint256) {
-        return
-            IRoyco(RoycoTrancheStorageLib._getRoycoTrancheStorage().royco)
-                .syncTrancheNAVs(RoycoTrancheStorageLib._getRoycoTrancheStorage().marketId, _rawNAVDelta);
+        return IRoyco(RoycoTrancheStorageLib._getRoycoTrancheStorage().royco).syncTrancheNAVs(
+            RoycoTrancheStorageLib._getRoycoTrancheStorage().marketId, _rawNAVDelta
+        );
     }
 
     function _previewSyncTrancheNAVs() internal view returns (uint256, uint256, uint256, uint256) {
@@ -525,9 +525,11 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
 
     /// @dev Returns if the specified action employs a synchronous execution model
     function _isSync(Action _action) internal view returns (bool) {
-        return (_action == Action.DEPOSIT
-                    ? RoycoTrancheStorageLib._getRoycoTrancheStorage().DEPOSIT_EXECUTION_MODEL
-                    : RoycoTrancheStorageLib._getRoycoTrancheStorage().WITHDRAW_EXECUTION_MODEL) == ExecutionModel.SYNC;
+        return (
+            _action == Action.DEPOSIT
+                ? RoycoTrancheStorageLib._getRoycoTrancheStorage().DEPOSIT_EXECUTION_MODEL
+                : RoycoTrancheStorageLib._getRoycoTrancheStorage().WITHDRAW_EXECUTION_MODEL
+        ) == ExecutionModel.SYNC;
     }
 
     /// @inheritdoc ERC4626Upgradeable

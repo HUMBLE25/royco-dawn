@@ -17,11 +17,10 @@ contract StaticCurveRDM is IRDM {
     using Math for uint256;
 
     /**
-     * @dev Constant for the target utilization of the junior tranche (90%)
-     * @dev Utilization = ((ST_NAV + JT_NAV) * COV_%) / JT_NAV
-     * @dev Coverage Condition: JT_NAV >= (JT_NAV + ST_NAV) * COV_%
-     * @dev The above attempts to keep utilization ∈ [0,1]
-     * @dev However, utilization can be greater than 1 if JT experiences a loss proportionally greater than ST
+     * @dev Constant for the target utilization (kink) of the junior tranche's (90%) loss capital
+     * @dev Utilization = ((ST_RAW_NAV + (JT_RAW_NAV * BETA_%)) * COV_%) / JT_EFFECTIVE_NAV
+     * @dev If Utilization <= 1, the senior tranche exposure is collateralized as per the market's configured coverage requirement
+     *      If Utilization > 1, the senior tranche exposure is undercollateralized as per the market's configured coverage requirement
      */
     uint256 public constant TARGET_UTILIZATION = 0.9e18;
 
@@ -35,7 +34,17 @@ contract StaticCurveRDM is IRDM {
     uint256 public constant BASE_RATE_GTE_TARGET_UTIL = 0.225e18;
 
     /// @inheritdoc IRDM
-    function getJTYieldShare(bytes32, uint256 _stRawNAV, uint256 _jtRawNAV, uint256 _coverageWAD) external pure returns (uint256) {
+    function getJTYieldShare(
+        uint256 _stRawNAV,
+        uint256 _jtRawNAV,
+        uint256 _betaWAD,
+        uint256 _coverageWAD,
+        uint256 _jtEffectiveNAV
+    )
+        external
+        pure
+        returns (uint256)
+    {
         /**
          * Reward Distribution Model (piecewise curve):
          *
@@ -43,18 +52,20 @@ contract StaticCurveRDM is IRDM {
          *        = 7.75 * (U - 0.9) + 0.225   if U ≥ 0.9
          *        = 1                          if U ≥ 1
          *
-         * U    → Utilization = ((ST_NAV + JT_NAV) * COV_%) / JT_NAV
+         * U    → Utilization = ((ST_RAW_NAV + (JT_RAW_NAV * BETA_%)) * COV_%) / JT_EFFECTIVE_NAV
          * R(U) → Percentage of ST yield paid to the junior tranche
          *
          * Below 90% utilization, JT yield allocation rises slowly (0.25 slope).
-         * Above 90% utilization, JT yield allocation rises sharply (7.75 slope), penalizing high utilization and incentivizing additional junior deposits or senior withdrawals.
+         * Above 90% utilization, JT yield allocation rises sharply (7.75 slope), penalizing high utilization and incentivizing marginal junior deposits or senior withdrawals.
          */
 
-        // If any of these quantities is 0, the utilization is effectively 0, so the JT's percentage of ST yield is 0%
+        // If any of these values is 0, the utilization is effectively 0, so the JT's percentage of ST yield is 0%
         if (_stRawNAV == 0 || _jtRawNAV == 0 || _coverageWAD == 0) return 0;
+        // If there is no loss capital remaining when raw NAVs are non-zero, JT's percentage of ST yield is 100%
+        if (_jtEffectiveNAV == 0) return ConstantsLib.WAD;
 
         // Compute the utilization of the market
-        uint256 utilization = UtilsLib.computeUtilization(_stRawNAV, _jtRawNAV, _coverageWAD);
+        uint256 utilization = UtilsLib.computeUtilization(_stRawNAV, _jtRawNAV, _betaWAD, _coverageWAD, _jtEffectiveNAV);
 
         // Compute R(U), rounding in favor the senior tranche
         if (utilization >= ConstantsLib.WAD) {

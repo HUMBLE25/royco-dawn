@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import { SafeERC20 } from "../../../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IAsyncJTDepositKernel } from "../../interfaces/kernel/IAsyncJTDepositKernel.sol";
 import { IAsyncJTWithdrawalKernel } from "../../interfaces/kernel/IAsyncJTWithdrawalKernel.sol";
-import { IRoycoBaseKernel } from "../../interfaces/kernel/IRoycoBaseKernel.sol";
+import { IBaseKernel } from "../../interfaces/kernel/IBaseKernel.sol";
 import { IRoycoJuniorTranche, IRoycoTranche } from "../../interfaces/tranche/IRoycoTranche.sol";
 import { RoycoTrancheStorageLib } from "../../libraries/RoycoTrancheStorageLib.sol";
 import { TrancheDeploymentParams } from "../../libraries/Types.sol";
@@ -47,13 +47,7 @@ contract RoycoJT is IRoycoJuniorTranche, BaseRoycoTranche {
     }
 
     /// @inheritdoc IRoycoJuniorTranche
-    function coverLosses(
-        uint256, /* _assets */
-        address /* _receiver */
-    )
-        external
-        returns (uint256)
-    {
+    function coverLosses(uint256, /* _assets */ address /* _receiver */ ) external returns (uint256) {
         // Ensure the caller is the senior tranche
         require(msg.sender == RoycoTrancheStorageLib._getRoycoTrancheStorage().complementTranche, ONLY_SENIOR_TRANCHE());
         // TODO: Implement coverLosses functionality

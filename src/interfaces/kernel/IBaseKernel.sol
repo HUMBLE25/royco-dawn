@@ -13,10 +13,10 @@ enum ExecutionModel {
 }
 
 /**
- * @title IRoycoBaseKernel
+ * @title IBaseKernel
  *
  */
-interface IRoycoBaseKernel {
+interface IBaseKernel {
     function getDepositExecutionModel() external view returns (ExecutionModel);
     function getWithdrawExecutionModel() external view returns (ExecutionModel);
 
@@ -33,10 +33,22 @@ interface IRoycoBaseKernel {
     function stMaxDeposit(address _receiver) external view returns (uint256);
     function stMaxWithdraw(address _owner) external view returns (uint256);
     function stDeposit(uint256 _assets, address _caller, address _receiver) external returns (uint256 fractionOfTotalAssetsAllocatedWAD);
-    function stWithdraw(uint256 _assets, address _caller, address _receiver) external returns (uint256 fractionOfTotalAssetsRedeemedWAD, uint256 assetsRedeemed);
+    function stWithdraw(
+        uint256 _assets,
+        address _caller,
+        address _receiver
+    )
+        external
+        returns (uint256 fractionOfTotalAssetsRedeemedWAD, uint256 assetsRedeemed);
 
     function jtMaxDeposit(address _receiver) external view returns (uint256);
     function jtMaxWithdraw(address _owner) external view returns (uint256);
     function jtDeposit(uint256 _assets, address _caller, address _receiver) external returns (uint256 fractionOfTotalAssetsAllocatedWAD);
-    function jtWithdraw(uint256 _assets, address _caller, address _receiver) external returns (uint256 fractionOfTotalAssetsRedeemedWAD, uint256 assetsRedeemed);
+    function jtWithdraw(
+        uint256 _assets,
+        address _caller,
+        address _receiver
+    )
+        external
+        returns (uint256 fractionOfTotalAssetsRedeemedWAD, uint256 assetsRedeemed);
 }

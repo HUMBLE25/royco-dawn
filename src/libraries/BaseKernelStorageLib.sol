@@ -1,0 +1,75 @@
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.28;
+
+/**
+ * @notice Storage state for the Royco Base Kernel
+ * @custom:storage-location erc7201:Royco.storage.BaseKernelState
+ * @custom:field seniorTranche - The address of the Royco senior tranche associated with this kernel
+ * @custom:field coverageWAD - The coverage ratio that the senior tranche is expected to be protected by scaled by WAD
+ * @custom:field juniorTranche - The address of the Royco junior tranche associated with this kernel
+ * @custom:field betaWAD - The JT's sensitivity to the same downside stress that affects ST scaled by WAD
+ *                         For example, beta is 0 when JT is in the RFR and 1 when JT is in the same opportunity as senior
+ * @custom:field rdm - The market's Reward Distribution Model (RDM), responsible for determining the ST's yield split between ST and JT
+ * @custom:field lastSeniorRawNAV - The last recorded raw NAV (excluding any losses, coverage, and yield accrual) of the senior tranche
+ * @custom:field lastJuniorRawNAV - The last recorded raw NAV (excluding any losses, coverage, and yield accrual) of the junior tranche
+ * @custom:field lastSeniorEffectiveNAV - The last recorded effective NAV (including any prior applied coverage, ST yield distributions, and uncovered losses) of the senior tranche
+ * @custom:field lastJuniorEffectiveNAV - The last recorded effective NAV (including any prior provided coverage, JT yield, ST yield distribution, and JT losses) of the junior tranche
+ * @custom:field twJTYieldShareAccruedWAD - The time-weighted junior tranche yield share (RDM output) since the last yield distribution
+ * @custom:field lastAccrualTimestamp - The last time the time-weighted JT yield share accumulator was updated
+ * @custom:field lastDistributionTimestamp - The last time a yield distribution occurred
+ */
+struct BaseKernelState {
+    address seniorTranche;
+    uint64 coverageWAD;
+    address juniorTranche;
+    uint96 betaWAD;
+    address rdm;
+    uint256 lastSeniorRawNAV;
+    uint256 lastJuniorRawNAV;
+    uint256 lastSeniorEffectiveNAV;
+    uint256 lastJuniorEffectiveNAV;
+    uint192 twJTYieldShareAccruedWAD;
+    uint32 lastAccrualTimestamp;
+    uint32 lastDistributionTimestamp;
+}
+
+/**
+ * @title BaseKernelStorageLib
+ * @notice Library for managing Royco Base Kernel storage using the ERC7201 pattern
+ * @dev Provides functions to safely access the set and get the base kernel state
+ */
+library BaseKernelStorageLib {
+    /// @dev Storage slot for BaseKernelState using ERC-7201 pattern
+    // keccak256(abi.encode(uint256(keccak256("Royco.storage.BaseKernelState")) - 1)) & ~bytes32(uint256(0xff))
+    bytes32 private constant BASE_KERNEL_STORAGE_SLOT = 0x25265df6fdb5acadb02f38e62cea4bba666d308120ed42c208a4ef005c50ec00;
+
+    /**
+     * @notice Returns a storage pointer to the BaseKernelState storage
+     * @dev Uses ERC-7201 storage slot pattern for collision-resistant storage
+     * @return $ Storage pointer to the base kernel state
+     */
+    function _getBaseKernelStorage() internal pure returns (BaseKernelState storage $) {
+        assembly ("memory-safe") {
+            $.slot := BASE_KERNEL_STORAGE_SLOT
+        }
+    }
+
+    /**
+     * @notice Initializes the base kernel state
+     * @param _seniorTranche The address of the Royco senior tranche associated with this kernel
+     * @param _juniorTranche The address of the Royco junior tranche associated with this kernel
+     * @param _coverageWAD The coverage ratio that the senior tranche is expected to be protected by scaled by WAD
+     * @param _betaWAD The junior tranche's sensitivity to the same downside stress that affects the senior tranche
+     *                 For example, beta is 0 when JT is in the RFR and 1 when JT is in the same opportunity as senior
+     * @param _rdm The market's Reward Distribution Model (RDM), responsible for determining the ST's yield split between ST and JT
+     */
+    function __BaseKernel_init(address _seniorTranche, address _juniorTranche, uint64 _coverageWAD, uint96 _betaWAD, address _rdm) internal {
+        // Set the initial state of the base kernel
+        BaseKernelState storage $ = _getBaseKernelStorage();
+        $.seniorTranche = _seniorTranche;
+        $.coverageWAD = _coverageWAD;
+        $.juniorTranche = _juniorTranche;
+        $.betaWAD = _betaWAD;
+        $.rdm = _rdm;
+    }
+}
