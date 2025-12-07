@@ -34,10 +34,11 @@ interface IBaseKernel {
     function previewSyncTrancheNAVs() external returns (uint256 stRawNAV, uint256 jtRawNAV, uint256 stEffectiveNAV, uint256 jtEffectiveNAV);
 
     // TODO: Assume that the following functions also enforce the invariants
-    function stMaxDeposit(address _receiver) external view returns (uint256);
-    function stMaxWithdraw(address _owner) external view returns (uint256);
-    function stDeposit(uint256 _assets, address _caller, address _receiver) external returns (uint256 fractionOfTotalAssetsAllocatedWAD);
+    function stMaxDeposit(address _asset, address _receiver) external view returns (uint256);
+    function stMaxWithdraw(address _asset, address _owner) external view returns (uint256);
+    function stDeposit(address _asset, uint256 _assets, address _caller, address _receiver) external returns (uint256 fractionOfTotalAssetsAllocatedWAD);
     function stWithdraw(
+        address _asset,
         uint256 _assets,
         address _caller,
         address _receiver
@@ -45,10 +46,11 @@ interface IBaseKernel {
         external
         returns (uint256 fractionOfTotalAssetsRedeemedWAD, uint256 assetsRedeemed);
 
-    function jtMaxDeposit(address _receiver) external view returns (uint256);
-    function jtMaxWithdraw(address _owner) external view returns (uint256);
-    function jtDeposit(uint256 _assets, address _caller, address _receiver) external returns (uint256 fractionOfTotalAssetsAllocatedWAD);
+    function jtMaxDeposit(address _asset, address _receiver) external view returns (uint256);
+    function jtMaxWithdraw(address _asset, address _owner) external view returns (uint256);
+    function jtDeposit(address _asset, uint256 _assets, address _caller, address _receiver) external returns (uint256 fractionOfTotalAssetsAllocatedWAD);
     function jtWithdraw(
+        address _asset,
         uint256 _assets,
         address _caller,
         address _receiver

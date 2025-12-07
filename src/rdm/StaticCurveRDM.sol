@@ -48,9 +48,9 @@ contract StaticCurveRDM is IRDM {
         /**
          * Reward Distribution Model (piecewise curve):
          *
-         *   R(U) = 0.25 * U                   if U < 0.9
-         *        = 7.75 * (U - 0.9) + 0.225   if U ≥ 0.9
-         *        = 1                          if U ≥ 1
+         *   R(U) = 0.25 * U                   if 0.9 > U >= 0
+         *        = 7.75 * (U - 0.9) + 0.225   if 1 > U >= 0.9
+         *        = 1                          if U >= 1
          *
          * U    → Utilization = ((ST_RAW_NAV + (JT_RAW_NAV * BETA_%)) * COV_%) / JT_EFFECTIVE_NAV
          * R(U) → Percentage of ST yield paid to the junior tranche
@@ -72,7 +72,7 @@ contract StaticCurveRDM is IRDM {
             // If utilization is greater than or equal to 1, apply the third leg of R(U)
             return ConstantsLib.WAD;
         } else if (utilization >= TARGET_UTILIZATION) {
-            // If utilization is at or above the kink (target), apply the second leg of R(U)
+            // If utilization is at or above the kink (target) but less than 1, apply the second leg of R(U)
             return SLOPE_GTE_TARGET_UTIL.mulDiv((utilization - TARGET_UTILIZATION), ConstantsLib.WAD, Math.Rounding.Floor) + BASE_RATE_GTE_TARGET_UTIL;
         } else {
             // If utilization is below the kink (target), apply the first leg of R(U)

@@ -123,7 +123,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
 
     /// @inheritdoc ERC4626Upgradeable
     function maxDeposit(address _receiver) public view override(ERC4626Upgradeable) returns (uint256) {
-        return (_isSeniorTranche() ? IBaseKernel(_kernel()).stMaxDeposit(_receiver) : IBaseKernel(_kernel()).jtMaxDeposit(_receiver));
+        return (_isSeniorTranche() ? IBaseKernel(_kernel()).stMaxDeposit(asset(), _receiver) : IBaseKernel(_kernel()).jtMaxDeposit(asset(), _receiver));
     }
 
     /// @inheritdoc ERC4626Upgradeable
@@ -135,7 +135,8 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
     /// @inheritdoc ERC4626Upgradeable
     function maxWithdraw(address _owner) public view virtual override(ERC4626Upgradeable) returns (uint256) {
         uint256 maxRedeemableByOwner = super.previewRedeem(balanceOf(_owner));
-        uint256 maxWithdrawable = (_isSeniorTranche() ? IBaseKernel(_kernel()).stMaxWithdraw(_owner) : IBaseKernel(_kernel()).jtMaxWithdraw(_owner));
+        uint256 maxWithdrawable =
+            (_isSeniorTranche() ? IBaseKernel(_kernel()).stMaxWithdraw(asset(), _owner) : IBaseKernel(_kernel()).jtMaxWithdraw(asset(), _owner));
         return Math.min(maxWithdrawable, maxRedeemableByOwner);
     }
 
@@ -194,8 +195,8 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         // Deposit the assets into the underlying investment opportunity and get the fraction of total assets allocated
         uint256 fractionOfTotalAssetsAllocatedWAD = (
             _isSeniorTranche()
-                ? IBaseKernel(_kernel()).stDeposit(_assets, _controller, _receiver)
-                : IBaseKernel(_kernel()).jtDeposit(_assets, _controller, _receiver)
+                ? IBaseKernel(_kernel()).stDeposit(asset(), _assets, _controller, _receiver)
+                : IBaseKernel(_kernel()).jtDeposit(asset(), _assets, _controller, _receiver)
         );
         uint256 sharesToMint;
 
@@ -257,8 +258,8 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         // It is expected that the kernel transfers the assets directly to the receiver
         (uint256 fractionOfTotalAssetsRedeemedWAD,) = (
             _isSeniorTranche()
-                ? IBaseKernel(_kernel()).stWithdraw(_assets, _controller, _receiver)
-                : IBaseKernel(_kernel()).jtWithdraw(_assets, _controller, _receiver)
+                ? IBaseKernel(_kernel()).stWithdraw(asset(), _assets, _controller, _receiver)
+                : IBaseKernel(_kernel()).jtWithdraw(asset(), _assets, _controller, _receiver)
         );
 
         if (_isSync(Action.WITHDRAW)) {
@@ -292,8 +293,8 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         // It is expected that the kernel transfers the assets directly to the receiver
         (uint256 fractionOfTotalAssetsRedeemedWAD, uint256 assetsRedeemed) = (
             _isSeniorTranche()
-                ? IBaseKernel(_kernel()).stWithdraw(_shares, _controller, _receiver)
-                : IBaseKernel(_kernel()).jtWithdraw(_shares, _controller, _receiver)
+                ? IBaseKernel(_kernel()).stWithdraw(asset(), _shares, _controller, _receiver)
+                : IBaseKernel(_kernel()).jtWithdraw(asset(), _shares, _controller, _receiver)
         );
         assets = assetsRedeemed;
 

@@ -17,15 +17,26 @@ import { ConstantsLib, Math, UtilsLib } from "../../libraries/UtilsLib.sol";
 abstract contract BaseKernel is Initializable, IBaseKernel {
     using Math for uint256;
 
-    /// @notice Thrown when a function is not implemented or disabled
-    error DISABLED();
-
     /// @notice Thrown when the market's coverage requirement is unsatisfied
     error INSUFFICIENT_COVERAGE();
 
-    /// @notice Disables a function
-    modifier disabled() {
-        revert DISABLED();
+    /// @notice Thrown when the caller of a permissioned function isn't the market's senior tranche
+    error ONLY_SENIOR_TRANCHE();
+
+    /// @notice Thrown when the caller of a permissioned function isn't the market's junior tranche
+    error ONLY_JUNIOR_TRANCHE();
+
+    /// @dev Permissions the function to only the market's senior tranche
+    /// @dev Should be placed on all ST deposit and withdraw functions
+    modifier onlySeniorTranche() {
+        require(msg.sender == BaseKernelStorageLib._getBaseKernelStorage().seniorTranche, ONLY_SENIOR_TRANCHE());
+        _;
+    }
+
+    /// @dev Permissions the function to only the market's junior tranche
+    /// @dev Should be placed on all JT deposit and withdraw functions
+    modifier onlyJuniorTranche() {
+        require(msg.sender == BaseKernelStorageLib._getBaseKernelStorage().juniorTranche, ONLY_JUNIOR_TRANCHE());
         _;
     }
 
