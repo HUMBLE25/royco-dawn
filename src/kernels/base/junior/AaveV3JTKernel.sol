@@ -21,14 +21,14 @@ abstract contract AaveV3JTKernel is BaseKernel {
      * @dev Mandates that the base kernel state is already initialized
      * @param _aaveV3Pool The address of the Aave V3 Pool
      */
-    function __AaveV3JTKernel_init_unchained(IPool _aaveV3Pool) internal onlyInitializing {
+    function __AaveV3JTKernel_init_unchained(address _aaveV3Pool) internal onlyInitializing {
         // Extend a one time max approval to the Aave V3 pool for the JT's base asset
         address jtAsset = IERC4626(BaseKernelStorageLib._getBaseKernelStorage().juniorTranche).asset();
-        IERC20(jtAsset).forceApprove(address(_aaveV3Pool), type(uint256).max);
+        IERC20(jtAsset).forceApprove(_aaveV3Pool, type(uint256).max);
 
         // Initialize the Aave V3 kernel storage
         AaveV3KernelStorageLib.__AaveV3Kernel_init(
-            address(_aaveV3Pool), address(_aaveV3Pool.ADDRESSES_PROVIDER()), jtAsset, _aaveV3Pool.getReserveAToken(jtAsset)
+            _aaveV3Pool, address(IPool(_aaveV3Pool).ADDRESSES_PROVIDER()), jtAsset, IPool(_aaveV3Pool).getReserveAToken(jtAsset)
         );
     }
 

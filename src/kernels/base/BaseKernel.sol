@@ -206,10 +206,22 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
         stEffectiveNAV = $.lastSeniorEffectiveNAV;
         jtEffectiveNAV = $.lastJuniorEffectiveNAV;
 
-        // Apply the loss to the junior tranche's effective NAV
-        if (deltaJT < 0) jtEffectiveNAV = Math.saturatingSub(jtEffectiveNAV, uint256(-deltaJT));
-        // Junior tranche always keeps all of its appreciation
-        else if (deltaJT > 0) jtEffectiveNAV += uint256(deltaJT);
+        if (deltaJT < 0) {
+            // Incur as much of the loss as possible to the junior tranche's effective NAV
+            uint256 jtLoss = uint256(-deltaJT);
+            uint256 excessLoss;
+            if (jtLoss > jtEffectiveNAV) {
+                // Any excess loss that is unabsorbable by JT hits ST effective NAV
+                excessLoss = jtLoss - jtEffectiveNAV;
+                jtEffectiveNAV = 0;
+                stEffectiveNAV = Math.saturatingSub(stEffectiveNAV, excessLoss);
+            } else {
+                jtEffectiveNAV -= jtLoss;
+            }
+        } else if (deltaJT > 0) {
+            // Junior tranche always keeps all of its appreciation
+            jtEffectiveNAV += uint256(deltaJT);
+        }
 
         if (deltaST == 0) {
             // Senior tranche NAV experienced no change
@@ -217,12 +229,12 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
         } else if (deltaST < 0) {
             // Senior tranche incurred a loss
             // Apply the loss to the senior tranche's effective NAV
-            uint256 loss = uint256(-deltaST);
-            stEffectiveNAV = Math.saturatingSub(stEffectiveNAV, loss);
+            uint256 stLoss = uint256(-deltaST);
+            stEffectiveNAV = Math.saturatingSub(stEffectiveNAV, stLoss);
             // Compute and apply the coverage provided by the junior tranche to the senior tranche
-            uint256 coverage = Math.min(loss, jtEffectiveNAV);
-            stEffectiveNAV += coverage;
-            jtEffectiveNAV -= coverage;
+            uint256 availableCoverage = Math.min(stLoss, jtEffectiveNAV);
+            stEffectiveNAV += availableCoverage;
+            jtEffectiveNAV -= availableCoverage;
         } else {
             // Senior tranche accrued yield
             // Compute the time weighted average JT share of yield
