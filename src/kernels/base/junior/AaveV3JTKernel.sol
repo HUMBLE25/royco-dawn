@@ -81,9 +81,10 @@ abstract contract AaveV3JTKernel is BaseKernel {
     }
 
     /// @inheritdoc IBaseKernel
-    function jtWithdraw(
+    function jtRedeem(
         address _asset,
-        uint256 _assets,
+        uint256 _shares,
+        uint256 _totalShares,
         address,
         address _receiver
     )
@@ -92,7 +93,10 @@ abstract contract AaveV3JTKernel is BaseKernel {
         onlyJuniorTranche
         returns (uint256 fractionOfTotalAssetsRedeemedWAD, uint256 assetsRedeemed)
     {
+        // TODO
+        uint256 assets;
+
         // Only withdraw the assets that are still owed to the receiver
-        IPool(AaveV3KernelStorageLib._getAaveV3KernelStorage().pool).withdraw(_asset, _assets, _receiver);
+        IPool(AaveV3KernelStorageLib._getAaveV3KernelStorage().pool).withdraw(_asset, assets, _receiver);
     }
 }

@@ -37,9 +37,10 @@ interface IBaseKernel {
     function stMaxDeposit(address _asset, address _receiver) external view returns (uint256);
     function stMaxWithdraw(address _asset, address _owner) external view returns (uint256);
     function stDeposit(address _asset, uint256 _assets, address _caller, address _receiver) external returns (uint256 fractionOfTotalAssetsAllocatedWAD);
-    function stWithdraw(
+    function stRedeem(
         address _asset,
-        uint256 _assets,
+        uint256 _shares,
+        uint256 _totalShares,
         address _caller,
         address _receiver
     )
@@ -49,9 +50,10 @@ interface IBaseKernel {
     function jtMaxDeposit(address _asset, address _receiver) external view returns (uint256);
     function jtMaxWithdraw(address _asset, address _owner) external view returns (uint256);
     function jtDeposit(address _asset, uint256 _assets, address _caller, address _receiver) external returns (uint256 fractionOfTotalAssetsAllocatedWAD);
-    function jtWithdraw(
+    function jtRedeem(
         address _asset,
-        uint256 _assets,
+        uint256 _shares,
+        uint256 _totalShares,
         address _caller,
         address _receiver
     )

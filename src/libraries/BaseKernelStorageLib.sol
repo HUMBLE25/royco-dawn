@@ -41,7 +41,7 @@ struct BaseKernelState {
 library BaseKernelStorageLib {
     /// @dev Storage slot for BaseKernelState using ERC-7201 pattern
     // keccak256(abi.encode(uint256(keccak256("Royco.storage.BaseKernelState")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant BASE_KERNEL_STORAGE_SLOT = 0x25265df6fdb5acadb02f38e62cea4bba666d308120ed42c208a4ef005c50ec00;
+    bytes32 private constant BASE_KERNEL_STORAGE_SLOT = 0x0e1123d8194dcf603de811512b2b6334f106b53313663d6b2df1a2b814038e00;
 
     /**
      * @notice Returns a storage pointer to the BaseKernelState storage

@@ -39,6 +39,14 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
     error ONLY_CALLER_OR_OPERATOR();
 
     /**
+     * @notice Modifier to ensure the functionality is disabled
+     */
+    modifier disabled() {
+        revert DISABLED();
+        _;
+    }
+
+    /**
      * @notice Modifier to ensure the specified action uses a synchronous execution model
      * @param _action The action to check (DEPOSIT or WITHDRAW)
      * @dev Reverts if the execution model for the action is asynchronous
@@ -77,15 +85,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
      * @param _owner The initial owner of the tranche
      * @param _marketId The identifier of the Royco market this tranche is linked to
      */
-    function __RoycoTranche_init(
-        TrancheDeploymentParams calldata _trancheParams,
-        address _asset,
-        address _owner,
-        bytes32 _marketId
-    )
-        internal
-        onlyInitializing
-    {
+    function __RoycoTranche_init(TrancheDeploymentParams calldata _trancheParams, address _asset, address _owner, bytes32 _marketId) internal onlyInitializing {
         // Initialize the parent contracts
         __ERC20_init_unchained(_trancheParams.name, _trancheParams.symbol);
         __ERC4626_init_unchained(IERC20(_asset));
@@ -127,24 +127,20 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
     }
 
     /// @inheritdoc ERC4626Upgradeable
-    function maxMint(address _receiver) public view virtual override(ERC4626Upgradeable) returns (uint256) {
-        // Preview deposit will handle computing the maximum mintable shares for the max assets depositable
-        return super.previewDeposit(maxDeposit(_receiver));
-    }
+    /// @dev mint* flows are not supported
+    function maxMint(address _receiver) public view virtual override(ERC4626Upgradeable) disabled returns (uint256) { }
 
     /// @inheritdoc ERC4626Upgradeable
-    function maxWithdraw(address _owner) public view virtual override(ERC4626Upgradeable) returns (uint256) {
-        uint256 maxRedeemableByOwner = super.previewRedeem(balanceOf(_owner));
-        uint256 maxWithdrawable =
-            (_isSeniorTranche() ? IBaseKernel(_kernel()).stMaxWithdraw(asset(), _owner) : IBaseKernel(_kernel()).jtMaxWithdraw(asset(), _owner));
-        return Math.min(maxWithdrawable, maxRedeemableByOwner);
-    }
+    /// @dev withdraw* flows are not supported
+    function maxWithdraw(address _owner) public view virtual override(ERC4626Upgradeable) disabled returns (uint256) { }
 
     /// @inheritdoc ERC4626Upgradeable
     /// @dev Should be overridden by junior tranches to check for withdrawal capacity
     function maxRedeem(address _owner) public view virtual override(ERC4626Upgradeable) returns (uint256) {
-        // Preview withdraw will handle computing the maximum redeemable shares for the max assets withdrawable by the owner
-        return super.previewWithdraw(maxWithdraw(_owner));
+        uint256 maxWithdrawable =
+            (_isSeniorTranche() ? IBaseKernel(_kernel()).stMaxWithdraw(asset(), _owner) : IBaseKernel(_kernel()).jtMaxWithdraw(asset(), _owner));
+
+        return maxWithdrawable.mulDiv(totalSupply(), totalAssets(), Math.Rounding.Floor);
     }
 
     /// @inheritdoc ERC4626Upgradeable
@@ -154,16 +150,12 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
     }
 
     /// @inheritdoc ERC4626Upgradeable
-    /// @dev Disabled if deposit execution is asynchronous as per ERC7540
-    function previewMint(uint256 _shares) public view virtual override(ERC4626Upgradeable) executionIsSync(Action.DEPOSIT) returns (uint256) {
-        return super.previewMint(_shares);
-    }
+    /// @dev mint* flows are not supported
+    function previewMint(uint256 _shares) public view virtual override(ERC4626Upgradeable) disabled returns (uint256) { }
 
     /// @inheritdoc ERC4626Upgradeable
-    /// @dev Disabled if withdrawal execution is asynchronous as per ERC7540
-    function previewWithdraw(uint256 _assets) public view virtual override(ERC4626Upgradeable) executionIsSync(Action.WITHDRAW) returns (uint256) {
-        return super.previewWithdraw(_assets);
-    }
+    /// @dev withdraw* flows are not supported
+    function previewWithdraw(uint256 _assets) public view virtual override(ERC4626Upgradeable) disabled returns (uint256) { }
 
     /// @inheritdoc ERC4626Upgradeable
     /// @dev Disabled if withdrawal execution is asynchronous as per ERC7540
@@ -193,32 +185,22 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         require(_assets <= maxDepositableAssets, ERC4626ExceededMaxDeposit(_receiver, _assets, maxDepositableAssets));
 
         // Deposit the assets into the underlying investment opportunity and get the fraction of total assets allocated
-        uint256 fractionOfTotalAssetsAllocatedWAD = (
-            _isSeniorTranche()
+        uint256 fractionOfTotalAssetsAllocatedWAD =
+            (_isSeniorTranche()
                 ? IBaseKernel(_kernel()).stDeposit(asset(), _assets, _controller, _receiver)
-                : IBaseKernel(_kernel()).jtDeposit(asset(), _assets, _controller, _receiver)
-        );
+                : IBaseKernel(_kernel()).jtDeposit(asset(), _assets, _controller, _receiver));
         uint256 sharesToMint;
 
-        // Handle positing assets and minting shares
-        if (_isSync(Action.DEPOSIT)) {
-            // If the deposit is synchronous, mint the shares directly
-            sharesToMint = super.previewDeposit(_assets);
-        } else {
-            // If the deposit is asynchronous, mint the shares based on the fraction of total assets allocated in the underlying investment opportunity
-            // TODO: Explain formula
-            sharesToMint = totalSupply().mulDiv(fractionOfTotalAssetsAllocatedWAD, ConstantsLib.WAD - fractionOfTotalAssetsAllocatedWAD, Math.Rounding.Floor);
-        }
-
+        // Mint the shares to the receiver
         _deposit(msg.sender, _receiver, _assets, sharesToMint);
     }
 
     /// @inheritdoc ERC4626Upgradeable
-    function mint(uint256 _shares, address _receiver) public virtual override(ERC4626Upgradeable) returns (uint256) {
-        return mint(_shares, _receiver, msg.sender);
-    }
+    /// @dev mint* flows are not supported
+    function mint(uint256 _shares, address _receiver) public virtual override(ERC4626Upgradeable) disabled returns (uint256) { }
 
     /// @inheritdoc IERC7540
+    /// @dev mint* flows are not supported
     function mint(
         uint256 _shares,
         address _receiver,
@@ -227,18 +209,13 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         public
         virtual
         override(IERC7540)
+        disabled
         onlyCallerOrOperator(_controller)
         returns (uint256 assets)
-    {
-        // Assert that the shares minted to the user fall under the max limit
-        uint256 maxMintableShares = maxMint(_receiver);
-        require(_shares <= maxMintableShares, ERC4626ExceededMaxMint(_receiver, _shares, maxMintableShares));
-
-        // TODO
-        revert("Not yet implemented");
-    }
+    { }
 
     /// @inheritdoc IERC7540
+    /// @dev withdraw* flows are not supported
     function withdraw(
         uint256 _assets,
         address _receiver,
@@ -248,32 +225,11 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         virtual
         override(ERC4626Upgradeable, IERC7540)
         onlyCallerOrOperator(_controller)
+        disabled
         returns (uint256 shares)
-    {
-        // Assert that the assets being withdrawn by the user fall under the permissible limits
-        uint256 maxWithdrawableAssets = maxWithdraw(_controller);
-        require(_assets <= maxWithdrawableAssets, ERC4626ExceededMaxWithdraw(_controller, _assets, maxWithdrawableAssets));
-
-        // Process the withdrawal from the underlying investment opportunity
-        // It is expected that the kernel transfers the assets directly to the receiver
-        (uint256 fractionOfTotalAssetsRedeemedWAD,) = (
-            _isSeniorTranche()
-                ? IBaseKernel(_kernel()).stWithdraw(asset(), _assets, _controller, _receiver)
-                : IBaseKernel(_kernel()).jtWithdraw(asset(), _assets, _controller, _receiver)
-        );
-
-        if (_isSync(Action.WITHDRAW)) {
-            shares = super.previewWithdraw(_assets);
-        } else {
-            shares = totalSupply().mulDiv(fractionOfTotalAssetsRedeemedWAD, ConstantsLib.WAD, Math.Rounding.Floor);
-        }
-
-        // Account for the withdrawal
-        _withdraw(msg.sender, _receiver, _controller, _assets, shares);
-    }
+    { }
 
     /// @inheritdoc IERC7540
-    /// @dev Should be overridden by junior tranches to check the coverage condition
     function redeem(
         uint256 _shares,
         address _receiver,
@@ -291,11 +247,9 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
 
         // Process the withdrawal from the underlying investment opportunity
         // It is expected that the kernel transfers the assets directly to the receiver
-        (uint256 fractionOfTotalAssetsRedeemedWAD, uint256 assetsRedeemed) = (
-            _isSeniorTranche()
-                ? IBaseKernel(_kernel()).stWithdraw(asset(), _shares, _controller, _receiver)
-                : IBaseKernel(_kernel()).jtWithdraw(asset(), _shares, _controller, _receiver)
-        );
+        (uint256 fractionOfTotalAssetsRedeemedWAD, uint256 assetsRedeemed) = (_isSeniorTranche()
+                ? IBaseKernel(_kernel()).stRedeem(asset(), _shares, totalSupply(), _controller, _receiver)
+                : IBaseKernel(_kernel()).jtRedeem(asset(), _shares, totalSupply(), _controller, _receiver));
         assets = assetsRedeemed;
 
         // Account for the withdrawal
@@ -345,11 +299,10 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         IERC20(asset()).approve(kernel, _assets);
 
         // Queue the deposit request and get the request ID from the kernel
-        requestId = (
-            _isSeniorTranche()
+        requestId =
+        (_isSeniorTranche()
                 ? IAsyncSTDepositKernel(kernel).stRequestDeposit(msg.sender, _assets, _controller)
-                : IAsyncJTDepositKernel(kernel).jtRequestDeposit(msg.sender, _assets, _controller)
-        );
+                : IAsyncJTDepositKernel(kernel).jtRequestDeposit(msg.sender, _assets, _controller));
 
         emit DepositRequest(_controller, _owner, requestId, msg.sender, _assets);
     }
@@ -367,11 +320,9 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         executionIsAsync(Action.DEPOSIT)
         returns (uint256)
     {
-        return (
-            _isSeniorTranche()
+        return (_isSeniorTranche()
                 ? IAsyncSTDepositKernel(_kernel()).stPendingDepositRequest(_requestId, _controller)
-                : IAsyncJTDepositKernel(_kernel()).jtPendingDepositRequest(_requestId, _controller)
-        );
+                : IAsyncJTDepositKernel(_kernel()).jtPendingDepositRequest(_requestId, _controller));
     }
 
     /// @inheritdoc IERC7540
@@ -387,11 +338,9 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         executionIsAsync(Action.DEPOSIT)
         returns (uint256)
     {
-        return (
-            _isSeniorTranche()
+        return (_isSeniorTranche()
                 ? IAsyncSTDepositKernel(_kernel()).stClaimableDepositRequest(_requestId, _controller)
-                : IAsyncJTDepositKernel(_kernel()).jtClaimableDepositRequest(_requestId, _controller)
-        );
+                : IAsyncJTDepositKernel(_kernel()).jtClaimableDepositRequest(_requestId, _controller));
     }
 
     /// @inheritdoc IERC7540
@@ -416,11 +365,10 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         _transfer(_owner, address(this), _shares);
 
         // Queue the redemption request and get the request ID from the kernel
-        requestId = (
-            _isSeniorTranche()
+        requestId =
+        (_isSeniorTranche()
                 ? IAsyncSTWithdrawalKernel(_kernel()).stRequestWithdrawal(msg.sender, _shares, totalSupply(), _controller)
-                : IAsyncJTWithdrawalKernel(_kernel()).jtRequestWithdrawal(msg.sender, _shares, totalSupply(), _controller)
-        );
+                : IAsyncJTWithdrawalKernel(_kernel()).jtRequestWithdrawal(msg.sender, _shares, totalSupply(), _controller));
 
         emit RedeemRequest(_controller, _owner, requestId, msg.sender, _shares);
     }
@@ -438,11 +386,9 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         executionIsAsync(Action.WITHDRAW)
         returns (uint256 pendingShares)
     {
-        return (
-            _isSeniorTranche()
+        return (_isSeniorTranche()
                 ? IAsyncSTWithdrawalKernel(_kernel()).stPendingWithdrawalRequest(_requestId, _controller)
-                : IAsyncJTWithdrawalKernel(_kernel()).jtPendingWithdrawalRequest(_requestId, _controller)
-        );
+                : IAsyncJTWithdrawalKernel(_kernel()).jtPendingWithdrawalRequest(_requestId, _controller));
     }
 
     /// @inheritdoc IERC7540
@@ -458,11 +404,9 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         executionIsAsync(Action.WITHDRAW)
         returns (uint256 claimableShares)
     {
-        return (
-            _isSeniorTranche()
+        return (_isSeniorTranche()
                 ? IAsyncSTWithdrawalKernel(_kernel()).stClaimableWithdrawalRequest(_requestId, _controller)
-                : IAsyncJTWithdrawalKernel(_kernel()).jtClaimableWithdrawalRequest(_requestId, _controller)
-        );
+                : IAsyncJTWithdrawalKernel(_kernel()).jtClaimableWithdrawalRequest(_requestId, _controller));
     }
 
     // =============================
@@ -504,11 +448,9 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         executionIsAsync(Action.DEPOSIT)
         returns (bool isPending)
     {
-        return (
-            _isSeniorTranche()
+        return (_isSeniorTranche()
                 ? IAsyncSTDepositKernel(_kernel()).stPendingCancelDepositRequest(_requestId, _controller)
-                : IAsyncJTDepositKernel(_kernel()).jtPendingCancelDepositRequest(_requestId, _controller)
-        );
+                : IAsyncJTDepositKernel(_kernel()).jtPendingCancelDepositRequest(_requestId, _controller));
     }
 
     /// @inheritdoc IERC7887
@@ -524,11 +466,9 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         executionIsAsync(Action.DEPOSIT)
         returns (uint256 assets)
     {
-        return (
-            _isSeniorTranche()
+        return (_isSeniorTranche()
                 ? IAsyncSTDepositKernel(_kernel()).stClaimableCancelDepositRequest(_requestId, _controller)
-                : IAsyncJTDepositKernel(_kernel()).jtClaimableCancelDepositRequest(_requestId, _controller)
-        );
+                : IAsyncJTDepositKernel(_kernel()).jtClaimableCancelDepositRequest(_requestId, _controller));
     }
 
     /// @inheritdoc IERC7887
@@ -545,11 +485,10 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         executionIsAsync(Action.DEPOSIT)
     {
         // Get the claimable amount before claiming
-        uint256 assets = (
-            _isSeniorTranche()
+        uint256 assets =
+            (_isSeniorTranche()
                 ? IAsyncSTDepositKernel(_kernel()).stClaimableCancelDepositRequest(_requestId, _controller)
-                : IAsyncJTDepositKernel(_kernel()).jtClaimableCancelDepositRequest(_requestId, _controller)
-        );
+                : IAsyncJTDepositKernel(_kernel()).jtClaimableCancelDepositRequest(_requestId, _controller));
 
         // Transfer cancelled deposit assets to receiver
         _transferOut(_receiver, assets);
@@ -592,11 +531,9 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         executionIsAsync(Action.WITHDRAW)
         returns (bool isPending)
     {
-        return (
-            _isSeniorTranche()
+        return (_isSeniorTranche()
                 ? IAsyncSTWithdrawalKernel(_kernel()).stPendingCancelWithdrawalRequest(_requestId, _controller)
-                : IAsyncJTWithdrawalKernel(_kernel()).jtPendingCancelWithdrawalRequest(_requestId, _controller)
-        );
+                : IAsyncJTWithdrawalKernel(_kernel()).jtPendingCancelWithdrawalRequest(_requestId, _controller));
     }
 
     /// @inheritdoc IERC7887
@@ -612,11 +549,9 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         executionIsAsync(Action.WITHDRAW)
         returns (uint256 shares)
     {
-        return (
-            _isSeniorTranche()
+        return (_isSeniorTranche()
                 ? IAsyncSTWithdrawalKernel(_kernel()).stClaimableCancelWithdrawalRequest(_requestId, _controller)
-                : IAsyncJTWithdrawalKernel(_kernel()).jtClaimableCancelWithdrawalRequest(_requestId, _controller)
-        );
+                : IAsyncJTWithdrawalKernel(_kernel()).jtClaimableCancelWithdrawalRequest(_requestId, _controller));
     }
 
     /// @inheritdoc IERC7887
@@ -633,11 +568,10 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         executionIsAsync(Action.WITHDRAW)
     {
         // Get the claimable amount before claiming
-        uint256 shares = (
-            _isSeniorTranche()
+        uint256 shares =
+            (_isSeniorTranche()
                 ? IAsyncSTWithdrawalKernel(_kernel()).stClaimableCancelWithdrawalRequest(_requestId, _owner)
-                : IAsyncJTWithdrawalKernel(_kernel()).jtClaimableCancelWithdrawalRequest(_requestId, _owner)
-        );
+                : IAsyncJTWithdrawalKernel(_kernel()).jtClaimableCancelWithdrawalRequest(_requestId, _owner));
 
         // Transfer the previously locked shares (on request) to the receiver
         _transfer(address(this), _receiver, shares);
@@ -679,6 +613,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
             // Burn the shares being redeemed from the owner
             _burn(_owner, _shares);
         } else {
+            // No need to spend allowance, that was already done during requestRedeem
             // If withdrawals are asynchronous, burn the shares that were locked in the tranche on requesting the redemption
             _burn(address(this), _shares);
         }
@@ -694,11 +629,9 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
 
     /// @dev Returns if the specified action employs a synchronous execution model
     function _isSync(Action _action) internal view returns (bool) {
-        return (
-            _action == Action.DEPOSIT
-                ? RoycoTrancheStorageLib._getRoycoTrancheStorage().DEPOSIT_EXECUTION_MODEL
-                : RoycoTrancheStorageLib._getRoycoTrancheStorage().WITHDRAW_EXECUTION_MODEL
-        ) == ExecutionModel.SYNC;
+        return (_action == Action.DEPOSIT
+                    ? RoycoTrancheStorageLib._getRoycoTrancheStorage().DEPOSIT_EXECUTION_MODEL
+                    : RoycoTrancheStorageLib._getRoycoTrancheStorage().WITHDRAW_EXECUTION_MODEL) == ExecutionModel.SYNC;
     }
 
     /// @inheritdoc ERC4626Upgradeable
