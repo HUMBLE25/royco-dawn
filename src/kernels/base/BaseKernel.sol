@@ -241,8 +241,9 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
             uint256 yield = uint256(deltaST);
             // Compute the time weighted average JT share of yield
             uint256 elapsed = block.timestamp - $.lastDistributionTimestamp;
-            // Preemptively accrue all yield to senior and return if last yield distribution was in the same block
-            if (elapsed == 0) return (stRawNAV, jtRawNAV, stEffectiveNAV + yield, jtEffectiveNAV, false);
+            // Preemptively accrue all yield to ST and return if last yield distribution was in the same block
+            // No need to update yield share accumulator and timestamp so return false for yieldDistributed
+            if (elapsed == 0) return (stRawNAV, jtRawNAV, (stEffectiveNAV + yield), jtEffectiveNAV, false);
             // Apply the yield split: adding each tranche's share of earnings to their effective NAVs
             uint256 jtYieldShareWAD = _twJTYieldShareAccruedWAD / elapsed;
             // Round in favor of the senior tranche
@@ -444,4 +445,12 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
      * @param _owner The owner of the assets being withdrawn (used to enforce white/black lists)
      */
     function _maxJTWithdrawalGlobally(address _owner) internal view virtual returns (uint256);
+
+    /**
+     * @notice Covers senior tranche losses from the junior tranche's controlled assets
+     * @param _asset The asset to cover losses in
+     * @param _coverageAssets The assets provided by JT to ST as loss coverage
+     * @param _receiver The receiver of the coverage assets
+     */
+    function _coverSTLossesFromJT(address _asset, uint256 _coverageAssets, address _receiver) internal virtual returns (uint256 assetsWithdrawn);
 }

@@ -67,8 +67,30 @@ abstract contract AaveV3JTKernel is BaseKernel {
     {
         // Only withdraw the assets that are still owed to the receiver
         assetsWithdrawn = _shares.mulDiv(_getJuniorTrancheEffectiveNAV(), _totalShares, Math.Rounding.Floor);
+        // TODO: Account for ST yield in withdrawal
+        _withdrawFromPool(assetsWithdrawn, _receiver);
+    }
+
+    /// @inheritdoc BaseKernel
+    function _coverSTLossesFromJT(address, uint256 _coverageAssets, address _receiver) internal override(BaseKernel) returns (uint256 assetsWithdrawn) {
+        uint256 maxAssetsWithdrawable = _maxJTWithdrawalGlobally(address(0));
+        if (maxAssetsWithdrawable >= _coverageAssets) {
+            _withdrawFromPool(_coverageAssets, _receiver);
+            return _coverageAssets;
+        } else {
+            _withdrawFromPool(maxAssetsWithdrawable, _receiver);
+            return maxAssetsWithdrawable;
+        }
+    }
+
+    /**
+     * @notice Withdraws the specified assets from the Aave V3 Pool to the receiver
+     * @param _assets The amount of assets to withdraw from the pool
+     * @param _receiver The receiver of the withdrawn assets
+     */
+    function _withdrawFromPool(uint256 _assets, address _receiver) internal {
         AaveV3KernelState storage $ = AaveV3KernelStorageLib._getAaveV3KernelStorage();
-        IPool($.pool).withdraw($.asset, assetsWithdrawn, _receiver);
+        IPool($.pool).withdraw($.asset, _assets, _receiver);
     }
 
     /// @inheritdoc BaseKernel

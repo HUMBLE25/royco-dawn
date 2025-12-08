@@ -27,6 +27,31 @@ abstract contract ERC7540STKernel is BaseKernel {
         ERC7540KernelStorageLib.__ERC7540Kernel_init(_vault, stAsset);
     }
 
+    /// @inheritdoc IBaseKernel
+    function stDeposit(
+        address _asset,
+        uint256 _assets,
+        address _caller,
+        address _receiver
+    )
+        external
+        override(IBaseKernel)
+        returns (uint256 fractionOfTotalAssetsAllocatedWAD)
+    { }
+
+    /// @inheritdoc IBaseKernel
+    function stRedeem(
+        address _asset,
+        uint256 _shares,
+        uint256 _totalShares,
+        address _caller,
+        address _receiver
+    )
+        external
+        override(IBaseKernel)
+        returns (uint256 assetsWithdrawn)
+    { }
+
     /// @inheritdoc BaseKernel
     function _getSeniorTrancheRawNAV() internal view override(BaseKernel) returns (uint256) {
         address vault = ERC7540KernelStorageLib._getERC7540KernelStorage().vault;
