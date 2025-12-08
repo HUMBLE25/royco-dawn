@@ -247,7 +247,8 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
 
         // Process the withdrawal from the underlying investment opportunity
         // It is expected that the kernel transfers the assets directly to the receiver
-        (uint256 fractionOfTotalAssetsRedeemedWAD, uint256 assetsRedeemed) = (_isSeniorTranche()
+        uint256 assetsRedeemed =
+            (_isSeniorTranche()
                 ? IBaseKernel(_kernel()).stRedeem(asset(), _shares, totalSupply(), _controller, _receiver)
                 : IBaseKernel(_kernel()).jtRedeem(asset(), _shares, totalSupply(), _controller, _receiver));
         assets = assetsRedeemed;

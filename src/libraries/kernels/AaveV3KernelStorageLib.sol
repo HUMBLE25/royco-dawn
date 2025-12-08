@@ -6,10 +6,14 @@ pragma solidity ^0.8.28;
  * @custom:storage-location erc7201:Royco.storage.AaveV3KernelState
  * @custom:field pool - The address of the Aave V3 pool
  * @custom:field poolAddressesProvider - The address of the Aave V3 pool addresses provider
+ * @custom:field asset - The address of the tranche's base asset
+ * @custom:field aToken - The address of the tranche's base asset's A Token
  */
 struct AaveV3KernelState {
     address pool;
     address poolAddressesProvider;
+    address asset;
+    address aToken;
 }
 
 /**
@@ -37,11 +41,15 @@ library AaveV3KernelStorageLib {
      * @notice Initializes the Aave V3 kernel state
      * @param _pool The address of the Aave V3 pool
      * @param _poolAddressesProvider The address of the Aave V3 pool addresses provider
+     * @param _asset - The address of the tranche's base asset
+     * @param _aToken - The address of the tranche's base asset's A Token
      */
-    function __AaveV3Kernel_init(address _pool, address _poolAddressesProvider) internal {
+    function __AaveV3Kernel_init(address _pool, address _poolAddressesProvider, address _asset, address _aToken) internal {
         // Set the initial state of the Aave V3 kernel
         AaveV3KernelState storage $ = _getAaveV3KernelStorage();
         $.pool = _pool;
         $.poolAddressesProvider = _poolAddressesProvider;
+        $.asset = _asset;
+        $.aToken = _aToken;
     }
 }

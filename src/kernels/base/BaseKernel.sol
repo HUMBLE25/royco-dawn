@@ -40,6 +40,12 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
         _;
     }
 
+    function stMaxDeposit(address _receiver) external view returns (uint256) { }
+    function stMaxWithdraw(address _owner) external view returns (uint256) { }
+
+    function jtMaxDeposit(address _receiver) external view returns (uint256) { }
+    function jtMaxWithdraw(address _owner) external view returns (uint256) { }
+
     /**
      * @notice Synchronizes tranche NAVs before and after an operation (deposit or withdrawal).
      * @dev Should be placed on senior tranche withdrawal functions and junior tranche deposit functions since coverage doesn't need to be enforced
@@ -180,7 +186,7 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
         // The deltas represent the unrealized PNL(s) of the underlying investment(s) since the last NAV checkpoints
         stRawNAV = _getSeniorTrancheRawNAV();
         jtRawNAV = _getJuniorTrancheRawNAV();
-        (int256 deltaST, int256 deltaJT) = _computeDeltas(stRawNAV, jtRawNAV, $.lastSeniorRawNAV, $.lastJuniorRawNAV);
+        (int256 deltaST, int256 deltaJT) = _computeRawNAVDeltas(stRawNAV, jtRawNAV, $.lastSeniorRawNAV, $.lastJuniorRawNAV);
 
         // Cache the effective NAV for each tranche as their last recorded effective NAV
         stEffectiveNAV = $.lastSeniorEffectiveNAV;
@@ -255,7 +261,7 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
         // The deltas represent the NAV changes after a deposit and withdrawal
         uint256 stRawNAV = _getSeniorTrancheRawNAV();
         uint256 jtRawNAV = _getJuniorTrancheRawNAV();
-        (int256 deltaST, int256 deltaJT) = _computeDeltas(stRawNAV, jtRawNAV, $.lastSeniorRawNAV, $.lastJuniorRawNAV);
+        (int256 deltaST, int256 deltaJT) = _computeRawNAVDeltas(stRawNAV, jtRawNAV, $.lastSeniorRawNAV, $.lastJuniorRawNAV);
         // Update the post-operation raw NAV checkpoints
         $.lastSeniorRawNAV = stRawNAV;
         $.lastJuniorRawNAV = jtRawNAV;
@@ -295,6 +301,52 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
     }
 
     /**
+     * @notice Returns the max assets depositable into the senior tranche without violating the market's coverage requirement
+     * @dev Always rounds in favor of senior tranche protection
+     * @dev Coverage Invariant: JT_EFFECTIVE_NAV >= (ST_RAW_NAV + (JT_RAW_NAV * BETA_%)) * COV_%
+     * @dev Max assets depositable into ST, x: JT_EFFECTIVE_NAV = ((ST_RAW_NAV + x) + (JT_RAW_NAV * BETA_%)) * COV_%
+     *      Isolate x: x = (JT_EFFECTIVE_NAV / COV_%) - (JT_RAW_NAV * BETA_%) - ST_RAW_NAV
+     */
+    function _maxSTDepositable() internal view returns (uint256) {
+        // Get the storage pointer to the base kernel state
+        BaseKernelState storage $ = BaseKernelStorageLib._getBaseKernelStorage();
+        // Solve for x, rounding in favor of senior protection
+        // Compute the total covered assets by the junior tranche loss absorption buffer
+        uint256 totalCoveredAssets = _getJuniorTrancheEffectiveNAV().mulDiv(ConstantsLib.WAD, $.coverageWAD, Math.Rounding.Floor);
+        // Compute the assets required to cover current junior tranche exposure
+        uint256 jtCoverageRequired = _getJuniorTrancheRawNAV().mulDiv($.betaWAD, ConstantsLib.WAD, Math.Rounding.Ceil);
+        // Compute the assets required to cover current senior tranche exposure
+        uint256 stCoverageRequired = _getSeniorTrancheRawNAV();
+        // Compute the amount of assets that can be deposited into senior while retaining full coverage
+        return totalCoveredAssets.saturatingSub(jtCoverageRequired).saturatingSub(stCoverageRequired);
+    }
+
+    /**
+     * @notice Returns the max assets withdrawable from the junior tranche without violating the market's coverage requirement
+     * @dev Always rounds in favor of senior tranche protection
+     * @dev Coverage Invariant: JT_EFFECTIVE_NAV >= (ST_RAW_NAV + (JT_RAW_NAV * BETA_%)) * COV_%
+     * @dev Max assets withdrawable from JT, y: (JT_EFFECTIVE_NAV - y) = (ST_RAW_NAV + ((JT_RAW_NAV - y) * BETA_%)) * COV_%
+     *      Isolate y: y = (JT_EFFECTIVE_NAV - (COV_% * (ST_RAW_NAV + (JT_RAW_NAV * BETA_%)))) / (1 - (BETA_% * COV_%))
+     */
+    function _maxJTWithdrawable() internal view returns (uint256) {
+        // Get the storage pointer to the base kernel state and cache beta and coverage
+        BaseKernelState storage $ = BaseKernelStorageLib._getBaseKernelStorage();
+        uint256 betaWAD = $.betaWAD;
+        uint256 coverageWAD = $.coverageWAD;
+        // Solve for y, rounding in favor of senior protection
+        // Compute the total covered exposure of the underlying investment
+        uint256 totalCoveredExposure = _getSeniorTrancheRawNAV() + _getJuniorTrancheRawNAV().mulDiv(betaWAD, ConstantsLib.WAD, Math.Rounding.Ceil);
+        // Compute the minimum junior tranche assets required to cover the exposure as per the market's coverage requirement
+        uint256 requiredJTAssets = totalCoveredExposure.mulDiv(coverageWAD, ConstantsLib.WAD, Math.Rounding.Ceil);
+        // Compute the surplus coverage currently provided by the junior tranche based on its currently remaining loss-absorption buffer
+        uint256 surplusJTAssets = _getJuniorTrancheEffectiveNAV().saturatingSub(requiredJTAssets);
+        // Compute how much coverage the system retains per 1 unit of JT assets withdrawn scaled by WAD
+        uint256 coverageRetentionWAD = ConstantsLib.WAD - betaWAD.mulDiv(coverageWAD, ConstantsLib.WAD, Math.Rounding.Floor);
+        // Return how much of the surplus can be withdrawn while satisfying the coverage requirement
+        return surplusJTAssets.mulDiv(ConstantsLib.WAD, coverageRetentionWAD, Math.Rounding.Floor);
+    }
+
+    /**
      * @notice Computes raw NAV deltas for both tranches
      * @param _stCurrentRawNAV The current senior raw NAV
      * @param _jtCurrentRawNAV The current junior raw NAV
@@ -303,7 +355,7 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
      * @return deltaST The delta in last to current senior raw NAV
      * @return deltaJT The delta in last to current junior raw NAV
      */
-    function _computeDeltas(
+    function _computeRawNAVDeltas(
         uint256 _stCurrentRawNAV,
         uint256 _jtCurrentRawNAV,
         uint256 _stLastRawNAV,

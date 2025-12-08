@@ -56,7 +56,8 @@ contract StaticCurveRDM is IRDM {
          * R(U) → Percentage of ST yield paid to the junior tranche
          *
          * Below 90% utilization, JT yield allocation rises slowly (0.25 slope).
-         * Above 90% utilization, JT yield allocation rises sharply (7.75 slope), penalizing high utilization and incentivizing marginal junior deposits or senior withdrawals.
+         * At and above 90% utilization, JT yield allocation rises sharply (7.75 slope), penalizing high utilization and incentivizing marginal junior deposits or senior withdrawals
+         * At and above 100% utilization, JT yield allocation is set to 100% of ST yield, as the market is exactly or undercollateralized
          */
 
         // If any of these values is 0, the utilization is effectively 0, so the JT's percentage of ST yield is 0%
