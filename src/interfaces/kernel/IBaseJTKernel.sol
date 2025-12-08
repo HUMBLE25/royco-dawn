@@ -27,5 +27,5 @@ interface IBaseKernel {
         address _receiver
     )
         external
-        returns (uint256 fractionOfTotalAssetsRedeemedWAD, uint256 assetsRedeemed);
+        returns (uint256 fractionOfTotalAssetsRedeemedWAD, uint256 assetsWithdrawn);
 }

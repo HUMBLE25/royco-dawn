@@ -113,22 +113,22 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
     }
 
     /// @inheritdoc IBaseKernel
-    function stMaxDeposit(address _asset, address _receiver) external view returns (uint256) {
+    function stMaxDeposit(address, address _receiver) external view override(IBaseKernel) returns (uint256) {
         return Math.min(_maxSTDepositGlobally(_receiver), _maxSTDepositGivenCoverage());
     }
 
     /// @inheritdoc IBaseKernel
-    function stMaxWithdraw(address, address _owner) external view returns (uint256) {
+    function stMaxWithdraw(address, address _owner) external view override(IBaseKernel) returns (uint256) {
         return _maxSTWithdrawalGlobally(_owner);
     }
 
     /// @inheritdoc IBaseKernel
-    function jtMaxDeposit(address, address _receiver) external view returns (uint256) {
+    function jtMaxDeposit(address, address _receiver) external view override(IBaseKernel) returns (uint256) {
         return _maxJTDepositGlobally(_receiver);
     }
 
     /// @inheritdoc IBaseKernel
-    function jtMaxWithdraw(address, address _owner) external view returns (uint256) {
+    function jtMaxWithdraw(address, address _owner) external view override(IBaseKernel) returns (uint256) {
         return Math.min(_maxJTWithdrawalGlobally(_owner), _maxJTWithdrawalGivenCoverage());
     }
 
@@ -383,6 +383,26 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
         return surplusJTAssets.mulDiv(ConstantsLib.WAD, coverageRetentionWAD, Math.Rounding.Floor);
     }
 
+    /// @notice Returns the effective net asset value of the senior tranche
+    /// @dev Includes applied coverage, ST yield distribution, and uncovered losses
+    function _getSeniorTrancheEffectiveNAV() internal view returns (uint256 stEffectiveNAV) {
+        (,, stEffectiveNAV,,) = _previewEffecitveNAVs(_previewJTYieldShareAccrual());
+    }
+
+    /// @notice Returns the effective net asset value of the junior tranche
+    /// @dev Includes provided coverage, JT yield, ST yield distribution, and JT losses
+    function _getJuniorTrancheEffectiveNAV() internal view returns (uint256 jtEffectiveNAV) {
+        (,,, jtEffectiveNAV,) = _previewEffecitveNAVs(_previewJTYieldShareAccrual());
+    }
+
+    /// @notice Returns the raw net asset value of the senior tranche
+    /// @dev The pure net asset value of the junior tranche invested assets
+    function _getSeniorTrancheRawNAV() internal view virtual returns (uint256);
+
+    /// @notice Returns the raw net asset value of the junior tranche
+    /// @dev The pure net asset value of the junior tranche invested assets
+    function _getJuniorTrancheRawNAV() internal view virtual returns (uint256);
+
     /**
      * @notice Returns the maximum amount of assets that can be deposited into the senior tranche globally
      * @dev Implementation should consider protocol-wide limits and liquidity constraints
@@ -410,20 +430,4 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
      * @param _owner The owner of the assets being withdrawn (used to enforce white/black lists)
      */
     function _maxJTWithdrawalGlobally(address _owner) internal view virtual returns (uint256);
-
-    /// @notice Returns the raw net asset value of the senior tranche
-    /// @dev The pure net asset value of the junior tranche invested assets
-    function _getSeniorTrancheRawNAV() internal view virtual returns (uint256);
-
-    /// @notice Returns the raw net asset value of the junior tranche
-    /// @dev The pure net asset value of the junior tranche invested assets
-    function _getJuniorTrancheRawNAV() internal view virtual returns (uint256);
-
-    /// @notice Returns the effective net asset value of the senior tranche
-    /// @dev Includes applied coverage, ST yield distribution, and uncovered losses
-    function _getSeniorTrancheEffectiveNAV() internal view virtual returns (uint256);
-
-    /// @notice Returns the effective net asset value of the junior tranche
-    /// @dev Includes provided coverage, JT yield, ST yield distribution, and JT losses
-    function _getJuniorTrancheEffectiveNAV() internal view virtual returns (uint256);
 }

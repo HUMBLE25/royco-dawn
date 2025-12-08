@@ -33,46 +33,6 @@ abstract contract AaveV3JTKernel is BaseKernel {
     }
 
     /// @inheritdoc IBaseKernel
-    function jtMaxDeposit(address, address) external view override(IBaseKernel) returns (uint256) {
-        // Retrieve the Pool's data provider and asset
-        AaveV3KernelState storage $ = AaveV3KernelStorageLib._getAaveV3KernelStorage();
-        IPoolDataProvider poolDataProvider = IPoolDataProvider(IPoolAddressesProvider($.poolAddressesProvider).getPoolDataProvider());
-        address asset = $.asset;
-
-        // If the reserve asset is inactive, frozen, or paused, supplies are forbidden
-        (uint256 decimals,,,,,,,, bool isActive, bool isFrozen) = poolDataProvider.getReserveConfigurationData(asset);
-        if (!isActive || isFrozen || poolDataProvider.getPaused(asset)) return 0;
-
-        // Get the supply cap for the reserve asset. If unset, the suppliable amount is unbounded
-        (, uint256 supplyCap) = poolDataProvider.getReserveCaps(asset);
-        if (supplyCap == 0) return type(uint256).max;
-
-        // Compute the total reserve assets supplied and accrued to the treasury
-        (, uint256 totalAccruedToTreasury, uint256 totalLent,,,,,,,,,) = poolDataProvider.getReserveData(asset);
-        uint256 currentlySupplied = totalLent + totalAccruedToTreasury;
-        // Supply cap was returned as whole tokens, so we must scale by underlying decimals
-        supplyCap = supplyCap * (10 ** decimals);
-
-        // If supply cap hit, no incremental supplies are permitted. Else, return the max suppliable amount within the cap.
-        return (currentlySupplied >= supplyCap) ? 0 : (supplyCap - currentlySupplied);
-    }
-
-    /// @inheritdoc IBaseKernel
-    function jtMaxWithdraw(address, address) external view override(IBaseKernel) returns (uint256) {
-        // Retrieve the Pool's data provider and asset
-        AaveV3KernelState storage $ = AaveV3KernelStorageLib._getAaveV3KernelStorage();
-        IPoolDataProvider poolDataProvider = IPoolDataProvider(IPoolAddressesProvider($.poolAddressesProvider).getPoolDataProvider());
-        address asset = $.asset;
-
-        // If the reserve asset is inactive or paused, withdrawals are forbidden
-        (,,,,,,,, bool isActive,) = poolDataProvider.getReserveConfigurationData(asset);
-        if (!isActive || poolDataProvider.getPaused(asset)) return 0;
-
-        // Return the total idle/unborrowed reserve assets. This is the max assets that can be withdrawn from the Pool.
-        return IERC20(asset).balanceOf($.aToken);
-    }
-
-    /// @inheritdoc IBaseKernel
     function jtDeposit(
         address,
         uint256 _assets,
@@ -103,18 +63,58 @@ abstract contract AaveV3JTKernel is BaseKernel {
         override(IBaseKernel)
         onlyJuniorTranche
         syncNAVsAndEnforceCoverage
-        returns (uint256 assetsRedeemed)
+        returns (uint256 assetsWithdrawn)
     {
         // Only withdraw the assets that are still owed to the receiver
-        assetsRedeemed = _shares.mulDiv(_getJuniorTrancheEffectiveNAV(), _totalShares, Math.Rounding.Floor);
+        assetsWithdrawn = _shares.mulDiv(_getJuniorTrancheEffectiveNAV(), _totalShares, Math.Rounding.Floor);
         AaveV3KernelState storage $ = AaveV3KernelStorageLib._getAaveV3KernelStorage();
-        IPool($.pool).withdraw($.asset, assetsRedeemed, _receiver);
+        IPool($.pool).withdraw($.asset, assetsWithdrawn, _receiver);
     }
 
     /// @inheritdoc BaseKernel
     function _getJuniorTrancheRawNAV() internal view override(BaseKernel) returns (uint256) {
-        // The tranche's balance of the AToken is the total assets it can currently withdraw from Aave
+        // The tranche's balance of the AToken is the total assets it is owed from the Aave pool
         AaveV3KernelState storage $ = AaveV3KernelStorageLib._getAaveV3KernelStorage();
         return IERC20($.aToken).balanceOf(address(this));
+    }
+
+    /// @inheritdoc BaseKernel
+    function _maxJTDepositGlobally(address) internal view override(BaseKernel) returns (uint256) {
+        // Retrieve the Pool's data provider and asset
+        AaveV3KernelState storage $ = AaveV3KernelStorageLib._getAaveV3KernelStorage();
+        IPoolDataProvider poolDataProvider = IPoolDataProvider(IPoolAddressesProvider($.poolAddressesProvider).getPoolDataProvider());
+        address asset = $.asset;
+
+        // If the reserve asset is inactive, frozen, or paused, supplies are forbidden
+        (uint256 decimals,,,,,,,, bool isActive, bool isFrozen) = poolDataProvider.getReserveConfigurationData(asset);
+        if (!isActive || isFrozen || poolDataProvider.getPaused(asset)) return 0;
+
+        // Get the supply cap for the reserve asset. If unset, the suppliable amount is unbounded
+        (, uint256 supplyCap) = poolDataProvider.getReserveCaps(asset);
+        if (supplyCap == 0) return type(uint256).max;
+
+        // Compute the total reserve assets supplied and accrued to the treasury
+        (, uint256 totalAccruedToTreasury, uint256 totalLent,,,,,,,,,) = poolDataProvider.getReserveData(asset);
+        uint256 currentlySupplied = totalLent + totalAccruedToTreasury;
+        // Supply cap was returned as whole tokens, so we must scale by underlying decimals
+        supplyCap = supplyCap * (10 ** decimals);
+
+        // If supply cap hit, no incremental supplies are permitted. Else, return the max suppliable amount within the cap.
+        return (currentlySupplied >= supplyCap) ? 0 : (supplyCap - currentlySupplied);
+    }
+
+    /// @inheritdoc BaseKernel
+    function _maxJTWithdrawalGlobally(address) internal view override(BaseKernel) returns (uint256) {
+        // Retrieve the Pool's data provider and asset
+        AaveV3KernelState storage $ = AaveV3KernelStorageLib._getAaveV3KernelStorage();
+        IPoolDataProvider poolDataProvider = IPoolDataProvider(IPoolAddressesProvider($.poolAddressesProvider).getPoolDataProvider());
+        address asset = $.asset;
+
+        // If the reserve asset is inactive or paused, withdrawals are forbidden
+        (,,,,,,,, bool isActive,) = poolDataProvider.getReserveConfigurationData(asset);
+        if (!isActive || poolDataProvider.getPaused(asset)) return 0;
+
+        // Return the total idle/unborrowed reserve assets. This is the max assets that can be withdrawn from the Pool.
+        return IERC20(asset).balanceOf($.aToken);
     }
 }
