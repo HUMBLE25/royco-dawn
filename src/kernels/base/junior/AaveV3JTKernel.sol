@@ -88,7 +88,7 @@ abstract contract AaveV3JTKernel is BaseKernel {
         // Max approval already given to the pool on initialization
         AaveV3KernelState storage $ = AaveV3KernelStorageLib._getAaveV3KernelStorage();
         IPool($.pool).supply($.asset, _assets, address(this), 0);
-        return _assets.mulDiv(ConstantsLib.WAD, _getJuniorTrancheRawNAV(), Math.Rounding.Floor);
+        return _assets.mulDiv(ConstantsLib.WAD, _getJuniorTrancheEffectiveNAV(), Math.Rounding.Floor);
     }
 
     /// @inheritdoc IBaseKernel
@@ -106,7 +106,7 @@ abstract contract AaveV3JTKernel is BaseKernel {
         returns (uint256 assetsRedeemed)
     {
         // Only withdraw the assets that are still owed to the receiver
-        assetsRedeemed = _shares.mulDiv(_getJuniorTrancheRawNAV(), _totalShares, Math.Rounding.Floor);
+        assetsRedeemed = _shares.mulDiv(_getJuniorTrancheEffectiveNAV(), _totalShares, Math.Rounding.Floor);
         AaveV3KernelState storage $ = AaveV3KernelStorageLib._getAaveV3KernelStorage();
         IPool($.pool).withdraw($.asset, assetsRedeemed, _receiver);
     }

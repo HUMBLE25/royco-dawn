@@ -40,12 +40,6 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
         _;
     }
 
-    function stMaxDeposit(address _receiver) external view returns (uint256) { }
-    function stMaxWithdraw(address _owner) external view returns (uint256) { }
-
-    function jtMaxDeposit(address _receiver) external view returns (uint256) { }
-    function jtMaxWithdraw(address _owner) external view returns (uint256) { }
-
     /**
      * @notice Synchronizes tranche NAVs before and after an operation (deposit or withdrawal).
      * @dev Should be placed on senior tranche withdrawal functions and junior tranche deposit functions since coverage doesn't need to be enforced
@@ -116,6 +110,26 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
     {
         // Initialize the base kernel state
         BaseKernelStorageLib.__BaseKernel_init(_seniorTranche, _juniorTranche, _coverageWAD, _betaWAD, _rdm);
+    }
+
+    /// @inheritdoc IBaseKernel
+    function stMaxDeposit(address _asset, address _receiver) external view returns (uint256) {
+        return Math.min(_maxSTDepositGlobally(_receiver), _maxSTDepositGivenCoverage());
+    }
+
+    /// @inheritdoc IBaseKernel
+    function stMaxWithdraw(address, address _owner) external view returns (uint256) {
+        return _maxSTWithdrawalGlobally(_owner);
+    }
+
+    /// @inheritdoc IBaseKernel
+    function jtMaxDeposit(address, address _receiver) external view returns (uint256) {
+        return _maxJTDepositGlobally(_receiver);
+    }
+
+    /// @inheritdoc IBaseKernel
+    function jtMaxWithdraw(address, address _owner) external view returns (uint256) {
+        return Math.min(_maxJTWithdrawalGlobally(_owner), _maxJTWithdrawalGivenCoverage());
     }
 
     /**
@@ -301,52 +315,6 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
     }
 
     /**
-     * @notice Returns the max assets depositable into the senior tranche without violating the market's coverage requirement
-     * @dev Always rounds in favor of senior tranche protection
-     * @dev Coverage Invariant: JT_EFFECTIVE_NAV >= (ST_RAW_NAV + (JT_RAW_NAV * BETA_%)) * COV_%
-     * @dev Max assets depositable into ST, x: JT_EFFECTIVE_NAV = ((ST_RAW_NAV + x) + (JT_RAW_NAV * BETA_%)) * COV_%
-     *      Isolate x: x = (JT_EFFECTIVE_NAV / COV_%) - (JT_RAW_NAV * BETA_%) - ST_RAW_NAV
-     */
-    function _maxSTDepositable() internal view returns (uint256) {
-        // Get the storage pointer to the base kernel state
-        BaseKernelState storage $ = BaseKernelStorageLib._getBaseKernelStorage();
-        // Solve for x, rounding in favor of senior protection
-        // Compute the total covered assets by the junior tranche loss absorption buffer
-        uint256 totalCoveredAssets = _getJuniorTrancheEffectiveNAV().mulDiv(ConstantsLib.WAD, $.coverageWAD, Math.Rounding.Floor);
-        // Compute the assets required to cover current junior tranche exposure
-        uint256 jtCoverageRequired = _getJuniorTrancheRawNAV().mulDiv($.betaWAD, ConstantsLib.WAD, Math.Rounding.Ceil);
-        // Compute the assets required to cover current senior tranche exposure
-        uint256 stCoverageRequired = _getSeniorTrancheRawNAV();
-        // Compute the amount of assets that can be deposited into senior while retaining full coverage
-        return totalCoveredAssets.saturatingSub(jtCoverageRequired).saturatingSub(stCoverageRequired);
-    }
-
-    /**
-     * @notice Returns the max assets withdrawable from the junior tranche without violating the market's coverage requirement
-     * @dev Always rounds in favor of senior tranche protection
-     * @dev Coverage Invariant: JT_EFFECTIVE_NAV >= (ST_RAW_NAV + (JT_RAW_NAV * BETA_%)) * COV_%
-     * @dev Max assets withdrawable from JT, y: (JT_EFFECTIVE_NAV - y) = (ST_RAW_NAV + ((JT_RAW_NAV - y) * BETA_%)) * COV_%
-     *      Isolate y: y = (JT_EFFECTIVE_NAV - (COV_% * (ST_RAW_NAV + (JT_RAW_NAV * BETA_%)))) / (1 - (BETA_% * COV_%))
-     */
-    function _maxJTWithdrawable() internal view returns (uint256) {
-        // Get the storage pointer to the base kernel state and cache beta and coverage
-        BaseKernelState storage $ = BaseKernelStorageLib._getBaseKernelStorage();
-        uint256 betaWAD = $.betaWAD;
-        uint256 coverageWAD = $.coverageWAD;
-        // Solve for y, rounding in favor of senior protection
-        // Compute the total covered exposure of the underlying investment
-        uint256 totalCoveredExposure = _getSeniorTrancheRawNAV() + _getJuniorTrancheRawNAV().mulDiv(betaWAD, ConstantsLib.WAD, Math.Rounding.Ceil);
-        // Compute the minimum junior tranche assets required to cover the exposure as per the market's coverage requirement
-        uint256 requiredJTAssets = totalCoveredExposure.mulDiv(coverageWAD, ConstantsLib.WAD, Math.Rounding.Ceil);
-        // Compute the surplus coverage currently provided by the junior tranche based on its currently remaining loss-absorption buffer
-        uint256 surplusJTAssets = _getJuniorTrancheEffectiveNAV().saturatingSub(requiredJTAssets);
-        // Compute how much coverage the system retains per 1 unit of JT assets withdrawn scaled by WAD
-        uint256 coverageRetentionWAD = ConstantsLib.WAD - betaWAD.mulDiv(coverageWAD, ConstantsLib.WAD, Math.Rounding.Floor);
-        // Return how much of the surplus can be withdrawn while satisfying the coverage requirement
-        return surplusJTAssets.mulDiv(ConstantsLib.WAD, coverageRetentionWAD, Math.Rounding.Floor);
-    }
-
-    /**
      * @notice Computes raw NAV deltas for both tranches
      * @param _stCurrentRawNAV The current senior raw NAV
      * @param _jtCurrentRawNAV The current junior raw NAV
@@ -368,6 +336,80 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
         deltaST = int256(_stCurrentRawNAV) - int256(_stLastRawNAV);
         deltaJT = int256(_jtCurrentRawNAV) - int256(_jtLastRawNAV);
     }
+
+    /**
+     * @notice Returns the max assets depositable into the senior tranche without violating the market's coverage requirement
+     * @dev Always rounds in favor of senior tranche protection
+     * @dev Coverage Invariant: JT_EFFECTIVE_NAV >= (ST_RAW_NAV + (JT_RAW_NAV * BETA_%)) * COV_%
+     * @dev Max assets depositable into ST, x: JT_EFFECTIVE_NAV = ((ST_RAW_NAV + x) + (JT_RAW_NAV * BETA_%)) * COV_%
+     *      Isolate x: x = (JT_EFFECTIVE_NAV / COV_%) - (JT_RAW_NAV * BETA_%) - ST_RAW_NAV
+     */
+    function _maxSTDepositGivenCoverage() internal view returns (uint256) {
+        // Get the storage pointer to the base kernel state
+        BaseKernelState storage $ = BaseKernelStorageLib._getBaseKernelStorage();
+        // Solve for x, rounding in favor of senior protection
+        // Compute the total covered assets by the junior tranche loss absorption buffer
+        uint256 totalCoveredAssets = _getJuniorTrancheEffectiveNAV().mulDiv(ConstantsLib.WAD, $.coverageWAD, Math.Rounding.Floor);
+        // Compute the assets required to cover current junior tranche exposure
+        uint256 jtCoverageRequired = _getJuniorTrancheRawNAV().mulDiv($.betaWAD, ConstantsLib.WAD, Math.Rounding.Ceil);
+        // Compute the assets required to cover current senior tranche exposure
+        uint256 stCoverageRequired = _getSeniorTrancheRawNAV();
+        // Compute the amount of assets that can be deposited into senior while retaining full coverage
+        return totalCoveredAssets.saturatingSub(jtCoverageRequired).saturatingSub(stCoverageRequired);
+    }
+
+    /**
+     * @notice Returns the max assets withdrawable from the junior tranche without violating the market's coverage requirement
+     * @dev Always rounds in favor of senior tranche protection
+     * @dev Coverage Invariant: JT_EFFECTIVE_NAV >= (ST_RAW_NAV + (JT_RAW_NAV * BETA_%)) * COV_%
+     * @dev Max assets withdrawable from JT, y: (JT_EFFECTIVE_NAV - y) = (ST_RAW_NAV + ((JT_RAW_NAV - y) * BETA_%)) * COV_%
+     *      Isolate y: y = (JT_EFFECTIVE_NAV - (COV_% * (ST_RAW_NAV + (JT_RAW_NAV * BETA_%)))) / (1 - (BETA_% * COV_%))
+     */
+    function _maxJTWithdrawalGivenCoverage() internal view returns (uint256) {
+        // Get the storage pointer to the base kernel state and cache beta and coverage
+        BaseKernelState storage $ = BaseKernelStorageLib._getBaseKernelStorage();
+        uint256 betaWAD = $.betaWAD;
+        uint256 coverageWAD = $.coverageWAD;
+        // Solve for y, rounding in favor of senior protection
+        // Compute the total covered exposure of the underlying investment
+        uint256 totalCoveredExposure = _getSeniorTrancheRawNAV() + _getJuniorTrancheRawNAV().mulDiv(betaWAD, ConstantsLib.WAD, Math.Rounding.Ceil);
+        // Compute the minimum junior tranche assets required to cover the exposure as per the market's coverage requirement
+        uint256 requiredJTAssets = totalCoveredExposure.mulDiv(coverageWAD, ConstantsLib.WAD, Math.Rounding.Ceil);
+        // Compute the surplus coverage currently provided by the junior tranche based on its currently remaining loss-absorption buffer
+        uint256 surplusJTAssets = _getJuniorTrancheEffectiveNAV().saturatingSub(requiredJTAssets);
+        // Compute how much coverage the system retains per 1 unit of JT assets withdrawn scaled by WAD
+        uint256 coverageRetentionWAD = ConstantsLib.WAD - betaWAD.mulDiv(coverageWAD, ConstantsLib.WAD, Math.Rounding.Floor);
+        // Return how much of the surplus can be withdrawn while satisfying the coverage requirement
+        return surplusJTAssets.mulDiv(ConstantsLib.WAD, coverageRetentionWAD, Math.Rounding.Floor);
+    }
+
+    /**
+     * @notice Returns the maximum amount of assets that can be deposited into the senior tranche globally
+     * @dev Implementation should consider protocol-wide limits and liquidity constraints
+     * @param _receiver The receiver of the shares for the assets being deposited (used to enforce white/black lists)
+     */
+    function _maxSTDepositGlobally(address _receiver) internal view virtual returns (uint256);
+
+    /**
+     * @notice Returns the maximum amount of assets that can be withdrawn from the senior tranche globally
+     * @dev Implementation should consider protocol-wide limits and liquidity constraints
+     * @param _owner The owner of the assets being withdrawn (used to enforce white/black lists)
+     */
+    function _maxSTWithdrawalGlobally(address _owner) internal view virtual returns (uint256);
+
+    /**
+     * @notice Returns the maximum amount of assets that can be deposited into the junior tranche globally
+     * @dev Implementation should consider protocol-wide limits and liquidity constraints
+     * @param _receiver The receiver of the shares for the assets being deposited (used to enforce white/black lists)
+     */
+    function _maxJTDepositGlobally(address _receiver) internal view virtual returns (uint256);
+
+    /**
+     * @notice Returns the maximum amount of assets that can be withdrawn from the junior tranche globally
+     * @dev Implementation should consider protocol-wide limits and liquidity constraints
+     * @param _owner The owner of the assets being withdrawn (used to enforce white/black lists)
+     */
+    function _maxJTWithdrawalGlobally(address _owner) internal view virtual returns (uint256);
 
     /// @notice Returns the raw net asset value of the senior tranche
     /// @dev The pure net asset value of the junior tranche invested assets
