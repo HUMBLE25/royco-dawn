@@ -211,11 +211,12 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
             uint256 jtLoss = uint256(-deltaJT);
             uint256 excessLoss;
             if (jtLoss > jtEffectiveNAV) {
-                // Any excess loss that is unabsorbable by JT hits ST effective NAV
+                // Since this loss is unabsorbale by the JT buffer, exxess loss needs to hit senior
                 excessLoss = jtLoss - jtEffectiveNAV;
                 jtEffectiveNAV = 0;
                 stEffectiveNAV = Math.saturatingSub(stEffectiveNAV, excessLoss);
             } else {
+                // Loss is fully absorbable by JT
                 jtEffectiveNAV -= jtLoss;
             }
         } else if (deltaJT > 0) {
@@ -237,13 +238,14 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
             jtEffectiveNAV -= availableCoverage;
         } else {
             // Senior tranche accrued yield
+            uint256 yield = uint256(deltaST);
             // Compute the time weighted average JT share of yield
             uint256 elapsed = block.timestamp - $.lastDistributionTimestamp;
-            // Preemptively return if last yield distribution was in the same block
-            if (elapsed == 0) return (stRawNAV, jtRawNAV, stEffectiveNAV, jtEffectiveNAV, false);
-            uint256 jtYieldShareWAD = _twJTYieldShareAccruedWAD / elapsed;
+            // Preemptively accrue all yield to senior and return if last yield distribution was in the same block
+            if (elapsed == 0) return (stRawNAV, jtRawNAV, stEffectiveNAV + yield, jtEffectiveNAV, false);
             // Apply the yield split: adding each tranche's share of earnings to their effective NAVs
-            uint256 yield = uint256(deltaST);
+            uint256 jtYieldShareWAD = _twJTYieldShareAccruedWAD / elapsed;
+            // Round in favor of the senior tranche
             uint256 jtYield = yield.mulDiv(jtYieldShareWAD, ConstantsLib.WAD, Math.Rounding.Floor);
             jtEffectiveNAV += jtYield;
             stEffectiveNAV += (yield - jtYield);
