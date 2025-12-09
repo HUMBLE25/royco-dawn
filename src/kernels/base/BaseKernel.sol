@@ -223,11 +223,11 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
         stCoverageDebt = $.lastSTCoverageDebt;
         jtCoverageDebt = $.lastJTCoverageDebt;
 
-        /// @dev CASE 1: The JT assets depreciated in value
+        /// @dev STEP_JT_APPLY_LOSS: The JT assets depreciated in value
         if (deltaJT < 0) {
             // JT incurs as much of the loss as possible, booking the remainder as a future liability to ST
             uint256 jtLoss = uint256(-deltaJT);
-            /// @dev CASE 1.1: This loss isn't fully absorbable by JT's remaning loss-absorption buffer
+            /// @dev STEP_JT_LOSS_OVERFLOW_TO_ST: This loss isn't fully absorbable by JT's remaning loss-absorption buffer
             if (jtLoss > jtEffectiveNAV) {
                 // Wipe out JT's remaining buffer and force ST to absorb any excess loss
                 uint256 excessLoss = jtLoss - jtEffectiveNAV;
@@ -235,49 +235,49 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
                 stEffectiveNAV = Math.saturatingSub(stEffectiveNAV, excessLoss);
                 // The excess loss is added to the JT's coverage debt: a future liability of JT to ST
                 jtCoverageDebt += excessLoss;
-                /// @dev CASE 1.2: This loss is fully absorbable by JT's remaning loss-absorption buffer
+                /// @dev STEP_JT_ABSORB_LOSS: This loss is fully absorbable by JT's remaning loss-absorption buffer
             } else {
                 // Deduct the loss from JT's remaining buffer
                 jtEffectiveNAV -= jtLoss;
             }
-            /// @dev CASE 2: The JT assets appreciated in value
+            /// @dev STEP_JT_APPLY_GAIN: The JT assets appreciated in value
         } else if (deltaJT > 0) {
             uint256 jtGain = uint256(deltaJT);
-            // JT uses gains to first pay off any debt to ST and then books any remainder as its own gains
+            /// @dev STEP_REPAY_JT_COVERAGE_DEBT: Pay off any JT debt to ST (previously uncovered losses)
             uint256 jtDebtRepayment = Math.min(jtGain, jtCoverageDebt);
             if (jtDebtRepayment != 0) {
                 stEffectiveNAV += jtDebtRepayment;
                 jtCoverageDebt -= jtDebtRepayment;
                 jtGain -= jtDebtRepayment;
             }
-            // Remaining gain, if any, goes to JT
+            /// @dev STEP_JT_BOOK_REMAINING_GAIN: JT accrues remaining appreciation
             jtEffectiveNAV += jtGain;
         }
 
-        /// @dev CASE 3: The ST assets experienced no change in value
+        /// @dev STEP_ST_NO_CHANGE: The ST assets experienced no change in value
         if (deltaST == 0) return (stRawNAV, jtRawNAV, stEffectiveNAV, jtEffectiveNAV, stCoverageDebt, jtCoverageDebt, false);
 
-        /// @dev CASE 4: The ST assets depreciated in value
+        /// @dev STEP_ST_APPLY_LOSS: The ST assets depreciated in value
         if (deltaST < 0) {
             uint256 stLoss = uint256(-deltaST);
-            // Apply any possible coverage provided by JT's loss-absorption buffer
+            /// @dev STEP_APPLY_JT_COVERAGE_TO_ST: Apply any possible coverage to ST provided by JT's loss-absorption buffer
             uint256 coverageApplied = Math.min(stLoss, jtEffectiveNAV);
             if (coverageApplied != 0) {
                 jtEffectiveNAV -= coverageApplied;
                 // Any coverage provided is a ST liability to JT
                 stCoverageDebt += coverageApplied;
             }
-            // Apply any uncovered losses by JT to ST
+            /// @dev STEP_ST_BOOK_REMAINING_LOSSES: Apply any uncovered losses by JT to ST
             uint256 netStLoss = stLoss - coverageApplied;
             if (netStLoss != 0) {
                 stEffectiveNAV = Math.saturatingSub(stEffectiveNAV, netStLoss);
                 // The uncovered portion of the ST loss is a JT liability to ST
                 jtCoverageDebt += netStLoss;
             }
-            /// @dev CASE 5: The ST assets appreciated in value
+            /// @dev STEP_ST_APPLY_GAIN: The ST assets appreciated in value
         } else {
             uint256 stGain = uint256(deltaST);
-            /// @dev CASE 5.1: The JT owes debt to ST (uncovered ST losses), first priority of repayment to reverse the loss-waterfall
+            /// @dev STEP_REPAY_JT_COVERAGE_DEBT: The first priority of repayment to reverse the loss-waterfall is repaying JT debt to ST (previously uncovered ST losses)
             uint256 debtRepayment = Math.min(stGain, jtCoverageDebt);
             if (debtRepayment != 0) {
                 // Pay back debt to ST
@@ -288,7 +288,7 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
                 if (stGain == 0) return (stRawNAV, jtRawNAV, stEffectiveNAV, jtEffectiveNAV, stCoverageDebt, jtCoverageDebt, false);
             }
 
-            /// @dev CASE 5.2: The ST owes debt to JT (covered JT losses), second priority of repayment to reverse the loss-waterfall
+            /// @dev STEP_REPAY_ST_COVERAGE_DEBT: The second priority of repayment to reverse the loss-waterfall is repaying ST debt to JT (previously uncovered ST losses)
             debtRepayment = Math.min(stGain, stCoverageDebt);
             if (debtRepayment != 0) {
                 // Pay back debt to JT
@@ -299,7 +299,7 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
                 if (stGain == 0) return (stRawNAV, jtRawNAV, stEffectiveNAV, jtEffectiveNAV, stCoverageDebt, jtCoverageDebt, false);
             }
 
-            /// @dev CASE 5.3: There are no remaining debts in the system and the residual gains can be used to distribute yield to both tranches
+            /// @dev STEP_DISTRIBUTE_YIELD: There are no remaining debts in the system and the residual gains can be used to distribute yield to both tranches
             // Compute the time weighted average JT share of yield
             uint256 elapsed = block.timestamp - $.lastDistributionTimestamp;
             // Preemptively accrue all yield to ST and return if last yield distribution was in the same block
