@@ -17,8 +17,11 @@ enum ExecutionModel {
  *
  */
 interface IBaseKernel {
-    function getDepositExecutionModel() external view returns (ExecutionModel);
-    function getWithdrawExecutionModel() external view returns (ExecutionModel);
+    function ST_DEPOSIT_EXECUTION_MODEL() external pure returns (ExecutionModel);
+    function ST_WITHDRAWAL_EXECUTION_MODEL() external pure returns (ExecutionModel);
+
+    function JT_DEPOSIT_EXECUTION_MODEL() external pure returns (ExecutionModel);
+    function JT_WITHDRAWAL_EXECUTION_MODEL() external pure returns (ExecutionModel);
 
     function getSTRawNAV() external view returns (uint256);
     function getJTRawNAV() external view returns (uint256);
@@ -31,7 +34,7 @@ interface IBaseKernel {
 
     function syncTrancheNAVs() external returns (uint256 stRawNAV, uint256 jtRawNAV, uint256 stEffectiveNAV, uint256 jtEffectiveNAV);
 
-    function previewSyncTrancheNAVs() external returns (uint256 stRawNAV, uint256 jtRawNAV, uint256 stEffectiveNAV, uint256 jtEffectiveNAV);
+    // function previewSyncTrancheNAVs() external returns (uint256 stRawNAV, uint256 jtRawNAV, uint256 stEffectiveNAV, uint256 jtEffectiveNAV);
 
     // TODO: Assume that the following functions also enforce the invariants
     function stMaxDeposit(address _asset, address _receiver) external view returns (uint256);

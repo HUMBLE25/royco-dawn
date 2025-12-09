@@ -7,14 +7,22 @@ import { Math } from "../../../../lib/openzeppelin-contracts/contracts/utils/mat
 import { IPool } from "../../../interfaces/aave/IPool.sol";
 import { IPoolAddressesProvider } from "../../../interfaces/aave/IPoolAddressesProvider.sol";
 import { IPoolDataProvider } from "../../../interfaces/aave/IPoolDataProvider.sol";
+
+import { ExecutionModel, IBaseKernel } from "../../../interfaces/kernel/IBaseKernel.sol";
 import { BaseKernelState, BaseKernelStorageLib } from "../../../libraries/BaseKernelStorageLib.sol";
 import { ConstantsLib } from "../../../libraries/ConstantsLib.sol";
 import { AaveV3KernelState, AaveV3KernelStorageLib } from "../../../libraries/kernels/AaveV3KernelStorageLib.sol";
-import { BaseKernel, IBaseKernel } from "../BaseKernel.sol";
+import { BaseKernel } from "../BaseKernel.sol";
 
 abstract contract AaveV3JTKernel is BaseKernel {
     using SafeERC20 for IERC20;
     using Math for uint256;
+
+    /// @inheritdoc IBaseKernel
+    ExecutionModel public constant JT_DEPOSIT_EXECUTION_MODEL = ExecutionModel.SYNC;
+
+    /// @inheritdoc IBaseKernel
+    ExecutionModel public constant JT_WITHDRAWAL_EXECUTION_MODEL = ExecutionModel.SYNC;
 
     /**
      * @notice Initializes a kernel where the junior tranche is deployed into Aave V3

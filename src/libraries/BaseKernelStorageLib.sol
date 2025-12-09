@@ -2,6 +2,23 @@
 pragma solidity ^0.8.28;
 
 /**
+ * @notice Initialization parameters for the Royco Base Kernel
+ * @custom:field seniorTranche - The address of the Royco senior tranche associated with this kernel
+ * @custom:field juniorTranche - The address of the Royco junior tranche associated with this kernel
+ * @custom:field coverageWAD - The coverage ratio that the senior tranche is expected to be protected by scaled by WAD
+ * @custom:field betaWAD - The junior tranche's sensitivity to the same downside stress that affects the senior tranche
+ *                For example, beta is 0 when JT is in the RFR and 1 when JT is in the same opportunity as senior
+ * @custom:field rdm - The market's Reward Distribution Model (RDM), responsible for determining the ST's yield split between ST and JT
+ */
+struct BaseKernelInitParams {
+    address seniorTranche;
+    address juniorTranche;
+    uint64 coverageWAD;
+    uint96 betaWAD;
+    address rdm;
+}
+
+/**
  * @notice Storage state for the Royco Base Kernel
  * @custom:storage-location erc7201:Royco.storage.BaseKernelState
  * @custom:field seniorTranche - The address of the Royco senior tranche associated with this kernel
@@ -56,20 +73,15 @@ library BaseKernelStorageLib {
 
     /**
      * @notice Initializes the base kernel state
-     * @param _seniorTranche The address of the Royco senior tranche associated with this kernel
-     * @param _juniorTranche The address of the Royco junior tranche associated with this kernel
-     * @param _coverageWAD The coverage ratio that the senior tranche is expected to be protected by scaled by WAD
-     * @param _betaWAD The junior tranche's sensitivity to the same downside stress that affects the senior tranche
-     *                 For example, beta is 0 when JT is in the RFR and 1 when JT is in the same opportunity as senior
-     * @param _rdm The market's Reward Distribution Model (RDM), responsible for determining the ST's yield split between ST and JT
+     * @param _params The initialization parameters for the base kernel
      */
-    function __BaseKernel_init(address _seniorTranche, address _juniorTranche, uint64 _coverageWAD, uint96 _betaWAD, address _rdm) internal {
+    function __BaseKernel_init(BaseKernelInitParams memory _params) internal {
         // Set the initial state of the base kernel
         BaseKernelState storage $ = _getBaseKernelStorage();
-        $.seniorTranche = _seniorTranche;
-        $.coverageWAD = _coverageWAD;
-        $.juniorTranche = _juniorTranche;
-        $.betaWAD = _betaWAD;
-        $.rdm = _rdm;
+        $.seniorTranche = _params.seniorTranche;
+        $.coverageWAD = _params.coverageWAD;
+        $.juniorTranche = _params.juniorTranche;
+        $.betaWAD = _params.betaWAD;
+        $.rdm = _params.rdm;
     }
 }

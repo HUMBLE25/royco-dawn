@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import { Initializable } from "../../../lib/openzeppelin-contracts/contracts/proxy/utils/Initializable.sol";
 import { IRDM } from "../../interfaces/IRDM.sol";
 import { IBaseKernel } from "../../interfaces/kernel/IBaseKernel.sol";
-import { BaseKernelState, BaseKernelStorageLib } from "../../libraries/BaseKernelStorageLib.sol";
+import { BaseKernelState, BaseKernelInitParams, BaseKernelStorageLib } from "../../libraries/BaseKernelStorageLib.sol";
 import { ConstantsLib, Math, UtilsLib } from "../../libraries/UtilsLib.sol";
 
 /**
@@ -77,39 +77,25 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
     /**
      * @notice Initializes the base kernel state
      * @dev Initializes any parent contracts and the base kernel state
-     * @param _seniorTranche The address of the Royco senior tranche associated with this kernel
-     * @param _juniorTranche The address of the Royco junior tranche associated with this kernel
-     * @param _coverageWAD The coverage ratio that the senior tranche is expected to be protected by scaled by WAD
-     * @param _betaWAD The junior tranche's sensitivity to the same downside stress that affects the senior tranche
-     *                 For example, beta is 0 when JT is in the RFR and 1 when JT is in the same opportunity as senior
-     * @param _rdm The market's Reward Distribution Model (RDM), responsible for determining the ST's yield split between ST and JT
+     * @param _params The initialization parameters for the base kernel
      */
-    function __BaseKernel_init(address _seniorTranche, address _juniorTranche, uint64 _coverageWAD, uint96 _betaWAD, address _rdm) internal onlyInitializing {
-        __BaseKernel_init_unchained(_seniorTranche, _juniorTranche, _coverageWAD, _betaWAD, _rdm);
+    function __BaseKernel_init(BaseKernelInitParams memory _params) internal onlyInitializing {
+        __BaseKernel_init_unchained(_params);
     }
 
     /**
      * @notice Initializes the base kernel state
      * @dev Initializes the base kernel state
-     * @param _seniorTranche The address of the Royco senior tranche associated with this kernel
-     * @param _juniorTranche The address of the Royco junior tranche associated with this kernel
-     * @param _coverageWAD The coverage ratio that the senior tranche is expected to be protected by scaled by WAD
-     * @param _betaWAD The junior tranche's sensitivity to the same downside stress that affects the senior tranche
-     *                 For example, beta is 0 when JT is in the RFR and 1 when JT is in the same opportunity as senior
-     * @param _rdm The market's Reward Distribution Model (RDM), responsible for determining the ST's yield split between ST and JT
+     * @param _params The initialization parameters for the base kernel
      */
     function __BaseKernel_init_unchained(
-        address _seniorTranche,
-        address _juniorTranche,
-        uint64 _coverageWAD,
-        uint96 _betaWAD,
-        address _rdm
+        BaseKernelInitParams memory _params
     )
         internal
         onlyInitializing
     {
         // Initialize the base kernel state
-        BaseKernelStorageLib.__BaseKernel_init(_seniorTranche, _juniorTranche, _coverageWAD, _betaWAD, _rdm);
+        BaseKernelStorageLib.__BaseKernel_init(_params);
     }
 
     /// @inheritdoc IBaseKernel
@@ -231,7 +217,7 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
             uint256 jtLoss = uint256(-deltaJT);
             uint256 excessLoss;
             if (jtLoss > jtEffectiveNAV) {
-                // Since this loss is unabsorbale by the JT buffer, exxess loss needs to hit senior
+                // Since this loss is unabsorbale by the JT buffer, excess losses needs to hit ST
                 excessLoss = jtLoss - jtEffectiveNAV;
                 jtEffectiveNAV = 0;
                 stEffectiveNAV = Math.saturatingSub(stEffectiveNAV, excessLoss);

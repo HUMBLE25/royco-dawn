@@ -4,14 +4,21 @@ pragma solidity ^0.8.28;
 import { IERC4626 } from "../../../../lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 import { IERC20, SafeERC20 } from "../../../../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import { Math } from "../../../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
+import { ExecutionModel, IBaseKernel } from "../../../interfaces/kernel/IBaseKernel.sol";
 import { BaseKernelState, BaseKernelStorageLib } from "../../../libraries/BaseKernelStorageLib.sol";
 import { ConstantsLib } from "../../../libraries/ConstantsLib.sol";
 import { ERC4626STKernelState, ERC4626STKernelStorageLib } from "../../../libraries/kernels/ERC4626STKernelStorageLib.sol";
-import { BaseKernel, IBaseKernel } from "../BaseKernel.sol";
+import { BaseKernel } from "../BaseKernel.sol";
 
 abstract contract ERC4626STKernel is BaseKernel {
     using SafeERC20 for IERC20;
     using Math for uint256;
+
+    /// @inheritdoc IBaseKernel
+    ExecutionModel public constant ST_DEPOSIT_EXECUTION_MODEL = ExecutionModel.SYNC;
+
+    /// @inheritdoc IBaseKernel
+    ExecutionModel public constant ST_WITHDRAWAL_EXECUTION_MODEL = ExecutionModel.SYNC;
 
     /**
      * @notice Initializes a kernel where the senior tranche is deployed into an ERC4626 vault
