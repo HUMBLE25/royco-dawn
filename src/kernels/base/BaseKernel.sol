@@ -165,7 +165,9 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
 
         // Preview the raw and coverage adjusted (effective) NAVs of each tranche
         bool yieldDistributed;
-        (stRawNAV, jtRawNAV, stEffectiveNAV, jtEffectiveNAV, yieldDistributed) = _previewEffecitveNAVs(twJTYieldShareAccruedWAD);
+        uint256 stCoverageDebt;
+        uint256 jtCoverageDebt;
+        (stRawNAV, jtRawNAV, stEffectiveNAV, jtEffectiveNAV, stCoverageDebt, jtCoverageDebt, yieldDistributed) = _previewEffectiveNAVs(twJTYieldShareAccruedWAD);
         // If yield was distributed, reset the accumulator and update the last yield distribution timestamp
         if (yieldDistributed) {
             delete $.twJTYieldShareAccruedWAD;
@@ -173,10 +175,12 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
         }
 
         // Checkpoint the computed NAVs
-        $.lastSeniorRawNAV = stRawNAV;
-        $.lastJuniorRawNAV = jtRawNAV;
-        $.lastSeniorEffectiveNAV = stEffectiveNAV;
-        $.lastJuniorEffectiveNAV = jtEffectiveNAV;
+        $.lastSTRawNAV = stRawNAV;
+        $.lastJTRawNAV = jtRawNAV;
+        $.lastSTEffectiveNAV = stEffectiveNAV;
+        $.lastJTEffectiveNAV = jtEffectiveNAV;
+        $.lastSTCoverageDebt = stCoverageDebt;
+        $.lastJTCoverageDebt = jtCoverageDebt;
     }
 
     /**
@@ -187,12 +191,22 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
      * @return jtRawNAV The junior tranche's raw NAV: the pure value of its investment
      * @return stEffectiveNAV The senior tranche's effective NAV, including applied coverage, ST yield distribution, and uncovered losses
      * @return jtEffectiveNAV The junior tranche's effective NAV, including provided coverage, JT yield, ST yield distribution, and JT losses
+     * @return stCoverageDebt The total coverage that has been applied to ST from the JT loss-absorption buffer : represents a claim the junior tranche has on future senior-side recoveries
+     * @return jtCoverageDebt The total losses that ST incurred after exhausting the JT loss-absorption buffer: represents a claim the senior tranche has on future junior-side recoveries
      * @return yieldDistributed Boolean indicating whether the ST accrued yield and it was distributed between ST and JT
      */
-    function _previewEffecitveNAVs(uint256 _twJTYieldShareAccruedWAD)
+    function _previewEffectiveNAVs(uint256 _twJTYieldShareAccruedWAD)
         internal
         view
-        returns (uint256 stRawNAV, uint256 jtRawNAV, uint256 stEffectiveNAV, uint256 jtEffectiveNAV, bool yieldDistributed)
+        returns (
+            uint256 stRawNAV,
+            uint256 jtRawNAV,
+            uint256 stEffectiveNAV,
+            uint256 jtEffectiveNAV,
+            uint256 stCoverageDebt,
+            uint256 jtCoverageDebt,
+            bool yieldDistributed
+        )
     {
         // Get the storage pointer to the base kernel state
         BaseKernelState storage $ = BaseKernelStorageLib._getBaseKernelStorage();
@@ -201,56 +215,102 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
         // The deltas represent the unrealized PNL(s) of the underlying investment(s) since the last NAV checkpoints
         stRawNAV = _getSeniorTrancheRawNAV();
         jtRawNAV = _getJuniorTrancheRawNAV();
-        (int256 deltaST, int256 deltaJT) = _computeRawNAVDeltas(stRawNAV, jtRawNAV, $.lastSeniorRawNAV, $.lastJuniorRawNAV);
+        (int256 deltaST, int256 deltaJT) = _computeRawNAVDeltas(stRawNAV, jtRawNAV, $.lastSTRawNAV, $.lastJTRawNAV);
 
-        // Cache the effective NAV for each tranche as their last recorded effective NAV
-        stEffectiveNAV = $.lastSeniorEffectiveNAV;
-        jtEffectiveNAV = $.lastJuniorEffectiveNAV;
+        // Cache the last checkpointed effective NAV and coverage debt for each tranche
+        stEffectiveNAV = $.lastSTEffectiveNAV;
+        jtEffectiveNAV = $.lastJTEffectiveNAV;
+        stCoverageDebt = $.lastSTCoverageDebt;
+        jtCoverageDebt = $.lastJTCoverageDebt;
 
+        /// @dev CASE 1: The JT assets depreciated in value
         if (deltaJT < 0) {
-            // Incur as much of the loss as possible to the junior tranche's effective NAV
+            // JT incurs as much of the loss as possible, booking the remainder as a future liability to ST
             uint256 jtLoss = uint256(-deltaJT);
-            uint256 excessLoss;
+            /// @dev CASE 1.1: This loss isn't fully absorbable by JT's remaning loss-absorption buffer
             if (jtLoss > jtEffectiveNAV) {
-                // Since this loss is unabsorbale by the JT buffer, excess losses needs to hit ST
-                excessLoss = jtLoss - jtEffectiveNAV;
+                // Wipe out JT's remaining buffer and force ST to absorb any excess loss
+                uint256 excessLoss = jtLoss - jtEffectiveNAV;
                 jtEffectiveNAV = 0;
                 stEffectiveNAV = Math.saturatingSub(stEffectiveNAV, excessLoss);
+                // The excess loss is added to the JT's coverage debt: a future liability of JT to ST
+                jtCoverageDebt += excessLoss;
+                /// @dev CASE 1.2: This loss is fully absorbable by JT's remaning loss-absorption buffer
             } else {
-                // Loss is fully absorbable by JT
+                // Deduct the loss from JT's remaining buffer
                 jtEffectiveNAV -= jtLoss;
             }
+            /// @dev CASE 2: The JT assets appreciated in value
         } else if (deltaJT > 0) {
-            // Junior tranche always keeps all of its appreciation
-            jtEffectiveNAV += uint256(deltaJT);
+            uint256 jtGain = uint256(deltaJT);
+            // JT uses gains to first pay off any debt to ST and then books any remainder as its own gains
+            uint256 jtDebtRepayment = Math.min(jtGain, jtCoverageDebt);
+            if (jtDebtRepayment != 0) {
+                stEffectiveNAV += jtDebtRepayment;
+                jtCoverageDebt -= jtDebtRepayment;
+                jtGain -= jtDebtRepayment;
+            }
+            // Remaining gain, if any, goes to JT
+            jtEffectiveNAV += jtGain;
         }
 
-        if (deltaST == 0) {
-            // Senior tranche NAV experienced no change
-            return (stRawNAV, jtRawNAV, stEffectiveNAV, jtEffectiveNAV, false);
-        } else if (deltaST < 0) {
-            // Senior tranche incurred a loss
-            // Apply the loss to the senior tranche's effective NAV
+        /// @dev CASE 3: The ST assets experienced no change in value
+        if (deltaST == 0) return (stRawNAV, jtRawNAV, stEffectiveNAV, jtEffectiveNAV, stCoverageDebt, jtCoverageDebt, false);
+
+        /// @dev CASE 4: The ST assets depreciated in value
+        if (deltaST < 0) {
             uint256 stLoss = uint256(-deltaST);
-            stEffectiveNAV = Math.saturatingSub(stEffectiveNAV, stLoss);
-            // Compute and apply the coverage provided by the junior tranche to the senior tranche
-            uint256 availableCoverage = Math.min(stLoss, jtEffectiveNAV);
-            stEffectiveNAV += availableCoverage;
-            jtEffectiveNAV -= availableCoverage;
+            // Apply any possible coverage provided by JT's loss-absorption buffer
+            uint256 coverageApplied = Math.min(stLoss, jtEffectiveNAV);
+            if (coverageApplied != 0) {
+                jtEffectiveNAV -= coverageApplied;
+                // Any coverage provided is a ST liability to JT
+                stCoverageDebt += coverageApplied;
+            }
+            // Apply any uncovered losses by JT to ST
+            uint256 netStLoss = stLoss - coverageApplied;
+            if (netStLoss != 0) {
+                stEffectiveNAV = Math.saturatingSub(stEffectiveNAV, netStLoss);
+                // The uncovered portion of the ST loss is a JT liability to ST
+                jtCoverageDebt += netStLoss;
+            }
+            /// @dev CASE 5: The ST assets appreciated in value
         } else {
-            // Senior tranche accrued yield
-            uint256 yield = uint256(deltaST);
+            uint256 stGain = uint256(deltaST);
+            /// @dev CASE 5.1: The JT owes debt to ST (uncovered ST losses), first priority of repayment to reverse the loss-waterfall
+            uint256 debtRepayment = Math.min(stGain, jtCoverageDebt);
+            if (debtRepayment != 0) {
+                // Pay back debt to ST
+                stEffectiveNAV += debtRepayment;
+                jtCoverageDebt -= debtRepayment;
+                // Deduct the repayment from the ST gains and return if no gains are left
+                stGain -= debtRepayment;
+                if (stGain == 0) return (stRawNAV, jtRawNAV, stEffectiveNAV, jtEffectiveNAV, stCoverageDebt, jtCoverageDebt, false);
+            }
+
+            /// @dev CASE 5.2: The ST owes debt to JT (covered JT losses), second priority of repayment to reverse the loss-waterfall
+            debtRepayment = Math.min(stGain, stCoverageDebt);
+            if (debtRepayment != 0) {
+                // Pay back debt to JT
+                jtEffectiveNAV += debtRepayment;
+                stCoverageDebt -= debtRepayment;
+                // Deduct the repayment from the remaining ST gains and return if no gains are left
+                stGain -= debtRepayment;
+                if (stGain == 0) return (stRawNAV, jtRawNAV, stEffectiveNAV, jtEffectiveNAV, stCoverageDebt, jtCoverageDebt, false);
+            }
+
+            /// @dev CASE 5.3: There are no remaining debts in the system and the residual gains can be used to distribute yield to both tranches
             // Compute the time weighted average JT share of yield
             uint256 elapsed = block.timestamp - $.lastDistributionTimestamp;
             // Preemptively accrue all yield to ST and return if last yield distribution was in the same block
             // No need to update yield share accumulator and timestamp so return false for yieldDistributed
-            if (elapsed == 0) return (stRawNAV, jtRawNAV, (stEffectiveNAV + yield), jtEffectiveNAV, false);
+            if (elapsed == 0) return (stRawNAV, jtRawNAV, (stEffectiveNAV + stGain), jtEffectiveNAV, stCoverageDebt, jtCoverageDebt, false);
             // Apply the yield split: adding each tranche's share of earnings to their effective NAVs
             uint256 jtYieldShareWAD = _twJTYieldShareAccruedWAD / elapsed;
             // Round in favor of the senior tranche
-            uint256 jtYield = yield.mulDiv(jtYieldShareWAD, ConstantsLib.WAD, Math.Rounding.Floor);
+            uint256 jtYield = stGain.mulDiv(jtYieldShareWAD, ConstantsLib.WAD, Math.Rounding.Floor);
             jtEffectiveNAV += jtYield;
-            stEffectiveNAV += (yield - jtYield);
+            stEffectiveNAV += (stGain - jtYield);
             yieldDistributed = true;
         }
     }
@@ -274,7 +334,7 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
         if (elapsed == 0) return $.twJTYieldShareAccruedWAD;
 
         // Get the instantaneous JT yield share, scaled by WAD
-        uint256 jtYieldShareWAD = IRDM($.rdm).getJTYieldShare($.lastSeniorRawNAV, $.lastJuniorRawNAV, $.betaWAD, $.coverageWAD, $.lastJuniorEffectiveNAV);
+        uint256 jtYieldShareWAD = IRDM($.rdm).getJTYieldShare($.lastSTRawNAV, $.lastJTRawNAV, $.betaWAD, $.coverageWAD, $.lastJTEffectiveNAV);
         // Apply the accural of JT yield share to the accumulator, weighted by the time elapsed
         return ($.twJTYieldShareAccruedWAD + uint192(jtYieldShareWAD * elapsed));
     }
@@ -291,20 +351,20 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
         // The deltas represent the NAV changes after a deposit and withdrawal
         uint256 stRawNAV = _getSeniorTrancheRawNAV();
         uint256 jtRawNAV = _getJuniorTrancheRawNAV();
-        (int256 deltaST, int256 deltaJT) = _computeRawNAVDeltas(stRawNAV, jtRawNAV, $.lastSeniorRawNAV, $.lastJuniorRawNAV);
+        (int256 deltaST, int256 deltaJT) = _computeRawNAVDeltas(stRawNAV, jtRawNAV, $.lastSTRawNAV, $.lastJTRawNAV);
         // Update the post-operation raw NAV checkpoints
-        $.lastSeniorRawNAV = stRawNAV;
-        $.lastJuniorRawNAV = jtRawNAV;
+        $.lastSTRawNAV = stRawNAV;
+        $.lastJTRawNAV = jtRawNAV;
 
         // Apply the withdrawal to the senior tranche's effective NAV
-        if (deltaST < 0) $.lastSeniorEffectiveNAV = Math.saturatingSub($.lastSeniorEffectiveNAV, uint256(-deltaST));
+        if (deltaST < 0) $.lastSTEffectiveNAV = Math.saturatingSub($.lastSTEffectiveNAV, uint256(-deltaST));
         // Apply the deposit to the senior tranche's effective NAV
-        else if (deltaST > 0) $.lastSeniorEffectiveNAV += uint256(deltaST);
+        else if (deltaST > 0) $.lastSTEffectiveNAV += uint256(deltaST);
 
         // Apply the withdrawal to the junior tranche's effective NAV
-        if (deltaJT < 0) $.lastJuniorEffectiveNAV = Math.saturatingSub($.lastJuniorEffectiveNAV, uint256(-deltaJT));
+        if (deltaJT < 0) $.lastJTEffectiveNAV = Math.saturatingSub($.lastJTEffectiveNAV, uint256(-deltaJT));
         // Apply the deposit to the junior tranche's effective NAV
-        else if (deltaJT > 0) $.lastJuniorEffectiveNAV += uint256(deltaJT);
+        else if (deltaJT > 0) $.lastJTEffectiveNAV += uint256(deltaJT);
     }
 
     /**
@@ -326,7 +386,7 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
         // Get the storage pointer to the base kernel state
         BaseKernelState storage $ = BaseKernelStorageLib._getBaseKernelStorage();
         // Compute the utilization and enforce that the senior tranche is properly collateralized
-        uint256 utilization = UtilsLib.computeUtilization($.lastSeniorRawNAV, $.lastJuniorRawNAV, $.betaWAD, $.coverageWAD, $.lastJuniorEffectiveNAV);
+        uint256 utilization = UtilsLib.computeUtilization($.lastSTRawNAV, $.lastJTRawNAV, $.betaWAD, $.coverageWAD, $.lastJTEffectiveNAV);
         require(ConstantsLib.WAD >= utilization, INSUFFICIENT_COVERAGE());
     }
 
@@ -402,17 +462,17 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
     /// @notice Returns the effective net asset value of the senior tranche
     /// @dev Includes applied coverage, ST yield distribution, and uncovered losses
     function _getSeniorTrancheEffectiveNAV() internal view returns (uint256 stEffectiveNAV) {
-        (,, stEffectiveNAV,,) = _previewEffecitveNAVs(_previewJTYieldShareAccrual());
+        (,, stEffectiveNAV,,,,) = _previewEffectiveNAVs(_previewJTYieldShareAccrual());
     }
 
     /// @notice Returns the effective net asset value of the junior tranche
     /// @dev Includes provided coverage, JT yield, ST yield distribution, and JT losses
     function _getJuniorTrancheEffectiveNAV() internal view returns (uint256 jtEffectiveNAV) {
-        (,,, jtEffectiveNAV,) = _previewEffecitveNAVs(_previewJTYieldShareAccrual());
+        (,,, jtEffectiveNAV,,,) = _previewEffectiveNAVs(_previewJTYieldShareAccrual());
     }
 
     /// @notice Returns the raw net asset value of the senior tranche
-    /// @dev The pure net asset value of the junior tranche invested assets
+    /// @dev The pure net asset value of the senior tranche invested assets
     function _getSeniorTrancheRawNAV() internal view virtual returns (uint256);
 
     /// @notice Returns the raw net asset value of the junior tranche

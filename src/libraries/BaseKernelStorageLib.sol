@@ -27,10 +27,12 @@ struct BaseKernelInitParams {
  * @custom:field betaWAD - The JT's sensitivity to the same downside stress that affects ST scaled by WAD
  *                         For example, beta is 0 when JT is in the RFR and 1 when JT is in the same opportunity as senior
  * @custom:field rdm - The market's Reward Distribution Model (RDM), responsible for determining the ST's yield split between ST and JT
- * @custom:field lastSeniorRawNAV - The last recorded raw NAV (excluding any losses, coverage, and yield accrual) of the senior tranche
- * @custom:field lastJuniorRawNAV - The last recorded raw NAV (excluding any losses, coverage, and yield accrual) of the junior tranche
- * @custom:field lastSeniorEffectiveNAV - The last recorded effective NAV (including any prior applied coverage, ST yield distributions, and uncovered losses) of the senior tranche
- * @custom:field lastJuniorEffectiveNAV - The last recorded effective NAV (including any prior provided coverage, JT yield, ST yield distribution, and JT losses) of the junior tranche
+ * @custom:field lastSTRawNAV - The last recorded raw NAV (excluding any losses, coverage, and yield accrual) of the senior tranche
+ * @custom:field lastJTRawNAV - The last recorded raw NAV (excluding any losses, coverage, and yield accrual) of the junior tranche
+ * @custom:field lastSTEffectiveNAV - The last recorded effective NAV (including any prior applied coverage, ST yield distributions, and uncovered losses) of the senior tranche
+ * @custom:field lastJTEffectiveNAV - The last recorded effective NAV (including any prior provided coverage, JT yield, ST yield distribution, and JT losses) of the junior tranche
+ * @custom:field lastSTCoverageDebt - The coverage that has been applied to ST from the JT loss-absorption buffer : represents a claim the junior tranche has on future senior-side recoveries
+ * @custom:field lastJTCoverageDebt - The losses that ST incurred after exhausting the JT loss-absorption buffer: represents a claim the senior tranche has on future junior-side recoveries
  * @custom:field twJTYieldShareAccruedWAD - The time-weighted junior tranche yield share (RDM output) since the last yield distribution
  * @custom:field lastAccrualTimestamp - The last time the time-weighted JT yield share accumulator was updated
  * @custom:field lastDistributionTimestamp - The last time a yield distribution occurred
@@ -41,10 +43,12 @@ struct BaseKernelState {
     address juniorTranche;
     uint96 betaWAD;
     address rdm;
-    uint256 lastSeniorRawNAV;
-    uint256 lastJuniorRawNAV;
-    uint256 lastSeniorEffectiveNAV;
-    uint256 lastJuniorEffectiveNAV;
+    uint256 lastSTRawNAV;
+    uint256 lastJTRawNAV;
+    uint256 lastSTEffectiveNAV;
+    uint256 lastJTEffectiveNAV;
+    uint256 lastSTCoverageDebt;
+    uint256 lastJTCoverageDebt;
     uint192 twJTYieldShareAccruedWAD;
     uint32 lastAccrualTimestamp;
     uint32 lastDistributionTimestamp;

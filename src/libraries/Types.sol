@@ -7,10 +7,10 @@ pragma solidity ^0.8.28;
  * @custom:field juniorTranche - The market's junior tranche
  * @custom:field rdm - The market's Reward Distribution Model (RDM), responsible for determining the allocation of the ST's yield between ST and JT
  * @custom:field coverageWAD - The expected minimum coverage provided by the junior tranche to the senior tranche at all times (scaled by WAD)
- * @custom:field lastSeniorRawNAV - The last recorded raw NAV (excluding any losses, coverage, and yield accrual) of the senior tranche
- * @custom:field lastJuniorRawNAV - The last recorded raw NAV (excluding any losses, coverage, and yield accrual) of the junior tranche
- * @custom:field lastSeniorEffectiveNAV - The last recorded effective NAV (including any losses, coverage, and yield accrual) of the senior tranche
- * @custom:field lastJuniorEffectiveNAV - The last recorded effective NAV (including any losses, coverage, and yield accrual) of the junior tranche
+ * @custom:field lastSTRawNAV - The last recorded raw NAV (excluding any losses, coverage, and yield accrual) of the senior tranche
+ * @custom:field lastJTRawNAV - The last recorded raw NAV (excluding any losses, coverage, and yield accrual) of the junior tranche
+ * @custom:field lastSTEffectiveNAV - The last recorded effective NAV (including any losses, coverage, and yield accrual) of the senior tranche
+ * @custom:field lastJTEffectiveNAV - The last recorded effective NAV (including any losses, coverage, and yield accrual) of the junior tranche
  * @custom:field twJTYieldShareAccruedWAD - The time-weighted junior tranche yield share (RDM output) since the last yield distribution
  * @custom:field lastAccrualTimestamp - The last time the time-weighted JT yield share accumulator was updated
  * @custom:field lastDistributionTimestamp - The last time a yield distribution occurred
@@ -20,10 +20,10 @@ struct Market {
     address juniorTranche;
     address rdm;
     uint64 coverageWAD;
-    uint256 lastSeniorRawNAV;
-    uint256 lastJuniorRawNAV;
-    uint256 lastSeniorEffectiveNAV;
-    uint256 lastJuniorEffectiveNAV;
+    uint256 lastSTRawNAV;
+    uint256 lastJTRawNAV;
+    uint256 lastSTEffectiveNAV;
+    uint256 lastJTEffectiveNAV;
     uint192 twJTYieldShareAccruedWAD;
     uint32 lastAccrualTimestamp;
     uint32 lastDistributionTimestamp;
