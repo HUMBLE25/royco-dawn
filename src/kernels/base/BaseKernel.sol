@@ -132,6 +132,26 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
         return Math.min(_maxJTWithdrawalGlobally(_owner), _maxJTWithdrawalGivenCoverage());
     }
 
+    /// @inheritdoc IBaseKernel
+    function getSTRawNAV() external view override(IBaseKernel) returns (uint256) {
+        return _getSeniorTrancheRawNAV();
+    }
+
+    /// @inheritdoc IBaseKernel
+    function getJTRawNAV() external view override(IBaseKernel) returns (uint256) {
+        return _getJuniorTrancheRawNAV();
+    }
+
+    /// @inheritdoc IBaseKernel
+    function getSTEffectiveNAV() external view override(IBaseKernel) returns (uint256) {
+        return _getSeniorTrancheEffectiveNAV();
+    }
+
+    /// @inheritdoc IBaseKernel
+    function getJTEffectiveNAV() external view override(IBaseKernel) returns (uint256) {
+        return _getJuniorTrancheEffectiveNAV();
+    }
+
     /**
      * @notice Synchronizes the raw and effective NAVs of both tranches
      * @dev Only performs a pre-op sync because there is no operation being executed in the same function call as this sync

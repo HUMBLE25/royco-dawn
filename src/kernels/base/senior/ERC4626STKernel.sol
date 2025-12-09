@@ -28,6 +28,11 @@ abstract contract ERC4626STKernel is BaseKernel {
     }
 
     /// @inheritdoc IBaseKernel
+    function getSTTotalEffectiveAssets() external view override(IBaseKernel) returns (uint256) {
+        return _getSeniorTrancheEffectiveNAV();
+    }
+
+    /// @inheritdoc IBaseKernel
     function stDeposit(
         address,
         uint256 _assets,

@@ -33,6 +33,11 @@ abstract contract AaveV3JTKernel is BaseKernel {
     }
 
     /// @inheritdoc IBaseKernel
+    function getJTTotalEffectiveAssets() external view override(IBaseKernel) returns (uint256) {
+        return _getJuniorTrancheEffectiveNAV();
+    }
+
+    /// @inheritdoc IBaseKernel
     function jtDeposit(
         address,
         uint256 _assets,
