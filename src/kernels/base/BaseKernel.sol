@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import { Initializable } from "../../../lib/openzeppelin-contracts/contracts/proxy/utils/Initializable.sol";
 import { IRDM } from "../../interfaces/IRDM.sol";
 import { IBaseKernel } from "../../interfaces/kernel/IBaseKernel.sol";
-import { BaseKernelState, BaseKernelInitParams, BaseKernelStorageLib } from "../../libraries/BaseKernelStorageLib.sol";
+import { BaseKernelInitParams, BaseKernelState, BaseKernelStorageLib } from "../../libraries/BaseKernelStorageLib.sol";
 import { ConstantsLib, Math, UtilsLib } from "../../libraries/UtilsLib.sol";
 
 /**
@@ -88,12 +88,7 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
      * @dev Initializes the base kernel state
      * @param _params The initialization parameters for the base kernel
      */
-    function __BaseKernel_init_unchained(
-        BaseKernelInitParams memory _params
-    )
-        internal
-        onlyInitializing
-    {
+    function __BaseKernel_init_unchained(BaseKernelInitParams memory _params) internal onlyInitializing {
         // Initialize the base kernel state
         BaseKernelStorageLib.__BaseKernel_init(_params);
     }
