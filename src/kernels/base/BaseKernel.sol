@@ -361,6 +361,7 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
 
         // Apply the withdrawal to the junior tranche's effective NAV
         // This should only happen when a JT LP is withdrawing from the tranche, not when its capital is being used as coverage
+        // This is because any coverage application has already been applied in the pre-op sync
         if (deltaJT < 0 && deltaST >= 0) $.lastJTEffectiveNAV = Math.saturatingSub($.lastJTEffectiveNAV, uint256(-deltaJT));
         // Apply the deposit to the junior tranche's effective NAV
         else if (deltaJT > 0) $.lastJTEffectiveNAV += uint256(deltaJT);

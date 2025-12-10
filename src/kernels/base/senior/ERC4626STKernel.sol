@@ -74,28 +74,23 @@ abstract contract ERC4626STKernel is BaseKernel {
         returns (uint256 assetsWithdrawn)
     {
         // Get the assets expected to be received on withdrawal based on the ST's effective NAV
-        assetsWithdrawn = _shares.mulDiv(_getSeniorTrancheEffectiveNAV(), _totalShares, Math.Rounding.Floor);
-        // Start by liquidating senior exposure to match expectations
-        address vault = ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault;
-        uint256 stLiquidatableAssets = IERC4626(vault).maxWithdraw(address(this));
-        if (stLiquidatableAssets >= assetsWithdrawn) {
-            // ST exposure can facilitate this entire withdrawal
-            IERC4626(vault).withdraw(assetsWithdrawn, _receiver, address(this));
-            return assetsWithdrawn;
-        } else {
-            // Liquidate as much senior exposure as possible to partially facilitate the withdrawal
-            IERC4626(vault).withdraw(stLiquidatableAssets, _receiver, address(this));
-            assetsWithdrawn -= stLiquidatableAssets;
-            // Liquidate the rest of the expected assets from JT
-            assetsWithdrawn -= _coverSTLossesFromJT(_asset, assetsWithdrawn, _receiver);
-        }
+        uint256 totalAssetsToWithdraw = _shares.mulDiv(_getSeniorTrancheEffectiveNAV(), _totalShares, Math.Rounding.Floor);
+        // Compute the coverage that needs to pulled from JT in this withdrawal
+        uint256 coverageToRealize = _shares.mulDiv(BaseKernelStorageLib._getBaseKernelStorage().lastSTCoverageDebt, _totalShares, Math.Rounding.Ceil);
+        // Pull any coverge that needs to be realized from JT
+        assetsWithdrawn += _coverSTLossesFromJT(_asset, coverageToRealize, _receiver);
+        totalAssetsToWithdraw -= assetsWithdrawn;
+        // Pull the remainder from ST exposure
+        uint256 stLiquidatableAssets = _getSeniorTrancheRawNAV();
+        uint256 stAssetsToWithdraw = totalAssetsToWithdraw > stLiquidatableAssets ? stLiquidatableAssets : totalAssetsToWithdraw;
+        IERC4626(ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault).withdraw(stAssetsToWithdraw, _receiver, address(this));
+        assetsWithdrawn += stAssetsToWithdraw;
     }
 
     /// @inheritdoc BaseKernel
     function _getSeniorTrancheRawNAV() internal view override(BaseKernel) returns (uint256) {
         address vault = ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault;
-        uint256 trancheSharesBalance = IERC4626(vault).balanceOf(address(this));
-        return IERC4626(vault).previewRedeem(trancheSharesBalance);
+        return IERC4626(vault).maxWithdraw(address(this));
     }
 
     /// @inheritdoc BaseKernel
@@ -105,6 +100,6 @@ abstract contract ERC4626STKernel is BaseKernel {
 
     /// @inheritdoc BaseKernel
     function _maxSTWithdrawalGlobally(address) internal view override(BaseKernel) returns (uint256) {
-        return IERC4626(ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault).maxWithdraw(address(this));
+        return _getSeniorTrancheRawNAV();
     }
 }

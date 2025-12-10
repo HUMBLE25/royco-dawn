@@ -149,7 +149,7 @@ abstract contract AaveV3JTKernel is BaseKernel {
         (,,,,,,,, bool isActive,) = poolDataProvider.getReserveConfigurationData(asset);
         if (!isActive || poolDataProvider.getPaused(asset)) return 0;
 
-        // Return the total idle/unborrowed reserve assets. This is the max assets that can be withdrawn from the Pool.
-        return IERC20(asset).balanceOf($.aToken);
+        // Return the minimum of the assets lent by the JT and the total idle/unborrowed reserve assets (currently withdrawable from the pool)
+        return Math.min(_getJuniorTrancheRawNAV(), IERC20(asset).balanceOf($.aToken));
     }
 }
