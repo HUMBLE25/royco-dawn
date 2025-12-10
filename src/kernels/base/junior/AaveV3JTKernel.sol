@@ -56,12 +56,13 @@ abstract contract AaveV3JTKernel is BaseKernel {
         override(IBaseKernel)
         onlyJuniorTranche
         syncNAVs
-        returns (uint256 fractionOfTotalAssetsAllocatedWAD)
+        returns (uint256 underlyingSharesAllocated, uint256 totalUnderlyingShares)
     {
         // Max approval already given to the pool on initialization
         AaveV3KernelState storage $ = AaveV3KernelStorageLib._getAaveV3KernelStorage();
         IPool($.pool).supply($.asset, _assets, address(this), 0);
-        return _assets.mulDiv(ConstantsLib.WAD, _getJuniorTrancheEffectiveNAV(), Math.Rounding.Floor);
+        underlyingSharesAllocated = _assets;
+        totalUnderlyingShares = _getJuniorTrancheEffectiveNAV();
     }
 
     /// @inheritdoc IBaseKernel

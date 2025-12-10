@@ -36,7 +36,7 @@ abstract contract ERC7540STKernel is BaseKernel {
     )
         external
         override(IBaseKernel)
-        returns (uint256 fractionOfTotalAssetsAllocatedWAD)
+        returns (uint256 underlyingSharesAllocated, uint256 totalUnderlyingShares)
     { }
 
     /// @inheritdoc IBaseKernel
