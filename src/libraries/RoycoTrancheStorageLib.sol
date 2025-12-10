@@ -52,15 +52,21 @@ library RoycoTrancheStorageLib {
      * @param _kernel The address of the kernel contract handling strategy logic
      * @param _marketId The identifier of the Royco market this tranche is linked to
      * @param _decimalsOffset Decimals offset for share token precision
+     * @param _isSeniorTranche Whether the tranche is a senior tranche
      */
-    function __RoycoTranche_init(address _royco, address _kernel, bytes32 _marketId, uint8 _decimalsOffset) internal {
+    function __RoycoTranche_init(address _royco, address _kernel, bytes32 _marketId, uint8 _decimalsOffset, bool _isSeniorTranche) internal {
         // Set the initial state of the tranche
         RoycoTrancheState storage $ = _getRoycoTrancheStorage();
         $.royco = _royco;
         $.kernel = _kernel;
         $.marketId = _marketId;
         $.decimalsOffset = _decimalsOffset;
-        $.DEPOSIT_EXECUTION_MODEL = IBaseKernel(_kernel).getDepositExecutionModel();
-        $.WITHDRAW_EXECUTION_MODEL = IBaseKernel(_kernel).getWithdrawExecutionModel();
+        if (_isSeniorTranche) {
+            $.DEPOSIT_EXECUTION_MODEL = IBaseKernel(_kernel).ST_DEPOSIT_EXECUTION_MODEL();
+            $.WITHDRAW_EXECUTION_MODEL = IBaseKernel(_kernel).ST_WITHDRAWAL_EXECUTION_MODEL();
+        } else {
+            $.DEPOSIT_EXECUTION_MODEL = IBaseKernel(_kernel).JT_DEPOSIT_EXECUTION_MODEL();
+            $.WITHDRAW_EXECUTION_MODEL = IBaseKernel(_kernel).JT_WITHDRAWAL_EXECUTION_MODEL();
+        }
     }
 }

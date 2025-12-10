@@ -108,7 +108,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         uint8 decimalsOffset = underlyingAssetDecimals >= 18 ? 0 : (18 - underlyingAssetDecimals);
 
         // Initialize the tranche's state
-        RoycoTrancheStorageLib.__RoycoTranche_init(msg.sender, _kernelAddress, _marketId, decimalsOffset);
+        RoycoTrancheStorageLib.__RoycoTranche_init(msg.sender, _kernelAddress, _marketId, decimalsOffset, _isSeniorTranche());
     }
 
     /// @inheritdoc ERC4626Upgradeable
@@ -185,21 +185,19 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         require(_assets <= maxDepositableAssets, ERC4626ExceededMaxDeposit(_receiver, _assets, maxDepositableAssets));
 
         // Deposit the assets into the underlying investment opportunity and get the fraction of total assets allocated
-        uint256 fractionOfTotalAssetsAllocatedWAD =
-            (_isSeniorTranche()
+        (uint256 underlyingSharesAllocated, uint256 totalUnderlyingShares) = (_isSeniorTranche()
                 ? IBaseKernel(_kernel()).stDeposit(asset(), _assets, _controller, _receiver)
                 : IBaseKernel(_kernel()).jtDeposit(asset(), _assets, _controller, _receiver));
-        uint256 sharesToMint;
 
-        // Calculate the shares to mint
-        if (_isSync(Action.DEPOSIT)) {
-            // If the deposit is synchronous, mint the shares directly
-            sharesToMint = super.previewDeposit(_assets);
-        } else {
-            // If the deposit is asynchronous, mint the shares based on the fraction of total assets allocated in the underlying investment opportunity
-            // TODO: Explain formula
-            sharesToMint = totalSupply().mulDiv(fractionOfTotalAssetsAllocatedWAD, ConstantsLib.WAD - fractionOfTotalAssetsAllocatedWAD, Math.Rounding.Floor);
-        }
+        // Calculate the proportional amount of shares to mint to the receiver such that lp_st_shares / total_st_shares = underlying_shares_allocated / total_underlying_shares
+        // sharesToMint / (totalSupply() + 10 ** _decimalsOffset() + sharesToMint) = underlyingSharesAllocated / (totalUnderlyingShares + 1)
+        // In the synchronous case, this is equivalent to previewDeposit(_assets)
+        // In the asynchronos case, the deposit request may not be have been fulfilled at the current nav.
+        //  Therefore, the kernel is expected to keep track of the underlying opportunity shares minted against the request.
+        //  The ratio of these shares to the total underlying shares held by the system represent the user's claim on the vault, therefore we mint
+        //  an equivalent amount of shares to the receiver.
+        uint256 sharesToMint = (totalSupply() + 10 ** _decimalsOffset())
+        .mulDiv(underlyingSharesAllocated, totalUnderlyingShares - underlyingSharesAllocated + 1, Math.Rounding.Floor);
 
         // Mint the shares to the receiver
         _deposit(msg.sender, _receiver, _assets, sharesToMint);

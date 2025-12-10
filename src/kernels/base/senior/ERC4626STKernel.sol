@@ -50,13 +50,12 @@ abstract contract ERC4626STKernel is BaseKernel {
         override(IBaseKernel)
         onlySeniorTranche
         syncNAVsAndEnforceCoverage
-        returns (uint256 fractionOfTotalAssetsAllocatedWAD)
+        returns (uint256 underlyingSharesAllocated, uint256 totalUnderlyingShares)
     {
         // Deposit the assets into the underlying investment vault
         address vault = ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault;
-        uint256 underlyingSharesMinted = IERC4626(vault).deposit(_assets, address(this));
-        // Return the fraction of the underlying exposure created by this deposit
-        return underlyingSharesMinted.mulDiv(ConstantsLib.WAD, IERC4626(vault).balanceOf(address(this)), Math.Rounding.Floor);
+        underlyingSharesAllocated = IERC4626(vault).deposit(_assets, address(this));
+        totalUnderlyingShares = IERC4626(vault).balanceOf(address(this));
     }
 
     /// @inheritdoc IBaseKernel

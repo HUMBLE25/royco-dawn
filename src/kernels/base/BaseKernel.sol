@@ -485,6 +485,10 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
         return surplusJTAssets.mulDiv(ConstantsLib.WAD, coverageRetentionWAD, Math.Rounding.Floor);
     }
 
+    function _computeFractionOfTotalAssetsAllocatedWAD(uint256 _assets, uint256 _totalAssets) internal pure returns (uint256) {
+        return _assets.mulDiv(ConstantsLib.WAD, _totalAssets + 1, Math.Rounding.Floor);
+    }
+
     /// @notice Returns the effective net asset value of the senior tranche
     /// @dev Includes applied coverage, ST yield distribution, and uncovered losses
     function _getSeniorTrancheEffectiveNAV() internal view returns (uint256 stEffectiveNAV) {
