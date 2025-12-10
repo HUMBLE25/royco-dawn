@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
+import { UUPSUpgradeable } from "../../../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
 import { Initializable } from "../../../lib/openzeppelin-contracts/contracts/proxy/utils/Initializable.sol";
+import { RoycoAuth, RoycoRoles } from "../../auth/RoycoAuth.sol";
 import { IRDM } from "../../interfaces/IRDM.sol";
 import { IBaseKernel } from "../../interfaces/kernel/IBaseKernel.sol";
 import { BaseKernelInitParams, BaseKernelState, BaseKernelStorageLib } from "../../libraries/BaseKernelStorageLib.sol";
@@ -14,7 +16,7 @@ import { ConstantsLib, Math, UtilsLib } from "../../libraries/UtilsLib.sol";
  * @dev All kernel contracts should inherit from this base contract to ensure proper execution context
  *      and use the modifier as stipulated by the IBaseKernel interface.
  */
-abstract contract BaseKernel is Initializable, IBaseKernel {
+abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, RoycoAuth {
     using Math for uint256;
 
     /// @notice Thrown when the market's coverage requirement is unsatisfied
@@ -78,8 +80,11 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
      * @notice Initializes the base kernel state
      * @dev Initializes any parent contracts and the base kernel state
      * @param _params The initialization parameters for the base kernel
+     * @param _owner The initial owner of the base kernel
+     * @param _pauser The initial pauser of the base kernel
      */
-    function __BaseKernel_init(BaseKernelInitParams memory _params) internal onlyInitializing {
+    function __BaseKernel_init(BaseKernelInitParams memory _params, address _owner, address _pauser) internal onlyInitializing {
+        __RoycoAuth_init(_owner, _pauser);
         __BaseKernel_init_unchained(_params);
     }
 
@@ -141,7 +146,12 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
      * @return stEffectiveNAV The senior tranche's effective NAV, including applied coverage, ST yield distribution, and uncovered losses
      * @return jtEffectiveNAV The junior tranche's effective NAV, including provided coverage, JT yield, ST yield distribution, and JT losses
      */
-    function syncTrancheNAVs() external returns (uint256 stRawNAV, uint256 jtRawNAV, uint256 stEffectiveNAV, uint256 jtEffectiveNAV) {
+    function syncTrancheNAVs()
+        external
+        onlyRole(RoycoRoles.SYNC_ROLE)
+        whenNotPaused
+        returns (uint256 stRawNAV, uint256 jtRawNAV, uint256 stEffectiveNAV, uint256 jtEffectiveNAV)
+    {
         return _preOpSyncTrancheNAVs();
     }
 
@@ -500,6 +510,10 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
     function _getJuniorTrancheEffectiveNAV() internal view returns (uint256 jtEffectiveNAV) {
         (,,, jtEffectiveNAV,,,) = _previewEffectiveNAVs(_previewJTYieldShareAccrual());
     }
+
+    /// @inheritdoc UUPSUpgradeable
+    /// @dev Will revert if the caller is not the upgrader role
+    function _authorizeUpgrade(address newImplementation) internal override onlyRole(RoycoRoles.UPGRADER_ROLE) { }
 
     /// @notice Returns the raw net asset value of the senior tranche
     /// @dev The pure net asset value of the senior tranche invested assets

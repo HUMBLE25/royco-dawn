@@ -57,6 +57,7 @@ contract RoycoTrancheFactory {
      * @param _kernelImplementation The kernel implementation address (if address(0), uses kernel from _stParams.kernel)
      * @param _asset The underlying asset for both tranches
      * @param _owner The initial owner of both tranches
+     * @param _pauser The initial pauser of both tranches
      * @param _marketId The identifier of the Royco market
      * @return seniorTranche The address of the deployed senior tranche proxy
      * @return juniorTranche The address of the deployed junior tranche proxy
@@ -68,6 +69,7 @@ contract RoycoTrancheFactory {
         address _kernelImplementation,
         address _asset,
         address _owner,
+        address _pauser,
         bytes32 _marketId
     )
         external
@@ -101,10 +103,10 @@ contract RoycoTrancheFactory {
         jtParams.kernel = kernel;
 
         // Deploy senior tranche proxy first
-        seniorTranche = _deployTranche(roycoSTImplementation, abi.encodeCall(RoycoST.initialize, (stParams, _asset, _owner, _marketId)));
+        seniorTranche = _deployTranche(roycoSTImplementation, abi.encodeCall(RoycoST.initialize, (stParams, _asset, _owner, _pauser, _marketId)));
 
         // Deploy junior tranche proxy
-        juniorTranche = _deployTranche(roycoJTImplementation, abi.encodeCall(RoycoJT.initialize, (jtParams, _asset, _owner, _marketId)));
+        juniorTranche = _deployTranche(roycoJTImplementation, abi.encodeCall(RoycoJT.initialize, (jtParams, _asset, _owner, _pauser, _marketId)));
 
         emit MarketDeployed(seniorTranche, juniorTranche, kernel, _marketId, _asset, _owner);
 

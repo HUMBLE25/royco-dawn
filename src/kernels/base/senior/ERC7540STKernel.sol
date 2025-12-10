@@ -36,6 +36,7 @@ abstract contract ERC7540STKernel is BaseKernel {
     )
         external
         override(IBaseKernel)
+        whenNotPaused
         returns (uint256 underlyingSharesAllocated, uint256 totalUnderlyingShares)
     { }
 
@@ -49,6 +50,7 @@ abstract contract ERC7540STKernel is BaseKernel {
     )
         external
         override(IBaseKernel)
+        whenNotPaused
         returns (uint256 assetsWithdrawn)
     { }
 

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import { Ownable2StepUpgradeable } from "../../lib/openzeppelin-contracts-upgradeable/contracts/access/Ownable2StepUpgradeable.sol";
 import { UUPSUpgradeable } from "../../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
 import {
     ERC4626Upgradeable,
@@ -9,7 +8,9 @@ import {
     IERC20Metadata,
     Math
 } from "../../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import { IAccessControlEnumerable } from "../../lib/openzeppelin-contracts/contracts/access/extensions/IAccessControlEnumerable.sol";
 import { SafeERC20 } from "../../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+import { AccessControlEnumerableUpgradeable, RoycoAuth, RoycoRoles } from "../auth/RoycoAuth.sol";
 import { IAsyncJTDepositKernel } from "../interfaces/kernel/IAsyncJTDepositKernel.sol";
 import { IAsyncJTWithdrawalKernel } from "../interfaces/kernel/IAsyncJTWithdrawalKernel.sol";
 import { IAsyncSTDepositKernel } from "../interfaces/kernel/IAsyncSTDepositKernel.sol";
@@ -20,7 +21,6 @@ import { ConstantsLib } from "../libraries/ConstantsLib.sol";
 import { RoycoTrancheStorageLib } from "../libraries/RoycoTrancheStorageLib.sol";
 import { Action, TrancheDeploymentParams } from "../libraries/Types.sol";
 
-// TODO: ST and JT base asset can have different decimals
 /**
  * @title BaseRoycoTranche
  * @notice Abstract base contract implementing core functionality for Royco tranches
@@ -28,7 +28,7 @@ import { Action, TrancheDeploymentParams } from "../libraries/Types.sol";
  *      asynchronous deposit/withdrawal support via ERC7540, and request cancellation via ERC7887
  *      All asset management and investment operations are delegated to the configured kernel
  */
-abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UUPSUpgradeable, ERC4626Upgradeable {
+abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable, ERC4626Upgradeable {
     using Math for uint256;
     using SafeERC20 for IERC20;
 
@@ -81,8 +81,17 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
      * @dev Reverts if caller is neither the address nor an approved operator
      */
     modifier onlyCallerOrOperator(address _account) {
-        require(msg.sender == _account || RoycoTrancheStorageLib._getRoycoTrancheStorage().isOperator[_account][msg.sender], ONLY_CALLER_OR_OPERATOR());
+        _onlyCallerOrOperator(_account);
         _;
+    }
+
+    /**
+     * @notice Checks if the caller is either the specified address or an approved operator
+     * @param _account The address to check
+     * @dev Reverts if the caller is neither the address nor an approved operator
+     */
+    function _onlyCallerOrOperator(address _account) internal view {
+        require(msg.sender == _account || RoycoTrancheStorageLib._getRoycoTrancheStorage().isOperator[_account][msg.sender], ONLY_CALLER_OR_OPERATOR());
     }
 
     /**
@@ -92,13 +101,23 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
      * @param _trancheParams Deployment parameters including name, symbol, kernel, and kernel initialization data
      * @param _asset The underlying asset for the tranche
      * @param _owner The initial owner of the tranche
+     * @param _pauser The initial pauser of the tranche
      * @param _marketId The identifier of the Royco market this tranche is linked to
      */
-    function __RoycoTranche_init(TrancheDeploymentParams calldata _trancheParams, address _asset, address _owner, bytes32 _marketId) internal onlyInitializing {
+    function __RoycoTranche_init(
+        TrancheDeploymentParams calldata _trancheParams,
+        address _asset,
+        address _owner,
+        address _pauser,
+        bytes32 _marketId
+    )
+        internal
+        onlyInitializing
+    {
         // Initialize the parent contracts
         __ERC20_init_unchained(_trancheParams.name, _trancheParams.symbol);
         __ERC4626_init_unchained(IERC20(_asset));
-        __Ownable_init_unchained(_owner);
+        __RoycoAuth_init(_owner, _pauser);
 
         // Initialize the Royco Tranche state
         __RoycoTranche_init_unchained(_asset, _trancheParams.kernel, _marketId);
@@ -186,6 +205,8 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         public
         virtual
         override(IERC7540)
+        onlyEnabledRole(RoycoRoles.DEPOSIT_ROLE)
+        whenNotPaused
         onlyCallerOrOperator(_controller)
         returns (uint256 shares)
     {
@@ -231,18 +252,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
 
     /// @inheritdoc IERC7540
     /// @dev mint* flows are not supported
-    function mint(
-        uint256 _shares,
-        address _receiver,
-        address _controller
-    )
-        public
-        virtual
-        override(IERC7540)
-        disabled
-        onlyCallerOrOperator(_controller)
-        returns (uint256 assets)
-    { }
+    function mint(uint256 _shares, address _receiver, address _controller) public virtual override(IERC7540) disabled returns (uint256 assets) { }
 
     /// @inheritdoc IERC7540
     /// @dev withdraw* flows are not supported
@@ -254,7 +264,6 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         public
         virtual
         override(ERC4626Upgradeable, IERC7540)
-        onlyCallerOrOperator(_controller)
         disabled
         returns (uint256 shares)
     { }
@@ -269,6 +278,8 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         virtual
         override(ERC4626Upgradeable, IERC7540)
         onlyCallerOrOperator(_controller)
+        onlyEnabledRole(RoycoRoles.REDEEM_ROLE)
+        whenNotPaused
         returns (uint256 assets)
     {
         require(_shares != 0, ERC4626ZeroRedeemAmount());
@@ -299,7 +310,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
     }
 
     /// @inheritdoc IERC7540
-    function setOperator(address _operator, bool _approved) external virtual override(IERC7540) returns (bool) {
+    function setOperator(address _operator, bool _approved) external virtual override(IERC7540) whenNotPaused returns (bool) {
         // Set the operator's approval status for the caller
         RoycoTrancheStorageLib._getRoycoTrancheStorage().isOperator[msg.sender][_operator] = _approved;
         emit OperatorSet(msg.sender, _operator, _approved);
@@ -318,6 +329,8 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         external
         virtual
         override(IERC7540)
+        onlyEnabledRole(RoycoRoles.DEPOSIT_ROLE)
+        whenNotPaused
         onlyCallerOrOperator(_owner)
         executionIsAsync(Action.DEPOSIT)
         returns (uint256 requestId)
@@ -382,6 +395,8 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         external
         virtual
         override(IERC7540)
+        onlyEnabledRole(RoycoRoles.REDEEM_ROLE)
+        whenNotPaused
         executionIsAsync(Action.WITHDRAW)
         returns (uint256 requestId)
     {
@@ -453,6 +468,8 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         external
         virtual
         override(IERC7887)
+        onlyEnabledRole(RoycoRoles.CANCEL_DEPOSIT_ROLE)
+        whenNotPaused
         onlyCallerOrOperator(_controller)
         executionIsAsync(Action.DEPOSIT)
     {
@@ -512,6 +529,8 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         external
         virtual
         override(IERC7887)
+        onlyEnabledRole(RoycoRoles.CANCEL_DEPOSIT_ROLE)
+        whenNotPaused
         onlyCallerOrOperator(_controller)
         executionIsAsync(Action.DEPOSIT)
     {
@@ -533,6 +552,8 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         external
         virtual
         override(IERC7887)
+        onlyEnabledRole(RoycoRoles.CANCEL_REDEEM_ROLE)
+        whenNotPaused
         onlyCallerOrOperator(_controller)
         executionIsAsync(Action.WITHDRAW)
     {
@@ -592,6 +613,8 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         external
         virtual
         override(IERC7887)
+        onlyEnabledRole(RoycoRoles.CANCEL_REDEEM_ROLE)
+        whenNotPaused
         onlyCallerOrOperator(_owner)
         executionIsAsync(Action.WITHDRAW)
     {
@@ -618,9 +641,10 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
     }
 
     /// @inheritdoc IERC165
-    function supportsInterface(bytes4 _interfaceId) public pure virtual override(IERC165) returns (bool) {
+    function supportsInterface(bytes4 _interfaceId) public pure virtual override(IERC165, AccessControlEnumerableUpgradeable) returns (bool) {
         return _interfaceId == type(IERC165).interfaceId || _interfaceId == type(ERC4626Upgradeable).interfaceId || _interfaceId == type(IERC7540).interfaceId
-            || _interfaceId == type(IERC7575).interfaceId || _interfaceId == type(IERC7887).interfaceId || _interfaceId == type(IRoycoTranche).interfaceId;
+            || _interfaceId == type(IERC7575).interfaceId || _interfaceId == type(IERC7887).interfaceId || _interfaceId == type(IRoycoTranche).interfaceId
+            || _interfaceId == type(IAccessControlEnumerable).interfaceId;
     }
 
     /// @inheritdoc ERC4626Upgradeable
@@ -642,10 +666,8 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
     }
 
     /// @inheritdoc UUPSUpgradeable
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
-        // Upgrade authorization is currently restricted to the owner
-        // TODO: Replace onlyOwner with role-based access control (e.g., UPGRADER_ROLE)
-    }
+    /// @dev Will revert if the caller is not the upgrader role
+    function _authorizeUpgrade(address newImplementation) internal override onlyRole(RoycoRoles.UPGRADER_ROLE) { }
 
     /// @dev Returns if the specified action employs a synchronous execution model
     function _isSync(Action _action) internal view returns (bool) {

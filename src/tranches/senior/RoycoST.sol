@@ -11,11 +11,12 @@ contract RoycoST is BaseRoycoTranche {
      * @param _stParams Deployment parameters including name, symbol, kernel, and kernel initialization data for the senior tranche
      * @param _asset The underlying asset for the tranche
      * @param _owner The initial owner of the tranche
+     * @param _pauser The initial pauser of the tranche
      * @param _marketId The identifier of the Royco market this tranche is linked to
      */
-    function initialize(TrancheDeploymentParams calldata _stParams, address _asset, address _owner, bytes32 _marketId) external initializer {
+    function initialize(TrancheDeploymentParams calldata _stParams, address _asset, address _owner, address _pauser, bytes32 _marketId) external initializer {
         // Initialize the Royco Senior Tranche
-        __RoycoTranche_init(_stParams, _asset, _owner, _marketId);
+        __RoycoTranche_init(_stParams, _asset, _owner, _pauser, _marketId);
     }
 
     function _isSeniorTranche() internal pure override(BaseRoycoTranche) returns (bool) {

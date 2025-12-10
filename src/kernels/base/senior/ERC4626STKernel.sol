@@ -49,6 +49,7 @@ abstract contract ERC4626STKernel is BaseKernel {
         external
         override(IBaseKernel)
         onlySeniorTranche
+        whenNotPaused
         syncNAVsAndEnforceCoverage
         returns (uint256 underlyingSharesAllocated, uint256 totalUnderlyingShares)
     {
@@ -69,6 +70,7 @@ abstract contract ERC4626STKernel is BaseKernel {
         external
         override(IBaseKernel)
         onlySeniorTranche
+        whenNotPaused
         syncNAVs
         returns (uint256 assetsWithdrawn)
     {

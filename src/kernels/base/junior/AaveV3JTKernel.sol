@@ -56,6 +56,7 @@ abstract contract AaveV3JTKernel is BaseKernel {
         override(IBaseKernel)
         onlyJuniorTranche
         syncNAVs
+        whenNotPaused
         returns (uint256 underlyingSharesAllocated, uint256 totalUnderlyingShares)
     {
         // Max approval already given to the pool on initialization
@@ -77,6 +78,7 @@ abstract contract AaveV3JTKernel is BaseKernel {
         override(IBaseKernel)
         onlyJuniorTranche
         syncNAVsAndEnforceCoverage
+        whenNotPaused
         returns (uint256 assetsWithdrawn)
     {
         // Only withdraw the assets that are still owed to the receiver
