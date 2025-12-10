@@ -31,8 +31,8 @@ struct BaseKernelInitParams {
  * @custom:field lastJTRawNAV - The last recorded raw NAV (excluding any losses, coverage, and yield accrual) of the junior tranche
  * @custom:field lastSTEffectiveNAV - The last recorded effective NAV (including any prior applied coverage, ST yield distributions, and uncovered losses) of the senior tranche
  * @custom:field lastJTEffectiveNAV - The last recorded effective NAV (including any prior provided coverage, JT yield, ST yield distribution, and JT losses) of the junior tranche
- * @custom:field lastSTCoverageDebt - The coverage that has been applied to ST from the JT loss-absorption buffer : represents a claim the junior tranche has on future senior-side recoveries
- * @custom:field lastJTCoverageDebt - The losses that ST incurred after exhausting the JT loss-absorption buffer: represents a claim the senior tranche has on future junior-side recoveries
+ * @custom:field lastJTCoverageDebt - The losses that ST incurred after exhausting the JT loss-absorption buffer: represents the first claim on capital the senior tranche has on future recoveries
+ * @custom:field lastSTCoverageDebt - The coverage that has been applied to ST from the JT loss-absorption buffer : represents the second claim on capital the junior tranche has on future recoveries
  * @custom:field twJTYieldShareAccruedWAD - The time-weighted junior tranche yield share (RDM output) since the last yield distribution
  * @custom:field lastAccrualTimestamp - The last time the time-weighted JT yield share accumulator was updated
  * @custom:field lastDistributionTimestamp - The last time a yield distribution occurred
@@ -47,8 +47,8 @@ struct BaseKernelState {
     uint256 lastJTRawNAV;
     uint256 lastSTEffectiveNAV;
     uint256 lastJTEffectiveNAV;
-    uint256 lastSTCoverageDebt;
     uint256 lastJTCoverageDebt;
+    uint256 lastSTCoverageDebt;
     uint192 twJTYieldShareAccruedWAD;
     uint32 lastAccrualTimestamp;
     uint32 lastDistributionTimestamp;

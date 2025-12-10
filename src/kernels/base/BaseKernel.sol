@@ -227,19 +227,17 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
         if (deltaJT < 0) {
             // JT incurs as much of the loss as possible, booking the remainder as a future liability to ST
             uint256 jtLoss = uint256(-deltaJT);
+            uint256 jtAbsorbableLoss = Math.min(jtLoss, jtEffectiveNAV);
             /// @dev STEP_JT_LOSS_OVERFLOW_TO_ST: This loss isn't fully absorbable by JT's remaning loss-absorption buffer
-            if (jtLoss > jtEffectiveNAV) {
-                // Wipe out JT's remaining buffer and force ST to absorb any excess loss
-                uint256 excessLoss = jtLoss - jtEffectiveNAV;
-                jtEffectiveNAV = 0;
-                stEffectiveNAV = Math.saturatingSub(stEffectiveNAV, excessLoss);
+            if (jtLoss > jtAbsorbableLoss) {
+                // The excess loss is absorbed by ST
+                uint256 stLoss = jtLoss - jtEffectiveNAV;
+                stEffectiveNAV = Math.saturatingSub(stEffectiveNAV, stLoss);
                 // The excess loss is added to the JT's coverage debt: a future liability of JT to ST
-                jtCoverageDebt += excessLoss;
-                /// @dev STEP_JT_ABSORB_LOSS: This loss is fully absorbable by JT's remaning loss-absorption buffer
-            } else {
-                // Deduct the loss from JT's remaining buffer
-                jtEffectiveNAV -= jtLoss;
+                jtCoverageDebt += stLoss;
             }
+            /// @dev STEP_JT_ABSORB_LOSS: This loss is fully absorbable by JT's remaning loss-absorption buffer
+            jtEffectiveNAV -= jtAbsorbableLoss;
             /// @dev STEP_JT_APPLY_GAIN: The JT assets appreciated in value
         } else if (deltaJT > 0) {
             uint256 jtGain = uint256(deltaJT);
