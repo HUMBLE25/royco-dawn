@@ -67,7 +67,7 @@ abstract contract AaveV3JTKernel is BaseKernel {
 
     /// @inheritdoc IBaseKernel
     function jtRedeem(
-        address,
+        address _asset,
         uint256 _shares,
         uint256 _totalShares,
         address,
@@ -79,32 +79,39 @@ abstract contract AaveV3JTKernel is BaseKernel {
         syncNAVsAndEnforceCoverage
         returns (uint256 assetsWithdrawn)
     {
-        // Only withdraw the assets that are still owed to the receiver
-        assetsWithdrawn = _shares.mulDiv(_getJuniorTrancheEffectiveNAV(), _totalShares, Math.Rounding.Floor);
-        // TODO: Account for ST yield in withdrawal
-        _withdrawFromPool(assetsWithdrawn, _receiver);
+        // Get the storage pointer to the base kernel state
+        // We can assume that all NAV values are synced
+        BaseKernelState storage $ = BaseKernelStorageLib._getBaseKernelStorage();
+        uint256 jtEffectiveNAV = $.lastJTEffectiveNAV;
+        // Compute the assets expected to be received on withdrawal based on the JT's effective NAV
+        uint256 assetsToWithdraw = _shares.mulDiv(jtEffectiveNAV, _totalShares, Math.Rounding.Floor);
+        // Compute the yield that has accrued in ST that JT is entitled to
+        uint256 jtShareOfSTYield = Math.saturatingSub(jtEffectiveNAV, $.lastJTRawNAV);
+        // Pull any yield that needs to be realized from ST
+        if (jtShareOfSTYield != 0) {
+            uint256 yieldToClaim = _shares.mulDiv(jtShareOfSTYield, _totalShares, Math.Rounding.Floor);
+            assetsToWithdraw -= (assetsWithdrawn += _claimJTYieldFromST(_asset, yieldToClaim, _receiver));
+        }
+        assetsWithdrawn += _withdrawFromPool(assetsToWithdraw, _receiver);
+        // TODO: Should we check assetsWithdrawn == totalAssetsToWithdraw. Considering rounding in the underlying scenario.
     }
 
     /// @inheritdoc BaseKernel
     function _coverSTLossesFromJT(address, uint256 _coverageAssets, address _receiver) internal override(BaseKernel) returns (uint256 assetsWithdrawn) {
-        uint256 maxAssetsWithdrawable = _maxJTWithdrawalGlobally(address(0));
-        if (maxAssetsWithdrawable >= _coverageAssets) {
-            _withdrawFromPool(_coverageAssets, _receiver);
-            return _coverageAssets;
-        } else {
-            _withdrawFromPool(maxAssetsWithdrawable, _receiver);
-            return maxAssetsWithdrawable;
-        }
+        return _withdrawFromPool(_coverageAssets, _receiver);
     }
 
     /**
      * @notice Withdraws the specified assets from the Aave V3 Pool to the receiver
      * @param _assets The amount of assets to withdraw from the pool
      * @param _receiver The receiver of the withdrawn assets
+     * @param assetsWithdrawn The actual number of assets withdrawn based on max withdrawal limits
      */
-    function _withdrawFromPool(uint256 _assets, address _receiver) internal {
+    function _withdrawFromPool(uint256 _assets, address _receiver) internal returns (uint256 assetsWithdrawn) {
         AaveV3KernelState storage $ = AaveV3KernelStorageLib._getAaveV3KernelStorage();
-        IPool($.pool).withdraw($.asset, _assets, _receiver);
+        uint256 maxJTAssetsWithdrawable = _maxJTWithdrawalGlobally(address(0));
+        assetsWithdrawn = maxJTAssetsWithdrawable >= _assets ? _assets : maxJTAssetsWithdrawable;
+        IPool($.pool).withdraw($.asset, assetsWithdrawn, _receiver);
     }
 
     /// @inheritdoc BaseKernel
