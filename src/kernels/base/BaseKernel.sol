@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import { Initializable } from "../../../lib/openzeppelin-contracts/contracts/proxy/utils/Initializable.sol";
 import { IRDM } from "../../interfaces/IRDM.sol";
 import { IBaseKernel } from "../../interfaces/kernel/IBaseKernel.sol";
-import { BaseKernelInitParams, BaseKernelState, BaseKernelStorageLib } from "../../libraries/BaseKernelStorageLib.sol";
+import { BaseKernelInitParams, BaseKernelState, BaseKernelStorageLib, Operation } from "../../libraries/BaseKernelStorageLib.sol";
 import { ConstantsLib, Math, UtilsLib } from "../../libraries/UtilsLib.sol";
 
 /**
@@ -45,15 +45,16 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
      * @dev Should be placed on senior tranche withdrawal functions and junior tranche deposit functions since coverage doesn't need to be enforced
      * @dev Before execution: realizes unrealized PnL into effective NAVs
      * @dev After execution: applies the operation's raw NAV deltas (deposit or withdrawal) to effective NAVs
+     * @param _op The operation being executed in between the pre and post synchronizations
      */
-    modifier syncNAVs() {
+    modifier syncNAVs(Operation _op) {
         // Sync the tranche NAVs based on the difference in current NAVs and checkpointed NAVs since the last operation
         // Any NAV updates caused by this are a result of unrealized PNL(s) in the underlying strategy
         _preOpSyncTrancheNAVs();
         _;
         // Sync the NAVs after the operation (deposit or withdrawal) has been executed
         // Any NAV updates caused by this are a result of a deposit or withdrawal
-        _postOpSyncTrancheNAVs();
+        _postOpSyncTrancheNAVs(_op);
     }
 
     /**
@@ -61,15 +62,16 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
      * @dev Should be placed on senior tranche deposit functions and junior tranche withdrawal functions since coverage needs to be enforced
      * @dev Before execution: realizes unrealized PnL into effective NAVs
      * @dev After execution: applies the operation's raw NAV deltas (deposit or withdrawal) to effective NAVs
+     * @param _op The operation being executed in between the pre and post synchronizations
      */
-    modifier syncNAVsAndEnforceCoverage() {
+    modifier syncNAVsAndEnforceCoverage(Operation _op) {
         // Sync the tranche NAVs based on the difference in current NAVs and checkpointed NAVs since the last operation
         // Any NAV updates caused by this are a result of unrealized PNL(s) in the underlying strategy
         _preOpSyncTrancheNAVs();
         _;
         // Sync the NAVs after the operation (deposit or withdrawal) has been executed
         // Any NAV updates caused by this are a result of a deposit or withdrawal
-        _postOpSyncTrancheNAVs();
+        _postOpSyncTrancheNAVs(_op);
         // Enforce that the coverage requirement of the market is satisfied
         _enforceCoverage();
     }
@@ -211,11 +213,10 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
         // Get the storage pointer to the base kernel state
         BaseKernelState storage $ = BaseKernelStorageLib._getBaseKernelStorage();
 
-        // Compute the deltas in the raw NAVs of each tranche and cache the raw NAVs
-        // The deltas represent the unrealized PNL(s) of the underlying investment(s) since the last NAV checkpoints
-        stRawNAV = _getSeniorTrancheRawNAV();
+        // Compute the delta in the raw NAV of the junior tranche
+        // The delta represents the unrealized JT PNL of the underlying investment since the last NAV checkpoints
         jtRawNAV = _getJuniorTrancheRawNAV();
-        (int256 deltaST, int256 deltaJT) = _computeRawNAVDeltas(stRawNAV, jtRawNAV, $.lastSTRawNAV, $.lastJTRawNAV);
+        int256 deltaJT = _computeRawNAVDelta(jtRawNAV, $.lastJTRawNAV);
 
         // Cache the last checkpointed effective NAV and coverage debt for each tranche
         stEffectiveNAV = $.lastSTEffectiveNAV;
@@ -245,7 +246,8 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
             uint256 jtDebtRepayment = Math.min(jtGain, jtCoverageDebt);
             if (jtDebtRepayment != 0) {
                 // Repay JT debt to ST
-                // This is equivalent to retroactively applying coverage for previously uncovered losses, this is now booked as ST debt to JT
+                // This is equivalent to retroactively applying coverage for previously uncovered losses
+                // Thus, the liability is flipped to ST debt to JT
                 jtCoverageDebt -= jtDebtRepayment;
                 stCoverageDebt += jtDebtRepayment;
                 // Apply the repayment (retroactive coverage) to the ST
@@ -255,6 +257,11 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
             /// @dev STEP_JT_BOOK_REMAINING_GAIN: JT accrues remaining appreciation
             jtEffectiveNAV += jtGain;
         }
+
+        // Compute the delta in the raw NAV of the senior tranche
+        // The delta represents the unrealized ST PNL of the underlying investment since the last NAV checkpoints
+        stRawNAV = _getSeniorTrancheRawNAV();
+        int256 deltaST = _computeRawNAVDelta(stRawNAV, $.lastSTRawNAV);
 
         /// @dev STEP_ST_NO_CHANGE: The ST assets experienced no change in value
         if (deltaST == 0) return (stRawNAV, jtRawNAV, stEffectiveNAV, jtEffectiveNAV, stCoverageDebt, jtCoverageDebt, false);
@@ -344,52 +351,71 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
     /**
      * @notice Applies post-operation (deposit and withdrawal) raw NAV deltas to effective NAV checkpoints
      * @dev Interprets deltas strictly as deposits/withdrawals with no yield or coverage logic
+     * @param _op The operation being executed in between the pre and post synchronizations
      */
-    function _postOpSyncTrancheNAVs() internal {
+    function _postOpSyncTrancheNAVs(Operation _op) internal {
         // Get the storage pointer to the base kernel state
         BaseKernelState storage $ = BaseKernelStorageLib._getBaseKernelStorage();
-
-        // Compute the deltas in the raw NAVs of each tranche after an operation's execution and cache the raw NAVs
-        // The deltas represent the NAV changes after a deposit and withdrawal
-        // This includes the discrete deposit and/or withdrawal amounts in addition to any coverage pulled from JT to ST
-        uint256 stRawNAV = _getSeniorTrancheRawNAV();
-        uint256 jtRawNAV = _getJuniorTrancheRawNAV();
-        (int256 deltaST, int256 deltaJT) = _computeRawNAVDeltas(stRawNAV, jtRawNAV, $.lastSTRawNAV, $.lastJTRawNAV);
-        // Update the post-operation raw NAV checkpoints
-        $.lastSTRawNAV = stRawNAV;
-        $.lastJTRawNAV = jtRawNAV;
-
-        // Apply the withdrawal to the junior tranche's effective NAV
-        // This should only happen when a JT LP is withdrawing from the tranche, not when its capital is being used as coverage
-        // This is because any coverage application has already been applied in the pre-op sync
-        if (deltaJT < 0 && deltaST >= 0) $.lastJTEffectiveNAV = Math.saturatingSub($.lastJTEffectiveNAV, uint256(-deltaJT));
-        // Apply the deposit to the junior tranche's effective NAV
-        else if (deltaJT > 0) $.lastJTEffectiveNAV += uint256(deltaJT);
-
-        // Apply the withdrawal to the senior tranche's effective NAV
-        if (deltaST < 0) {
-            // If the withdrawal used JT capital as coverage to facilitate this ST withdrawal
-            if (deltaJT < 0) {
-                // The actual amount withdrawn was the delta in ST raw NAV and the coverage applied from JT
-                uint256 coverageRealized = uint256(-deltaJT);
-                $.lastSTEffectiveNAV = Math.saturatingSub($.lastSTEffectiveNAV, uint256(-deltaST) + coverageRealized);
-                /// We need to adjust debts by accounting for the realized coverage
-                // The coverage realization waterfall works by first erasing ST debt and then JT debt
-                // This mimics the same top -> down waterfall used to apply coverage when computing effective NAVs
-                // Erase as much ST coverage debt as possible
-                uint256 stCoverageDebtErased = Math.min(coverageRealized, $.lastSTCoverageDebt);
-                if (stCoverageDebtErased != 0) $.lastSTCoverageDebt -= stCoverageDebtErased;
-                // Reduce remaining available coverage
-                coverageRealized -= stCoverageDebtErased;
-                // Apply the remainder to JT debt
-                if (coverageRealized != 0) $.lastJTCoverageDebt = Math.saturatingSub($.lastJTCoverageDebt, coverageRealized);
-            } else {
-                // Apply the withdrawal to the senior tranche's effective NAV
-                $.lastSTEffectiveNAV = Math.saturatingSub($.lastSTEffectiveNAV, uint256(-deltaST));
-            }
-        } else if (deltaST > 0) {
+        if (_op == Operation.ST_DEPOSIT) {
+            // Compute the delta in the raw NAV of the senior tranche
+            // The deltas represent the NAV changes after a deposit and withdrawal
+            uint256 stRawNAV = _getSeniorTrancheRawNAV();
+            int256 deltaST = _computeRawNAVDelta(stRawNAV, $.lastSTRawNAV);
+            // Update the post-operation raw NAV ST checkpoint
+            $.lastSTRawNAV = stRawNAV;
             // Apply the deposit to the senior tranche's effective NAV
             $.lastSTEffectiveNAV += uint256(deltaST);
+        } else if (_op == Operation.JT_DEPOSIT) {
+            // Compute the delta in the raw NAV of the junior tranche
+            // The deltas represent the NAV changes after a deposit and withdrawal
+            uint256 jtRawNAV = _getJuniorTrancheRawNAV();
+            int256 deltaJT = _computeRawNAVDelta(jtRawNAV, $.lastJTRawNAV);
+            // Update the post-operation raw NAV ST checkpoint
+            $.lastJTRawNAV = jtRawNAV;
+            // Apply the deposit to the junior tranche's effective NAV
+            $.lastJTEffectiveNAV += uint256(deltaJT);
+        } else {
+            // Compute the deltas in the raw NAVs of each tranche after an operation's execution and cache the raw NAVs
+            // The deltas represent the NAV changes after a deposit and withdrawal
+            uint256 stRawNAV = _getSeniorTrancheRawNAV();
+            uint256 jtRawNAV = _getJuniorTrancheRawNAV();
+            int256 deltaST = _computeRawNAVDelta(stRawNAV, $.lastSTRawNAV);
+            int256 deltaJT = _computeRawNAVDelta(jtRawNAV, $.lastJTRawNAV);
+
+            // Update the post-operation raw NAV checkpoints
+            $.lastSTRawNAV = stRawNAV;
+            $.lastJTRawNAV = jtRawNAV;
+
+            if (_op == Operation.ST_WITHDRAW) {
+                // Senior withdrew: The NAV deltas include the discrete withdrawal amount in addition to any coverage pulled from JT to ST
+                // If the withdrawal used JT capital as coverage to facilitate this ST withdrawal
+                if (deltaJT < 0) {
+                    // The actual amount withdrawn was the delta in ST raw NAV and the coverage applied from JT
+                    uint256 coverageRealized = uint256(-deltaJT);
+                    $.lastSTEffectiveNAV = Math.saturatingSub($.lastSTEffectiveNAV, uint256(-deltaST) + coverageRealized);
+                    /// We need to adjust debts by accounting for the realized coverage
+                    // The coverage realization waterfall works by first erasing ST debt and then JT debt
+                    // This mimics the same top -> down waterfall used to apply coverage when computing effective NAVs
+                    // Erase as much ST coverage debt as possible
+                    uint256 stCoverageDebtErased = Math.min(coverageRealized, $.lastSTCoverageDebt);
+                    if (stCoverageDebtErased != 0) $.lastSTCoverageDebt -= stCoverageDebtErased;
+                    // Reduce remaining available coverage
+                    coverageRealized -= stCoverageDebtErased;
+                    // Apply the remainder to JT debt
+                    if (coverageRealized != 0) $.lastJTCoverageDebt = Math.saturatingSub($.lastJTCoverageDebt, coverageRealized);
+                } else {
+                    // Apply the withdrawal to the senior tranche's effective NAV
+                    $.lastSTEffectiveNAV = Math.saturatingSub($.lastSTEffectiveNAV, uint256(-deltaST));
+                }
+            } else if (_op == Operation.JT_WITHDRAW) {
+                // Junior withdrew: The NAV deltas include the discrete withdrawal amount in addition to any yield pulled from ST to JT
+                // If the withdrawal used ST capital to claim yield when facilitating this JT withdrawal
+                // No need to touch debt accounting: all debts are cleared
+                // If ST delta was negative, the actual amount withdrawn by JT was the delta in JT raw NAV and the yield claimed from ST
+                if (deltaST < 0) $.lastJTEffectiveNAV = Math.saturatingSub($.lastJTEffectiveNAV, (uint256(-deltaJT) + uint256(-deltaST)));
+                // Apply the pure withdrawal to the junior tranche's effective NAV
+                else $.lastJTEffectiveNAV = Math.saturatingSub($.lastJTEffectiveNAV, uint256(-deltaJT));
+            }
         }
     }
 
@@ -414,29 +440,6 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
         // Compute the utilization and enforce that the senior tranche is properly collateralized
         uint256 utilization = UtilsLib.computeUtilization($.lastSTRawNAV, $.lastJTRawNAV, $.betaWAD, $.coverageWAD, $.lastJTEffectiveNAV);
         require(ConstantsLib.WAD >= utilization, INSUFFICIENT_COVERAGE());
-    }
-
-    /**
-     * @notice Computes raw NAV deltas for both tranches
-     * @param _stCurrentRawNAV The current senior raw NAV
-     * @param _jtCurrentRawNAV The current junior raw NAV
-     * @param _stLastRawNAV The last senior raw NAV
-     * @param _jtLastRawNAV The last junior raw NAV
-     * @return deltaST The delta in last to current senior raw NAV
-     * @return deltaJT The delta in last to current junior raw NAV
-     */
-    function _computeRawNAVDeltas(
-        uint256 _stCurrentRawNAV,
-        uint256 _jtCurrentRawNAV,
-        uint256 _stLastRawNAV,
-        uint256 _jtLastRawNAV
-    )
-        internal
-        pure
-        returns (int256 deltaST, int256 deltaJT)
-    {
-        deltaST = int256(_stCurrentRawNAV) - int256(_stLastRawNAV);
-        deltaJT = int256(_jtCurrentRawNAV) - int256(_jtLastRawNAV);
     }
 
     /**
@@ -499,6 +502,16 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
     /// @dev Includes provided coverage, JT yield, ST yield distribution, and JT losses
     function _getJuniorTrancheEffectiveNAV() internal view returns (uint256 jtEffectiveNAV) {
         (,,, jtEffectiveNAV,,,) = _previewEffectiveNAVs(_previewJTYieldShareAccrual());
+    }
+
+    /**
+     * @notice Computes raw NAV deltas for a tranche
+     * @param _currentRawNAV The current raw NAV
+     * @param _lastRawNAV The last recorded raw NAV
+     * @return deltaNAV The delta between the last recorded and current raw NAV
+     */
+    function _computeRawNAVDelta(uint256 _currentRawNAV, uint256 _lastRawNAV) internal pure returns (int256 deltaNAV) {
+        deltaNAV = int256(_currentRawNAV) - int256(_lastRawNAV);
     }
 
     /// @notice Returns the raw net asset value of the senior tranche

@@ -2,6 +2,21 @@
 pragma solidity ^0.8.28;
 
 /**
+ * @title Operation
+ * @dev Defines the operation being executed by the user
+ * @custom:type ST_DEPOSIT Depositing assets into the senior tranche
+ * @custom:type ST_WITHDRAW Withdrawing assets from the senior tranche
+ * @custom:type JT_DEPOSIT Depositing assets into the junior tranche
+ * @custom:type JT_WITHDRAW Withdrawing assets from the junior tranche
+ */
+enum Operation {
+    ST_DEPOSIT,
+    ST_WITHDRAW,
+    JT_DEPOSIT,
+    JT_WITHDRAW
+}
+
+/**
  * @notice Initialization parameters for the Royco Base Kernel
  * @custom:field seniorTranche - The address of the Royco senior tranche associated with this kernel
  * @custom:field juniorTranche - The address of the Royco junior tranche associated with this kernel

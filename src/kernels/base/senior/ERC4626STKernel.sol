@@ -5,7 +5,7 @@ import { IERC4626 } from "../../../../lib/openzeppelin-contracts/contracts/inter
 import { IERC20, SafeERC20 } from "../../../../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import { Math } from "../../../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 import { ExecutionModel, IBaseKernel } from "../../../interfaces/kernel/IBaseKernel.sol";
-import { BaseKernelState, BaseKernelStorageLib } from "../../../libraries/BaseKernelStorageLib.sol";
+import { BaseKernelState, BaseKernelStorageLib, Operation } from "../../../libraries/BaseKernelStorageLib.sol";
 import { ConstantsLib } from "../../../libraries/ConstantsLib.sol";
 import { ERC4626STKernelState, ERC4626STKernelStorageLib } from "../../../libraries/kernels/ERC4626STKernelStorageLib.sol";
 import { BaseKernel } from "../BaseKernel.sol";
@@ -49,7 +49,7 @@ abstract contract ERC4626STKernel is BaseKernel {
         external
         override(IBaseKernel)
         onlySeniorTranche
-        syncNAVsAndEnforceCoverage
+        syncNAVsAndEnforceCoverage(Operation.ST_DEPOSIT)
         returns (uint256 underlyingSharesAllocated, uint256 totalUnderlyingShares)
     {
         // Deposit the assets into the underlying investment vault
@@ -69,7 +69,7 @@ abstract contract ERC4626STKernel is BaseKernel {
         external
         override(IBaseKernel)
         onlySeniorTranche
-        syncNAVs
+        syncNAVs(Operation.ST_WITHDRAW)
         returns (uint256 assetsWithdrawn)
     {
         // Get the storage pointer to the base kernel state

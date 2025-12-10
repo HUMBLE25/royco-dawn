@@ -63,17 +63,6 @@ struct TrancheDeploymentParams {
 }
 
 /**
- * @title Action
- * @dev Defines the action being executed by the user
- * @custom:type DEPOSIT Depositing assets into the tranche
- * @custom:type WITHDRAW Withdrawing assets from the tranche
- */
-enum Action {
-    DEPOSIT,
-    WITHDRAW
-}
-
-/**
  * @title TrancheType
  * @dev Defines the two types of Royco tranches deployed per market.
  * @custom:type JUNIOR The identifier for the junior tranche (first-loss capital)

@@ -7,9 +7,8 @@ import { Math } from "../../../../lib/openzeppelin-contracts/contracts/utils/mat
 import { IPool } from "../../../interfaces/aave/IPool.sol";
 import { IPoolAddressesProvider } from "../../../interfaces/aave/IPoolAddressesProvider.sol";
 import { IPoolDataProvider } from "../../../interfaces/aave/IPoolDataProvider.sol";
-
 import { ExecutionModel, IBaseKernel } from "../../../interfaces/kernel/IBaseKernel.sol";
-import { BaseKernelState, BaseKernelStorageLib } from "../../../libraries/BaseKernelStorageLib.sol";
+import { BaseKernelState, BaseKernelStorageLib, Operation } from "../../../libraries/BaseKernelStorageLib.sol";
 import { ConstantsLib } from "../../../libraries/ConstantsLib.sol";
 import { AaveV3KernelState, AaveV3KernelStorageLib } from "../../../libraries/kernels/AaveV3KernelStorageLib.sol";
 import { BaseKernel } from "../BaseKernel.sol";
@@ -55,7 +54,7 @@ abstract contract AaveV3JTKernel is BaseKernel {
         external
         override(IBaseKernel)
         onlyJuniorTranche
-        syncNAVs
+        syncNAVs(Operation.JT_DEPOSIT)
         returns (uint256 underlyingSharesAllocated, uint256 totalUnderlyingShares)
     {
         // Max approval already given to the pool on initialization
@@ -76,7 +75,7 @@ abstract contract AaveV3JTKernel is BaseKernel {
         external
         override(IBaseKernel)
         onlyJuniorTranche
-        syncNAVsAndEnforceCoverage
+        syncNAVsAndEnforceCoverage(Operation.JT_WITHDRAW)
         returns (uint256 assetsWithdrawn)
     {
         // Get the storage pointer to the base kernel state
