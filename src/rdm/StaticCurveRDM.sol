@@ -59,12 +59,6 @@ contract StaticCurveRDM is IRDM {
          * At and above 90% utilization, JT yield allocation rises sharply (7.75 slope), penalizing high utilization and incentivizing marginal junior deposits or senior withdrawals
          * At and above 100% utilization, JT yield allocation is set to 100% of ST yield, as the market is exactly or undercollateralized
          */
-
-        // If any of these values is 0, the utilization is effectively 0, so the JT's percentage of ST yield is 0%
-        if (_stRawNAV == 0 || _jtRawNAV == 0 || _coverageWAD == 0) return 0;
-        // If there is no loss capital remaining when raw NAVs are non-zero, JT's percentage of ST yield is 100%
-        if (_jtEffectiveNAV == 0) return ConstantsLib.WAD;
-
         // Compute the utilization of the market
         uint256 utilization = UtilsLib.computeUtilization(_stRawNAV, _jtRawNAV, _betaWAD, _coverageWAD, _jtEffectiveNAV);
 

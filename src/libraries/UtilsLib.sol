@@ -30,6 +30,8 @@ library UtilsLib {
         pure
         returns (uint256 utilization)
     {
+        // If there is no remaining JT loss-absorption buffer, utilization is effectively infinite
+        if (_jtEffectiveNAV == 0) return type(uint256).max;
         // Round in favor of ensuring senior tranche protection
         utilization = (_stRawNAV + _jtRawNAV.mulDiv(_betaWAD, ConstantsLib.WAD, Math.Rounding.Ceil)).mulDiv(_coverageWAD, _jtEffectiveNAV, Math.Rounding.Ceil);
     }
