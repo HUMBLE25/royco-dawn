@@ -108,7 +108,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         uint8 decimalsOffset = underlyingAssetDecimals >= 18 ? 0 : (18 - underlyingAssetDecimals);
 
         // Initialize the tranche's state
-        RoycoTrancheStorageLib.__RoycoTranche_init(msg.sender, _kernelAddress, _marketId, decimalsOffset);
+        RoycoTrancheStorageLib.__RoycoTranche_init(msg.sender, _kernelAddress, _marketId, decimalsOffset, _isSeniorTranche());
     }
 
     /// @inheritdoc ERC4626Upgradeable
@@ -198,7 +198,8 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         } else {
             // If the deposit is asynchronous, mint the shares based on the fraction of total assets allocated in the underlying investment opportunity
             // TODO: Explain formula
-            sharesToMint = totalSupply().mulDiv(fractionOfTotalAssetsAllocatedWAD, ConstantsLib.WAD - fractionOfTotalAssetsAllocatedWAD, Math.Rounding.Floor);
+            sharesToMint = (totalSupply() + 10 ** _decimalsOffset())
+            .mulDiv(fractionOfTotalAssetsAllocatedWAD, ConstantsLib.WAD - fractionOfTotalAssetsAllocatedWAD, Math.Rounding.Floor);
         }
 
         // Mint the shares to the receiver

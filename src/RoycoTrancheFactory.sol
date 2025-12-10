@@ -89,8 +89,8 @@ contract RoycoTrancheFactory {
 
         // Verify kernel implements IBaseKernel by checking it returns valid execution models
         // This will revert if the kernel doesn't implement the interface
-        ExecutionModel depositModel = IBaseKernel(kernel).getDepositExecutionModel();
-        ExecutionModel withdrawModel = IBaseKernel(kernel).getWithdrawExecutionModel();
+        ExecutionModel depositModel = IBaseKernel(kernel).ST_DEPOSIT_EXECUTION_MODEL();
+        ExecutionModel withdrawModel = IBaseKernel(kernel).ST_WITHDRAWAL_EXECUTION_MODEL();
         require(depositModel == ExecutionModel.SYNC || depositModel == ExecutionModel.ASYNC, InvalidDepositModel());
         require(withdrawModel == ExecutionModel.SYNC || withdrawModel == ExecutionModel.ASYNC, InvalidWithdrawModel());
 
