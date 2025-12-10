@@ -351,6 +351,7 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
 
         // Compute the deltas in the raw NAVs of each tranche after an operation's execution and cache the raw NAVs
         // The deltas represent the NAV changes after a deposit and withdrawal
+        // This includes the discrete deposit and/or withdrawal amounts in addition to any coverage pulled from JT to ST
         uint256 stRawNAV = _getSeniorTrancheRawNAV();
         uint256 jtRawNAV = _getJuniorTrancheRawNAV();
         (int256 deltaST, int256 deltaJT) = _computeRawNAVDeltas(stRawNAV, jtRawNAV, $.lastSTRawNAV, $.lastJTRawNAV);
@@ -358,15 +359,37 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
         $.lastSTRawNAV = stRawNAV;
         $.lastJTRawNAV = jtRawNAV;
 
-        // Apply the withdrawal to the senior tranche's effective NAV
-        if (deltaST < 0) $.lastSTEffectiveNAV = Math.saturatingSub($.lastSTEffectiveNAV, uint256(-deltaST));
-        // Apply the deposit to the senior tranche's effective NAV
-        else if (deltaST > 0) $.lastSTEffectiveNAV += uint256(deltaST);
-
         // Apply the withdrawal to the junior tranche's effective NAV
-        if (deltaJT < 0) $.lastJTEffectiveNAV = Math.saturatingSub($.lastJTEffectiveNAV, uint256(-deltaJT));
+        // This should only happen when a JT LP is withdrawing from the tranche, not when its capital is being used as coverage
+        if (deltaJT < 0 && deltaST >= 0) $.lastJTEffectiveNAV = Math.saturatingSub($.lastJTEffectiveNAV, uint256(-deltaJT));
         // Apply the deposit to the junior tranche's effective NAV
         else if (deltaJT > 0) $.lastJTEffectiveNAV += uint256(deltaJT);
+
+        // Apply the withdrawal to the senior tranche's effective NAV
+        if (deltaST < 0) {
+            // If the withdrawal used JT capital as coverage to facilitate this ST withdrawal
+            if (deltaJT < 0) {
+                // The actual amount withdrawn was the delta in ST raw NAV and the coverage applied from JT
+                uint256 coverageRealized = uint256(-deltaJT);
+                $.lastSTEffectiveNAV = Math.saturatingSub($.lastSTEffectiveNAV, uint256(-deltaST) + coverageRealized);
+                /// We need to adjust debts by accounting for the realized coverage
+                // The coverage realization waterfall works by first erasing ST debt and then JT debt
+                // This mimics the same top -> down waterfall used to apply coverage when computing effective NAVs
+                // Erase as much ST coverage debt as possible
+                uint256 stCoverageDebtErased = Math.min(coverageRealized, $.lastSTCoverageDebt);
+                if (stCoverageDebtErased != 0) $.lastSTCoverageDebt -= stCoverageDebtErased;
+                // Reduce remaining available coverage
+                coverageRealized -= stCoverageDebtErased;
+                // Apply the remainder to JT debt
+                if (coverageRealized != 0) $.lastJTCoverageDebt = Math.saturatingSub($.lastJTCoverageDebt, coverageRealized);
+            } else {
+                // Apply the withdrawal to the senior tranche's effective NAV
+                $.lastSTEffectiveNAV = Math.saturatingSub($.lastSTEffectiveNAV, uint256(-deltaST));
+            }
+        } else if (deltaST > 0) {
+            // Apply the deposit to the senior tranche's effective NAV
+            $.lastSTEffectiveNAV += uint256(deltaST);
+        }
     }
 
     /**
