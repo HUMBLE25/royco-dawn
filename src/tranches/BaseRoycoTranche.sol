@@ -17,7 +17,6 @@ import { IAsyncSTDepositKernel } from "../interfaces/kernel/IAsyncSTDepositKerne
 import { IAsyncSTWithdrawalKernel } from "../interfaces/kernel/IAsyncSTWithdrawalKernel.sol";
 import { ExecutionModel, IBaseKernel } from "../interfaces/kernel/IBaseKernel.sol";
 import { IERC165, IERC7540, IERC7575, IERC7887, IRoycoTranche } from "../interfaces/tranche/IRoycoTranche.sol";
-import { ConstantsLib } from "../libraries/ConstantsLib.sol";
 import { RoycoTrancheStorageLib } from "../libraries/RoycoTrancheStorageLib.sol";
 import { Action, TrancheDeploymentParams } from "../libraries/Types.sol";
 
@@ -50,6 +49,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
     /**
      * @notice Modifier to ensure the functionality is disabled
      */
+    // forge-lint: disable-next-line(unwrapped-modifier-logic)
     modifier disabled() {
         revert DISABLED();
         _;
@@ -237,13 +237,13 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         //  Therefore, the kernel is expected to keep track of the underlying opportunity shares minted against the request.
         //  The ratio of these shares to the total underlying shares held by the system represent the user's claim on the vault, therefore we mint
         //  an equivalent amount of shares to the receiver.
-        uint256 sharesToMint = (totalSupply() + 10 ** _decimalsOffset())
+        shares = (totalSupply() + 10 ** _decimalsOffset())
         .mulDiv(underlyingSharesAllocated, totalUnderlyingShares - underlyingSharesAllocated + 1, Math.Rounding.Floor);
 
         // Mint the shares to the receiver
-        _mint(_receiver, sharesToMint);
+        _mint(_receiver, shares);
 
-        emit Deposit(msg.sender, _receiver, _assets, sharesToMint);
+        emit Deposit(msg.sender, _receiver, _assets, shares);
     }
 
     /// @inheritdoc ERC4626Upgradeable
@@ -473,7 +473,6 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         onlyCallerOrOperator(_controller)
         executionIsAsync(Action.DEPOSIT)
     {
-        // Delegate call to kernel to handle deposit cancellation
         if (_isSeniorTranche()) {
             IAsyncSTDepositKernel(_kernel()).stCancelDepositRequest(msg.sender, _requestId, _controller);
         } else {
@@ -557,7 +556,6 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         onlyCallerOrOperator(_controller)
         executionIsAsync(Action.WITHDRAW)
     {
-        // Delegate call to kernel to handle redeem cancellation
         if (_isSeniorTranche()) {
             IAsyncSTWithdrawalKernel(_kernel()).stCancelWithdrawalRequest(_requestId, _controller);
         } else {

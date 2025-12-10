@@ -9,8 +9,7 @@ import { IPoolAddressesProvider } from "../../../interfaces/aave/IPoolAddressesP
 import { IPoolDataProvider } from "../../../interfaces/aave/IPoolDataProvider.sol";
 
 import { ExecutionModel, IBaseKernel } from "../../../interfaces/kernel/IBaseKernel.sol";
-import { BaseKernelState, BaseKernelStorageLib } from "../../../libraries/BaseKernelStorageLib.sol";
-import { ConstantsLib } from "../../../libraries/ConstantsLib.sol";
+import { BaseKernelStorageLib } from "../../../libraries/BaseKernelStorageLib.sol";
 import { AaveV3KernelState, AaveV3KernelStorageLib } from "../../../libraries/kernels/AaveV3KernelStorageLib.sol";
 import { BaseKernel } from "../BaseKernel.sol";
 

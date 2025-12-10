@@ -31,15 +31,23 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
     /// @dev Permissions the function to only the market's senior tranche
     /// @dev Should be placed on all ST deposit and withdraw functions
     modifier onlySeniorTranche() {
-        require(msg.sender == BaseKernelStorageLib._getBaseKernelStorage().seniorTranche, ONLY_SENIOR_TRANCHE());
+        _onlySeniorTranche();
         _;
+    }
+
+    function _onlySeniorTranche() internal view {
+        require(msg.sender == BaseKernelStorageLib._getBaseKernelStorage().seniorTranche, ONLY_SENIOR_TRANCHE());
     }
 
     /// @dev Permissions the function to only the market's junior tranche
     /// @dev Should be placed on all JT deposit and withdraw functions
     modifier onlyJuniorTranche() {
-        require(msg.sender == BaseKernelStorageLib._getBaseKernelStorage().juniorTranche, ONLY_JUNIOR_TRANCHE());
+        _onlyJuniorTranche();
         _;
+    }
+
+    function _onlyJuniorTranche() internal view {
+        require(msg.sender == BaseKernelStorageLib._getBaseKernelStorage().juniorTranche, ONLY_JUNIOR_TRANCHE());
     }
 
     /**
