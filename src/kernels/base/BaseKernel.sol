@@ -244,8 +244,12 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
             /// @dev STEP_REPAY_JT_COVERAGE_DEBT: Pay off any JT debt to ST (previously uncovered losses)
             uint256 jtDebtRepayment = Math.min(jtGain, jtCoverageDebt);
             if (jtDebtRepayment != 0) {
-                stEffectiveNAV += jtDebtRepayment;
+                // Repay JT debt to ST
+                // This is equivalent to retroactively applying coverage for previously uncovered losses, this is now booked as ST debt to JT
                 jtCoverageDebt -= jtDebtRepayment;
+                stCoverageDebt += jtDebtRepayment;
+                // Apply the repayment (retroactive coverage) to the ST
+                stEffectiveNAV += jtDebtRepayment;
                 jtGain -= jtDebtRepayment;
             }
             /// @dev STEP_JT_BOOK_REMAINING_GAIN: JT accrues remaining appreciation
