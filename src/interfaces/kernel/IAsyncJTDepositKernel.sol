@@ -34,6 +34,16 @@ interface IAsyncJTDepositKernel {
     function jtClaimableDepositRequest(uint256 _requestId, address _controller) external view returns (uint256 claimableAssets);
 
     /**
+     * @notice Claims a cancelled deposit request for a specified controller
+     * @dev It is expected that this function transfers the assets to the receiver directly after the cancellation is processed
+     * @param _requestId The request ID of this deposit request
+     * @param _receiver The receiver of the cancelled deposit assets
+     * @param _controller The controller corresponding to this request
+     * @return assets The amount of assets claimed from the cancelled deposit request
+     */
+    function jtClaimCancelDepositRequest(uint256 _requestId, address _receiver, address _controller) external returns (uint256 assets);
+
+    /**
      * @notice Cancels a pending deposit request for the specified controller
      * @dev The tranche calling this function must have a pending deposit request with this requestId and/or controller
      * @param _caller The address of the user requesting the cancelation of a deposit request for the junior tranche

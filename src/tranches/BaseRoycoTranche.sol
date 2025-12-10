@@ -38,6 +38,15 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
     /// @notice Thrown when the caller is not the expected account or an approved operator
     error ONLY_CALLER_OR_OPERATOR();
 
+    /// @notice Thrown when the underlying shares allocated are greater than the total underlying shares
+    error InvalidUnderlyingSharesAllocated(uint256 underlyingSharesAllocated, uint256 totalUnderlyingShares);
+
+    /// @notice Thrown when the redeem amount is zero
+    error ERC4626ZeroRedeemAmount();
+
+    /// @notice Thrown when the deposit amount is zero
+    error ERC4626ZeroDepositAmount();
+
     /**
      * @notice Modifier to ensure the functionality is disabled
      */
@@ -182,12 +191,23 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
     {
         // Assert that the user's deposited assets fall under the max limit
         uint256 maxDepositableAssets = maxDeposit(_receiver);
+        require(_assets != 0, ERC4626ZeroDepositAmount());
         require(_assets <= maxDepositableAssets, ERC4626ExceededMaxDeposit(_receiver, _assets, maxDepositableAssets));
+
+        IBaseKernel kernel = IBaseKernel(_kernel());
+        IERC20 asset = IERC20(asset());
+
+        // Transfer the assets from the receiver to the kernel, if the deposit is synchronous
+        // If the deposit is asynchronous, the assets were transferred in during requestDeposit
+        if (_isSync(Action.DEPOSIT)) {
+            asset.safeTransferFrom(_receiver, address(kernel), _assets);
+        }
 
         // Deposit the assets into the underlying investment opportunity and get the fraction of total assets allocated
         (uint256 underlyingSharesAllocated, uint256 totalUnderlyingShares) = (_isSeniorTranche()
-                ? IBaseKernel(_kernel()).stDeposit(asset(), _assets, _controller, _receiver)
-                : IBaseKernel(_kernel()).jtDeposit(asset(), _assets, _controller, _receiver));
+                ? kernel.stDeposit(address(asset), _assets, _controller, _receiver)
+                : kernel.jtDeposit(address(asset), _assets, _controller, _receiver));
+        require(underlyingSharesAllocated <= totalUnderlyingShares, InvalidUnderlyingSharesAllocated(underlyingSharesAllocated, totalUnderlyingShares));
 
         // Calculate the proportional amount of shares to mint to the receiver such that lp_st_shares / total_st_shares = underlying_shares_allocated / total_underlying_shares
         // sharesToMint / (totalSupply() + 10 ** _decimalsOffset() + sharesToMint) = underlyingSharesAllocated / (totalUnderlyingShares + 1)
@@ -200,7 +220,9 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         .mulDiv(underlyingSharesAllocated, totalUnderlyingShares - underlyingSharesAllocated + 1, Math.Rounding.Floor);
 
         // Mint the shares to the receiver
-        _deposit(msg.sender, _receiver, _assets, sharesToMint);
+        _mint(_receiver, sharesToMint);
+
+        emit Deposit(msg.sender, _receiver, _assets, sharesToMint);
     }
 
     /// @inheritdoc ERC4626Upgradeable
@@ -249,6 +271,8 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         onlyCallerOrOperator(_controller)
         returns (uint256 assets)
     {
+        require(_shares != 0, ERC4626ZeroRedeemAmount());
+
         // Assert that the shares being redeeemed by the user fall under the permissible limits
         uint256 maxRedeemableShares = maxRedeem(_controller);
         require(_shares <= maxRedeemableShares, ERC4626ExceededMaxRedeem(_controller, _shares, maxRedeemableShares));
@@ -298,14 +322,10 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         executionIsAsync(Action.DEPOSIT)
         returns (uint256 requestId)
     {
-        // Transfer the assets from the owner to the tranche
-        /// @dev These assets must not be counted in the NAV (total assets). Enforced by the kernel.
-        _transferIn(_owner, _assets);
-
         address kernel = _kernel();
 
-        // Approve the assets to be transferred to the kernel
-        IERC20(asset()).approve(kernel, _assets);
+        // Transfer the assets from the owner to the kernel
+        IERC20(asset()).safeTransferFrom(_owner, kernel, _assets);
 
         // Queue the deposit request and get the request ID from the kernel
         requestId =
@@ -365,6 +385,8 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         executionIsAsync(Action.WITHDRAW)
         returns (uint256 requestId)
     {
+        require(_shares != 0, ERC4626ZeroRedeemAmount());
+
         // Spend the caller's share allowance if the caller isn't the owner or an approved operator
         if (msg.sender != _owner && !RoycoTrancheStorageLib._getRoycoTrancheStorage().isOperator[_owner][msg.sender]) {
             _spendAllowance(_owner, msg.sender, _shares);
@@ -493,14 +515,11 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         onlyCallerOrOperator(_controller)
         executionIsAsync(Action.DEPOSIT)
     {
-        // Get the claimable amount before claiming
+        // Expect the kernel to transfer the assets to the receiver directly after the cancellation is processed
         uint256 assets =
             (_isSeniorTranche()
-                ? IAsyncSTDepositKernel(_kernel()).stClaimableCancelDepositRequest(_requestId, _controller)
-                : IAsyncJTDepositKernel(_kernel()).jtClaimableCancelDepositRequest(_requestId, _controller));
-
-        // Transfer cancelled deposit assets to receiver
-        _transferOut(_receiver, assets);
+                ? IAsyncSTDepositKernel(_kernel()).stClaimCancelDepositRequest(_requestId, _receiver, _controller)
+                : IAsyncJTDepositKernel(_kernel()).jtClaimCancelDepositRequest(_requestId, _receiver, _controller));
 
         emit CancelDepositClaim(_controller, _receiver, _requestId, msg.sender, assets);
     }
@@ -602,14 +621,6 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
     function supportsInterface(bytes4 _interfaceId) public pure virtual override(IERC165) returns (bool) {
         return _interfaceId == type(IERC165).interfaceId || _interfaceId == type(ERC4626Upgradeable).interfaceId || _interfaceId == type(IERC7540).interfaceId
             || _interfaceId == type(IERC7575).interfaceId || _interfaceId == type(IERC7887).interfaceId || _interfaceId == type(IRoycoTranche).interfaceId;
-    }
-
-    /// @inheritdoc ERC4626Upgradeable
-    function _deposit(address _caller, address _receiver, uint256 _assets, uint256 _shares) internal virtual override(ERC4626Upgradeable) {
-        // If deposits are synchronous, transfer the assets to the tranche and mint the shares
-        if (_isSync(Action.DEPOSIT)) super._deposit(_caller, _receiver, _assets, _shares);
-        // If deposits are asynchronous, only mint shares since assets were transfered in on the request
-        else _mint(_receiver, _shares);
     }
 
     /// @inheritdoc ERC4626Upgradeable
