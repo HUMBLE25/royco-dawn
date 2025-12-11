@@ -97,7 +97,7 @@ abstract contract AaveV3JTKernel is BaseKernel, BaseAsyncJTWithrawalDelayKernel 
         // Compute the assets expected to be received on withdrawal based on the JT's effective NAV
         assetsWithdrawn = _shares.mulDiv(jtEffectiveNAV, _totalShares, Math.Rounding.Floor);
 
-        // Compute the yield to claim from the ST, rounding in favor of ST
+        // Compute the yield to claim from the ST
         uint256 yieldToClaim = _shares.mulDiv(Math.saturatingSub(jtEffectiveNAV, $.lastJTRawNAV), _totalShares, Math.Rounding.Floor);
         // Pull any yield that needs to be realized from ST
         if (yieldToClaim != 0) _claimJTYieldFromST(_asset, yieldToClaim, _receiver);

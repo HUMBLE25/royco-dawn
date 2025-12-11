@@ -28,6 +28,9 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
     /// @notice Thrown when the caller of a permissioned function isn't the market's junior tranche
     error ONLY_JUNIOR_TRANCHE();
 
+    /// @notice Thrown when the sum of the raw NAVs don't equal the sum of the effective NAVs of both tranches
+    error NAV_CONSERVATION_VIOLATION();
+
     /// @notice Thrown when an operation results in an invalid NAV state in the post-operation synchronization
     error INVALID_POST_OP_STATE(Operation _op);
 
@@ -357,6 +360,9 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
             stEffectiveNAV += (stGain - jtYield);
             yieldDistributed = true;
         }
+
+        // Enforce NAV conservation invariant
+        require(stRawNAV + jtRawNAV == stEffectiveNAV + jtEffectiveNAV, NAV_CONSERVATION_VIOLATION());
     }
 
     /**
@@ -434,17 +440,13 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
                 if (deltaJT < 0) {
                     // The actual amount withdrawn was the delta in ST raw NAV and the coverage applied from JT
                     uint256 coverageRealized = uint256(-deltaJT);
-                    $.lastSTEffectiveNAV -= (uint256(-deltaST) + coverageRealized);
+                    $.lastSTEffectiveNAV = Math.saturatingSub($.lastSTEffectiveNAV, (uint256(-deltaST) + coverageRealized));
                     /// We need to adjust debts by accounting for the realized coverage
                     // The coverage realization waterfall works by first erasing ST debt and then JT debt
                     // This mimics the same top -> down waterfall used to apply coverage when computing effective NAVs
-                    // Erase as much ST coverage debt as possible
+                    // Erase as much ST coverage debt as possible since these liabilities have been realized by ST
                     uint256 stCoverageDebtErased = Math.min(coverageRealized, $.lastSTCoverageDebt);
                     if (stCoverageDebtErased != 0) $.lastSTCoverageDebt -= stCoverageDebtErased;
-                    // Reduce remaining available coverage
-                    coverageRealized -= stCoverageDebtErased;
-                    // Apply the remainder to erasing JT debt
-                    if (coverageRealized != 0) $.lastJTCoverageDebt = Math.saturatingSub($.lastJTCoverageDebt, coverageRealized);
                 } else {
                     // Apply the withdrawal to the senior tranche's effective NAV
                     $.lastSTEffectiveNAV = Math.saturatingSub($.lastSTEffectiveNAV, uint256(-deltaST));
@@ -454,7 +456,6 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
                 require(deltaJT < 0 && deltaST <= 0, INVALID_POST_OP_STATE(_op));
                 // Junior withdrew: The NAV deltas include the discrete withdrawal amount in addition to any yield pulled from ST to JT
                 // If the withdrawal used ST capital to claim yield when facilitating this JT withdrawal
-                // No need to touch debt accounting: all debts are cleared
                 // If ST delta was negative, the actual amount withdrawn by JT was the delta in JT raw NAV and the yield claimed from ST
                 if (deltaST < 0) $.lastJTEffectiveNAV = Math.saturatingSub($.lastJTEffectiveNAV, (uint256(-deltaJT) + uint256(-deltaST)));
                 // Apply the pure withdrawal to the junior tranche's effective NAV
