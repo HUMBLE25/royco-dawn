@@ -85,8 +85,6 @@ abstract contract ERC4626STKernel is BaseKernel {
         BaseKernelState storage $ = BaseKernelStorageLib._getBaseKernelStorage();
         // Compute the assets expected to be received on withdrawal based on the ST's effective NAV
         uint256 assetsToWithdraw = _shares.mulDiv($.lastSTEffectiveNAV, _totalShares, Math.Rounding.Floor);
-
-        uint256 stAssetsToWithdraw = _shares.mulDiv($.lastSTRawNAV, _totalShares, Math.Rounding.Floor);
         // Compute the coverage that needs to pulled from JT in this withdrawal, rounding in favor of ST
         uint256 coverageToRealize = _shares.mulDiv(BaseKernelStorageLib._getBaseKernelStorage().lastSTCoverageDebt, _totalShares, Math.Rounding.Ceil);
         // Pull any coverge that needs to be realized from JT
@@ -117,8 +115,8 @@ abstract contract ERC4626STKernel is BaseKernel {
 
     /// @inheritdoc BaseKernel
     function _getSeniorTrancheRawNAV() internal view override(BaseKernel) returns (uint256) {
-        // Must use preview redeem for all the tranche owned shares
-        // Max withdraw might misreport NAV due to global withdrawal limits
+        // Must use preview redeem for the tranche owned shares
+        // Max withdraw will mistake illiquidity for NAV losses
         address vault = ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault;
         uint256 trancheSharesBalance = IERC4626(vault).balanceOf(address(this));
         return IERC4626(vault).previewRedeem(trancheSharesBalance);
