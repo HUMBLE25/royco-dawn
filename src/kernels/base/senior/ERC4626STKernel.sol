@@ -20,18 +20,24 @@ abstract contract ERC4626STKernel is BaseKernel {
     /// @inheritdoc IBaseKernel
     ExecutionModel public constant ST_WITHDRAWAL_EXECUTION_MODEL = ExecutionModel.SYNC;
 
+    /// @notice Thrown when the ST base asset is different the the ERC4626 vault's base asset
+    error TRANCHE_AND_VAULT_ASSET_MISMATCH();
+
     /**
      * @notice Initializes a kernel where the senior tranche is deployed into an ERC4626 vault
      * @dev Mandates that the base kernel state is already initialized
      * @param _vault The address of the ERC4626 compliant vault
+     * @param _stAsset The address of the base asset of the senior tranche
      */
-    function __ERC4626STKernel_init_unchained(address _vault) internal onlyInitializing {
+    function __ERC4626STKernel_init_unchained(address _vault, address _stAsset) internal onlyInitializing {
+        // Ensure that the ST base asset is identical to the ERC4626 vault's base asset
+        require(IERC4626(_vault).asset() == _stAsset, TRANCHE_AND_VAULT_ASSET_MISMATCH());
+
         // Extend a one time max approval to the ERC4626 vault for the ST's base asset
-        address stAsset = IERC4626(BaseKernelStorageLib._getBaseKernelStorage().seniorTranche).asset();
-        IERC20(stAsset).forceApprove(address(_vault), type(uint256).max);
+        IERC20(_stAsset).forceApprove(address(_vault), type(uint256).max);
 
         // Initialize the ERC4626 ST kernel storage
-        ERC4626STKernelStorageLib.__ERC4626STKernel_init(_vault, stAsset);
+        ERC4626STKernelStorageLib.__ERC4626STKernel_init(_vault, _stAsset);
     }
 
     /// @inheritdoc IBaseKernel

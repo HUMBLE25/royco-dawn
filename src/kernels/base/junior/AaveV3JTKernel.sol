@@ -26,20 +26,25 @@ abstract contract AaveV3JTKernel is BaseKernel, BaseAsyncJTWithrawalDelayKernel 
     /// @inheritdoc IBaseKernel
     ExecutionModel public constant JT_WITHDRAWAL_EXECUTION_MODEL = ExecutionModel.ASYNC;
 
+    /// @notice Thrown when the JT base asset is not a supported reserve token in the Aave V3 Pool
+    error UNSUPPORTED_RESERVE_TOKEN();
+
     /**
      * @notice Initializes a kernel where the junior tranche is deployed into Aave V3
      * @dev Mandates that the base kernel state is already initialized
      * @param _aaveV3Pool The address of the Aave V3 Pool
+     * @param _jtAsset The address of the base asset of the junior tranche
      */
-    function __AaveV3JTKernel_init_unchained(address _aaveV3Pool) internal onlyInitializing {
+    function __AaveV3JTKernel_init_unchained(address _aaveV3Pool, address _jtAsset) internal onlyInitializing {
+        // Ensure that the JT base asset is identical to the ERC4626 vault
+        address jtAssetAToken = IPool(_aaveV3Pool).getReserveAToken(_jtAsset);
+        require(jtAssetAToken != address(0), UNSUPPORTED_RESERVE_TOKEN());
+
         // Extend a one time max approval to the Aave V3 pool for the JT's base asset
-        address jtAsset = IERC4626(BaseKernelStorageLib._getBaseKernelStorage().juniorTranche).asset();
-        IERC20(jtAsset).forceApprove(_aaveV3Pool, type(uint256).max);
+        IERC20(_jtAsset).forceApprove(_aaveV3Pool, type(uint256).max);
 
         // Initialize the Aave V3 kernel storage
-        AaveV3KernelStorageLib.__AaveV3Kernel_init(
-            _aaveV3Pool, address(IPool(_aaveV3Pool).ADDRESSES_PROVIDER()), jtAsset, IPool(_aaveV3Pool).getReserveAToken(jtAsset)
-        );
+        AaveV3KernelStorageLib.__AaveV3Kernel_init(_aaveV3Pool, address(IPool(_aaveV3Pool).ADDRESSES_PROVIDER()), _jtAsset, jtAssetAToken);
     }
 
     /// @inheritdoc IBaseKernel
