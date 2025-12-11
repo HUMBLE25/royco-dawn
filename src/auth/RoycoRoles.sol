@@ -17,5 +17,6 @@ library RoycoRoles {
 
     /// Kernel roles
     bytes32 public constant SYNC_ROLE = keccak256(abi.encode("ROYCO_SYNC_ROLE"));
+    bytes32 public constant KERNEL_ADMIN_ROLE = keccak256(abi.encode("ROYCO_KERNEL_ADMIN_ROLE"));
 }
 

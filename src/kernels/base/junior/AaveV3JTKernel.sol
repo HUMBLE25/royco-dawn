@@ -12,8 +12,9 @@ import { ExecutionModel, IBaseKernel } from "../../../interfaces/kernel/IBaseKer
 import { BaseKernelStorageLib } from "../../../libraries/BaseKernelStorageLib.sol";
 import { AaveV3KernelState, AaveV3KernelStorageLib } from "../../../libraries/kernels/AaveV3KernelStorageLib.sol";
 import { BaseKernel } from "../BaseKernel.sol";
+import { BaseAsyncJTWithrawalDelayKernel } from "./BaseAsyncJTWithrawalDelayKernel.sol";
 
-abstract contract AaveV3JTKernel is BaseKernel {
+abstract contract AaveV3JTKernel is BaseKernel, BaseAsyncJTWithrawalDelayKernel {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
@@ -21,7 +22,7 @@ abstract contract AaveV3JTKernel is BaseKernel {
     ExecutionModel public constant JT_DEPOSIT_EXECUTION_MODEL = ExecutionModel.SYNC;
 
     /// @inheritdoc IBaseKernel
-    ExecutionModel public constant JT_WITHDRAWAL_EXECUTION_MODEL = ExecutionModel.SYNC;
+    ExecutionModel public constant JT_WITHDRAWAL_EXECUTION_MODEL = ExecutionModel.ASYNC;
 
     /**
      * @notice Initializes a kernel where the junior tranche is deployed into Aave V3
@@ -40,7 +41,7 @@ abstract contract AaveV3JTKernel is BaseKernel {
     }
 
     /// @inheritdoc IBaseKernel
-    function getJTTotalEffectiveAssets() external view override(IBaseKernel) returns (uint256) {
+    function getJTTotalEffectiveAssets() public view override(IBaseKernel, BaseAsyncJTWithrawalDelayKernel) returns (uint256) {
         return _getJuniorTrancheEffectiveNAV();
     }
 
@@ -70,7 +71,7 @@ abstract contract AaveV3JTKernel is BaseKernel {
         address,
         uint256 _shares,
         uint256 _totalShares,
-        address,
+        address _controller,
         address _receiver
     )
         external
@@ -80,7 +81,10 @@ abstract contract AaveV3JTKernel is BaseKernel {
         whenNotPaused
         returns (uint256 assetsWithdrawn)
     {
+        _processClaimableRedeemRequest(_controller, _shares);
+
         // Only withdraw the assets that are still owed to the receiver
+        // TODO: Virtual Shares and decimal offset
         assetsWithdrawn = _shares.mulDiv(_getJuniorTrancheEffectiveNAV(), _totalShares, Math.Rounding.Floor);
         // TODO: Account for ST yield in withdrawal
         _withdrawFromPool(assetsWithdrawn, _receiver);

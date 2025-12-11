@@ -208,20 +208,23 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         }
 
         // Deposit the assets into the underlying investment opportunity and get the fraction of total assets allocated
-        (uint256 underlyingSharesAllocated, uint256 totalUnderlyingShares) = (_isSeniorTranche()
+        (uint256 underlyingSharesAllocated, uint256 totalEffectiveUnderlyingShares) = (_isSeniorTranche()
                 ? kernel.stDeposit(address(asset), _assets, _controller, _receiver)
                 : kernel.jtDeposit(address(asset), _assets, _controller, _receiver));
-        require(underlyingSharesAllocated <= totalUnderlyingShares, InvalidUnderlyingSharesAllocated(underlyingSharesAllocated, totalUnderlyingShares));
+        require(
+            underlyingSharesAllocated <= totalEffectiveUnderlyingShares,
+            InvalidUnderlyingSharesAllocated(underlyingSharesAllocated, totalEffectiveUnderlyingShares)
+        );
 
         // Calculate the proportional amount of shares to mint to the receiver such that lp_st_shares / total_st_shares = underlying_shares_allocated / total_underlying_shares
-        // sharesToMint / (totalSupply() + 10 ** _decimalsOffset() + sharesToMint) = underlyingSharesAllocated / (totalUnderlyingShares + 1)
+        // sharesToMint / (totalSupply() + 10 ** _decimalsOffset() + sharesToMint) = underlyingSharesAllocated / (totalEffectiveUnderlyingShares + 1)
         // In the synchronous case, this is equivalent to previewDeposit(_assets)
         // In the asynchronos case, the deposit request may not be have been fulfilled at the current nav.
         //  Therefore, the kernel is expected to keep track of the underlying opportunity shares minted against the request.
         //  The ratio of these shares to the total underlying shares held by the system represent the user's claim on the vault, therefore we mint
         //  an equivalent amount of shares to the receiver.
         shares = (totalSupply() + 10 ** _decimalsOffset())
-        .mulDiv(underlyingSharesAllocated, totalUnderlyingShares - underlyingSharesAllocated + 1, Math.Rounding.Floor);
+        .mulDiv(underlyingSharesAllocated, totalEffectiveUnderlyingShares - underlyingSharesAllocated + 1, Math.Rounding.Floor);
 
         // Mint the shares to the receiver
         _mint(_receiver, shares);
@@ -416,8 +419,8 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         returns (uint256 pendingShares)
     {
         return (_isSeniorTranche()
-                ? IAsyncSTWithdrawalKernel(_kernel()).stPendingWithdrawalRequest(_requestId, _controller)
-                : IAsyncJTWithdrawalKernel(_kernel()).jtPendingWithdrawalRequest(_requestId, _controller));
+                ? IAsyncSTWithdrawalKernel(_kernel()).stPendingWithdrawalRequest(_requestId, totalSupply(), _controller)
+                : IAsyncJTWithdrawalKernel(_kernel()).jtPendingWithdrawalRequest(_requestId, totalSupply(), _controller));
     }
 
     /// @inheritdoc IERC7540
@@ -434,8 +437,8 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         returns (uint256 claimableShares)
     {
         return (_isSeniorTranche()
-                ? IAsyncSTWithdrawalKernel(_kernel()).stClaimableWithdrawalRequest(_requestId, _controller)
-                : IAsyncJTWithdrawalKernel(_kernel()).jtClaimableWithdrawalRequest(_requestId, _controller));
+                ? IAsyncSTWithdrawalKernel(_kernel()).stClaimableWithdrawalRequest(_requestId, totalSupply(), _controller)
+                : IAsyncJTWithdrawalKernel(_kernel()).jtClaimableWithdrawalRequest(_requestId, totalSupply(), _controller));
     }
 
     // =============================
@@ -579,6 +582,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         executionIsAsync(Action.WITHDRAW)
         returns (uint256 shares)
     {
+        // TODO: This funciton returns assets, not shares
         return (_isSeniorTranche()
                 ? IAsyncSTWithdrawalKernel(_kernel()).stClaimableCancelWithdrawalRequest(_requestId, _controller)
                 : IAsyncJTWithdrawalKernel(_kernel()).jtClaimableCancelWithdrawalRequest(_requestId, _controller));
@@ -599,6 +603,8 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         onlyCallerOrOperator(_owner)
         executionIsAsync(Action.WITHDRAW)
     {
+        // TODO: This funciton returns assets, not shares
+
         // Get the claimable amount before claiming
         uint256 shares =
             (_isSeniorTranche()
