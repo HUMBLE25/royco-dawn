@@ -2,6 +2,7 @@
 pragma solidity ^0.8.28;
 
 import { ExecutionModel, IBaseKernel } from "../interfaces/kernel/IBaseKernel.sol";
+import { TrancheType } from "./Types.sol";
 
 /// @notice Storage state for Royco Tranche contracts
 /// @custom:storage-location erc7201:Royco.storage.RoycoTrancheState
@@ -45,15 +46,15 @@ library RoycoTrancheStorageLib {
     /// @param _kernel The address of the kernel contract handling strategy logic
     /// @param _marketId The identifier of the Royco market this tranche is linked to
     /// @param _decimalsOffset Decimals offset for share token precision
-    /// @param _isSeniorTranche Whether the tranche is a senior tranche
-    function __RoycoTranche_init(address _royco, address _kernel, bytes32 _marketId, uint8 _decimalsOffset, bool _isSeniorTranche) internal {
+    /// @param _trancheType The type of the tranche
+    function __RoycoTranche_init(address _royco, address _kernel, bytes32 _marketId, uint8 _decimalsOffset, TrancheType _trancheType) internal {
         // Set the initial state of the tranche
         RoycoTrancheState storage $ = _getRoycoTrancheStorage();
         $.royco = _royco;
         $.kernel = _kernel;
         $.marketId = _marketId;
         $.decimalsOffset = _decimalsOffset;
-        if (_isSeniorTranche) {
+        if (_trancheType == TrancheType.SENIOR) {
             $.DEPOSIT_EXECUTION_MODEL = IBaseKernel(_kernel).ST_DEPOSIT_EXECUTION_MODEL();
             $.WITHDRAW_EXECUTION_MODEL = IBaseKernel(_kernel).ST_WITHDRAWAL_EXECUTION_MODEL();
         } else {

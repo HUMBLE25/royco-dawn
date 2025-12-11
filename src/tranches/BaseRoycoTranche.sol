@@ -18,6 +18,7 @@ import { IAsyncSTWithdrawalKernel } from "../interfaces/kernel/IAsyncSTWithdrawa
 import { ExecutionModel, IBaseKernel } from "../interfaces/kernel/IBaseKernel.sol";
 import { IERC165, IERC7540, IERC7575, IERC7887, IRoycoTranche } from "../interfaces/tranche/IRoycoTranche.sol";
 import { RoycoTrancheStorageLib } from "../libraries/RoycoTrancheStorageLib.sol";
+import { TrancheType } from "../libraries/Types.sol";
 import { Action, TrancheDeploymentParams } from "../libraries/Types.sol";
 
 /// @title BaseRoycoTranche
@@ -119,22 +120,24 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         uint8 decimalsOffset = underlyingAssetDecimals >= 18 ? 0 : (18 - underlyingAssetDecimals);
 
         // Initialize the tranche's state
-        RoycoTrancheStorageLib.__RoycoTranche_init(msg.sender, _kernelAddress, _marketId, decimalsOffset, _isSeniorTranche());
+        RoycoTrancheStorageLib.__RoycoTranche_init(msg.sender, _kernelAddress, _marketId, decimalsOffset, TRANCHE_TYPE());
     }
 
     /// @inheritdoc ERC4626Upgradeable
     function totalAssets() public view virtual override(ERC4626Upgradeable) returns (uint256) {
-        return (_isSeniorTranche() ? IBaseKernel(_kernel()).getSTTotalEffectiveAssets() : IBaseKernel(_kernel()).getJTTotalEffectiveAssets());
+        return (TRANCHE_TYPE() == TrancheType.SENIOR ? IBaseKernel(_kernel()).getSTTotalEffectiveAssets() : IBaseKernel(_kernel()).getJTTotalEffectiveAssets());
     }
 
     /// @inheritdoc IRoycoTranche
     function getNAV() external view override(IRoycoTranche) returns (uint256) {
-        return (_isSeniorTranche() ? IBaseKernel(_kernel()).getSTEffectiveNAV() : IBaseKernel(_kernel()).getJTEffectiveNAV());
+        return (TRANCHE_TYPE() == TrancheType.SENIOR ? IBaseKernel(_kernel()).getSTEffectiveNAV() : IBaseKernel(_kernel()).getJTEffectiveNAV());
     }
 
     /// @inheritdoc ERC4626Upgradeable
     function maxDeposit(address _receiver) public view override(ERC4626Upgradeable) returns (uint256) {
-        return (_isSeniorTranche() ? IBaseKernel(_kernel()).stMaxDeposit(asset(), _receiver) : IBaseKernel(_kernel()).jtMaxDeposit(asset(), _receiver));
+        return (TRANCHE_TYPE() == TrancheType.SENIOR
+                ? IBaseKernel(_kernel()).stMaxDeposit(asset(), _receiver)
+                : IBaseKernel(_kernel()).jtMaxDeposit(asset(), _receiver));
     }
 
     /// @inheritdoc ERC4626Upgradeable
@@ -149,7 +152,9 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
     /// @dev Should be overridden by junior tranches to check for withdrawal capacity
     function maxRedeem(address _owner) public view virtual override(ERC4626Upgradeable) returns (uint256) {
         uint256 maxWithdrawable =
-            (_isSeniorTranche() ? IBaseKernel(_kernel()).stMaxWithdraw(asset(), _owner) : IBaseKernel(_kernel()).jtMaxWithdraw(asset(), _owner));
+            (TRANCHE_TYPE() == TrancheType.SENIOR
+                ? IBaseKernel(_kernel()).stMaxWithdraw(asset(), _owner)
+                : IBaseKernel(_kernel()).jtMaxWithdraw(asset(), _owner));
 
         return maxWithdrawable.mulDiv(totalSupply(), totalAssets(), Math.Rounding.Floor);
     }
@@ -208,7 +213,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         }
 
         // Deposit the assets into the underlying investment opportunity and get the fraction of total assets allocated
-        (uint256 underlyingSharesAllocated, uint256 totalEffectiveUnderlyingShares) = (_isSeniorTranche()
+        (uint256 underlyingSharesAllocated, uint256 totalEffectiveUnderlyingShares) = (TRANCHE_TYPE() == TrancheType.SENIOR
                 ? kernel.stDeposit(address(asset), _assets, _controller, _receiver)
                 : kernel.jtDeposit(address(asset), _assets, _controller, _receiver));
         require(
@@ -277,7 +282,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         // Process the withdrawal from the underlying investment opportunity
         // It is expected that the kernel transfers the assets directly to the receiver
         uint256 assetsWithdrawn =
-            (_isSeniorTranche()
+            (TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IBaseKernel(_kernel()).stRedeem(asset(), _shares, totalSupply(), _controller, _receiver)
                 : IBaseKernel(_kernel()).jtRedeem(asset(), _shares, totalSupply(), _controller, _receiver));
         assets = assetsWithdrawn;
@@ -328,7 +333,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
 
         // Queue the deposit request and get the request ID from the kernel
         requestId =
-        (_isSeniorTranche()
+        (TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTDepositKernel(kernel).stRequestDeposit(msg.sender, _assets, _controller)
                 : IAsyncJTDepositKernel(kernel).jtRequestDeposit(msg.sender, _assets, _controller));
 
@@ -348,7 +353,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         executionIsAsync(Action.DEPOSIT)
         returns (uint256)
     {
-        return (_isSeniorTranche()
+        return (TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTDepositKernel(_kernel()).stPendingDepositRequest(_requestId, _controller)
                 : IAsyncJTDepositKernel(_kernel()).jtPendingDepositRequest(_requestId, _controller));
     }
@@ -366,7 +371,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         executionIsAsync(Action.DEPOSIT)
         returns (uint256)
     {
-        return (_isSeniorTranche()
+        return (TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTDepositKernel(_kernel()).stClaimableDepositRequest(_requestId, _controller)
                 : IAsyncJTDepositKernel(_kernel()).jtClaimableDepositRequest(_requestId, _controller));
     }
@@ -398,7 +403,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
 
         // Queue the redemption request and get the request ID from the kernel
         requestId =
-        (_isSeniorTranche()
+        (TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTWithdrawalKernel(_kernel()).stRequestWithdrawal(msg.sender, _shares, totalSupply(), _controller)
                 : IAsyncJTWithdrawalKernel(_kernel()).jtRequestWithdrawal(msg.sender, _shares, totalSupply(), _controller));
 
@@ -418,7 +423,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         executionIsAsync(Action.WITHDRAW)
         returns (uint256 pendingShares)
     {
-        return (_isSeniorTranche()
+        return (TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTWithdrawalKernel(_kernel()).stPendingWithdrawalRequest(_requestId, totalSupply(), _controller)
                 : IAsyncJTWithdrawalKernel(_kernel()).jtPendingWithdrawalRequest(_requestId, totalSupply(), _controller));
     }
@@ -436,7 +441,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         executionIsAsync(Action.WITHDRAW)
         returns (uint256 claimableShares)
     {
-        return (_isSeniorTranche()
+        return (TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTWithdrawalKernel(_kernel()).stClaimableWithdrawalRequest(_requestId, totalSupply(), _controller)
                 : IAsyncJTWithdrawalKernel(_kernel()).jtClaimableWithdrawalRequest(_requestId, totalSupply(), _controller));
     }
@@ -459,7 +464,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         onlyCallerOrOperator(_controller)
         executionIsAsync(Action.DEPOSIT)
     {
-        if (_isSeniorTranche()) {
+        if (TRANCHE_TYPE() == TrancheType.SENIOR) {
             IAsyncSTDepositKernel(_kernel()).stCancelDepositRequest(msg.sender, _requestId, _controller);
         } else {
             IAsyncJTDepositKernel(_kernel()).jtCancelDepositRequest(msg.sender, _requestId, _controller);
@@ -481,7 +486,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         executionIsAsync(Action.DEPOSIT)
         returns (bool isPending)
     {
-        return (_isSeniorTranche()
+        return (TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTDepositKernel(_kernel()).stPendingCancelDepositRequest(_requestId, _controller)
                 : IAsyncJTDepositKernel(_kernel()).jtPendingCancelDepositRequest(_requestId, _controller));
     }
@@ -499,7 +504,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         executionIsAsync(Action.DEPOSIT)
         returns (uint256 assets)
     {
-        return (_isSeniorTranche()
+        return (TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTDepositKernel(_kernel()).stClaimableCancelDepositRequest(_requestId, _controller)
                 : IAsyncJTDepositKernel(_kernel()).jtClaimableCancelDepositRequest(_requestId, _controller));
     }
@@ -521,7 +526,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
     {
         // Expect the kernel to transfer the assets to the receiver directly after the cancellation is processed
         uint256 assets =
-            (_isSeniorTranche()
+            (TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTDepositKernel(_kernel()).stClaimCancelDepositRequest(_requestId, _receiver, _controller)
                 : IAsyncJTDepositKernel(_kernel()).jtClaimCancelDepositRequest(_requestId, _receiver, _controller));
 
@@ -542,7 +547,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         onlyCallerOrOperator(_controller)
         executionIsAsync(Action.WITHDRAW)
     {
-        if (_isSeniorTranche()) {
+        if (TRANCHE_TYPE() == TrancheType.SENIOR) {
             IAsyncSTWithdrawalKernel(_kernel()).stCancelWithdrawalRequest(_requestId, _controller);
         } else {
             IAsyncJTWithdrawalKernel(_kernel()).jtCancelWithdrawalRequest(_requestId, _controller);
@@ -564,7 +569,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         executionIsAsync(Action.WITHDRAW)
         returns (bool isPending)
     {
-        return (_isSeniorTranche()
+        return (TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTWithdrawalKernel(_kernel()).stPendingCancelWithdrawalRequest(_requestId, _controller)
                 : IAsyncJTWithdrawalKernel(_kernel()).jtPendingCancelWithdrawalRequest(_requestId, _controller));
     }
@@ -583,7 +588,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         returns (uint256 shares)
     {
         // TODO: This funciton returns assets, not shares
-        return (_isSeniorTranche()
+        return (TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTWithdrawalKernel(_kernel()).stClaimableCancelWithdrawalRequest(_requestId, _controller)
                 : IAsyncJTWithdrawalKernel(_kernel()).jtClaimableCancelWithdrawalRequest(_requestId, _controller));
     }
@@ -607,7 +612,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
 
         // Get the claimable amount before claiming
         uint256 shares =
-            (_isSeniorTranche()
+            (TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTWithdrawalKernel(_kernel()).stClaimableCancelWithdrawalRequest(_requestId, _owner)
                 : IAsyncJTWithdrawalKernel(_kernel()).jtClaimableCancelWithdrawalRequest(_requestId, _owner));
 
@@ -633,6 +638,9 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
             || _interfaceId == type(IERC7575).interfaceId || _interfaceId == type(IERC7887).interfaceId || _interfaceId == type(IRoycoTranche).interfaceId
             || _interfaceId == type(IAccessControlEnumerable).interfaceId;
     }
+
+    /// @dev Returns the type of the tranche
+    function TRANCHE_TYPE() public pure virtual returns (TrancheType);
 
     /// @inheritdoc ERC4626Upgradeable
     /// @dev Doesn't transfer assets to the receiver. This is the responsibility of the kernel.
@@ -667,9 +675,6 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
     function _decimalsOffset() internal view virtual override(ERC4626Upgradeable) returns (uint8) {
         return RoycoTrancheStorageLib._getRoycoTrancheStorage().decimalsOffset;
     }
-
-    /// @dev Returns if the tranche is a senior tranche
-    function _isSeniorTranche() internal pure virtual returns (bool);
 
     function _kernel() internal view virtual returns (address) {
         return RoycoTrancheStorageLib._getRoycoTrancheStorage().kernel;

@@ -2,6 +2,7 @@
 pragma solidity ^0.8.28;
 
 import { TrancheDeploymentParams } from "../../libraries/Types.sol";
+import { TrancheType } from "../../libraries/Types.sol";
 import { BaseRoycoTranche } from "../BaseRoycoTranche.sol";
 
 // TODO: ST and JT base asset can have different decimals
@@ -17,7 +18,8 @@ contract RoycoST is BaseRoycoTranche {
         __RoycoTranche_init(_stParams, _asset, _owner, _pauser, _marketId);
     }
 
-    function _isSeniorTranche() internal pure override(BaseRoycoTranche) returns (bool) {
-        return true;
+    /// @inheritdoc BaseRoycoTranche
+    function TRANCHE_TYPE() public pure virtual override(BaseRoycoTranche) returns (TrancheType) {
+        return TrancheType.SENIOR;
     }
 }
