@@ -81,36 +81,24 @@ abstract contract ERC4626STKernel is BaseKernel {
         returns (uint256 assetsWithdrawn)
     {
         // Get the storage pointer to the base kernel state
-        // We can assume that all NAV values are synced
+        // We can assume that all NAV and debt values are synced
         BaseKernelState storage $ = BaseKernelStorageLib._getBaseKernelStorage();
         // Compute the assets expected to be received on withdrawal based on the ST's effective NAV
-        uint256 assetsToWithdraw = _shares.mulDiv($.lastSTEffectiveNAV, _totalShares, Math.Rounding.Floor);
-        // Compute the coverage that needs to pulled from JT in this withdrawal, rounding in favor of ST
+        assetsWithdrawn = _shares.mulDiv($.lastSTEffectiveNAV, _totalShares, Math.Rounding.Floor);
+
+        // Compute the coverage that needs to pulled from JT for this withdrawal, rounding in favor of ST
         uint256 coverageToRealize = _shares.mulDiv(BaseKernelStorageLib._getBaseKernelStorage().lastSTCoverageDebt, _totalShares, Math.Rounding.Ceil);
+        coverageToRealize = Math.min(coverageToRealize, _getJuniorTrancheRawNAV());
         // Pull any coverge that needs to be realized from JT
-        if (coverageToRealize != 0) {
-            assetsToWithdraw -= (assetsWithdrawn += _coverSTLossesFromJT(_asset, coverageToRealize, _receiver));
-        }
+        if (coverageToRealize != 0) _coverSTLossesFromJT(_asset, coverageToRealize, _receiver);
+
         // Facilitate the remainder of the withdrawal from ST exposure
-        assetsWithdrawn += _withdrawFromVault(assetsToWithdraw, _receiver);
-        // TODO: Should we check assetsWithdrawn == totalAssetsToWithdraw. Considering rounding in the underlying scenario.
+        IERC4626(ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault).withdraw((assetsWithdrawn - coverageToRealize), _receiver, address(this));
     }
 
     /// @inheritdoc BaseKernel
-    function _claimJTYieldFromST(address, uint256 _yieldAssets, address _receiver) internal override(BaseKernel) returns (uint256 yieldWithdrawn) {
-        return _withdrawFromVault(_yieldAssets, _receiver);
-    }
-
-    /**
-     * @notice Withdraws the specified assets from the ERC4626 vault
-     * @param _assets The amount of assets to withdraw from the pool
-     * @param _receiver The receiver of the withdrawn assets
-     * @param assetsWithdrawn The actual number of assets withdrawn based on max withdrawal limits
-     */
-    function _withdrawFromVault(uint256 _assets, address _receiver) internal returns (uint256 assetsWithdrawn) {
-        uint256 maxSTAssetsWithdrawable = _maxSTWithdrawalGlobally(address(0));
-        assetsWithdrawn = maxSTAssetsWithdrawable >= _assets ? _assets : maxSTAssetsWithdrawable;
-        IERC4626(ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault).withdraw(assetsWithdrawn, _receiver, address(this));
+    function _claimJTYieldFromST(address, uint256 _yieldAssets, address _receiver) internal override(BaseKernel) {
+        IERC4626(ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault).withdraw(_yieldAssets, _receiver, address(this));
     }
 
     /// @inheritdoc BaseKernel

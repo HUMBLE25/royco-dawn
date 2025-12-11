@@ -599,18 +599,16 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
      * @param _asset The asset to cover losses in
      * @param _coverageAssets The assets provided by JT to ST as loss coverage
      * @param _receiver The receiver of the coverage assets
-     * @return coverageWithdrawn The actual amount of coverage assets that were withdrawn
      */
-    function _coverSTLossesFromJT(address _asset, uint256 _coverageAssets, address _receiver) internal virtual returns (uint256 coverageWithdrawn);
+    function _coverSTLossesFromJT(address _asset, uint256 _coverageAssets, address _receiver) internal virtual;
 
     /**
      * @notice Claims junior tranche yield from the senior tranche's controlled assets
      * @param _asset The asset to claim yield in
      * @param _yieldAssets The assets to claim as yield
      * @param _receiver The receiver of the yield assets
-     * @return yieldWithdrawn The actual amount of yield assets that were withdrawn
      */
-    function _claimJTYieldFromST(address _asset, uint256 _yieldAssets, address _receiver) internal virtual returns (uint256 yieldWithdrawn);
+    function _claimJTYieldFromST(address _asset, uint256 _yieldAssets, address _receiver) internal virtual;
 
     /// @inheritdoc UUPSUpgradeable
     /// @dev Will revert if the caller is not the upgrader role
