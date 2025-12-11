@@ -97,7 +97,9 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
      * @param _pauser The initial pauser of the base kernel
      */
     function __BaseKernel_init(BaseKernelInitParams memory _params, address _owner, address _pauser) internal onlyInitializing {
+        // Initialize the auth state of the kernel
         __RoycoAuth_init(_owner, _pauser);
+        // Initialize the base kernel state
         __BaseKernel_init_unchained(_params);
     }
 
@@ -110,7 +112,7 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
         // Ensure that the coverage requirement is valid
         require(_params.coverageWAD < ConstantsLib.WAD && _params.coverageWAD >= ConstantsLib.MIN_COVERAGE_WAD);
         // Ensure that JT withdrawals are not permanently bricked
-        require(uint256(_params.coverageWAD).mulDiv(_params.betaWAD, ConstantsLib.WAD, Math.Rounding.Ceil) <= ConstantsLib.WAD);
+        require(uint256(_params.coverageWAD).mulDiv(_params.betaWAD, ConstantsLib.WAD, Math.Rounding.Ceil) < ConstantsLib.WAD);
         // Ensure that the tranche address and RDM are not null
         require((bytes20(_params.seniorTranche) & bytes20(_params.juniorTranche) & bytes20(_params.rdm)) != bytes20(0));
         // Initialize the base kernel state
@@ -303,7 +305,7 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
                 // Any coverage provided is a ST liability to JT
                 stCoverageDebt += coverageApplied;
             }
-            /// @dev STEP_ST_BOOK_REMAINING_LOSSES: Apply any uncovered losses by JT to ST
+            /// @dev STEP_ST_INCURS_RESIDUAL_LOSSES: Apply any uncovered losses by JT to ST
             uint256 netStLoss = stLoss - coverageApplied;
             if (netStLoss != 0) {
                 stEffectiveNAV = Math.saturatingSub(stEffectiveNAV, netStLoss);
@@ -313,7 +315,8 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
             /// @dev STEP_ST_APPLY_GAIN: The ST assets appreciated in value
         } else {
             uint256 stGain = uint256(deltaST);
-            /// @dev STEP_REPAY_JT_COVERAGE_DEBT: The first priority of repayment to reverse the loss-waterfall is repaying JT debt to ST (previously uncovered ST losses)
+            /// @dev STEP_REPAY_JT_COVERAGE_DEBT: The first priority of repayment to reverse the loss-waterfall is making ST whole again
+            // Repay JT debt to ST: previously uncovered ST losses
             uint256 debtRepayment = Math.min(stGain, jtCoverageDebt);
             if (debtRepayment != 0) {
                 // Pay back debt to ST
@@ -324,7 +327,8 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
                 if (stGain == 0) return (stRawNAV, jtRawNAV, stEffectiveNAV, jtEffectiveNAV, stCoverageDebt, jtCoverageDebt, false);
             }
 
-            /// @dev STEP_REPAY_ST_COVERAGE_DEBT: The second priority of repayment to reverse the loss-waterfall is repaying ST debt to JT (previously uncovered ST losses)
+            /// @dev STEP_REPAY_ST_COVERAGE_DEBT: The second priority of repayment to reverse the loss-waterfall is making JT whole again
+            // Repay ST debt to JT: previously applied coverage from JT to ST
             debtRepayment = Math.min(stGain, stCoverageDebt);
             if (debtRepayment != 0) {
                 // Pay back debt to JT
@@ -419,7 +423,8 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
 
             if (_op == Operation.ST_WITHDRAW) {
                 // ST withdrawals must decrease ST NAV and leave JT NAV decreased or unchanged (coverage realization)
-                require(deltaST < 0 && deltaJT <= 0, INVALID_POST_OP_STATE(_op));
+                // Or they must leave ST NAV unchanged and decrease JT NAV (pure coverage realization)
+                require((deltaST < 0 && deltaJT <= 0) || (deltaST == 0 && deltaJT < 0), INVALID_POST_OP_STATE(_op));
                 // Senior withdrew: The NAV deltas include the discrete withdrawal amount in addition to any coverage pulled from JT to ST
                 // If the withdrawal used JT capital as coverage to facilitate this ST withdrawal
                 if (deltaJT < 0) {
@@ -434,7 +439,7 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
                     if (stCoverageDebtErased != 0) $.lastSTCoverageDebt -= stCoverageDebtErased;
                     // Reduce remaining available coverage
                     coverageRealized -= stCoverageDebtErased;
-                    // Apply the remainder to JT debt
+                    // Apply the remainder to erasing JT debt
                     if (coverageRealized != 0) $.lastJTCoverageDebt = Math.saturatingSub($.lastJTCoverageDebt, coverageRealized);
                 } else {
                     // Apply the withdrawal to the senior tranche's effective NAV
@@ -442,7 +447,7 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
                 }
             } else if (_op == Operation.JT_WITHDRAW) {
                 // JT withdrawals must decrease JT NAV and leave ST NAV decreased or unchanged (yield claiming)
-                require(deltaST < 0 && deltaJT <= 0, INVALID_POST_OP_STATE(_op));
+                require(deltaJT < 0 && deltaST <= 0, INVALID_POST_OP_STATE(_op));
                 // Junior withdrew: The NAV deltas include the discrete withdrawal amount in addition to any yield pulled from ST to JT
                 // If the withdrawal used ST capital to claim yield when facilitating this JT withdrawal
                 // No need to touch debt accounting: all debts are cleared
