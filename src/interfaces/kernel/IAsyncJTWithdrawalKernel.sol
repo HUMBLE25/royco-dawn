@@ -11,28 +11,32 @@ interface IAsyncJTWithdrawalKernel {
     /**
      * @notice Requests a redemption for a specified amount of shares from the underlying investment opportunity
      * @param _caller The address of the user requesting the withdrawal for the junior tranche
-     * @param _shares The amount of shares being requested to be redeemed
-     * @param _totalShares The total number of shares in the tranche at the time of the request
+     * @param _shares The amount of shares of the junior tranche being requested to be redeemed
+     * @param _totalShares The total number of shares in the junior tranche at the time of the request
      * @param _controller The controller that is allowed to operate the lifecycle of the request.
      * @return requestId The request ID of this withdrawal request
      */
     function jtRequestWithdrawal(address _caller, uint256 _shares, uint256 _totalShares, address _controller) external returns (uint256 requestId);
 
     /**
+     * TODO: Consider this change of adding total shares here deeply
      * @notice Returns the amount of assets pending redemption for a specific controller
      * @param _requestId The request ID of this withdrawal request
+     * @param _totalShares The total number of shares in the junior tranche at the time of the request
      * @param _controller The controller to query pending redemptions for
      * @return pendingAssets The amount of assets pending redemption for the controller
      */
-    function jtPendingWithdrawalRequest(uint256 _requestId, address _controller) external view returns (uint256 pendingAssets);
+    function jtPendingWithdrawalRequest(uint256 _requestId, uint256 _totalShares, address _controller) external view returns (uint256 pendingAssets);
 
     /**
+     * TODO: Consider this change of adding total shares here deeply
      * @notice Returns the amount of shares claimable from completed redemption requests for a specific controller
      * @param _requestId The request ID of this withdrawal request
+     * @param _totalShares The total number of shares in the junior tranche at the time of the request
      * @param _controller The controller to query claimable redemptions for
-     * @return claimableShares The amount of shares claimable from completed redemption requests
+     * @return claimableAssets The amount of assets claimable from completed redemption requests
      */
-    function jtClaimableWithdrawalRequest(uint256 _requestId, address _controller) external view returns (uint256 claimableShares);
+    function jtClaimableWithdrawalRequest(uint256 _requestId, uint256 _totalShares, address _controller) external view returns (uint256 claimableAssets);
 
     /**
      * @notice Cancels a pending redeem request for the specified controller
@@ -54,11 +58,11 @@ interface IAsyncJTWithdrawalKernel {
     function jtPendingCancelWithdrawalRequest(uint256 _requestId, address _controller) external view returns (bool isPending);
 
     /**
-     * @notice Returns the amount of shares claimable from a redeem cancellation for the specified controller
+     * @notice Returns the amount of assets claimable from a redeem cancellation for the specified controller
      * @dev This function is only relevant if the kernel supports redeem cancellation
      * @param _requestId The request ID of this deposit request
-     * @param _controller The controller to query for claimable cancellation shares
-     * @return shares The amount of shares claimable from redeem cancellation
+     * @param _controller The controller to query for claimable cancellation assets
+     * @return assets The amount of assets claimable from redeem cancellation
      */
-    function jtClaimableCancelWithdrawalRequest(uint256 _requestId, address _controller) external view returns (uint256 shares);
+    function jtClaimableCancelWithdrawalRequest(uint256 _requestId, address _controller) external view returns (uint256 assets);
 }

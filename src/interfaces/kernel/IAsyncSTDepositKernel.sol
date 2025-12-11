@@ -10,6 +10,7 @@ pragma solidity ^0.8.28;
 interface IAsyncSTDepositKernel {
     /**
      * @notice Requests a deposit of a specified amount of an asset into the underlying investment opportunity
+     * @dev Assumes that the funds are transferred to the kernel before the deposit call is made
      * @param _caller The address of the user requesting the deposit for the senior tranche
      * @param _assets The amount of the asset to deposit into the underlying investment opportunity
      * @param _controller The controller that is allowed to operate the lifecycle of this deposit request
@@ -24,6 +25,16 @@ interface IAsyncSTDepositKernel {
      * @return pendingAssets The amount of assets pending deposit for the controller
      */
     function stPendingDepositRequest(uint256 _requestId, address _controller) external view returns (uint256 pendingAssets);
+
+    /**
+     * @notice Claims a cancelled deposit request for a specified controller
+     * @dev It is expected that this function transfers the assets to the receiver directly after the cancellation is processed
+     * @param _requestId The request ID of this deposit request
+     * @param _receiver The receiver of the cancelled deposit assets
+     * @param _controller The controller corresponding to this request
+     * @return assets The amount of assets claimed from the cancelled deposit request
+     */
+    function stClaimCancelDepositRequest(uint256 _requestId, address _receiver, address _controller) external returns (uint256 assets);
 
     /**
      * @notice Returns the amount of assets claimable from a processed deposit request for a specified controller

@@ -9,11 +9,14 @@ import { IPoolAddressesProvider } from "../../../interfaces/aave/IPoolAddressesP
 import { IPoolDataProvider } from "../../../interfaces/aave/IPoolDataProvider.sol";
 import { ExecutionModel, IBaseKernel } from "../../../interfaces/kernel/IBaseKernel.sol";
 import { BaseKernelState, BaseKernelStorageLib, Operation } from "../../../libraries/BaseKernelStorageLib.sol";
+
+import { BaseKernelStorageLib } from "../../../libraries/BaseKernelStorageLib.sol";
 import { ConstantsLib } from "../../../libraries/ConstantsLib.sol";
 import { AaveV3KernelState, AaveV3KernelStorageLib } from "../../../libraries/kernels/AaveV3KernelStorageLib.sol";
 import { BaseKernel } from "../BaseKernel.sol";
+import { BaseAsyncJTWithrawalDelayKernel } from "./BaseAsyncJTWithrawalDelayKernel.sol";
 
-abstract contract AaveV3JTKernel is BaseKernel {
+abstract contract AaveV3JTKernel is BaseKernel, BaseAsyncJTWithrawalDelayKernel {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
@@ -21,7 +24,7 @@ abstract contract AaveV3JTKernel is BaseKernel {
     ExecutionModel public constant JT_DEPOSIT_EXECUTION_MODEL = ExecutionModel.SYNC;
 
     /// @inheritdoc IBaseKernel
-    ExecutionModel public constant JT_WITHDRAWAL_EXECUTION_MODEL = ExecutionModel.SYNC;
+    ExecutionModel public constant JT_WITHDRAWAL_EXECUTION_MODEL = ExecutionModel.ASYNC;
 
     /**
      * @notice Initializes a kernel where the junior tranche is deployed into Aave V3
@@ -40,7 +43,7 @@ abstract contract AaveV3JTKernel is BaseKernel {
     }
 
     /// @inheritdoc IBaseKernel
-    function getJTTotalEffectiveAssets() external view override(IBaseKernel) returns (uint256) {
+    function getJTTotalEffectiveAssets() public view override(IBaseKernel, BaseAsyncJTWithrawalDelayKernel) returns (uint256) {
         return _getJuniorTrancheEffectiveNAV();
     }
 
@@ -55,6 +58,7 @@ abstract contract AaveV3JTKernel is BaseKernel {
         override(IBaseKernel)
         onlyJuniorTranche
         syncNAVs(Operation.JT_DEPOSIT)
+        whenNotPaused
         returns (uint256 underlyingSharesAllocated, uint256 totalUnderlyingShares)
     {
         // Max approval already given to the pool on initialization
@@ -69,7 +73,7 @@ abstract contract AaveV3JTKernel is BaseKernel {
         address _asset,
         uint256 _shares,
         uint256 _totalShares,
-        address,
+        address _controller,
         address _receiver
     )
         external
@@ -78,6 +82,7 @@ abstract contract AaveV3JTKernel is BaseKernel {
         syncNAVsAndEnforceCoverage(Operation.JT_WITHDRAW)
         returns (uint256 assetsWithdrawn)
     {
+        _processClaimableRedeemRequest(_controller, _shares);
         // Get the storage pointer to the base kernel state
         // We can assume that all NAV values are synced
         BaseKernelState storage $ = BaseKernelStorageLib._getBaseKernelStorage();

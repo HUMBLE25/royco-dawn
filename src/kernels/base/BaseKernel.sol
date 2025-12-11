@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
+import { UUPSUpgradeable } from "../../../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
 import { Initializable } from "../../../lib/openzeppelin-contracts/contracts/proxy/utils/Initializable.sol";
+import { RoycoAuth, RoycoRoles } from "../../auth/RoycoAuth.sol";
 import { IRDM } from "../../interfaces/IRDM.sol";
 import { IBaseKernel } from "../../interfaces/kernel/IBaseKernel.sol";
 import { BaseKernelInitParams, BaseKernelState, BaseKernelStorageLib, Operation } from "../../libraries/BaseKernelStorageLib.sol";
@@ -14,7 +16,7 @@ import { ConstantsLib, Math, UtilsLib } from "../../libraries/UtilsLib.sol";
  * @dev All kernel contracts should inherit from this base contract to ensure proper execution context
  *      and use the modifier as stipulated by the IBaseKernel interface.
  */
-abstract contract BaseKernel is Initializable, IBaseKernel {
+abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, RoycoAuth {
     using Math for uint256;
 
     /// @notice Thrown when the market's coverage requirement is unsatisfied
@@ -26,18 +28,29 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
     /// @notice Thrown when the caller of a permissioned function isn't the market's junior tranche
     error ONLY_JUNIOR_TRANCHE();
 
+    /// @notice Thrown when an operation results in an invalid NAV state in the post-operation synchronization
+    error INVALID_POST_OP_STATE(Operation _op);
+
     /// @dev Permissions the function to only the market's senior tranche
     /// @dev Should be placed on all ST deposit and withdraw functions
     modifier onlySeniorTranche() {
-        require(msg.sender == BaseKernelStorageLib._getBaseKernelStorage().seniorTranche, ONLY_SENIOR_TRANCHE());
+        _onlySeniorTranche();
         _;
+    }
+
+    function _onlySeniorTranche() internal view {
+        require(msg.sender == BaseKernelStorageLib._getBaseKernelStorage().seniorTranche, ONLY_SENIOR_TRANCHE());
     }
 
     /// @dev Permissions the function to only the market's junior tranche
     /// @dev Should be placed on all JT deposit and withdraw functions
     modifier onlyJuniorTranche() {
-        require(msg.sender == BaseKernelStorageLib._getBaseKernelStorage().juniorTranche, ONLY_JUNIOR_TRANCHE());
+        _onlyJuniorTranche();
         _;
+    }
+
+    function _onlyJuniorTranche() internal view {
+        require(msg.sender == BaseKernelStorageLib._getBaseKernelStorage().juniorTranche, ONLY_JUNIOR_TRANCHE());
     }
 
     /**
@@ -80,8 +93,11 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
      * @notice Initializes the base kernel state
      * @dev Initializes any parent contracts and the base kernel state
      * @param _params The initialization parameters for the base kernel
+     * @param _owner The initial owner of the base kernel
+     * @param _pauser The initial pauser of the base kernel
      */
-    function __BaseKernel_init(BaseKernelInitParams memory _params) internal onlyInitializing {
+    function __BaseKernel_init(BaseKernelInitParams memory _params, address _owner, address _pauser) internal onlyInitializing {
+        __RoycoAuth_init(_owner, _pauser);
         __BaseKernel_init_unchained(_params);
     }
 
@@ -143,7 +159,12 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
      * @return stEffectiveNAV The senior tranche's effective NAV, including applied coverage, ST yield distribution, and uncovered losses
      * @return jtEffectiveNAV The junior tranche's effective NAV, including provided coverage, JT yield, ST yield distribution, and JT losses
      */
-    function syncTrancheNAVs() external returns (uint256 stRawNAV, uint256 jtRawNAV, uint256 stEffectiveNAV, uint256 jtEffectiveNAV) {
+    function syncTrancheNAVs()
+        external
+        onlyRole(RoycoRoles.SYNC_ROLE)
+        whenNotPaused
+        returns (uint256 stRawNAV, uint256 jtRawNAV, uint256 stEffectiveNAV, uint256 jtEffectiveNAV)
+    {
         return _preOpSyncTrancheNAVs();
     }
 
@@ -361,6 +382,8 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
             // The deltas represent the NAV changes after a deposit and withdrawal
             uint256 stRawNAV = _getSeniorTrancheRawNAV();
             int256 deltaST = _computeRawNAVDelta(stRawNAV, $.lastSTRawNAV);
+            // Deposits must increase NAV
+            require(deltaST > 0, INVALID_POST_OP_STATE(_op));
             // Update the post-operation raw NAV ST checkpoint
             $.lastSTRawNAV = stRawNAV;
             // Apply the deposit to the senior tranche's effective NAV
@@ -370,6 +393,8 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
             // The deltas represent the NAV changes after a deposit and withdrawal
             uint256 jtRawNAV = _getJuniorTrancheRawNAV();
             int256 deltaJT = _computeRawNAVDelta(jtRawNAV, $.lastJTRawNAV);
+            // Deposits must increase NAV
+            require(deltaJT > 0, INVALID_POST_OP_STATE(_op));
             // Update the post-operation raw NAV ST checkpoint
             $.lastJTRawNAV = jtRawNAV;
             // Apply the deposit to the junior tranche's effective NAV
@@ -387,6 +412,8 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
             $.lastJTRawNAV = jtRawNAV;
 
             if (_op == Operation.ST_WITHDRAW) {
+                // ST withdrawals must decrease ST NAV and leave JT NAV decreased or unchanged (coverage realization)
+                require(deltaST < 0 && deltaJT <= 0, INVALID_POST_OP_STATE(_op));
                 // Senior withdrew: The NAV deltas include the discrete withdrawal amount in addition to any coverage pulled from JT to ST
                 // If the withdrawal used JT capital as coverage to facilitate this ST withdrawal
                 if (deltaJT < 0) {
@@ -408,6 +435,8 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
                     $.lastSTEffectiveNAV = Math.saturatingSub($.lastSTEffectiveNAV, uint256(-deltaST));
                 }
             } else if (_op == Operation.JT_WITHDRAW) {
+                // JT withdrawals must decrease JT NAV and leave ST NAV decreased or unchanged (yield claiming)
+                require(deltaST < 0 && deltaJT <= 0, INVALID_POST_OP_STATE(_op));
                 // Junior withdrew: The NAV deltas include the discrete withdrawal amount in addition to any yield pulled from ST to JT
                 // If the withdrawal used ST capital to claim yield when facilitating this JT withdrawal
                 // No need to touch debt accounting: all debts are cleared
@@ -567,4 +596,8 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
      * @return yieldWithdrawn The actual amount of yield assets that were withdrawn
      */
     function _claimJTYieldFromST(address _asset, uint256 _yieldAssets, address _receiver) internal virtual returns (uint256 yieldWithdrawn);
+
+    /// @inheritdoc UUPSUpgradeable
+    /// @dev Will revert if the caller is not the upgrader role
+    function _authorizeUpgrade(address newImplementation) internal override onlyRole(RoycoRoles.UPGRADER_ROLE) { }
 }

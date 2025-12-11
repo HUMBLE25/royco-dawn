@@ -7,18 +7,16 @@ import { ConstantsLib } from "./ConstantsLib.sol";
 library UtilsLib {
     using Math for uint256;
 
-    /**
-     * @notice Computes the utilization of the Royco market given the market's state
-     * @dev Informally: total covered exposure / junior loss absorbtion buffer
-     * @dev Formally: Utilization = ((ST_RAW_NAV + (JT_RAW_NAV * BETA_%)) * COV_%) / JT_EFFECTIVE_NAV
-     * @param _stRawNAV The raw net asset value of the senior tranche invested assets
-     * @param _jtRawNAV The raw net asset value of the junior tranche invested assets
-     * @param _betaWAD The JT's sensitivity to the same downside stress that affects ST scaled by WAD
-     *                 For example, beta is 0 when JT is in the RFR and 1 when JT is in the same opportunity as senior
-     * @param _coverageWAD The ratio of current total exposure that is expected to be covered by the junior capital scaled by WAD
-     * @param _jtEffectiveNAV The junior tranche net asset value after applying provided coverage, JT yield, ST yield distribution, and JT losses
-     * @return utilization The utilization of the Royco market scaled by WAD
-     */
+    /// @notice Computes the utilization of the Royco market given the market's state
+    /// @dev Informally: total covered exposure / junior loss absorbtion buffer
+    /// @dev Formally: Utilization = ((ST_RAW_NAV + (JT_RAW_NAV * BETA_%)) * COV_%) / JT_EFFECTIVE_NAV
+    /// @param _stRawNAV The raw net asset value of the senior tranche invested assets
+    /// @param _jtRawNAV The raw net asset value of the junior tranche invested assets
+    /// @param _betaWAD The JT's sensitivity to the same downside stress that affects ST scaled by WAD
+    ///                 For example, beta is 0 when JT is in the RFR and 1 when JT is in the same opportunity as senior
+    /// @param _coverageWAD The ratio of current total exposure that is expected to be covered by the junior capital scaled by WAD
+    /// @param _jtEffectiveNAV The junior tranche net asset value after applying provided coverage, JT yield, ST yield distribution, and JT losses
+    /// @return utilization The utilization of the Royco market scaled by WAD
     function computeUtilization(
         uint256 _stRawNAV,
         uint256 _jtRawNAV,

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import { Ownable2StepUpgradeable } from "../../lib/openzeppelin-contracts-upgradeable/contracts/access/Ownable2StepUpgradeable.sol";
 import { UUPSUpgradeable } from "../../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
 import {
     ERC4626Upgradeable,
@@ -9,26 +8,24 @@ import {
     IERC20Metadata,
     Math
 } from "../../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/ERC4626Upgradeable.sol";
+import { IAccessControlEnumerable } from "../../lib/openzeppelin-contracts/contracts/access/extensions/IAccessControlEnumerable.sol";
 import { SafeERC20 } from "../../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+import { AccessControlEnumerableUpgradeable, RoycoAuth, RoycoRoles } from "../auth/RoycoAuth.sol";
 import { IAsyncJTDepositKernel } from "../interfaces/kernel/IAsyncJTDepositKernel.sol";
 import { IAsyncJTWithdrawalKernel } from "../interfaces/kernel/IAsyncJTWithdrawalKernel.sol";
 import { IAsyncSTDepositKernel } from "../interfaces/kernel/IAsyncSTDepositKernel.sol";
 import { IAsyncSTWithdrawalKernel } from "../interfaces/kernel/IAsyncSTWithdrawalKernel.sol";
 import { ExecutionModel, IBaseKernel } from "../interfaces/kernel/IBaseKernel.sol";
 import { IERC165, IERC7540, IERC7575, IERC7887, IRoycoTranche } from "../interfaces/tranche/IRoycoTranche.sol";
-import { ConstantsLib } from "../libraries/ConstantsLib.sol";
 import { RoycoTrancheStorageLib } from "../libraries/RoycoTrancheStorageLib.sol";
 import { Action, TrancheDeploymentParams } from "../libraries/Types.sol";
 
-// TODO: ST and JT base asset can have different decimals
-/**
- * @title BaseRoycoTranche
- * @notice Abstract base contract implementing core functionality for Royco tranches
- * @dev This contract provides common tranche operations including ERC4626 vault functionality,
- *      asynchronous deposit/withdrawal support via ERC7540, and request cancellation via ERC7887
- *      All asset management and investment operations are delegated to the configured kernel
- */
-abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UUPSUpgradeable, ERC4626Upgradeable {
+/// @title BaseRoycoTranche
+/// @notice Abstract base contract implementing core functionality for Royco tranches
+/// @dev This contract provides common tranche operations including ERC4626 vault functionality,
+///      asynchronous deposit/withdrawal support via ERC7540, and request cancellation via ERC7887
+///      All asset management and investment operations are delegated to the configured kernel
+abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable, ERC4626Upgradeable {
     using Math for uint256;
     using SafeERC20 for IERC20;
 
@@ -38,70 +35,84 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
     /// @notice Thrown when the caller is not the expected account or an approved operator
     error ONLY_CALLER_OR_OPERATOR();
 
-    /**
-     * @notice Modifier to ensure the functionality is disabled
-     */
+    /// @notice Thrown when the underlying shares allocated are greater than the total underlying shares
+    error InvalidUnderlyingSharesAllocated(uint256 underlyingSharesAllocated, uint256 totalUnderlyingShares);
+
+    /// @notice Thrown when the redeem amount is zero
+    error ERC4626ZeroRedeemAmount();
+
+    /// @notice Thrown when the deposit amount is zero
+    error ERC4626ZeroDepositAmount();
+
+    /// @notice Modifier to ensure the functionality is disabled
+    // forge-lint: disable-next-line(unwrapped-modifier-logic)
     modifier disabled() {
         revert DISABLED();
         _;
     }
 
-    /**
-     * @notice Modifier to ensure the specified action uses a synchronous execution model
-     * @param _action The action to check (DEPOSIT or WITHDRAW)
-     * @dev Reverts if the execution model for the action is asynchronous
-     */
+    /// @notice Modifier to ensure the specified action uses a synchronous execution model
+    /// @param _action The action to check (DEPOSIT or WITHDRAW)
+    /// @dev Reverts if the execution model for the action is asynchronous
     modifier executionIsSync(Action _action) {
         require(_isSync(_action), DISABLED());
         _;
     }
 
-    /**
-     * @notice Modifier to ensure the specified action uses an asynchronous execution model
-     * @param _action The action to check (DEPOSIT or WITHDRAW)
-     * @dev Reverts if the execution model for the action is synchronous
-     */
+    /// @notice Modifier to ensure the specified action uses an asynchronous execution model
+    /// @param _action The action to check (DEPOSIT or WITHDRAW)
+    /// @dev Reverts if the execution model for the action is synchronous
     modifier executionIsAsync(Action _action) {
         require(!_isSync(_action), DISABLED());
         _;
     }
 
-    /**
-     * @notice Modifier to ensure caller is either the specified address or an approved operator
-     * @param _account The address that the caller should match or have operator approval for
-     * @dev Reverts if caller is neither the address nor an approved operator
-     */
+    /// @notice Modifier to ensure caller is either the specified address or an approved operator
+    /// @param _account The address that the caller should match or have operator approval for
+    /// @dev Reverts if caller is neither the address nor an approved operator
     modifier onlyCallerOrOperator(address _account) {
-        require(msg.sender == _account || RoycoTrancheStorageLib._getRoycoTrancheStorage().isOperator[_account][msg.sender], ONLY_CALLER_OR_OPERATOR());
+        _onlyCallerOrOperator(_account);
         _;
     }
 
-    /**
-     *
-     * @notice Initializes the Royco tranche
-     * @dev This function initializes parent contracts and the tranche-specific state
-     * @param _trancheParams Deployment parameters including name, symbol, kernel, and kernel initialization data
-     * @param _asset The underlying asset for the tranche
-     * @param _owner The initial owner of the tranche
-     * @param _marketId The identifier of the Royco market this tranche is linked to
-     */
-    function __RoycoTranche_init(TrancheDeploymentParams calldata _trancheParams, address _asset, address _owner, bytes32 _marketId) internal onlyInitializing {
+    /// @notice Checks if the caller is either the specified address or an approved operator
+    /// @param _account The address to check
+    /// @dev Reverts if the caller is neither the address nor an approved operator
+    function _onlyCallerOrOperator(address _account) internal view {
+        require(msg.sender == _account || RoycoTrancheStorageLib._getRoycoTrancheStorage().isOperator[_account][msg.sender], ONLY_CALLER_OR_OPERATOR());
+    }
+
+    /// @notice Initializes the Royco tranche
+    /// @dev This function initializes parent contracts and the tranche-specific state
+    /// @param _trancheParams Deployment parameters including name, symbol, kernel, and kernel initialization data
+    /// @param _asset The underlying asset for the tranche
+    /// @param _owner The initial owner of the tranche
+    /// @param _pauser The initial pauser of the tranche
+    /// @param _marketId The identifier of the Royco market this tranche is linked to
+    function __RoycoTranche_init(
+        TrancheDeploymentParams calldata _trancheParams,
+        address _asset,
+        address _owner,
+        address _pauser,
+        bytes32 _marketId
+    )
+        internal
+        onlyInitializing
+    {
         // Initialize the parent contracts
         __ERC20_init_unchained(_trancheParams.name, _trancheParams.symbol);
         __ERC4626_init_unchained(IERC20(_asset));
-        __Ownable_init_unchained(_owner);
+        __RoycoAuth_init(_owner, _pauser);
 
         // Initialize the Royco Tranche state
         __RoycoTranche_init_unchained(_asset, _trancheParams.kernel, _marketId);
     }
 
-    /**
-     * @notice Internal initialization function for Royco tranche-specific state
-     * @dev This function sets up the tranche storage and initializes the kernel
-     * @param _asset The underlying asset for the tranche
-     * @param _kernelAddress The address of the kernel that handles strategy logic
-     * @param _marketId The identifier of the Royco market this tranche is linked to
-     */
+    /// @notice Internal initialization function for Royco tranche-specific state
+    /// @dev This function sets up the tranche storage and initializes the kernel
+    /// @param _asset The underlying asset for the tranche
+    /// @param _kernelAddress The address of the kernel that handles strategy logic
+    /// @param _marketId The identifier of the Royco market this tranche is linked to
     function __RoycoTranche_init_unchained(address _asset, address _kernelAddress, bytes32 _marketId) internal onlyInitializing {
         // Calculate the vault's decimal offset (curb inflation attacks)
         uint8 underlyingAssetDecimals = IERC20Metadata(_asset).decimals();
@@ -177,30 +188,48 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         public
         virtual
         override(IERC7540)
+        checkRoleAndDelayIfGated(RoycoRoles.DEPOSIT_ROLE)
+        whenNotPaused
         onlyCallerOrOperator(_controller)
         returns (uint256 shares)
     {
         // Assert that the user's deposited assets fall under the max limit
         uint256 maxDepositableAssets = maxDeposit(_receiver);
+        require(_assets != 0, ERC4626ZeroDepositAmount());
         require(_assets <= maxDepositableAssets, ERC4626ExceededMaxDeposit(_receiver, _assets, maxDepositableAssets));
 
+        IBaseKernel kernel = IBaseKernel(_kernel());
+        IERC20 asset = IERC20(asset());
+
+        // Transfer the assets from the receiver to the kernel, if the deposit is synchronous
+        // If the deposit is asynchronous, the assets were transferred in during requestDeposit
+        if (_isSync(Action.DEPOSIT)) {
+            asset.safeTransferFrom(_receiver, address(kernel), _assets);
+        }
+
         // Deposit the assets into the underlying investment opportunity and get the fraction of total assets allocated
-        (uint256 underlyingSharesAllocated, uint256 totalUnderlyingShares) = (_isSeniorTranche()
-                ? IBaseKernel(_kernel()).stDeposit(asset(), _assets, _controller, _receiver)
-                : IBaseKernel(_kernel()).jtDeposit(asset(), _assets, _controller, _receiver));
+        (uint256 underlyingSharesAllocated, uint256 totalEffectiveUnderlyingShares) = (_isSeniorTranche()
+                ? kernel.stDeposit(address(asset), _assets, _controller, _receiver)
+                : kernel.jtDeposit(address(asset), _assets, _controller, _receiver));
+        require(
+            underlyingSharesAllocated <= totalEffectiveUnderlyingShares,
+            InvalidUnderlyingSharesAllocated(underlyingSharesAllocated, totalEffectiveUnderlyingShares)
+        );
 
         // Calculate the proportional amount of shares to mint to the receiver such that lp_st_shares / total_st_shares = underlying_shares_allocated / total_underlying_shares
-        // sharesToMint / (totalSupply() + 10 ** _decimalsOffset() + sharesToMint) = underlyingSharesAllocated / (totalUnderlyingShares + 1)
+        // sharesToMint / (totalSupply() + 10 ** _decimalsOffset() + sharesToMint) = underlyingSharesAllocated / (totalEffectiveUnderlyingShares + 1)
         // In the synchronous case, this is equivalent to previewDeposit(_assets)
         // In the asynchronos case, the deposit request may not be have been fulfilled at the current nav.
         //  Therefore, the kernel is expected to keep track of the underlying opportunity shares minted against the request.
         //  The ratio of these shares to the total underlying shares held by the system represent the user's claim on the vault, therefore we mint
         //  an equivalent amount of shares to the receiver.
-        uint256 sharesToMint = (totalSupply() + 10 ** _decimalsOffset())
-        .mulDiv(underlyingSharesAllocated, totalUnderlyingShares - underlyingSharesAllocated + 1, Math.Rounding.Floor);
+        shares = (totalSupply() + 10 ** _decimalsOffset())
+        .mulDiv(underlyingSharesAllocated, totalEffectiveUnderlyingShares - underlyingSharesAllocated + 1, Math.Rounding.Floor);
 
         // Mint the shares to the receiver
-        _deposit(msg.sender, _receiver, _assets, sharesToMint);
+        _mint(_receiver, shares);
+
+        emit Deposit(msg.sender, _receiver, _assets, shares);
     }
 
     /// @inheritdoc ERC4626Upgradeable
@@ -209,18 +238,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
 
     /// @inheritdoc IERC7540
     /// @dev mint* flows are not supported
-    function mint(
-        uint256 _shares,
-        address _receiver,
-        address _controller
-    )
-        public
-        virtual
-        override(IERC7540)
-        disabled
-        onlyCallerOrOperator(_controller)
-        returns (uint256 assets)
-    { }
+    function mint(uint256 _shares, address _receiver, address _controller) public virtual override(IERC7540) disabled returns (uint256 assets) { }
 
     /// @inheritdoc IERC7540
     /// @dev withdraw* flows are not supported
@@ -232,7 +250,6 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         public
         virtual
         override(ERC4626Upgradeable, IERC7540)
-        onlyCallerOrOperator(_controller)
         disabled
         returns (uint256 shares)
     { }
@@ -247,8 +264,12 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         virtual
         override(ERC4626Upgradeable, IERC7540)
         onlyCallerOrOperator(_controller)
+        checkRoleAndDelayIfGated(RoycoRoles.REDEEM_ROLE)
+        whenNotPaused
         returns (uint256 assets)
     {
+        require(_shares != 0, ERC4626ZeroRedeemAmount());
+
         // Assert that the shares being redeeemed by the user fall under the permissible limits
         uint256 maxRedeemableShares = maxRedeem(_controller);
         require(_shares <= maxRedeemableShares, ERC4626ExceededMaxRedeem(_controller, _shares, maxRedeemableShares));
@@ -275,7 +296,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
     }
 
     /// @inheritdoc IERC7540
-    function setOperator(address _operator, bool _approved) external virtual override(IERC7540) returns (bool) {
+    function setOperator(address _operator, bool _approved) external virtual override(IERC7540) whenNotPaused returns (bool) {
         // Set the operator's approval status for the caller
         RoycoTrancheStorageLib._getRoycoTrancheStorage().isOperator[msg.sender][_operator] = _approved;
         emit OperatorSet(msg.sender, _operator, _approved);
@@ -294,18 +315,16 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         external
         virtual
         override(IERC7540)
+        checkRoleAndDelayIfGated(RoycoRoles.DEPOSIT_ROLE)
+        whenNotPaused
         onlyCallerOrOperator(_owner)
         executionIsAsync(Action.DEPOSIT)
         returns (uint256 requestId)
     {
-        // Transfer the assets from the owner to the tranche
-        /// @dev These assets must not be counted in the NAV (total assets). Enforced by the kernel.
-        _transferIn(_owner, _assets);
-
         address kernel = _kernel();
 
-        // Approve the assets to be transferred to the kernel
-        IERC20(asset()).approve(kernel, _assets);
+        // Transfer the assets from the owner to the kernel
+        IERC20(asset()).safeTransferFrom(_owner, kernel, _assets);
 
         // Queue the deposit request and get the request ID from the kernel
         requestId =
@@ -362,9 +381,13 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         external
         virtual
         override(IERC7540)
+        checkRoleAndDelayIfGated(RoycoRoles.REDEEM_ROLE)
+        whenNotPaused
         executionIsAsync(Action.WITHDRAW)
         returns (uint256 requestId)
     {
+        require(_shares != 0, ERC4626ZeroRedeemAmount());
+
         // Spend the caller's share allowance if the caller isn't the owner or an approved operator
         if (msg.sender != _owner && !RoycoTrancheStorageLib._getRoycoTrancheStorage().isOperator[_owner][msg.sender]) {
             _spendAllowance(_owner, msg.sender, _shares);
@@ -396,8 +419,8 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         returns (uint256 pendingShares)
     {
         return (_isSeniorTranche()
-                ? IAsyncSTWithdrawalKernel(_kernel()).stPendingWithdrawalRequest(_requestId, _controller)
-                : IAsyncJTWithdrawalKernel(_kernel()).jtPendingWithdrawalRequest(_requestId, _controller));
+                ? IAsyncSTWithdrawalKernel(_kernel()).stPendingWithdrawalRequest(_requestId, totalSupply(), _controller)
+                : IAsyncJTWithdrawalKernel(_kernel()).jtPendingWithdrawalRequest(_requestId, totalSupply(), _controller));
     }
 
     /// @inheritdoc IERC7540
@@ -414,8 +437,8 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         returns (uint256 claimableShares)
     {
         return (_isSeniorTranche()
-                ? IAsyncSTWithdrawalKernel(_kernel()).stClaimableWithdrawalRequest(_requestId, _controller)
-                : IAsyncJTWithdrawalKernel(_kernel()).jtClaimableWithdrawalRequest(_requestId, _controller));
+                ? IAsyncSTWithdrawalKernel(_kernel()).stClaimableWithdrawalRequest(_requestId, totalSupply(), _controller)
+                : IAsyncJTWithdrawalKernel(_kernel()).jtClaimableWithdrawalRequest(_requestId, totalSupply(), _controller));
     }
 
     // =============================
@@ -431,10 +454,11 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         external
         virtual
         override(IERC7887)
+        checkRoleAndDelayIfGated(RoycoRoles.CANCEL_DEPOSIT_ROLE)
+        whenNotPaused
         onlyCallerOrOperator(_controller)
         executionIsAsync(Action.DEPOSIT)
     {
-        // Delegate call to kernel to handle deposit cancellation
         if (_isSeniorTranche()) {
             IAsyncSTDepositKernel(_kernel()).stCancelDepositRequest(msg.sender, _requestId, _controller);
         } else {
@@ -490,17 +514,16 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         external
         virtual
         override(IERC7887)
+        checkRoleAndDelayIfGated(RoycoRoles.CANCEL_DEPOSIT_ROLE)
+        whenNotPaused
         onlyCallerOrOperator(_controller)
         executionIsAsync(Action.DEPOSIT)
     {
-        // Get the claimable amount before claiming
+        // Expect the kernel to transfer the assets to the receiver directly after the cancellation is processed
         uint256 assets =
             (_isSeniorTranche()
-                ? IAsyncSTDepositKernel(_kernel()).stClaimableCancelDepositRequest(_requestId, _controller)
-                : IAsyncJTDepositKernel(_kernel()).jtClaimableCancelDepositRequest(_requestId, _controller));
-
-        // Transfer cancelled deposit assets to receiver
-        _transferOut(_receiver, assets);
+                ? IAsyncSTDepositKernel(_kernel()).stClaimCancelDepositRequest(_requestId, _receiver, _controller)
+                : IAsyncJTDepositKernel(_kernel()).jtClaimCancelDepositRequest(_requestId, _receiver, _controller));
 
         emit CancelDepositClaim(_controller, _receiver, _requestId, msg.sender, assets);
     }
@@ -514,10 +537,11 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         external
         virtual
         override(IERC7887)
+        checkRoleAndDelayIfGated(RoycoRoles.CANCEL_REDEEM_ROLE)
+        whenNotPaused
         onlyCallerOrOperator(_controller)
         executionIsAsync(Action.WITHDRAW)
     {
-        // Delegate call to kernel to handle redeem cancellation
         if (_isSeniorTranche()) {
             IAsyncSTWithdrawalKernel(_kernel()).stCancelWithdrawalRequest(_requestId, _controller);
         } else {
@@ -558,6 +582,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         executionIsAsync(Action.WITHDRAW)
         returns (uint256 shares)
     {
+        // TODO: This funciton returns assets, not shares
         return (_isSeniorTranche()
                 ? IAsyncSTWithdrawalKernel(_kernel()).stClaimableCancelWithdrawalRequest(_requestId, _controller)
                 : IAsyncJTWithdrawalKernel(_kernel()).jtClaimableCancelWithdrawalRequest(_requestId, _controller));
@@ -573,9 +598,13 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
         external
         virtual
         override(IERC7887)
+        checkRoleAndDelayIfGated(RoycoRoles.CANCEL_REDEEM_ROLE)
+        whenNotPaused
         onlyCallerOrOperator(_owner)
         executionIsAsync(Action.WITHDRAW)
     {
+        // TODO: This funciton returns assets, not shares
+
         // Get the claimable amount before claiming
         uint256 shares =
             (_isSeniorTranche()
@@ -599,17 +628,10 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
     }
 
     /// @inheritdoc IERC165
-    function supportsInterface(bytes4 _interfaceId) public pure virtual override(IERC165) returns (bool) {
+    function supportsInterface(bytes4 _interfaceId) public pure virtual override(IERC165, AccessControlEnumerableUpgradeable) returns (bool) {
         return _interfaceId == type(IERC165).interfaceId || _interfaceId == type(ERC4626Upgradeable).interfaceId || _interfaceId == type(IERC7540).interfaceId
-            || _interfaceId == type(IERC7575).interfaceId || _interfaceId == type(IERC7887).interfaceId || _interfaceId == type(IRoycoTranche).interfaceId;
-    }
-
-    /// @inheritdoc ERC4626Upgradeable
-    function _deposit(address _caller, address _receiver, uint256 _assets, uint256 _shares) internal virtual override(ERC4626Upgradeable) {
-        // If deposits are synchronous, transfer the assets to the tranche and mint the shares
-        if (_isSync(Action.DEPOSIT)) super._deposit(_caller, _receiver, _assets, _shares);
-        // If deposits are asynchronous, only mint shares since assets were transfered in on the request
-        else _mint(_receiver, _shares);
+            || _interfaceId == type(IERC7575).interfaceId || _interfaceId == type(IERC7887).interfaceId || _interfaceId == type(IRoycoTranche).interfaceId
+            || _interfaceId == type(IAccessControlEnumerable).interfaceId;
     }
 
     /// @inheritdoc ERC4626Upgradeable
@@ -631,10 +653,8 @@ abstract contract BaseRoycoTranche is IRoycoTranche, Ownable2StepUpgradeable, UU
     }
 
     /// @inheritdoc UUPSUpgradeable
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
-        // Upgrade authorization is currently restricted to the owner
-        // TODO: Replace onlyOwner with role-based access control (e.g., UPGRADER_ROLE)
-    }
+    /// @dev Will revert if the caller is not the upgrader role
+    function _authorizeUpgrade(address newImplementation) internal override onlyRole(RoycoRoles.UPGRADER_ROLE) { }
 
     /// @dev Returns if the specified action employs a synchronous execution model
     function _isSync(Action _action) internal view returns (bool) {

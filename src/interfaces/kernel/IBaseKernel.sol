@@ -39,6 +39,8 @@ interface IBaseKernel {
     // TODO: Assume that the following functions also enforce the invariants
     function stMaxDeposit(address _asset, address _receiver) external view returns (uint256);
     function stMaxWithdraw(address _asset, address _owner) external view returns (uint256);
+
+    // Assumes that the funds are transferred to the kernel before the deposit call is made
     function stDeposit(
         address _asset,
         uint256 _assets,
@@ -46,11 +48,13 @@ interface IBaseKernel {
         address _receiver
     )
         external
-        returns (uint256 underlyingSharesAllocated, uint256 totalUnderlyingShares);
-    function stRedeem(address _asset, uint256 _shares, uint256 _totalShares, address _caller, address _receiver) external returns (uint256 assetsWithdrawn);
+        returns (uint256 underlyingSharesAllocated, uint256 totalEffectiveUnderlyingShares);
+    function stRedeem(address _asset, uint256 _shares, uint256 _totalShares, address _controller, address _receiver) external returns (uint256 assetsWithdrawn);
 
     function jtMaxDeposit(address _asset, address _receiver) external view returns (uint256);
     function jtMaxWithdraw(address _asset, address _owner) external view returns (uint256);
+
+    // Assumes that the funds are transferred to the kernel before the deposit call is made
     function jtDeposit(
         address _asset,
         uint256 _assets,
@@ -58,6 +62,6 @@ interface IBaseKernel {
         address _receiver
     )
         external
-        returns (uint256 underlyingSharesAllocated, uint256 totalUnderlyingShares);
-    function jtRedeem(address _asset, uint256 _shares, uint256 _totalShares, address _caller, address _receiver) external returns (uint256 assetsWithdrawn);
+        returns (uint256 underlyingSharesAllocated, uint256 totalEffectiveUnderlyingShares);
+    function jtRedeem(address _asset, uint256 _shares, uint256 _totalShares, address _controller, address _receiver) external returns (uint256 assetsWithdrawn);
 }

@@ -11,8 +11,8 @@ interface IAsyncSTWithdrawalKernel {
     /**
      * @notice Requests a redemption for a specified amount of shares from the underlying investment opportunity
      * @param _caller The address of the user requesting the withdrawal for the senior tranche
-     * @param _shares The amount of shares being requested to be redeemed
-     * @param _totalShares The total number of shares in the tranche at the time of the request
+     * @param _shares The amount of shares of the senior tranche being requested to be redeemed
+     * @param _totalShares The total number of shares in the senior tranche at the time of the request
      * @param _controller The controller that is allowed to operate the lifecycle of the request.
      * @return requestId The request ID of this withdrawal request
      */
@@ -21,10 +21,11 @@ interface IAsyncSTWithdrawalKernel {
     /**
      * @notice Returns the amount of assets pending redemption for a specific controller
      * @param _requestId The request ID of this withdrawal request
+     * @param _totalShares The total number of shares in the senior tranche at the time of the request
      * @param _controller The controller to query pending redemptions for
      * @return pendingAssets The amount of assets pending redemption for the controller
      */
-    function stPendingWithdrawalRequest(uint256 _requestId, address _controller) external view returns (uint256 pendingAssets);
+    function stPendingWithdrawalRequest(uint256 _requestId, uint256 _totalShares, address _controller) external view returns (uint256 pendingAssets);
 
     /**
      * @notice Returns the amount of shares claimable from completed redemption requests for a specific controller
@@ -32,7 +33,7 @@ interface IAsyncSTWithdrawalKernel {
      * @param _controller The controller to query claimable redemptions for
      * @return claimableShares The amount of shares claimable from completed redemption requests
      */
-    function stClaimableWithdrawalRequest(uint256 _requestId, address _controller) external view returns (uint256 claimableShares);
+    function stClaimableWithdrawalRequest(uint256 _requestId, uint256 _totalShares, address _controller) external view returns (uint256 claimableShares);
 
     /**
      * @notice Cancels a pending redeem request for the specified controller

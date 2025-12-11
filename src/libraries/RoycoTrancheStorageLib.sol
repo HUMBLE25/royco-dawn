@@ -3,17 +3,15 @@ pragma solidity ^0.8.28;
 
 import { ExecutionModel, IBaseKernel } from "../interfaces/kernel/IBaseKernel.sol";
 
-/**
- * @notice Storage state for Royco Tranche contracts
- * @custom:storage-location erc7201:Royco.storage.RoycoTrancheState
- * @custom:field royco - The address of the Royco factory contract
- * @custom:field kernel - The address of the kernel contract handling strategy logic
- * @custom:field marketId - The identifier of the Royco market this tranche is linked to
- * @custom:field decimalsOffset - Decimals offset for share token precision
- * @custom:field DEPOSIT_EXECUTION_MODEL - The kernel execution model for deposit operations
- * @custom:field WITHDRAW_EXECUTION_MODEL - The kernel execution model for withdrawal operations
- * @custom:field isOperator - Nested mapping tracking operator approvals for owners
- */
+/// @notice Storage state for Royco Tranche contracts
+/// @custom:storage-location erc7201:Royco.storage.RoycoTrancheState
+/// @custom:field royco - The address of the Royco factory contract
+/// @custom:field kernel - The address of the kernel contract handling strategy logic
+/// @custom:field marketId - The identifier of the Royco market this tranche is linked to
+/// @custom:field decimalsOffset - Decimals offset for share token precision
+/// @custom:field DEPOSIT_EXECUTION_MODEL - The kernel execution model for deposit operations
+/// @custom:field WITHDRAW_EXECUTION_MODEL - The kernel execution model for withdrawal operations
+/// @custom:field isOperator - Nested mapping tracking operator approvals for owners
 struct RoycoTrancheState {
     address royco;
     address kernel;
@@ -24,36 +22,30 @@ struct RoycoTrancheState {
     mapping(address owner => mapping(address operator => bool isOperator)) isOperator;
 }
 
-/**
- * @title RoycoTrancheStorageLib
- * @notice Library for managing Royco Tranche storage using ERC-7201 pattern
- * @dev Provides functions to safely access and modify tranche state
- */
+/// @title RoycoTrancheStorageLib
+/// @notice Library for managing Royco Tranche storage using ERC-7201 pattern
+/// @dev Provides functions to safely access and modify tranche state
 library RoycoTrancheStorageLib {
     /// @dev Storage slot for RoycoTrancheState using ERC-7201 pattern
     // keccak256(abi.encode(uint256(keccak256("Royco.storage.RoycoTrancheState")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant ROYCO_TRANCHE_STORAGE_SLOT = 0x25265df6fdb5acadb02f38e62cea4bba666d308120ed42c208a4ef005c50ec00;
 
-    /**
-     * @notice Returns a reference to the RoycoTrancheState storage
-     * @dev Uses ERC-7201 storage slot pattern for collision-resistant storage
-     * @return $ Storage reference to the tranche state
-     */
+    /// @notice Returns a reference to the RoycoTrancheState storage
+    /// @dev Uses ERC-7201 storage slot pattern for collision-resistant storage
+    /// @return $ Storage reference to the tranche state
     function _getRoycoTrancheStorage() internal pure returns (RoycoTrancheState storage $) {
         assembly ("memory-safe") {
             $.slot := ROYCO_TRANCHE_STORAGE_SLOT
         }
     }
 
-    /**
-     * @notice Initializes the tranche storage state
-     * @dev Sets up all initial parameters and validates fee constraints
-     * @param _royco The address of the Royco factory contract
-     * @param _kernel The address of the kernel contract handling strategy logic
-     * @param _marketId The identifier of the Royco market this tranche is linked to
-     * @param _decimalsOffset Decimals offset for share token precision
-     * @param _isSeniorTranche Whether the tranche is a senior tranche
-     */
+    /// @notice Initializes the tranche storage state
+    /// @dev Sets up all initial parameters and validates fee constraints
+    /// @param _royco The address of the Royco factory contract
+    /// @param _kernel The address of the kernel contract handling strategy logic
+    /// @param _marketId The identifier of the Royco market this tranche is linked to
+    /// @param _decimalsOffset Decimals offset for share token precision
+    /// @param _isSeniorTranche Whether the tranche is a senior tranche
     function __RoycoTranche_init(address _royco, address _kernel, bytes32 _marketId, uint8 _decimalsOffset, bool _isSeniorTranche) internal {
         // Set the initial state of the tranche
         RoycoTrancheState storage $ = _getRoycoTrancheStorage();

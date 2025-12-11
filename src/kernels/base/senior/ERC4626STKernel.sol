@@ -7,7 +7,7 @@ import { Math } from "../../../../lib/openzeppelin-contracts/contracts/utils/mat
 import { ExecutionModel, IBaseKernel } from "../../../interfaces/kernel/IBaseKernel.sol";
 import { BaseKernelState, BaseKernelStorageLib, Operation } from "../../../libraries/BaseKernelStorageLib.sol";
 import { ConstantsLib } from "../../../libraries/ConstantsLib.sol";
-import { ERC4626STKernelState, ERC4626STKernelStorageLib } from "../../../libraries/kernels/ERC4626STKernelStorageLib.sol";
+import { ERC4626STKernelStorageLib } from "../../../libraries/kernels/ERC4626STKernelStorageLib.sol";
 import { BaseKernel } from "../BaseKernel.sol";
 
 abstract contract ERC4626STKernel is BaseKernel {
@@ -49,6 +49,7 @@ abstract contract ERC4626STKernel is BaseKernel {
         external
         override(IBaseKernel)
         onlySeniorTranche
+        whenNotPaused
         syncNAVsAndEnforceCoverage(Operation.ST_DEPOSIT)
         returns (uint256 underlyingSharesAllocated, uint256 totalUnderlyingShares)
     {
@@ -69,6 +70,7 @@ abstract contract ERC4626STKernel is BaseKernel {
         external
         override(IBaseKernel)
         onlySeniorTranche
+        whenNotPaused
         syncNAVs(Operation.ST_WITHDRAW)
         returns (uint256 assetsWithdrawn)
     {
