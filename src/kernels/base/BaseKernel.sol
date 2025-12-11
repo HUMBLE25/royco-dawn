@@ -263,7 +263,10 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
                 // The excess loss is absorbed by ST
                 uint256 stLoss = jtLoss - jtEffectiveNAV;
                 stEffectiveNAV = Math.saturatingSub(stEffectiveNAV, stLoss);
-                // The excess loss is added to the JT's coverage debt: a future liability of JT to ST
+                // Repay ST debt to JT
+                // This is equivalent to retroactively removing coverage for previously covered losses
+                // Thus, the liability is flipped to JT debt to ST
+                stCoverageDebt = Math.saturatingSub(stCoverageDebt, stLoss);
                 jtCoverageDebt += stLoss;
             }
             /// @dev STEP_JT_ABSORB_LOSS: This loss is fully absorbable by JT's remaning loss-absorption buffer
@@ -293,10 +296,10 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
         int256 deltaST = _computeRawNAVDelta(stRawNAV, $.lastSTRawNAV);
 
         /// @dev STEP_ST_NO_CHANGE: The ST assets experienced no change in value
-        if (deltaST == 0) return (stRawNAV, jtRawNAV, stEffectiveNAV, jtEffectiveNAV, stCoverageDebt, jtCoverageDebt, false);
-
-        /// @dev STEP_ST_APPLY_LOSS: The ST assets depreciated in value
-        if (deltaST < 0) {
+        if (deltaST == 0) {
+            return (stRawNAV, jtRawNAV, stEffectiveNAV, jtEffectiveNAV, stCoverageDebt, jtCoverageDebt, false);
+            /// @dev STEP_ST_APPLY_LOSS: The ST assets depreciated in value
+        } else if (deltaST < 0) {
             uint256 stLoss = uint256(-deltaST);
             /// @dev STEP_APPLY_JT_COVERAGE_TO_ST: Apply any possible coverage to ST provided by JT's loss-absorption buffer
             uint256 coverageApplied = Math.min(stLoss, jtEffectiveNAV);
@@ -345,10 +348,11 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
             // Preemptively accrue all yield to ST and return if last yield distribution was in the same block
             // No need to update yield share accumulator and timestamp so return false for yieldDistributed
             if (elapsed == 0) return (stRawNAV, jtRawNAV, (stEffectiveNAV + stGain), jtEffectiveNAV, stCoverageDebt, jtCoverageDebt, false);
-            // Apply the yield split: adding each tranche's share of earnings to their effective NAVs
+            // Compute the time weighted JT yield share of this distribution scaled by WAD
             uint256 jtYieldShareWAD = _twJTYieldShareAccruedWAD / elapsed;
             // Round in favor of the senior tranche
             uint256 jtYield = stGain.mulDiv(jtYieldShareWAD, ConstantsLib.WAD, Math.Rounding.Floor);
+            // Apply the yield split: adding each tranche's share of earnings to their effective NAVs
             jtEffectiveNAV += jtYield;
             stEffectiveNAV += (stGain - jtYield);
             yieldDistributed = true;
