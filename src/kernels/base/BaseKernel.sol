@@ -103,10 +103,16 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
 
     /**
      * @notice Initializes the base kernel state
-     * @dev Initializes the base kernel state
+     * @dev Checks the initial market's configuration and initializes the base kernel state
      * @param _params The initialization parameters for the base kernel
      */
     function __BaseKernel_init_unchained(BaseKernelInitParams memory _params) internal onlyInitializing {
+        // Ensure that the coverage requirement is valid
+        require(_params.coverageWAD < ConstantsLib.WAD && _params.coverageWAD >= ConstantsLib.MIN_COVERAGE_WAD);
+        // Ensure that JT withdrawals are not permanently bricked
+        require(uint256(_params.coverageWAD).mulDiv(_params.betaWAD, ConstantsLib.WAD, Math.Rounding.Ceil) <= ConstantsLib.WAD);
+        // Ensure that the tranche address and RDM are not null
+        require((bytes20(_params.seniorTranche) & bytes20(_params.juniorTranche) & bytes20(_params.rdm)) != bytes20(0));
         // Initialize the base kernel state
         BaseKernelStorageLib.__BaseKernel_init(_params);
     }
