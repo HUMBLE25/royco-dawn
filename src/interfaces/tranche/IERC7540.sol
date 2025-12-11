@@ -58,14 +58,14 @@ interface IERC7540 {
     /// @param requestId Request identifier.
     /// @param controller Controller address.
     /// @return pendingAssets Amount in Pending.
-    function pendingDepositRequest(uint256 requestId, address controller) external returns (uint256 pendingAssets);
+    function pendingDepositRequest(uint256 requestId, address controller) external view returns (uint256 pendingAssets);
 
     /// @notice Amount of requested assets in Claimable state for controller/requestId.
     /// @dev MUST NOT include amounts in Pending; MUST NOT vary by caller.
     /// @param requestId Request identifier.
     /// @param controller Controller address.
     /// @return claimableAssets Amount in Claimable.
-    function claimableDepositRequest(uint256 requestId, address controller) external returns (uint256 claimableAssets);
+    function claimableDepositRequest(uint256 requestId, address controller) external view returns (uint256 claimableAssets);
 
     /// @notice Claim an async deposit by calling ERC-4626 deposit.
     /// @dev Overload per ERC-7540. MUST revert unless msg.sender == controller or operator.
@@ -96,14 +96,14 @@ interface IERC7540 {
     /// @param requestId Request identifier.
     /// @param controller Controller address.
     /// @return pendingShares Amount in Pending.
-    function pendingRedeemRequest(uint256 requestId, address controller) external returns (uint256 pendingShares);
+    function pendingRedeemRequest(uint256 requestId, address controller) external view returns (uint256 pendingShares);
 
     /// @notice Amount of requested shares in Claimable state for controller/requestId.
     /// @dev MUST NOT include amounts in Pending; MUST NOT vary by caller.
     /// @param requestId Request identifier.
     /// @param controller Controller address.
     /// @return claimableShares Amount in Claimable.
-    function claimableRedeemRequest(uint256 requestId, address controller) external returns (uint256 claimableShares);
+    function claimableRedeemRequest(uint256 requestId, address controller) external view returns (uint256 claimableShares);
 
     /// @notice Claim an async redemption by calling ERC-4626 redeem.
     /// @dev Overload per ERC-7540. MUST revert unless msg.sender == controller or operator.

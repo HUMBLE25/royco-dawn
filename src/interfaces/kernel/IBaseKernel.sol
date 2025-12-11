@@ -14,76 +14,54 @@ enum ExecutionModel {
 
 /**
  * @title IBaseKernel
- * @notice Base interface for Royco kernel contracts that handle asset management operations to/from an underlying investment opportunity
- * @dev Provides the logic for Royco Tranches to interact with external investment opportunities (e.g., Aave, Ethena, RWAs, etc.)
- * @dev Kernels support both synchronous and asynchronous flows for deposits and withdrawals via ExecutionModel enum
- * @dev Asynchronous operations use a request/claim pattern for deposits and withdrawals (ERC7540).
- *       Must implement IAsyncDepostKernel and/or IAsyncWithdrawalKernel if using asynchronous flows.
- * @dev Kernels may optionally support cancellation of pending requests (ERC7887). Must implement ICancellableKernel if supported.
+ *
  */
 interface IBaseKernel {
-    // =============================
-    // Kernel Configuration
-    // =============================
+    function ST_DEPOSIT_EXECUTION_MODEL() external pure returns (ExecutionModel);
+    function ST_WITHDRAWAL_EXECUTION_MODEL() external pure returns (ExecutionModel);
 
-    /**
-     * @notice Returns the deposit type of the kernel
-     * @return The deposit type of the kernel
-     */
-    function DEPOSIT_EXECUTION_MODEL() external pure returns (ExecutionModel);
+    function JT_DEPOSIT_EXECUTION_MODEL() external pure returns (ExecutionModel);
+    function JT_WITHDRAWAL_EXECUTION_MODEL() external pure returns (ExecutionModel);
 
-    /**
-     * @notice Returns the withdraw type of the kernel
-     * @return The withdraw type of the kernel
-     */
-    function WITHDRAW_EXECUTION_MODEL() external pure returns (ExecutionModel);
+    function getSTRawNAV() external view returns (uint256);
+    function getJTRawNAV() external view returns (uint256);
 
-    /**
-     * @notice Returns whether the kernel supports deposit cancellation
-     * @return Whether the kernel supports deposit cancellation
-     */
-    function SUPPORTS_DEPOSIT_CANCELLATION() external pure returns (bool);
+    function getSTEffectiveNAV() external view returns (uint256);
+    function getJTEffectiveNAV() external view returns (uint256);
 
-    /**
-     * @notice Returns whether the kernel supports redeem cancellation
-     * @return Whether the kernel supports redeem cancellation
-     */
-    function SUPPORTS_REDEMPTION_CANCELLATION() external pure returns (bool);
+    function getSTTotalEffectiveAssets() external view returns (uint256);
+    function getJTTotalEffectiveAssets() external view returns (uint256);
 
-    // =============================
-    // Core Asset Management Getters
-    // =============================
+    function syncTrancheNAVs() external returns (uint256 stRawNAV, uint256 jtRawNAV, uint256 stEffectiveNAV, uint256 jtEffectiveNAV);
 
-    /**
-     * @notice Returns the net asset value managed by the caller in the underlying investment opportunity
-     * @dev Must be called via a call or staticcall (reliant on msg.sender)
-     * @param _asset The address of the asset to query the owner's balance in the underlying investment opportunity for
-     * @return The total amount of the specified asset managed by the caller
-     */
-    function getNAV(address _asset) external view returns (uint256);
+    // function previewSyncTrancheNAVs() external returns (uint256 stRawNAV, uint256 jtRawNAV, uint256 stEffectiveNAV, uint256 jtEffectiveNAV);
 
-    // =============================
-    // Deposit and Withdrawal Operations
-    // =============================
+    // TODO: Assume that the following functions also enforce the invariants
+    function stMaxDeposit(address _asset, address _receiver) external view returns (uint256);
+    function stMaxWithdraw(address _asset, address _owner) external view returns (uint256);
 
-    /**
-     * @notice Deposits a specified amount of an asset into the underlying investment opportunity
-     * @dev Must be called via a delegatecall (reliant on address(this))
-     * @dev The contract delegatecalling this function must hold the specified amount of assets to deposit
-     * @param _asset The address of the asset to deposit into the underlying investment opportunity
-     * @param _assets The amount of the asset to deposit into the underlying investment opportunity
-     * @param _controller The controller that is allowed to operate the lifecycle of the request.
-     */
-    function deposit(address _asset, uint256 _assets, address _controller) external;
+    // Assumes that the funds are transferred to the kernel before the deposit call is made
+    function stDeposit(
+        address _asset,
+        uint256 _assets,
+        address _caller,
+        address _receiver
+    )
+        external
+        returns (uint256 underlyingSharesAllocated, uint256 totalEffectiveUnderlyingShares);
+    function stRedeem(address _asset, uint256 _shares, uint256 _totalShares, address _controller, address _receiver) external returns (uint256 assetsWithdrawn);
 
-    /**
-     * @notice Withdraws a specified amount of an asset from the underlying investment opportunity
-     * @dev Must be called via a delegatecall (reliant on address(this))
-     * @dev The contract delegatecalling this function must have a balance greater than or equal to the specified amount of assets in the underlying investment opportunity
-     * @param _asset The address of the asset to withdraw from the underlying investment opportunity
-     * @param _assets The amount of the asset to withdraw from the underlying investment opportunity
-     * @param _controller The controller that is allowed to operate the withdrawal.
-     * @param _receiver The recipient of the withdrawn assets
-     */
-    function withdraw(address _asset, uint256 _assets, address _controller, address _receiver) external;
+    function jtMaxDeposit(address _asset, address _receiver) external view returns (uint256);
+    function jtMaxWithdraw(address _asset, address _owner) external view returns (uint256);
+
+    // Assumes that the funds are transferred to the kernel before the deposit call is made
+    function jtDeposit(
+        address _asset,
+        uint256 _assets,
+        address _caller,
+        address _receiver
+    )
+        external
+        returns (uint256 underlyingSharesAllocated, uint256 totalEffectiveUnderlyingShares);
+    function jtRedeem(address _asset, uint256 _shares, uint256 _totalShares, address _controller, address _receiver) external returns (uint256 assetsWithdrawn);
 }
