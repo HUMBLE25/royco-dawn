@@ -262,11 +262,11 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
             if (jtLoss > jtAbsorbableLoss) {
                 // The excess loss is absorbed by ST
                 uint256 stLoss = jtLoss - jtEffectiveNAV;
-                stEffectiveNAV -= stLoss;
+                stEffectiveNAV = Math.saturatingSub(stEffectiveNAV, stLoss);
                 // Repay ST debt to JT
                 // This is equivalent to retroactively removing coverage for previously covered losses
                 // Thus, the liability is flipped to JT debt to ST
-                stCoverageDebt -= stLoss;
+                stCoverageDebt = Math.saturatingSub(stCoverageDebt, stLoss);
                 jtCoverageDebt += stLoss;
             }
             /// @dev STEP_JT_ABSORB_LOSS: This loss is fully absorbable by JT's remaning loss-absorption buffer
@@ -311,7 +311,7 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
             /// @dev STEP_ST_INCURS_RESIDUAL_LOSSES: Apply any uncovered losses by JT to ST
             uint256 netStLoss = stLoss - coverageApplied;
             if (netStLoss != 0) {
-                stEffectiveNAV -= netStLoss;
+                stEffectiveNAV - Math.saturatingSub(stEffectiveNAV, netStLoss);
                 // The uncovered portion of the ST loss is a JT liability to ST
                 jtCoverageDebt += netStLoss;
             }
