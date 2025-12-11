@@ -262,11 +262,11 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
             if (jtLoss > jtAbsorbableLoss) {
                 // The excess loss is absorbed by ST
                 uint256 stLoss = jtLoss - jtEffectiveNAV;
-                stEffectiveNAV = Math.saturatingSub(stEffectiveNAV, stLoss);
+                stEffectiveNAV -= stLoss;
                 // Repay ST debt to JT
                 // This is equivalent to retroactively removing coverage for previously covered losses
                 // Thus, the liability is flipped to JT debt to ST
-                stCoverageDebt = Math.saturatingSub(stCoverageDebt, stLoss);
+                stCoverageDebt -= stLoss;
                 jtCoverageDebt += stLoss;
             }
             /// @dev STEP_JT_ABSORB_LOSS: This loss is fully absorbable by JT's remaning loss-absorption buffer
@@ -311,7 +311,7 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
             /// @dev STEP_ST_INCURS_RESIDUAL_LOSSES: Apply any uncovered losses by JT to ST
             uint256 netStLoss = stLoss - coverageApplied;
             if (netStLoss != 0) {
-                stEffectiveNAV = Math.saturatingSub(stEffectiveNAV, netStLoss);
+                stEffectiveNAV -= netStLoss;
                 // The uncovered portion of the ST loss is a JT liability to ST
                 jtCoverageDebt += netStLoss;
             }
@@ -434,7 +434,7 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
                 if (deltaJT < 0) {
                     // The actual amount withdrawn was the delta in ST raw NAV and the coverage applied from JT
                     uint256 coverageRealized = uint256(-deltaJT);
-                    $.lastSTEffectiveNAV = Math.saturatingSub($.lastSTEffectiveNAV, uint256(-deltaST) + coverageRealized);
+                    $.lastSTEffectiveNAV -= (uint256(-deltaST) + coverageRealized);
                     /// We need to adjust debts by accounting for the realized coverage
                     // The coverage realization waterfall works by first erasing ST debt and then JT debt
                     // This mimics the same top -> down waterfall used to apply coverage when computing effective NAVs
