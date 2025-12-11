@@ -20,13 +20,11 @@ import { IERC165, IERC7540, IERC7575, IERC7887, IRoycoTranche } from "../interfa
 import { RoycoTrancheStorageLib } from "../libraries/RoycoTrancheStorageLib.sol";
 import { Action, TrancheDeploymentParams } from "../libraries/Types.sol";
 
-/**
- * @title BaseRoycoTranche
- * @notice Abstract base contract implementing core functionality for Royco tranches
- * @dev This contract provides common tranche operations including ERC4626 vault functionality,
- *      asynchronous deposit/withdrawal support via ERC7540, and request cancellation via ERC7887
- *      All asset management and investment operations are delegated to the configured kernel
- */
+/// @title BaseRoycoTranche
+/// @notice Abstract base contract implementing core functionality for Royco tranches
+/// @dev This contract provides common tranche operations including ERC4626 vault functionality,
+///      asynchronous deposit/withdrawal support via ERC7540, and request cancellation via ERC7887
+///      All asset management and investment operations are delegated to the configured kernel
 abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable, ERC4626Upgradeable {
     using Math for uint256;
     using SafeERC20 for IERC20;
@@ -46,64 +44,51 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
     /// @notice Thrown when the deposit amount is zero
     error ERC4626ZeroDepositAmount();
 
-    /**
-     * @notice Modifier to ensure the functionality is disabled
-     */
+    /// @notice Modifier to ensure the functionality is disabled
     // forge-lint: disable-next-line(unwrapped-modifier-logic)
     modifier disabled() {
         revert DISABLED();
         _;
     }
 
-    /**
-     * @notice Modifier to ensure the specified action uses a synchronous execution model
-     * @param _action The action to check (DEPOSIT or WITHDRAW)
-     * @dev Reverts if the execution model for the action is asynchronous
-     */
+    /// @notice Modifier to ensure the specified action uses a synchronous execution model
+    /// @param _action The action to check (DEPOSIT or WITHDRAW)
+    /// @dev Reverts if the execution model for the action is asynchronous
     modifier executionIsSync(Action _action) {
         require(_isSync(_action), DISABLED());
         _;
     }
 
-    /**
-     * @notice Modifier to ensure the specified action uses an asynchronous execution model
-     * @param _action The action to check (DEPOSIT or WITHDRAW)
-     * @dev Reverts if the execution model for the action is synchronous
-     */
+    /// @notice Modifier to ensure the specified action uses an asynchronous execution model
+    /// @param _action The action to check (DEPOSIT or WITHDRAW)
+    /// @dev Reverts if the execution model for the action is synchronous
     modifier executionIsAsync(Action _action) {
         require(!_isSync(_action), DISABLED());
         _;
     }
 
-    /**
-     * @notice Modifier to ensure caller is either the specified address or an approved operator
-     * @param _account The address that the caller should match or have operator approval for
-     * @dev Reverts if caller is neither the address nor an approved operator
-     */
+    /// @notice Modifier to ensure caller is either the specified address or an approved operator
+    /// @param _account The address that the caller should match or have operator approval for
+    /// @dev Reverts if caller is neither the address nor an approved operator
     modifier onlyCallerOrOperator(address _account) {
         _onlyCallerOrOperator(_account);
         _;
     }
 
-    /**
-     * @notice Checks if the caller is either the specified address or an approved operator
-     * @param _account The address to check
-     * @dev Reverts if the caller is neither the address nor an approved operator
-     */
+    /// @notice Checks if the caller is either the specified address or an approved operator
+    /// @param _account The address to check
+    /// @dev Reverts if the caller is neither the address nor an approved operator
     function _onlyCallerOrOperator(address _account) internal view {
         require(msg.sender == _account || RoycoTrancheStorageLib._getRoycoTrancheStorage().isOperator[_account][msg.sender], ONLY_CALLER_OR_OPERATOR());
     }
 
-    /**
-     *
-     * @notice Initializes the Royco tranche
-     * @dev This function initializes parent contracts and the tranche-specific state
-     * @param _trancheParams Deployment parameters including name, symbol, kernel, and kernel initialization data
-     * @param _asset The underlying asset for the tranche
-     * @param _owner The initial owner of the tranche
-     * @param _pauser The initial pauser of the tranche
-     * @param _marketId The identifier of the Royco market this tranche is linked to
-     */
+    /// @notice Initializes the Royco tranche
+    /// @dev This function initializes parent contracts and the tranche-specific state
+    /// @param _trancheParams Deployment parameters including name, symbol, kernel, and kernel initialization data
+    /// @param _asset The underlying asset for the tranche
+    /// @param _owner The initial owner of the tranche
+    /// @param _pauser The initial pauser of the tranche
+    /// @param _marketId The identifier of the Royco market this tranche is linked to
     function __RoycoTranche_init(
         TrancheDeploymentParams calldata _trancheParams,
         address _asset,
@@ -123,13 +108,11 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         __RoycoTranche_init_unchained(_asset, _trancheParams.kernel, _marketId);
     }
 
-    /**
-     * @notice Internal initialization function for Royco tranche-specific state
-     * @dev This function sets up the tranche storage and initializes the kernel
-     * @param _asset The underlying asset for the tranche
-     * @param _kernelAddress The address of the kernel that handles strategy logic
-     * @param _marketId The identifier of the Royco market this tranche is linked to
-     */
+    /// @notice Internal initialization function for Royco tranche-specific state
+    /// @dev This function sets up the tranche storage and initializes the kernel
+    /// @param _asset The underlying asset for the tranche
+    /// @param _kernelAddress The address of the kernel that handles strategy logic
+    /// @param _marketId The identifier of the Royco market this tranche is linked to
     function __RoycoTranche_init_unchained(address _asset, address _kernelAddress, bytes32 _marketId) internal onlyInitializing {
         // Calculate the vault's decimal offset (curb inflation attacks)
         uint8 underlyingAssetDecimals = IERC20Metadata(_asset).decimals();
@@ -205,7 +188,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         public
         virtual
         override(IERC7540)
-        onlyEnabledRole(RoycoRoles.DEPOSIT_ROLE)
+        checkRoleAndDelayIfGated(RoycoRoles.DEPOSIT_ROLE)
         whenNotPaused
         onlyCallerOrOperator(_controller)
         returns (uint256 shares)
@@ -278,7 +261,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         virtual
         override(ERC4626Upgradeable, IERC7540)
         onlyCallerOrOperator(_controller)
-        onlyEnabledRole(RoycoRoles.REDEEM_ROLE)
+        checkRoleAndDelayIfGated(RoycoRoles.REDEEM_ROLE)
         whenNotPaused
         returns (uint256 assets)
     {
@@ -329,7 +312,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         external
         virtual
         override(IERC7540)
-        onlyEnabledRole(RoycoRoles.DEPOSIT_ROLE)
+        checkRoleAndDelayIfGated(RoycoRoles.DEPOSIT_ROLE)
         whenNotPaused
         onlyCallerOrOperator(_owner)
         executionIsAsync(Action.DEPOSIT)
@@ -395,7 +378,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         external
         virtual
         override(IERC7540)
-        onlyEnabledRole(RoycoRoles.REDEEM_ROLE)
+        checkRoleAndDelayIfGated(RoycoRoles.REDEEM_ROLE)
         whenNotPaused
         executionIsAsync(Action.WITHDRAW)
         returns (uint256 requestId)
@@ -468,7 +451,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         external
         virtual
         override(IERC7887)
-        onlyEnabledRole(RoycoRoles.CANCEL_DEPOSIT_ROLE)
+        checkRoleAndDelayIfGated(RoycoRoles.CANCEL_DEPOSIT_ROLE)
         whenNotPaused
         onlyCallerOrOperator(_controller)
         executionIsAsync(Action.DEPOSIT)
@@ -528,7 +511,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         external
         virtual
         override(IERC7887)
-        onlyEnabledRole(RoycoRoles.CANCEL_DEPOSIT_ROLE)
+        checkRoleAndDelayIfGated(RoycoRoles.CANCEL_DEPOSIT_ROLE)
         whenNotPaused
         onlyCallerOrOperator(_controller)
         executionIsAsync(Action.DEPOSIT)
@@ -551,7 +534,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         external
         virtual
         override(IERC7887)
-        onlyEnabledRole(RoycoRoles.CANCEL_REDEEM_ROLE)
+        checkRoleAndDelayIfGated(RoycoRoles.CANCEL_REDEEM_ROLE)
         whenNotPaused
         onlyCallerOrOperator(_controller)
         executionIsAsync(Action.WITHDRAW)
@@ -611,7 +594,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         external
         virtual
         override(IERC7887)
-        onlyEnabledRole(RoycoRoles.CANCEL_REDEEM_ROLE)
+        checkRoleAndDelayIfGated(RoycoRoles.CANCEL_REDEEM_ROLE)
         whenNotPaused
         onlyCallerOrOperator(_owner)
         executionIsAsync(Action.WITHDRAW)
