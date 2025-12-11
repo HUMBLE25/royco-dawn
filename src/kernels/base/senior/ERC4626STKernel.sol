@@ -107,17 +107,22 @@ abstract contract ERC4626STKernel is BaseKernel {
 
     /// @inheritdoc BaseKernel
     function _getSeniorTrancheRawNAV() internal view override(BaseKernel) returns (uint256) {
+        // Must use preview redeem for all the tranche owned shares
+        // Max withdraw might misreport NAV due to global withdrawal limits
         address vault = ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault;
-        return IERC4626(vault).maxWithdraw(address(this));
+        uint256 trancheSharesBalance = IERC4626(vault).balanceOf(address(this));
+        return IERC4626(vault).previewRedeem(trancheSharesBalance);
     }
 
     /// @inheritdoc BaseKernel
     function _maxSTDepositGlobally(address) internal view override(BaseKernel) returns (uint256) {
+        // Max deposit takes global withdrawal limits into account
         return IERC4626(ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault).maxDeposit(address(this));
     }
 
     /// @inheritdoc BaseKernel
     function _maxSTWithdrawalGlobally(address) internal view override(BaseKernel) returns (uint256) {
-        return _getSeniorTrancheRawNAV();
+        // Max withdraw takes global withdrawal limits into account
+        return IERC4626(ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault).maxWithdraw(address(this));
     }
 }

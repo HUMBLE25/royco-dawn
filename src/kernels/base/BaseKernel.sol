@@ -44,7 +44,7 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
      * @notice Synchronizes tranche NAVs before and after an operation (deposit or withdrawal).
      * @dev Should be placed on senior tranche withdrawal functions and junior tranche deposit functions since coverage doesn't need to be enforced
      * @dev Before execution: realizes unrealized PnL into effective NAVs
-     * @dev After execution: applies the operation's raw NAV deltas (deposit or withdrawal) to effective NAVs
+     * @dev After execution: applies the effects of the operation (deposit or withdrawal) to all NAVs
      * @param _op The operation being executed in between the pre and post synchronizations
      */
     modifier syncNAVs(Operation _op) {
@@ -61,7 +61,7 @@ abstract contract BaseKernel is Initializable, IBaseKernel {
      * @notice Synchronizes tranche NAVs before and after an operation (deposit or withdrawal).
      * @dev Should be placed on senior tranche deposit functions and junior tranche withdrawal functions since coverage needs to be enforced
      * @dev Before execution: realizes unrealized PnL into effective NAVs
-     * @dev After execution: applies the operation's raw NAV deltas (deposit or withdrawal) to effective NAVs
+     * @dev After execution: applies the effects of the operation (deposit or withdrawal) to all NAVs
      * @param _op The operation being executed in between the pre and post synchronizations
      */
     modifier syncNAVsAndEnforceCoverage(Operation _op) {

@@ -116,6 +116,7 @@ abstract contract AaveV3JTKernel is BaseKernel {
     /// @inheritdoc BaseKernel
     function _getJuniorTrancheRawNAV() internal view override(BaseKernel) returns (uint256) {
         // The tranche's balance of the AToken is the total assets it is owed from the Aave pool
+        /// @dev This does not treat illiquidity in the Aave pool as a loss: we assume that total lent will be withdrawable at some point
         AaveV3KernelState storage $ = AaveV3KernelStorageLib._getAaveV3KernelStorage();
         return IERC20($.aToken).balanceOf(address(this));
     }
