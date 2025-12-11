@@ -36,7 +36,7 @@ abstract contract AaveV3JTKernel is BaseKernel, BaseAsyncJTWithrawalDelayKernel 
      * @param _jtAsset The address of the base asset of the junior tranche
      */
     function __AaveV3JTKernel_init_unchained(address _aaveV3Pool, address _jtAsset) internal onlyInitializing {
-        // Ensure that the JT base asset is identical to the ERC4626 vault
+        // Ensure that the JT base asset is a supported reserve token in the Aave V3 Pool
         address jtAssetAToken = IPool(_aaveV3Pool).getReserveAToken(_jtAsset);
         require(jtAssetAToken != address(0), UNSUPPORTED_RESERVE_TOKEN());
 
