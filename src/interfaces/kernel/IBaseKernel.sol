@@ -48,7 +48,7 @@ interface IBaseKernel {
         address _receiver
     )
         external
-        returns (uint256 underlyingSharesAllocated, uint256 totalEffectiveUnderlyingShares);
+        returns (uint256 valueAllocated, uint256 effectiveNAVToMintAt);
     function stRedeem(address _asset, uint256 _shares, uint256 _totalShares, address _controller, address _receiver) external returns (uint256 assetsWithdrawn);
 
     function jtMaxDeposit(address _asset, address _receiver) external view returns (uint256);
@@ -62,6 +62,6 @@ interface IBaseKernel {
         address _receiver
     )
         external
-        returns (uint256 underlyingSharesAllocated, uint256 totalEffectiveUnderlyingShares);
+        returns (uint256 valueAllocated, uint256 effectiveNAVToMintAt);
     function jtRedeem(address _asset, uint256 _shares, uint256 _totalShares, address _controller, address _receiver) external returns (uint256 assetsWithdrawn);
 }

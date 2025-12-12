@@ -36,9 +36,6 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
     /// @notice Thrown when the caller is not the expected account or an approved operator
     error ONLY_CALLER_OR_OPERATOR();
 
-    /// @notice Thrown when the underlying shares allocated are greater than the total underlying shares
-    error InvalidUnderlyingSharesAllocated(uint256 underlyingSharesAllocated, uint256 totalUnderlyingShares);
-
     /// @notice Thrown when the redeem amount is zero
     error ERC4626ZeroRedeemAmount();
 
@@ -129,7 +126,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
     }
 
     /// @inheritdoc IRoycoTranche
-    function getNAV() external view override(IRoycoTranche) returns (uint256) {
+    function getNAV() public view override(IRoycoTranche) returns (uint256) {
         return (TRANCHE_TYPE() == TrancheType.SENIOR ? IBaseKernel(_kernel()).getSTEffectiveNAV() : IBaseKernel(_kernel()).getJTEffectiveNAV());
     }
 
@@ -213,23 +210,14 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         }
 
         // Deposit the assets into the underlying investment opportunity and get the fraction of total assets allocated
-        (uint256 underlyingSharesAllocated, uint256 totalEffectiveUnderlyingShares) = (TRANCHE_TYPE() == TrancheType.SENIOR
+        (uint256 valueAllocated, uint256 effectiveNAVToMintAt) = (TRANCHE_TYPE() == TrancheType.SENIOR
                 ? kernel.stDeposit(address(asset), _assets, _controller, _receiver)
                 : kernel.jtDeposit(address(asset), _assets, _controller, _receiver));
-        require(
-            underlyingSharesAllocated <= totalEffectiveUnderlyingShares,
-            InvalidUnderlyingSharesAllocated(underlyingSharesAllocated, totalEffectiveUnderlyingShares)
-        );
 
-        // Calculate the proportional amount of shares to mint to the receiver such that lp_st_shares / total_st_shares = underlying_shares_allocated / total_underlying_shares
-        // sharesToMint / (totalSupply() + 10 ** _decimalsOffset() + sharesToMint) = underlyingSharesAllocated / (totalEffectiveUnderlyingShares + 1)
-        // In the synchronous case, this is equivalent to previewDeposit(_assets)
-        // In the asynchronos case, the deposit request may not be have been fulfilled at the current nav.
-        //  Therefore, the kernel is expected to keep track of the underlying opportunity shares minted against the request.
-        //  The ratio of these shares to the total underlying shares held by the system represent the user's claim on the vault, therefore we mint
-        //  an equivalent amount of shares to the receiver.
-        shares = (totalSupply() + 10 ** _decimalsOffset())
-        .mulDiv(underlyingSharesAllocated, totalEffectiveUnderlyingShares - underlyingSharesAllocated + 1, Math.Rounding.Floor);
+        // valueAllocated represents the value of the assets deposited in the asset that the tranche's NAV is denominated in
+        // shares are minted to the user at the effective NAV of the tranche
+        // effectiveNAVToMintAt is the effective NAV of the tranche before the deposit is made, ie. the NAV at which the shares will be minted
+        shares = valueAllocated.mulDiv(totalSupply() + 10 ** _decimalsOffset(), effectiveNAVToMintAt + 1, Math.Rounding.Floor);
 
         // Mint the shares to the receiver
         _mint(_receiver, shares);

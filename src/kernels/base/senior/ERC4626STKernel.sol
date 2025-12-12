@@ -57,12 +57,19 @@ abstract contract ERC4626STKernel is BaseKernel {
         onlySeniorTranche
         whenNotPaused
         syncNAVsAndEnforceCoverage(Operation.ST_DEPOSIT)
-        returns (uint256 underlyingSharesAllocated, uint256 totalUnderlyingShares)
+        returns (uint256 valueAllocated, uint256 effectiveNAVToMintAt)
     {
         // Deposit the assets into the underlying investment vault
         address vault = ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault;
-        underlyingSharesAllocated = IERC4626(vault).deposit(_assets, address(this));
-        totalUnderlyingShares = IERC4626(vault).balanceOf(address(this));
+
+        // Deposit the assets into the underlying investment vault
+        IERC4626(vault).deposit(_assets, address(this));
+
+        // The value of the assets deposited is the value of the assets in the asset that the tranche's NAV is denominated in
+        valueAllocated = _convertAssetsToValue(_assets);
+
+        // The effective NAV to mint at is the effective NAV of the tranche before the deposit is made, ie. the NAV at which the shares will be minted
+        effectiveNAVToMintAt = _getSeniorTrancheEffectiveNAV();
     }
 
     /// @inheritdoc IBaseKernel
@@ -94,6 +101,16 @@ abstract contract ERC4626STKernel is BaseKernel {
 
         // Facilitate the remainder of the withdrawal from ST exposure
         IERC4626(ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault).withdraw((assetsWithdrawn - coverageToRealize), _receiver, address(this));
+    }
+
+    /**
+     * @notice Converts the amount of assets to the value of the assets in the asset that the tranche's NAV is denominated in
+     * @dev This implementation assumes that the NAV is denominated in the same asset as the assets being deposited
+     * @param _assets The amount of assets to convert
+     * @return value The value of the assets in the asset that the tranche's NAV is denominated in
+     */
+    function _convertAssetsToValue(uint256 _assets) internal view virtual returns (uint256 value) {
+        return _assets;
     }
 
     /// @inheritdoc BaseKernel
