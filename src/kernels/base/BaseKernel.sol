@@ -267,7 +267,7 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
                 uint256 stLoss = jtLoss - jtEffectiveNAV;
                 stEffectiveNAV = Math.saturatingSub(stEffectiveNAV, stLoss);
                 // Repay ST debt to JT
-                // This is equivalent to retroactively removing coverage for previously covered losses
+                // This is equivalent to retroactively reducing previously applied coverage
                 // Thus, the liability is flipped to JT debt to ST
                 stCoverageDebt = Math.saturatingSub(stCoverageDebt, stLoss);
                 jtCoverageDebt += stLoss;
@@ -314,7 +314,7 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
             /// @dev STEP_ST_INCURS_RESIDUAL_LOSSES: Apply any uncovered losses by JT to ST
             uint256 netStLoss = stLoss - coverageApplied;
             if (netStLoss != 0) {
-                stEffectiveNAV - Math.saturatingSub(stEffectiveNAV, netStLoss);
+                stEffectiveNAV = Math.saturatingSub(stEffectiveNAV, netStLoss);
                 // The uncovered portion of the ST loss is a JT liability to ST
                 jtCoverageDebt += netStLoss;
             }
@@ -325,7 +325,7 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
             // Repay JT debt to ST: previously uncovered ST losses
             uint256 debtRepayment = Math.min(stGain, jtCoverageDebt);
             if (debtRepayment != 0) {
-                // Pay back debt to ST
+                // Pay back JT debt to ST: making ST whole again
                 stEffectiveNAV += debtRepayment;
                 jtCoverageDebt -= debtRepayment;
                 // Deduct the repayment from the ST gains and return if no gains are left
@@ -337,7 +337,7 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
             // Repay ST debt to JT: previously applied coverage from JT to ST
             debtRepayment = Math.min(stGain, stCoverageDebt);
             if (debtRepayment != 0) {
-                // Pay back debt to JT
+                // Pay back ST debt to JT: making JT whole again
                 jtEffectiveNAV += debtRepayment;
                 stCoverageDebt -= debtRepayment;
                 // Deduct the repayment from the remaining ST gains and return if no gains are left
@@ -442,9 +442,7 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
                     uint256 coverageRealized = uint256(-deltaJT);
                     $.lastSTEffectiveNAV = Math.saturatingSub($.lastSTEffectiveNAV, (uint256(-deltaST) + coverageRealized));
                     /// We need to adjust debts by accounting for the realized coverage
-                    // The coverage realization waterfall works by first erasing ST debt and then JT debt
-                    // This mimics the same top -> down waterfall used to apply coverage when computing effective NAVs
-                    // Erase as much ST coverage debt as possible since these liabilities have been realized by ST
+                    // Coverage being realized means that
                     uint256 stCoverageDebtErased = Math.min(coverageRealized, $.lastSTCoverageDebt);
                     if (stCoverageDebtErased != 0) $.lastSTCoverageDebt -= stCoverageDebtErased;
                 } else {
@@ -533,20 +531,32 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
         return surplusJTAssets.mulDiv(ConstantsLib.WAD, coverageRetentionWAD, Math.Rounding.Floor);
     }
 
-    function _computeFractionOfTotalAssetsAllocatedWAD(uint256 _assets, uint256 _totalAssets) internal pure returns (uint256) {
+    function _computeFractionOfTotalAssetsAllocatedWAD(uint256 _assets, uint256 _totalAssets) internal pure virtual returns (uint256) {
         return _assets.mulDiv(ConstantsLib.WAD, _totalAssets + 1, Math.Rounding.Floor);
     }
 
     /// @notice Returns the effective net asset value of the senior tranche
     /// @dev Includes applied coverage, ST yield distribution, and uncovered losses
-    function _getSeniorTrancheEffectiveNAV() internal view returns (uint256 stEffectiveNAV) {
+    function _getSeniorTrancheEffectiveNAV() internal view virtual returns (uint256 stEffectiveNAV) {
         (,, stEffectiveNAV,,,,) = _previewEffectiveNAVs(_previewJTYieldShareAccrual());
     }
 
     /// @notice Returns the effective net asset value of the junior tranche
     /// @dev Includes provided coverage, JT yield, ST yield distribution, and JT losses
-    function _getJuniorTrancheEffectiveNAV() internal view returns (uint256 jtEffectiveNAV) {
+    function _getJuniorTrancheEffectiveNAV() internal view virtual returns (uint256 jtEffectiveNAV) {
         (,,, jtEffectiveNAV,,,) = _previewEffectiveNAVs(_previewJTYieldShareAccrual());
+    }
+
+    /// @notice Returns the ST's total claim on JT's assets at this point in time
+    /// @dev ST's coverage debt is indicative of coverage that has been applied from JT to ST and is currently callable by ST LPs
+    function _getSeniorClaimOnJuniorNAV() internal view virtual returns (uint256) {
+        return BaseKernelStorageLib._getBaseKernelStorage().lastSTCoverageDebt;
+    }
+
+    /// @notice Returns the JT's total claim on ST's assets at this point in time
+    /// @dev Any positive delta between JT's effective and raw NAVs consists of yield and ST coverage debt repayments that is currently callable by JT LPs
+    function _getJuniorClaimOnSeniorNAV() internal view virtual returns (uint256) {
+        return Math.saturatingSub(_getJuniorTrancheEffectiveNAV(), _getJuniorTrancheRawNAV());
     }
 
     /**
