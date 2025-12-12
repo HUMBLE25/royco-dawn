@@ -119,6 +119,8 @@ abstract contract RoycoKernel is Initializable, IRoycoKernel, UUPSUpgradeable, R
         require(uint256(_params.coverageWAD).mulDiv(_params.betaWAD, ConstantsLib.WAD, Math.Rounding.Ceil) < ConstantsLib.WAD);
         // Ensure that the tranche address and RDM are not null
         require(_params.seniorTranche != address(0) && _params.juniorTranche != address(0) && _params.rdm != address(0));
+        // Ensure that the protocol fee configuration is valid
+        require(_params.protocolFeeRecipient != address(0) && _params.protocolFeeWAD <= ConstantsLib.MAX_PROTOCOL_FEE_WAD);
         // Initialize the base kernel state
         RoycoKernelStorageLib.__RoycoKernel_init(_params);
     }
@@ -199,12 +201,14 @@ abstract contract RoycoKernel is Initializable, IRoycoKernel, UUPSUpgradeable, R
         $.lastAccrualTimestamp = uint32(block.timestamp);
 
         // Preview the raw and coverage adjusted (effective) NAVs of each tranche
-        bool yieldDistributed;
         uint256 stCoverageDebt;
         uint256 jtCoverageDebt;
-        (stRawNAV, jtRawNAV, stEffectiveNAV, jtEffectiveNAV, stCoverageDebt, jtCoverageDebt, yieldDistributed) = _previewEffectiveNAVs(twJTYieldShareAccruedWAD);
+        uint256 stProtocolYieldFeeTaken;
+        uint256 jtProtocolYieldFeeTaken;
+        (stRawNAV, jtRawNAV, stEffectiveNAV, jtEffectiveNAV, stCoverageDebt, jtCoverageDebt, stProtocolYieldFeeTaken, jtProtocolYieldFeeTaken) =
+            _previewEffectiveNAVs(twJTYieldShareAccruedWAD);
         // If yield was distributed, reset the accumulator and update the last yield distribution timestamp
-        if (yieldDistributed) {
+        if (stProtocolYieldFeeTaken > 0) {
             delete $.twJTYieldShareAccruedWAD;
             $.lastDistributionTimestamp = uint32(block.timestamp);
         }
@@ -228,7 +232,8 @@ abstract contract RoycoKernel is Initializable, IRoycoKernel, UUPSUpgradeable, R
      * @return jtEffectiveNAV The junior tranche's effective NAV, including provided coverage, JT yield, ST yield distribution, and JT losses
      * @return stCoverageDebt The coverage that has currently been applied to ST from the JT loss-absorption buffer: represents the second claim on capital the junior tranche has on future recoveries
      * @return jtCoverageDebt The losses that ST incurred after exhausting the JT loss-absorption buffer: represents the first claim on capital the senior tranche has on future recoveries
-     * @return yieldDistributed Boolean indicating whether the ST accrued yield and it was distributed between ST and JT
+     * @return stProtocolYieldFeeTaken The protocol fee in assets taken on ST yield on this sync
+     * @return jtProtocolYieldFeeTaken The protocol fee in assets taken on JT yield on this sync
      */
     function _previewEffectiveNAVs(uint256 _twJTYieldShareAccruedWAD)
         internal
@@ -240,7 +245,8 @@ abstract contract RoycoKernel is Initializable, IRoycoKernel, UUPSUpgradeable, R
             uint256 jtEffectiveNAV,
             uint256 stCoverageDebt,
             uint256 jtCoverageDebt,
-            bool yieldDistributed
+            uint256 stProtocolYieldFeeTaken,
+            uint256 jtProtocolYieldFeeTaken
         )
     {
         // Get the storage pointer to the base kernel state
@@ -290,8 +296,13 @@ abstract contract RoycoKernel is Initializable, IRoycoKernel, UUPSUpgradeable, R
                 stEffectiveNAV += jtDebtRepayment;
                 jtGain -= jtDebtRepayment;
             }
-            /// @dev STEP_JT_BOOK_REMAINING_GAIN: JT accrues remaining appreciation
-            jtEffectiveNAV += jtGain;
+            /// @dev STEP_JT_BOOK_RESIDUAL_GAINS: JT accrues remaining appreciation
+            if (jtGain != 0) {
+                // Compute the protocol fee taken on this JT yield accrual (will be used to mint shares to the protocol fee recipient) at the updated JT effective NAV
+                jtProtocolYieldFeeTaken = jtGain.mulDiv($.protocolFeeWAD, ConstantsLib.WAD, Math.Rounding.Floor);
+                // Book the residual gains to the JT
+                jtEffectiveNAV += jtGain;
+            }
         }
 
         // Compute the delta in the raw NAV of the senior tranche
@@ -340,24 +351,27 @@ abstract contract RoycoKernel is Initializable, IRoycoKernel, UUPSUpgradeable, R
                 // Deduct the repayment from the remaining ST gains and return if no gains are left
                 stGain -= debtRepayment;
             }
+
             /// @dev STEP_DISTRIBUTE_YIELD: There are no remaining debts in the system and the residual gains can be used to distribute yield to both tranches
             if (stGain != 0) {
                 // Compute the time weighted average JT share of yield
                 uint256 elapsed = block.timestamp - $.lastDistributionTimestamp;
-                // Preemptively accrue all yield to ST and return if last yield distribution was in the same block
-                // No need to update yield share accumulator and timestamp so return false for yieldDistributed
-                if (elapsed == 0) {
-                    stEffectiveNAV += stGain;
-                } else {
-                    // Compute the time weighted JT yield share of this distribution scaled by WAD
-                    uint256 jtYieldShareWAD = _twJTYieldShareAccruedWAD / elapsed;
-                    // Round in favor of the senior tranche
-                    uint256 jtYield = stGain.mulDiv(jtYieldShareWAD, ConstantsLib.WAD, Math.Rounding.Floor);
-                    // Apply the yield split: adding each tranche's share of earnings to their effective NAVs
-                    jtEffectiveNAV += jtYield;
-                    stEffectiveNAV += (stGain - jtYield);
-                    yieldDistributed = true;
+                uint256 protocolFeeWAD = $.protocolFeeWAD;
+                // If the last yield distribution wasn't in this block, split the yield between ST and JT
+                if (elapsed != 0) {
+                    // Compute the ST gain allocated to JT based on its time weighted yield share since the last distribution, rounding in favor of the senior tranche
+                    uint256 jtGain = stGain.mulDiv((_twJTYieldShareAccruedWAD / elapsed), ConstantsLib.WAD, Math.Rounding.Floor);
+                    // Apply the yield split to JT's effective NAV
+                    if (jtGain != 0) {
+                        // Compute the protocol fee taken on this JT yield accrual (will be used to mint shares to the protocol fee recipient) at the updated JT effective NAV
+                        jtProtocolYieldFeeTaken += jtGain.mulDiv(protocolFeeWAD, ConstantsLib.WAD, Math.Rounding.Floor);
+                        jtEffectiveNAV += jtGain;
+                        stGain -= jtGain;
+                    }
                 }
+                // Compute the protocol fee taken on this ST yield accrual (will be used to mint shares to the protocol fee recipient) at the updated JT effective NAV
+                stProtocolYieldFeeTaken = stGain.mulDiv(protocolFeeWAD, ConstantsLib.WAD, Math.Rounding.Floor);
+                stEffectiveNAV += stGain;
             }
         }
 
@@ -542,13 +556,13 @@ abstract contract RoycoKernel is Initializable, IRoycoKernel, UUPSUpgradeable, R
     /// @notice Returns the effective net asset value of the senior tranche
     /// @dev Includes applied coverage, ST yield distribution, and uncovered losses
     function _getSeniorTrancheEffectiveNAV() internal view returns (uint256 stEffectiveNAV) {
-        (,, stEffectiveNAV,,,,) = _previewEffectiveNAVs(_previewJTYieldShareAccrual());
+        (,, stEffectiveNAV,,,,,) = _previewEffectiveNAVs(_previewJTYieldShareAccrual());
     }
 
     /// @notice Returns the effective net asset value of the junior tranche
     /// @dev Includes provided coverage, JT yield, ST yield distribution, and JT losses
     function _getJuniorTrancheEffectiveNAV() internal view returns (uint256 jtEffectiveNAV) {
-        (,,, jtEffectiveNAV,,,) = _previewEffectiveNAVs(_previewJTYieldShareAccrual());
+        (,,, jtEffectiveNAV,,,,) = _previewEffectiveNAVs(_previewJTYieldShareAccrual());
     }
 
     /// @notice Returns ST's total claim on JT's assets at this point in time
