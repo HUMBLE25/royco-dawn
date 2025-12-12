@@ -91,7 +91,7 @@ abstract contract AaveV3JTKernel is BaseKernel, BaseAsyncJTRedemptionDelayKernel
         // Calculate the value of the shares to claim and update the controller's redemption request
         assetsWithdrawn = _processClaimableRedeemRequest(_controller, _shares, _totalShares);
 
-        // Compute the yield to claim from the ST, rounding in favor of ST
+        // Compute the yield to claim from the ST
         uint256 yieldToClaim = _shares.mulDiv(Math.saturatingSub($.lastJTEffectiveNAV, $.lastJTRawNAV), _totalShares, Math.Rounding.Floor);
         // Pull any yield that needs to be realized from ST
         if (yieldToClaim != 0) _claimJTYieldFromST(_asset, yieldToClaim, _receiver);

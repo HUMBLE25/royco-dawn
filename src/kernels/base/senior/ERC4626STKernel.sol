@@ -97,8 +97,8 @@ abstract contract ERC4626STKernel is BaseKernel {
         // Compute the assets expected to be received on withdrawal based on the ST's effective NAV
         assetsWithdrawn = _shares.mulDiv($.lastSTEffectiveNAV, _totalShares, Math.Rounding.Floor);
 
-        // Compute the coverage that needs to pulled from JT for this withdrawal, rounding in favor of ST
-        uint256 coverageToRealize = _shares.mulDiv(BaseKernelStorageLib._getBaseKernelStorage().lastSTCoverageDebt, _totalShares, Math.Rounding.Ceil);
+        // Compute the coverage that needs to pulled from JT for this withdrawal
+        uint256 coverageToRealize = _shares.mulDiv(BaseKernelStorageLib._getBaseKernelStorage().lastSTCoverageDebt, _totalShares, Math.Rounding.Floor);
         coverageToRealize = Math.min(coverageToRealize, _getJuniorTrancheRawNAV());
         // Pull any coverge that needs to be realized from JT
         if (coverageToRealize != 0) _coverSTLossesFromJT(_asset, coverageToRealize, _receiver);
