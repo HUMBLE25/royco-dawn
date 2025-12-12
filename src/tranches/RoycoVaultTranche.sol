@@ -16,7 +16,7 @@ import { IAsyncJTWithdrawalKernel } from "../interfaces/kernel/IAsyncJTWithdrawa
 import { IAsyncSTDepositKernel } from "../interfaces/kernel/IAsyncSTDepositKernel.sol";
 import { IAsyncSTWithdrawalKernel } from "../interfaces/kernel/IAsyncSTWithdrawalKernel.sol";
 import { ExecutionModel, IRoycoKernel, RequestRedeemSharesBehavior } from "../interfaces/kernel/IRoycoKernel.sol";
-import { IERC165, IERC7540, IERC7575, IERC7887, IRoycoTranche } from "../interfaces/tranche/IRoycoTranche.sol";
+import { IERC165, IERC7540, IERC7575, IERC7887, IRoycoVaultTranche } from "../interfaces/tranche/IRoycoVaultTranche.sol";
 import { RoycoTrancheStorageLib } from "../libraries/RoycoTrancheStorageLib.sol";
 import { TrancheType } from "../libraries/Types.sol";
 import { Action, TrancheDeploymentParams } from "../libraries/Types.sol";
@@ -28,7 +28,7 @@ import { Action, TrancheDeploymentParams } from "../libraries/Types.sol";
 /// @dev This contract provides common tranche operations including ERC4626 vault functionality,
 ///      asynchronous deposit/withdrawal support via ERC7540, and request cancellation via ERC7887
 ///      All asset management and investment operations are delegated to the configured kernel
-abstract contract RoycoVaultTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable, ERC4626Upgradeable {
+abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoAuth, UUPSUpgradeable, ERC4626Upgradeable {
     using Math for uint256;
     using SafeERC20 for IERC20;
 
@@ -134,8 +134,8 @@ abstract contract RoycoVaultTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable
             (TRANCHE_TYPE() == TrancheType.SENIOR ? IRoycoKernel(_kernel()).getSTTotalEffectiveAssets() : IRoycoKernel(_kernel()).getJTTotalEffectiveAssets());
     }
 
-    /// @inheritdoc IRoycoTranche
-    function getNAV() public view override(IRoycoTranche) returns (uint256) {
+    /// @inheritdoc IRoycoVaultTranche
+    function getNAV() public view override(IRoycoVaultTranche) returns (uint256) {
         return (TRANCHE_TYPE() == TrancheType.SENIOR ? IRoycoKernel(_kernel()).getSTEffectiveNAV() : IRoycoKernel(_kernel()).getJTEffectiveNAV());
     }
 
@@ -655,6 +655,23 @@ abstract contract RoycoVaultTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable
         emit CancelRedeemClaim(_owner, _receiver, _requestId, msg.sender, shares);
     }
 
+    /// @inheritdoc IRoycoVaultTranche
+    function mintProtocolFeeShares(
+        uint256 _protocolFeeAssets,
+        uint256 _totalTrancheAssets,
+        address _protocolFeeRecipient
+    )
+        external
+        virtual
+        override(IRoycoVaultTranche)
+        onlyRole(RoycoRoles.ROYCO_KERNEL)
+    {
+        // Compute the shares to be minted to the protocol fee recipient to satisfy the ratio of total assets that the fee represents
+        // Round in favor of the tranche
+        uint256 protocolFeeSharesToMint = _convertToShares(_protocolFeeAssets, totalSupply(), (_totalTrancheAssets - _protocolFeeAssets), Math.Rounding.Floor);
+        _mint(_protocolFeeRecipient, protocolFeeSharesToMint);
+    }
+
     /// @inheritdoc IERC7575
     function share() external view virtual override(IERC7575) returns (address) {
         return address(this);
@@ -668,7 +685,7 @@ abstract contract RoycoVaultTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable
     /// @inheritdoc IERC165
     function supportsInterface(bytes4 _interfaceId) public pure virtual override(IERC165, AccessControlEnumerableUpgradeable) returns (bool) {
         return _interfaceId == type(IERC165).interfaceId || _interfaceId == type(ERC4626Upgradeable).interfaceId || _interfaceId == type(IERC7540).interfaceId
-            || _interfaceId == type(IERC7575).interfaceId || _interfaceId == type(IERC7887).interfaceId || _interfaceId == type(IRoycoTranche).interfaceId
+            || _interfaceId == type(IERC7575).interfaceId || _interfaceId == type(IERC7887).interfaceId || _interfaceId == type(IRoycoVaultTranche).interfaceId
             || _interfaceId == type(IAccessControlEnumerable).interfaceId;
     }
 
@@ -690,6 +707,16 @@ abstract contract RoycoVaultTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable
         }
 
         emit Withdraw(_caller, _receiver, _owner, _assets, _shares);
+    }
+
+    /// @dev Returns the amount of shares that have a claim on the tranche's assets specified
+    function _convertToShares(uint256 _assets, uint256 _totalSupply, uint256 _totalAssets, Math.Rounding rounding) internal view returns (uint256) {
+        return _assets.mulDiv(_totalSupply + 10 ** _decimalsOffset(), _totalAssets + 1, rounding);
+    }
+
+    /// @dev Returns the amount of tranche controlled assets that the specified shares have a claim on
+    function _convertToAssets(uint256 _shares, uint256 _totalSupply, uint256 _totalAssets, Math.Rounding rounding) internal view returns (uint256) {
+        return _shares.mulDiv(_totalAssets + 1, _totalSupply + 10 ** _decimalsOffset(), rounding);
     }
 
     /// @inheritdoc UUPSUpgradeable

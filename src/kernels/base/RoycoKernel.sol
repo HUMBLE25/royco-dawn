@@ -2,10 +2,10 @@
 pragma solidity ^0.8.28;
 
 import { UUPSUpgradeable } from "../../../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
-import { Initializable } from "../../../lib/openzeppelin-contracts/contracts/proxy/utils/Initializable.sol";
 import { RoycoAuth, RoycoRoles } from "../../auth/RoycoAuth.sol";
 import { IRDM } from "../../interfaces/IRDM.sol";
 import { IRoycoKernel } from "../../interfaces/kernel/IRoycoKernel.sol";
+import { IRoycoVaultTranche } from "../../interfaces/tranche/IRoycoVaultTranche.sol";
 import { Operation, RoycoKernelInitParams, RoycoKernelState, RoycoKernelStorageLib } from "../../libraries/RoycoKernelStorageLib.sol";
 import { ConstantsLib, Math, UtilsLib } from "../../libraries/UtilsLib.sol";
 
@@ -15,7 +15,7 @@ import { ConstantsLib, Math, UtilsLib } from "../../libraries/UtilsLib.sol";
  * @dev Provides the foundational logic for kernel contracts including re and post operation NAV reconciliation, coverage enforcement logic,
  *      and base wiring for tranche synchronization primitives. All concrete kernel implementations should inherit from the Royco Kernel.
  */
-abstract contract RoycoKernel is Initializable, IRoycoKernel, UUPSUpgradeable, RoycoAuth {
+abstract contract RoycoKernel is IRoycoKernel, UUPSUpgradeable, RoycoAuth {
     using Math for uint256;
 
     /// @notice Thrown when the market's coverage requirement is unsatisfied
@@ -200,17 +200,27 @@ abstract contract RoycoKernel is Initializable, IRoycoKernel, UUPSUpgradeable, R
         uint256 twJTYieldShareAccruedWAD = $.twJTYieldShareAccruedWAD = _previewJTYieldShareAccrual();
         $.lastAccrualTimestamp = uint32(block.timestamp);
 
-        // Preview the raw and coverage adjusted (effective) NAVs of each tranche
+        // Preview the new NAVs of each tranche based on PNL(s) of the underlying investment(s)
         uint256 stCoverageDebt;
         uint256 jtCoverageDebt;
         uint256 stProtocolYieldFeeTaken;
         uint256 jtProtocolYieldFeeTaken;
         (stRawNAV, jtRawNAV, stEffectiveNAV, jtEffectiveNAV, stCoverageDebt, jtCoverageDebt, stProtocolYieldFeeTaken, jtProtocolYieldFeeTaken) =
             _previewEffectiveNAVs(twJTYieldShareAccruedWAD);
-        // If yield was distributed, reset the accumulator and update the last yield distribution timestamp
+
+        // If ST yield was distributed:
+        // 1. Reset the accumulator and update the last yield distribution timestamp
+        // 2. Mint protocol fee shares to protocol fee recipient
+        address protocolFeeRecipient = $.protocolFeeRecipient;
         if (stProtocolYieldFeeTaken > 0) {
             delete $.twJTYieldShareAccruedWAD;
             $.lastDistributionTimestamp = uint32(block.timestamp);
+            IRoycoVaultTranche($.seniorTranche).mintProtocolFeeShares(stProtocolYieldFeeTaken, stEffectiveNAV, protocolFeeRecipient);
+        }
+
+        // If JT yield was distributed, mint protocol fee shares to protocol fee recipient
+        if (jtProtocolYieldFeeTaken > 0) {
+            IRoycoVaultTranche($.juniorTranche).mintProtocolFeeShares(jtProtocolYieldFeeTaken, jtEffectiveNAV, protocolFeeRecipient);
         }
 
         // Checkpoint the computed NAVs
@@ -265,9 +275,11 @@ abstract contract RoycoKernel is Initializable, IRoycoKernel, UUPSUpgradeable, R
 
         /// @dev STEP_JT_APPLY_LOSS: The JT assets depreciated in value
         if (deltaJT < 0) {
+            /// @dev STEP_JT_ABSORB_LOSS: This loss is fully absorbable by JT's remaning loss-absorption buffer
             // JT incurs as much of the loss as possible, booking the remainder as a future liability to ST
             uint256 jtLoss = uint256(-deltaJT);
             uint256 jtAbsorbableLoss = Math.min(jtLoss, jtEffectiveNAV);
+            if (jtAbsorbableLoss != 0) jtEffectiveNAV -= jtAbsorbableLoss;
             /// @dev STEP_JT_LOSS_OVERFLOW_TO_ST: This loss isn't fully absorbable by JT's remaning loss-absorption buffer
             if (jtLoss > jtAbsorbableLoss) {
                 // The excess loss is absorbed by ST
@@ -279,8 +291,6 @@ abstract contract RoycoKernel is Initializable, IRoycoKernel, UUPSUpgradeable, R
                 stCoverageDebt = Math.saturatingSub(stCoverageDebt, stLoss);
                 jtCoverageDebt += stLoss;
             }
-            /// @dev STEP_JT_ABSORB_LOSS: This loss is fully absorbable by JT's remaning loss-absorption buffer
-            jtEffectiveNAV -= jtAbsorbableLoss;
             /// @dev STEP_JT_APPLY_GAIN: The JT assets appreciated in value
         } else if (deltaJT > 0) {
             uint256 jtGain = uint256(deltaJT);
@@ -298,7 +308,7 @@ abstract contract RoycoKernel is Initializable, IRoycoKernel, UUPSUpgradeable, R
             }
             /// @dev STEP_JT_BOOK_RESIDUAL_GAINS: JT accrues remaining appreciation
             if (jtGain != 0) {
-                // Compute the protocol fee taken on this JT yield accrual (will be used to mint shares to the protocol fee recipient) at the updated JT effective NAV
+                // Compute the protocol fee taken on this JT yield accrual - will be used to mint JT shares to the protocol fee recipient at the updated JT effective NAV
                 jtProtocolYieldFeeTaken = jtGain.mulDiv($.protocolFeeWAD, ConstantsLib.WAD, Math.Rounding.Floor);
                 // Book the residual gains to the JT
                 jtEffectiveNAV += jtGain;

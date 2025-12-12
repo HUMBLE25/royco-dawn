@@ -2,9 +2,8 @@
 pragma solidity ^0.8.28;
 
 import { Ownable2StepUpgradeable } from "../../lib/openzeppelin-contracts-upgradeable/contracts/access/Ownable2StepUpgradeable.sol";
-import {
-    AccessControlEnumerableUpgradeable
-} from "../../lib/openzeppelin-contracts-upgradeable/contracts/access/extensions/AccessControlEnumerableUpgradeable.sol";
+import { AccessControlEnumerableUpgradeable } from
+    "../../lib/openzeppelin-contracts-upgradeable/contracts/access/extensions/AccessControlEnumerableUpgradeable.sol";
 import { PausableUpgradeable } from "../../lib/openzeppelin-contracts-upgradeable/contracts/utils/PausableUpgradeable.sol";
 import { EfficientHashLib } from "../../lib/solady/src/utils/EfficientHashLib.sol";
 import { RoycoRoles } from "./RoycoRoles.sol";
@@ -69,13 +68,10 @@ abstract contract RoycoAuth is AccessControlEnumerableUpgradeable, Ownable2StepU
     struct RoycoAuthStorage {
         /// @notice Mapping of roles to their gating disabled status
         mapping(bytes32 role => bool isRoleGatingDisabled) isRoleGatingDisabled;
-
         /// @notice Mapping of function signatures to their gating disabled status
         mapping(bytes4 selector => bool isFunctionGatingDisabled) isFunctionGatingDisabled;
-
         /// @notice Mapping of function selectors to their execution delays in seconds
         mapping(bytes4 selector => uint256 delay) executionDelay;
-
         /// @notice Mapping of function selectors to their scheduled operations
         mapping(bytes4 selector => ScheduledOperation operation) scheduledOperations;
     }
@@ -84,8 +80,8 @@ abstract contract RoycoAuth is AccessControlEnumerableUpgradeable, Ownable2StepU
     bytes32 private constant ROYCO_AUTH_STORAGE_SLOT = 0xc6351ca3982f48b7bceb4d41d4ea8768b3c95833ea37fa7955947ef4cfee2d00;
 
     /// forge-lint: disable-next-item(unwrapped-modifier-logic)
-    modifier checkRoleAndDelayIfGated(bytes32 role) {
-        if (!_checkRoleAndDelayIfGated(role)) {
+    modifier checkRoleAndDelayIfGated(bytes32 _role) {
+        if (!_checkRoleAndDelayIfGated(_role)) {
             return;
         }
         _;
