@@ -74,6 +74,24 @@ enum TrancheType {
     SENIOR
 }
 
+/// @title RequestRedeemSharesBehavior
+/// @dev Defines the behavior of the shares when a redeem request is made
+/// @custom:type BURN_ON_REQUEST The shares are burned when calling requestRedeem
+/// @custom:type BURN_ON_REDEEM The shares are burned when calling redeem
+enum RequestRedeemSharesBehavior {
+    BURN_ON_REQUEST,
+    BURN_ON_REDEEM
+}
+
+/// @title ExecutionModel
+/// @dev Defines the execution semantics for the deposit or withdrawal flow of a vault
+/// @custom:type SYNC Refers to the flow being synchronous (the vault uses ERC4626 for this flow)
+/// @custom:type ASYNC Refers to the flow being asynchronous (the vault uses ERC7540 for this flow)
+enum ExecutionModel {
+    SYNC,
+    ASYNC
+}
+
 library TypesLib {
     function Id(CreateMarketParams calldata _createMarketParams) internal pure returns (bytes32) {
         return keccak256(abi.encode(_createMarketParams));

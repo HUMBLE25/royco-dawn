@@ -15,11 +15,13 @@ import { IAsyncJTDepositKernel } from "../interfaces/kernel/IAsyncJTDepositKerne
 import { IAsyncJTWithdrawalKernel } from "../interfaces/kernel/IAsyncJTWithdrawalKernel.sol";
 import { IAsyncSTDepositKernel } from "../interfaces/kernel/IAsyncSTDepositKernel.sol";
 import { IAsyncSTWithdrawalKernel } from "../interfaces/kernel/IAsyncSTWithdrawalKernel.sol";
-import { ExecutionModel, IBaseKernel } from "../interfaces/kernel/IBaseKernel.sol";
+import { ExecutionModel, IBaseKernel, RequestRedeemSharesBehavior } from "../interfaces/kernel/IBaseKernel.sol";
 import { IERC165, IERC7540, IERC7575, IERC7887, IRoycoTranche } from "../interfaces/tranche/IRoycoTranche.sol";
 import { RoycoTrancheStorageLib } from "../libraries/RoycoTrancheStorageLib.sol";
 import { TrancheType } from "../libraries/Types.sol";
 import { Action, TrancheDeploymentParams } from "../libraries/Types.sol";
+
+// TODO: Check call share conversions across the codebase for whether they include virtual shares / decimal offset in their calculations
 
 /// @title BaseRoycoTranche
 /// @notice Abstract base contract implementing core functionality for Royco tranches
@@ -36,17 +38,17 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
     /// @notice Thrown when the caller is not the expected account or an approved operator
     error ONLY_CALLER_OR_OPERATOR();
 
-    /// @notice Thrown when the underlying shares allocated are greater than the total underlying shares
-    error InvalidUnderlyingSharesAllocated(uint256 underlyingSharesAllocated, uint256 totalUnderlyingShares);
-
     /// @notice Thrown when the redeem amount is zero
-    error ERC4626ZeroRedeemAmount();
+    error MUST_REQUEST_NON_ZERO_SHARES();
 
     /// @notice Thrown when the deposit amount is zero
-    error ERC4626ZeroDepositAmount();
+    error MUST_DEPOSIT_NON_ZERO_ASSETS();
+
+    /// @notice Thrown when the redeem amount is zero
+    error MUST_CLAIM_NON_ZERO_SHARES();
 
     /// @notice Modifier to ensure the functionality is disabled
-    // forge-lint: disable-next-line(unwrapped-modifier-logic)
+    /// forge-lint: disable-next-item(unwrapped-modifier-logic)
     modifier disabled() {
         revert DISABLED();
         _;
@@ -55,6 +57,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
     /// @notice Modifier to ensure the specified action uses a synchronous execution model
     /// @param _action The action to check (DEPOSIT or WITHDRAW)
     /// @dev Reverts if the execution model for the action is asynchronous
+    /// forge-lint: disable-next-item(unwrapped-modifier-logic)
     modifier executionIsSync(Action _action) {
         require(_isSync(_action), DISABLED());
         _;
@@ -63,6 +66,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
     /// @notice Modifier to ensure the specified action uses an asynchronous execution model
     /// @param _action The action to check (DEPOSIT or WITHDRAW)
     /// @dev Reverts if the execution model for the action is synchronous
+    /// forge-lint: disable-next-item(unwrapped-modifier-logic)
     modifier executionIsAsync(Action _action) {
         require(!_isSync(_action), DISABLED());
         _;
@@ -117,6 +121,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
     function __RoycoTranche_init_unchained(address _asset, address _kernelAddress, bytes32 _marketId) internal onlyInitializing {
         // Calculate the vault's decimal offset (curb inflation attacks)
         uint8 underlyingAssetDecimals = IERC20Metadata(_asset).decimals();
+        // TODO: Justify
         uint8 decimalsOffset = underlyingAssetDecimals >= 18 ? 0 : (18 - underlyingAssetDecimals);
 
         // Initialize the tranche's state
@@ -129,7 +134,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
     }
 
     /// @inheritdoc IRoycoTranche
-    function getNAV() external view override(IRoycoTranche) returns (uint256) {
+    function getNAV() public view override(IRoycoTranche) returns (uint256) {
         return (TRANCHE_TYPE() == TrancheType.SENIOR ? IBaseKernel(_kernel()).getSTEffectiveNAV() : IBaseKernel(_kernel()).getJTEffectiveNAV());
     }
 
@@ -200,7 +205,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
     {
         // Assert that the user's deposited assets fall under the max limit
         uint256 maxDepositableAssets = maxDeposit(_receiver);
-        require(_assets != 0, ERC4626ZeroDepositAmount());
+        require(_assets != 0, MUST_DEPOSIT_NON_ZERO_ASSETS());
         require(_assets <= maxDepositableAssets, ERC4626ExceededMaxDeposit(_receiver, _assets, maxDepositableAssets));
 
         IBaseKernel kernel = IBaseKernel(_kernel());
@@ -213,23 +218,14 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         }
 
         // Deposit the assets into the underlying investment opportunity and get the fraction of total assets allocated
-        (uint256 underlyingSharesAllocated, uint256 totalEffectiveUnderlyingShares) = (TRANCHE_TYPE() == TrancheType.SENIOR
+        (uint256 valueAllocated, uint256 effectiveNAVToMintAt) = (TRANCHE_TYPE() == TrancheType.SENIOR
                 ? kernel.stDeposit(address(asset), _assets, _controller, _receiver)
                 : kernel.jtDeposit(address(asset), _assets, _controller, _receiver));
-        require(
-            underlyingSharesAllocated <= totalEffectiveUnderlyingShares,
-            InvalidUnderlyingSharesAllocated(underlyingSharesAllocated, totalEffectiveUnderlyingShares)
-        );
 
-        // Calculate the proportional amount of shares to mint to the receiver such that lp_st_shares / total_st_shares = underlying_shares_allocated / total_underlying_shares
-        // sharesToMint / (totalSupply() + 10 ** _decimalsOffset() + sharesToMint) = underlyingSharesAllocated / (totalEffectiveUnderlyingShares + 1)
-        // In the synchronous case, this is equivalent to previewDeposit(_assets)
-        // In the asynchronos case, the deposit request may not be have been fulfilled at the current nav.
-        //  Therefore, the kernel is expected to keep track of the underlying opportunity shares minted against the request.
-        //  The ratio of these shares to the total underlying shares held by the system represent the user's claim on the vault, therefore we mint
-        //  an equivalent amount of shares to the receiver.
-        shares = (totalSupply() + 10 ** _decimalsOffset())
-        .mulDiv(underlyingSharesAllocated, totalEffectiveUnderlyingShares - underlyingSharesAllocated + 1, Math.Rounding.Floor);
+        // valueAllocated represents the value of the assets deposited in the asset that the tranche's NAV is denominated in
+        // shares are minted to the user at the effective NAV of the tranche
+        // effectiveNAVToMintAt is the effective NAV of the tranche before the deposit is made, ie. the NAV at which the shares will be minted
+        shares = valueAllocated.mulDiv(_withVirtualShares(totalSupply()), effectiveNAVToMintAt + 1, Math.Rounding.Floor);
 
         // Mint the shares to the receiver
         _mint(_receiver, shares);
@@ -273,7 +269,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         whenNotPaused
         returns (uint256 assets)
     {
-        require(_shares != 0, ERC4626ZeroRedeemAmount());
+        require(_shares != 0, MUST_REQUEST_NON_ZERO_SHARES());
 
         // Assert that the shares being redeeemed by the user fall under the permissible limits
         uint256 maxRedeemableShares = maxRedeem(_controller);
@@ -283,8 +279,8 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         // It is expected that the kernel transfers the assets directly to the receiver
         uint256 assetsWithdrawn =
             (TRANCHE_TYPE() == TrancheType.SENIOR
-                ? IBaseKernel(_kernel()).stRedeem(asset(), _shares, totalSupply(), _controller, _receiver)
-                : IBaseKernel(_kernel()).jtRedeem(asset(), _shares, totalSupply(), _controller, _receiver));
+                ? IBaseKernel(_kernel()).stRedeem(asset(), _shares, _withVirtualShares(totalSupply()), _controller, _receiver)
+                : IBaseKernel(_kernel()).jtRedeem(asset(), _shares, _withVirtualShares(totalSupply()), _controller, _receiver));
         assets = assetsWithdrawn;
 
         // Account for the withdrawal
@@ -351,9 +347,10 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         virtual
         override(IERC7540)
         executionIsAsync(Action.DEPOSIT)
-        returns (uint256)
+        returns (uint256 pendingAssets)
     {
-        return (TRANCHE_TYPE() == TrancheType.SENIOR
+        pendingAssets =
+        (TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTDepositKernel(_kernel()).stPendingDepositRequest(_requestId, _controller)
                 : IAsyncJTDepositKernel(_kernel()).jtPendingDepositRequest(_requestId, _controller));
     }
@@ -391,21 +388,27 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         executionIsAsync(Action.WITHDRAW)
         returns (uint256 requestId)
     {
-        require(_shares != 0, ERC4626ZeroRedeemAmount());
+        require(_shares != 0, MUST_REQUEST_NON_ZERO_SHARES());
 
         // Spend the caller's share allowance if the caller isn't the owner or an approved operator
         if (msg.sender != _owner && !RoycoTrancheStorageLib._getRoycoTrancheStorage().isOperator[_owner][msg.sender]) {
             _spendAllowance(_owner, msg.sender, _shares);
         }
-        // Transfer and lock the requested shares being redeemed from the owner to the tranche
-        /// @dev Don't burn the shares so that total supply remains unchanged while this request is unclaimed
-        _transfer(_owner, address(this), _shares);
 
         // Queue the redemption request and get the request ID from the kernel
         requestId =
         (TRANCHE_TYPE() == TrancheType.SENIOR
-                ? IAsyncSTWithdrawalKernel(_kernel()).stRequestWithdrawal(msg.sender, _shares, totalSupply(), _controller)
-                : IAsyncJTWithdrawalKernel(_kernel()).jtRequestWithdrawal(msg.sender, _shares, totalSupply(), _controller));
+                ? IAsyncSTWithdrawalKernel(_kernel()).stRequestRedeem(msg.sender, _shares, _withVirtualShares(totalSupply()), _controller)
+                : IAsyncJTWithdrawalKernel(_kernel()).jtRequestRedeem(msg.sender, _shares, _withVirtualShares(totalSupply()), _controller));
+
+        // Handle the shares being redeemed from the owner
+        if (_requestRedeemSharesBehavior() == RequestRedeemSharesBehavior.BURN_ON_REDEEM) {
+            // Transfer and lock the requested shares being redeemed from the owner to the tranche
+            _transfer(_owner, address(this), _shares);
+        } else {
+            // Burn the shares being redeemed from the owner immediately after the request is made
+            _burn(_owner, _shares);
+        }
 
         emit RedeemRequest(_controller, _owner, requestId, msg.sender, _shares);
     }
@@ -423,9 +426,10 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         executionIsAsync(Action.WITHDRAW)
         returns (uint256 pendingShares)
     {
-        return (TRANCHE_TYPE() == TrancheType.SENIOR
-                ? IAsyncSTWithdrawalKernel(_kernel()).stPendingWithdrawalRequest(_requestId, totalSupply(), _controller)
-                : IAsyncJTWithdrawalKernel(_kernel()).jtPendingWithdrawalRequest(_requestId, totalSupply(), _controller));
+        pendingShares =
+        (TRANCHE_TYPE() == TrancheType.SENIOR
+                ? IAsyncSTWithdrawalKernel(_kernel()).stPendingRedeemRequest(_requestId, _controller)
+                : IAsyncJTWithdrawalKernel(_kernel()).jtPendingRedeemRequest(_requestId, _controller));
     }
 
     /// @inheritdoc IERC7540
@@ -442,8 +446,8 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         returns (uint256 claimableShares)
     {
         return (TRANCHE_TYPE() == TrancheType.SENIOR
-                ? IAsyncSTWithdrawalKernel(_kernel()).stClaimableWithdrawalRequest(_requestId, totalSupply(), _controller)
-                : IAsyncJTWithdrawalKernel(_kernel()).jtClaimableWithdrawalRequest(_requestId, totalSupply(), _controller));
+                ? IAsyncSTWithdrawalKernel(_kernel()).stClaimableRedeemRequest(_requestId, _controller)
+                : IAsyncJTWithdrawalKernel(_kernel()).jtClaimableRedeemRequest(_requestId, _controller));
     }
 
     // =============================
@@ -548,9 +552,9 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         executionIsAsync(Action.WITHDRAW)
     {
         if (TRANCHE_TYPE() == TrancheType.SENIOR) {
-            IAsyncSTWithdrawalKernel(_kernel()).stCancelWithdrawalRequest(_requestId, _controller);
+            IAsyncSTWithdrawalKernel(_kernel()).stCancelRedeemRequest(_requestId, _controller);
         } else {
-            IAsyncJTWithdrawalKernel(_kernel()).jtCancelWithdrawalRequest(_requestId, _controller);
+            IAsyncJTWithdrawalKernel(_kernel()).jtCancelRedeemRequest(_requestId, _controller);
         }
 
         emit CancelRedeemRequest(_controller, _requestId, msg.sender);
@@ -570,8 +574,8 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         returns (bool isPending)
     {
         return (TRANCHE_TYPE() == TrancheType.SENIOR
-                ? IAsyncSTWithdrawalKernel(_kernel()).stPendingCancelWithdrawalRequest(_requestId, _controller)
-                : IAsyncJTWithdrawalKernel(_kernel()).jtPendingCancelWithdrawalRequest(_requestId, _controller));
+                ? IAsyncSTWithdrawalKernel(_kernel()).stPendingCancelRedeemRequest(_requestId, _controller)
+                : IAsyncJTWithdrawalKernel(_kernel()).jtPendingCancelRedeemRequest(_requestId, _controller));
     }
 
     /// @inheritdoc IERC7887
@@ -587,10 +591,9 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         executionIsAsync(Action.WITHDRAW)
         returns (uint256 shares)
     {
-        // TODO: This funciton returns assets, not shares
         return (TRANCHE_TYPE() == TrancheType.SENIOR
-                ? IAsyncSTWithdrawalKernel(_kernel()).stClaimableCancelWithdrawalRequest(_requestId, _controller)
-                : IAsyncJTWithdrawalKernel(_kernel()).jtClaimableCancelWithdrawalRequest(_requestId, _controller));
+                ? IAsyncSTWithdrawalKernel(_kernel()).stClaimableCancelRedeemRequest(_requestId, _controller)
+                : IAsyncJTWithdrawalKernel(_kernel()).jtClaimableCancelRedeemRequest(_requestId, _controller));
     }
 
     /// @inheritdoc IERC7887
@@ -608,16 +611,21 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         onlyCallerOrOperator(_owner)
         executionIsAsync(Action.WITHDRAW)
     {
-        // TODO: This funciton returns assets, not shares
-
-        // Get the claimable amount before claiming
         uint256 shares =
             (TRANCHE_TYPE() == TrancheType.SENIOR
-                ? IAsyncSTWithdrawalKernel(_kernel()).stClaimableCancelWithdrawalRequest(_requestId, _owner)
-                : IAsyncJTWithdrawalKernel(_kernel()).jtClaimableCancelWithdrawalRequest(_requestId, _owner));
+                ? IAsyncSTWithdrawalKernel(_kernel()).stClaimCancelRedeemRequest(_requestId, _receiver, _owner)
+                : IAsyncJTWithdrawalKernel(_kernel()).jtClaimCancelRedeemRequest(_requestId, _receiver, _owner));
 
-        // Transfer the previously locked shares (on request) to the receiver
-        _transfer(address(this), _receiver, shares);
+        require(shares != 0, MUST_CLAIM_NON_ZERO_SHARES());
+
+        // Return the shares to the receiver based on the redeem shares behavior
+        if (_requestRedeemSharesBehavior() == RequestRedeemSharesBehavior.BURN_ON_REQUEST) {
+            // Mint the burnt shares to the receiver
+            _mint(_receiver, shares);
+        } else {
+            // Transfer the previously locked shares (on request) to the receiver
+            _transfer(address(this), _receiver, shares);
+        }
 
         emit CancelRedeemClaim(_owner, _receiver, _requestId, msg.sender, shares);
     }
@@ -651,9 +659,8 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
             if (_caller != _owner) _spendAllowance(_owner, _caller, _shares);
             // Burn the shares being redeemed from the owner
             _burn(_owner, _shares);
-        } else {
+        } else if (_requestRedeemSharesBehavior() == RequestRedeemSharesBehavior.BURN_ON_REDEEM) {
             // No need to spend allowance, that was already done during requestRedeem
-            // If withdrawals are asynchronous, burn the shares that were locked in the tranche on requesting the redemption
             _burn(address(this), _shares);
         }
 
@@ -676,7 +683,17 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         return RoycoTrancheStorageLib._getRoycoTrancheStorage().decimalsOffset;
     }
 
+    function _requestRedeemSharesBehavior() internal view virtual returns (RequestRedeemSharesBehavior) {
+        return (TRANCHE_TYPE() == TrancheType.SENIOR
+                ? RoycoTrancheStorageLib._getRoycoTrancheStorage().REQUEST_REDEEM_SHARES_ST_BEHAVIOR
+                : RoycoTrancheStorageLib._getRoycoTrancheStorage().REQUEST_REDEEM_SHARES_JT_BEHAVIOR);
+    }
+
     function _kernel() internal view virtual returns (address) {
         return RoycoTrancheStorageLib._getRoycoTrancheStorage().kernel;
+    }
+
+    function _withVirtualShares(uint256 _shares) internal view returns (uint256) {
+        return _shares + 10 ** _decimalsOffset();
     }
 }

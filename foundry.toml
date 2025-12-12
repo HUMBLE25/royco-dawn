@@ -10,8 +10,7 @@ sparse_mode = false
 build_info = true
 evm_version="cancun"
 via_ir = true
-fuzz_runs = 100
-deny_warnings = false
+deny = "never"
 fs_permissions = [{ access = "read", path = "./out"}]
 
 [profile.default.optimizer_details]
@@ -34,3 +33,6 @@ sort_imports = true
 
 [lint]
 exclude_lints = ["mixed-case-function", "mixed-case-variable"]
+
+[fuzz]
+runs = 100

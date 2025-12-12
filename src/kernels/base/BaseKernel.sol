@@ -63,6 +63,7 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
      * @dev After execution: applies the effects of the operation (deposit or withdrawal) to all NAVs
      * @param _op The operation being executed in between the pre and post synchronizations
      */
+    /// forge-lint: disable-next-item(unwrapped-modifier-logic)
     modifier syncNAVs(Operation _op) {
         // Sync the tranche NAVs based on the difference in current NAVs and checkpointed NAVs since the last operation
         // Any NAV updates caused by this are a result of unrealized PNL(s) in the underlying strategy
@@ -80,6 +81,7 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
      * @dev After execution: applies the effects of the operation (deposit or withdrawal) to all NAVs
      * @param _op The operation being executed in between the pre and post synchronizations
      */
+    /// forge-lint: disable-next-item(unwrapped-modifier-logic)
     modifier syncNAVsAndEnforceCoverage(Operation _op) {
         // Sync the tranche NAVs based on the difference in current NAVs and checkpointed NAVs since the last operation
         // Any NAV updates caused by this are a result of unrealized PNL(s) in the underlying strategy

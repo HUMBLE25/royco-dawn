@@ -6,6 +6,7 @@ import {
     AccessControlEnumerableUpgradeable
 } from "../../lib/openzeppelin-contracts-upgradeable/contracts/access/extensions/AccessControlEnumerableUpgradeable.sol";
 import { PausableUpgradeable } from "../../lib/openzeppelin-contracts-upgradeable/contracts/utils/PausableUpgradeable.sol";
+import { EfficientHashLib } from "../../lib/solady/src/utils/EfficientHashLib.sol";
 import { RoycoRoles } from "./RoycoRoles.sol";
 
 abstract contract RoycoAuth is AccessControlEnumerableUpgradeable, Ownable2StepUpgradeable, PausableUpgradeable {
@@ -80,8 +81,9 @@ abstract contract RoycoAuth is AccessControlEnumerableUpgradeable, Ownable2StepU
     }
 
     // keccak256(abi.encode(uint256(keccak256("Royco.storage.RoycoAuth")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant RoycoAuthStorageLocation = 0xc6351ca3982f48b7bceb4d41d4ea8768b3c95833ea37fa7955947ef4cfee2d00;
+    bytes32 private constant ROYCO_AUTH_STORAGE_SLOT = 0xc6351ca3982f48b7bceb4d41d4ea8768b3c95833ea37fa7955947ef4cfee2d00;
 
+    /// forge-lint: disable-next-item(unwrapped-modifier-logic)
     modifier checkRoleAndDelayIfGated(bytes32 role) {
         if (!_checkRoleAndDelayIfGated(role)) {
             return;
@@ -218,7 +220,7 @@ abstract contract RoycoAuth is AccessControlEnumerableUpgradeable, Ownable2StepU
 
         // Read any scheduled operation for the function from storage
         ScheduledOperation storage operation = $.scheduledOperations[msg.sig];
-        bytes32 calldataHash = keccak256(msg.data);
+        bytes32 calldataHash = EfficientHashLib.hashCalldata(msg.data);
 
         if (operation.executeAt == 0) {
             // If the operation has not been scheduled, schedule it with the delay set for the function
@@ -241,7 +243,7 @@ abstract contract RoycoAuth is AccessControlEnumerableUpgradeable, Ownable2StepU
 
     function _getRoycoAuthStorage() private pure returns (RoycoAuthStorage storage $) {
         assembly ("memory-safe") {
-            $.slot := RoycoAuthStorageLocation
+            $.slot := ROYCO_AUTH_STORAGE_SLOT
         }
     }
 }
