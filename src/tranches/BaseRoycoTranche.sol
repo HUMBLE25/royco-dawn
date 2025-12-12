@@ -17,7 +17,7 @@ import { IAsyncSTDepositKernel } from "../interfaces/kernel/IAsyncSTDepositKerne
 import { IAsyncSTWithdrawalKernel } from "../interfaces/kernel/IAsyncSTWithdrawalKernel.sol";
 import { ExecutionModel, IBaseKernel, RequestRedeemSharesBehavior } from "../interfaces/kernel/IBaseKernel.sol";
 import { IERC165, IERC7540, IERC7575, IERC7887, IRoycoTranche } from "../interfaces/tranche/IRoycoTranche.sol";
-import { RoycoTrancheState, RoycoTrancheStorageLib } from "../libraries/RoycoTrancheStorageLib.sol";
+import { RoycoTrancheStorageLib } from "../libraries/RoycoTrancheStorageLib.sol";
 import { TrancheType } from "../libraries/Types.sol";
 import { Action, TrancheDeploymentParams } from "../libraries/Types.sol";
 

@@ -5,6 +5,7 @@ pragma solidity ^0.8.28;
 /// @custom:storage-location erc7201:Royco.storage.ERC4626STKernelState
 /// @custom:field vault - The address of the ERC4626 vault
 /// @custom:field asset - The address of the senior tranche's base asset
+/// forge-lint: disable-next-item(pascal-case-struct)
 struct ERC4626STKernelState {
     address vault;
     address asset;

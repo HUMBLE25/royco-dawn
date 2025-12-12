@@ -6,7 +6,6 @@ import { IERC20, SafeERC20 } from "../../../../lib/openzeppelin-contracts/contra
 import { Math } from "../../../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 import { ExecutionModel, IBaseKernel } from "../../../interfaces/kernel/IBaseKernel.sol";
 import { BaseKernelState, BaseKernelStorageLib, Operation } from "../../../libraries/BaseKernelStorageLib.sol";
-import { ConstantsLib } from "../../../libraries/ConstantsLib.sol";
 import { RequestRedeemSharesBehavior } from "../../../libraries/Types.sol";
 import { ERC4626STKernelStorageLib } from "../../../libraries/kernels/ERC4626STKernelStorageLib.sol";
 import { BaseKernel } from "../BaseKernel.sol";

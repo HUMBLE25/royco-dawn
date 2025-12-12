@@ -16,7 +16,7 @@ abstract contract BaseAsyncJTRedemptionDelayKernel is IAsyncJTWithdrawalKernel, 
     using Math for uint256;
 
     // keccak256(abi.encode(uint256(keccak256("Royco.storage.BaseAsyncJTRedemptionDelayKernel")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant BaseAsyncJTRedemptionDelayKernelStorageLocation = 0xb5c6c83047900617b0d8e0a777db642d7504e41a6e0a65096bced63526c1bf00;
+    bytes32 private constant BASE_ASYNC_JT_REDEMPTION_DELAY_KERNEL_STORAGE_SLOT = 0xb5c6c83047900617b0d8e0a777db642d7504e41a6e0a65096bced63526c1bf00;
 
     RequestRedeemSharesBehavior public constant JT_REQUEST_REDEEM_SHARES_BEHAVIOR = RequestRedeemSharesBehavior.BURN_ON_REDEEM;
 
@@ -39,6 +39,7 @@ abstract contract BaseAsyncJTRedemptionDelayKernel is IAsyncJTWithdrawalKernel, 
     error MUST_CLAIM_NON_ZERO_SHARES();
 
     /// @custom:storage-location erc7201:Royco.storage.BaseAsyncJTRedemptionDelayKernelState
+    /// forge-lint: disable-next-item(pascal-case-struct)
     struct BaseAsyncJTRedemptionDelayKernelState {
         uint256 redemptionDelaySeconds;
         mapping(address controller => Redemption redemption) redemptions;
@@ -65,16 +66,7 @@ abstract contract BaseAsyncJTRedemptionDelayKernel is IAsyncJTWithdrawalKernel, 
     // =============================
 
     /// @inheritdoc IAsyncJTWithdrawalKernel
-    function jtRequestRedeem(
-        address _caller,
-        uint256 _shares,
-        uint256 _totalShares,
-        address _controller
-    )
-        external
-        onlyJuniorTranche
-        returns (uint256 requestId)
-    {
+    function jtRequestRedeem(address, uint256 _shares, uint256 _totalShares, address _controller) external onlyJuniorTranche returns (uint256 requestId) {
         BaseAsyncJTRedemptionDelayKernelState storage $ = _getBaseAsyncJTRedemptionDelayKernelState();
 
         Redemption storage redemption = $.redemptions[_controller];
@@ -231,7 +223,7 @@ abstract contract BaseAsyncJTRedemptionDelayKernel is IAsyncJTWithdrawalKernel, 
 
     function _getBaseAsyncJTRedemptionDelayKernelState() private pure returns (BaseAsyncJTRedemptionDelayKernelState storage $) {
         assembly ("memory-safe") {
-            $.slot := BaseAsyncJTRedemptionDelayKernelStorageLocation
+            $.slot := BASE_ASYNC_JT_REDEMPTION_DELAY_KERNEL_STORAGE_SLOT
         }
     }
 }

@@ -5,6 +5,7 @@ pragma solidity ^0.8.28;
 /// @custom:storage-location erc7201:Royco.storage.ERC7540KernelState
 /// @custom:field vault - The address of the ERC7540 vault
 /// @custom:field asset - The address of the tranche's base asset
+/// forge-lint: disable-next-item(pascal-case-struct)
 struct ERC7540KernelState {
     address vault;
     address asset;
