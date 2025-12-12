@@ -443,19 +443,13 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
                     // The actual amount withdrawn was the delta in ST raw NAV and the coverage applied from JT
                     uint256 coverageRealized = uint256(-deltaJT);
                     $.lastSTEffectiveNAV = Math.saturatingSub($.lastSTEffectiveNAV, (uint256(-deltaST) + coverageRealized));
-                    /// We need to adjust debts by accounting for the realized coverage
-                    // Coverage being realized means that debts needs to proportionally decrease
-                    // Compute the percentage of pre-op coverage remaining after this realization
-                    uint256 percentageCoverageRemainingWAD =
-                        ConstantsLib.WAD - coverageRealized.mulDiv(ConstantsLib.WAD, _getSeniorClaimOnJuniorNAV(), Math.Rounding.Floor);
-                    // Scale down ST's coverage liability to JT by the remaining fraction of ST's coverage claim
-                    // The withdrawing senior LP has realized its proportional share of past covered losses
-                    // The realized portion has been effectively settled by the exiting senior LP
-                    $.lastSTCoverageDebt = $.lastSTCoverageDebt.mulDiv(percentageCoverageRemainingWAD, ConstantsLib.WAD, Math.Rounding.Floor);
-                    // Scale down JT's recovery liability to ST by the same remaining fraction
-                    // The withdrawing senior LP has realized its proportional share of past uncovered losses and associated recovery optionality
-                    // Thus, the JT debt to ST should shrink in line with the reduced senior exposure
-                    $.lastJTCoverageDebt = $.lastJTCoverageDebt.mulDiv(percentageCoverageRemainingWAD, ConstantsLib.WAD, Math.Rounding.Floor);
+                    // We need to adjust debts by accounting for the realized coverage
+                    // Coverage being realized means that debts are being settled
+                    // For ST Coverage Debt: The withdrawing senior LP has realized its proportional share of past covered losses, settling the realized portion between JT and ST
+                    $.lastSTCoverageDebt -= coverageRealized;
+                    // For JT Coverage Debt: The withdrawing senior LP has realized its proportional share of past uncovered losses and associated recovery optionality
+                    uint256 totalCoverageClaim = _getSeniorClaimOnJuniorNAV();
+                    $.lastJTCoverageDebt = $.lastJTCoverageDebt.mulDiv((totalCoverageClaim - coverageRealized), totalCoverageClaim, Math.Rounding.Ceil); // Round in favor of senior
                 } else {
                     // Apply the withdrawal to the senior tranche's effective NAV
                     $.lastSTEffectiveNAV = Math.saturatingSub($.lastSTEffectiveNAV, uint256(-deltaST));
