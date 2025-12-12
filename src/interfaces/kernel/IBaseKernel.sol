@@ -30,7 +30,6 @@ interface IBaseKernel {
 
     // function previewSyncTrancheNAVs() external returns (uint256 stRawNAV, uint256 jtRawNAV, uint256 stEffectiveNAV, uint256 jtEffectiveNAV);
 
-    // TODO: Assume that the following functions also enforce the invariants
     function stMaxDeposit(address _asset, address _receiver) external view returns (uint256);
     function stMaxWithdraw(address _asset, address _owner) external view returns (uint256);
 

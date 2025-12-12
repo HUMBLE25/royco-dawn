@@ -10,9 +10,9 @@ import { ExecutionModel, IBaseKernel } from "../../../interfaces/kernel/IBaseKer
 import { BaseKernelState, BaseKernelStorageLib, Operation } from "../../../libraries/BaseKernelStorageLib.sol";
 import { AaveV3KernelState, AaveV3KernelStorageLib } from "../../../libraries/kernels/AaveV3KernelStorageLib.sol";
 import { BaseKernel } from "../BaseKernel.sol";
-import { BaseAsyncJTWithrawalDelayKernel } from "./BaseAsyncJTWithrawalDelayKernel.sol";
+import { BaseAsyncJTRedemptionDelayKernel } from "./BaseAsyncJTRedemptionDelayKernel.sol";
 
-abstract contract AaveV3JTKernel is BaseKernel, BaseAsyncJTWithrawalDelayKernel {
+abstract contract AaveV3JTKernel is BaseKernel, BaseAsyncJTRedemptionDelayKernel {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
@@ -24,6 +24,8 @@ abstract contract AaveV3JTKernel is BaseKernel, BaseAsyncJTWithrawalDelayKernel 
 
     /// @notice Thrown when the JT base asset is not a supported reserve token in the Aave V3 Pool
     error UNSUPPORTED_RESERVE_TOKEN();
+    /// @notice Thrown when the shares to redeem are greater than the claimable shares
+    error INSUFFICIENT_CLAIMABLE_SHARES(uint256 sharesToRedeem, uint256 claimableShares);
 
     /**
      * @notice Initializes a kernel where the junior tranche is deployed into Aave V3
@@ -44,7 +46,7 @@ abstract contract AaveV3JTKernel is BaseKernel, BaseAsyncJTWithrawalDelayKernel 
     }
 
     /// @inheritdoc IBaseKernel
-    function getJTTotalEffectiveAssets() public view override(IBaseKernel, BaseAsyncJTWithrawalDelayKernel) returns (uint256) {
+    function getJTTotalEffectiveAssets() public view override(IBaseKernel) returns (uint256) {
         return _getJuniorTrancheEffectiveNAV();
     }
 
@@ -83,18 +85,14 @@ abstract contract AaveV3JTKernel is BaseKernel, BaseAsyncJTWithrawalDelayKernel 
         syncNAVsAndEnforceCoverage(Operation.JT_WITHDRAW)
         returns (uint256 assetsWithdrawn)
     {
-        // Make sure this withdrawal can be processed based
-        _processClaimableRedeemRequest(_controller, _shares);
-
-        // Get the storage pointer to the base kernel state
-        // We can assume that all NAV values are synced
+        require(_shares <= _jtClaimableRedeemRequest(_controller), INSUFFICIENT_CLAIMABLE_SHARES(_shares, _jtClaimableRedeemRequest(_controller)));
         BaseKernelState storage $ = BaseKernelStorageLib._getBaseKernelStorage();
-        uint256 jtEffectiveNAV = $.lastJTEffectiveNAV;
-        // Compute the assets expected to be received on withdrawal based on the JT's effective NAV
-        assetsWithdrawn = _shares.mulDiv(jtEffectiveNAV, _totalShares, Math.Rounding.Floor);
+
+        // Calculate the value of the shares to claim and update the controller's redemption request
+        assetsWithdrawn = _processClaimableRedeemRequest(_controller, _shares, _totalShares);
 
         // Compute the yield to claim from the ST, rounding in favor of ST
-        uint256 yieldToClaim = _shares.mulDiv(Math.saturatingSub(jtEffectiveNAV, $.lastJTRawNAV), _totalShares, Math.Rounding.Floor);
+        uint256 yieldToClaim = _shares.mulDiv(Math.saturatingSub($.lastJTEffectiveNAV, $.lastJTRawNAV), _totalShares, Math.Rounding.Floor);
         // Pull any yield that needs to be realized from ST
         if (yieldToClaim != 0) _claimJTYieldFromST(_asset, yieldToClaim, _receiver);
 

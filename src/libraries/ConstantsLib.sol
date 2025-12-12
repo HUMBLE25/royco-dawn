@@ -14,4 +14,7 @@ library ConstantsLib {
 
     /// @dev The max protocol fee on yield
     uint256 public constant MAX_YIELD_FEE_WAD = 0.33e18;
+
+    /// @dev The request ID for a purely controller-discriminated request in ERC-7540
+    uint256 public constant ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID = 0;
 }
