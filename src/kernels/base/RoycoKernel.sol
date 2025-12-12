@@ -118,7 +118,7 @@ abstract contract RoycoKernel is Initializable, IRoycoKernel, UUPSUpgradeable, R
         // Ensure that JT withdrawals are not permanently bricked
         require(uint256(_params.coverageWAD).mulDiv(_params.betaWAD, ConstantsLib.WAD, Math.Rounding.Ceil) < ConstantsLib.WAD);
         // Ensure that the tranche address and RDM are not null
-        require((bytes20(_params.seniorTranche) & bytes20(_params.juniorTranche) & bytes20(_params.rdm)) != bytes20(0));
+        require(_params.seniorTranche != address(0) && _params.juniorTranche != address(0) && _params.rdm != address(0));
         // Initialize the base kernel state
         RoycoKernelStorageLib.__RoycoKernel_init(_params);
     }
@@ -226,8 +226,8 @@ abstract contract RoycoKernel is Initializable, IRoycoKernel, UUPSUpgradeable, R
      * @return jtRawNAV The junior tranche's raw NAV: the pure value of its investment
      * @return stEffectiveNAV The senior tranche's effective NAV, including applied coverage, ST yield distribution, and uncovered losses
      * @return jtEffectiveNAV The junior tranche's effective NAV, including provided coverage, JT yield, ST yield distribution, and JT losses
-     * @return stCoverageDebt The total coverage that has been applied to ST from the JT loss-absorption buffer : represents a claim the junior tranche has on future senior-side recoveries
-     * @return jtCoverageDebt The total losses that ST incurred after exhausting the JT loss-absorption buffer: represents a claim the senior tranche has on future junior-side recoveries
+     * @return stCoverageDebt The coverage that has currently been applied to ST from the JT loss-absorption buffer: represents the second claim on capital the junior tranche has on future recoveries
+     * @return jtCoverageDebt The losses that ST incurred after exhausting the JT loss-absorption buffer: represents the first claim on capital the senior tranche has on future recoveries
      * @return yieldDistributed Boolean indicating whether the ST accrued yield and it was distributed between ST and JT
      */
     function _previewEffectiveNAVs(uint256 _twJTYieldShareAccruedWAD)
@@ -299,11 +299,8 @@ abstract contract RoycoKernel is Initializable, IRoycoKernel, UUPSUpgradeable, R
         stRawNAV = _getSeniorTrancheRawNAV();
         int256 deltaST = _computeRawNAVDelta(stRawNAV, $.lastSTRawNAV);
 
-        /// @dev STEP_ST_NO_CHANGE: The ST assets experienced no change in value
-        if (deltaST == 0) {
-            return (stRawNAV, jtRawNAV, stEffectiveNAV, jtEffectiveNAV, stCoverageDebt, jtCoverageDebt, false);
-            /// @dev STEP_ST_APPLY_LOSS: The ST assets depreciated in value
-        } else if (deltaST < 0) {
+        /// @dev STEP_ST_APPLY_LOSS: The ST assets depreciated in value
+        if (deltaST < 0) {
             uint256 stLoss = uint256(-deltaST);
             /// @dev STEP_APPLY_JT_COVERAGE_TO_ST: Apply any possible coverage to ST provided by JT's loss-absorption buffer
             uint256 coverageApplied = Math.min(stLoss, jtEffectiveNAV);
@@ -320,7 +317,7 @@ abstract contract RoycoKernel is Initializable, IRoycoKernel, UUPSUpgradeable, R
                 jtCoverageDebt += netStLoss;
             }
             /// @dev STEP_ST_APPLY_GAIN: The ST assets appreciated in value
-        } else {
+        } else if (deltaST > 0) {
             uint256 stGain = uint256(deltaST);
             /// @dev STEP_REPAY_JT_COVERAGE_DEBT: The first priority of repayment to reverse the loss-waterfall is making ST whole again
             // Repay JT debt to ST: previously uncovered ST losses
@@ -331,7 +328,6 @@ abstract contract RoycoKernel is Initializable, IRoycoKernel, UUPSUpgradeable, R
                 jtCoverageDebt -= debtRepayment;
                 // Deduct the repayment from the ST gains and return if no gains are left
                 stGain -= debtRepayment;
-                if (stGain == 0) return (stRawNAV, jtRawNAV, stEffectiveNAV, jtEffectiveNAV, stCoverageDebt, jtCoverageDebt, false);
             }
 
             /// @dev STEP_REPAY_ST_COVERAGE_DEBT: The second priority of repayment to reverse the loss-waterfall is making JT whole again
@@ -343,23 +339,26 @@ abstract contract RoycoKernel is Initializable, IRoycoKernel, UUPSUpgradeable, R
                 stCoverageDebt -= debtRepayment;
                 // Deduct the repayment from the remaining ST gains and return if no gains are left
                 stGain -= debtRepayment;
-                if (stGain == 0) return (stRawNAV, jtRawNAV, stEffectiveNAV, jtEffectiveNAV, stCoverageDebt, jtCoverageDebt, false);
             }
-
             /// @dev STEP_DISTRIBUTE_YIELD: There are no remaining debts in the system and the residual gains can be used to distribute yield to both tranches
-            // Compute the time weighted average JT share of yield
-            uint256 elapsed = block.timestamp - $.lastDistributionTimestamp;
-            // Preemptively accrue all yield to ST and return if last yield distribution was in the same block
-            // No need to update yield share accumulator and timestamp so return false for yieldDistributed
-            if (elapsed == 0) return (stRawNAV, jtRawNAV, (stEffectiveNAV + stGain), jtEffectiveNAV, stCoverageDebt, jtCoverageDebt, false);
-            // Compute the time weighted JT yield share of this distribution scaled by WAD
-            uint256 jtYieldShareWAD = _twJTYieldShareAccruedWAD / elapsed;
-            // Round in favor of the senior tranche
-            uint256 jtYield = stGain.mulDiv(jtYieldShareWAD, ConstantsLib.WAD, Math.Rounding.Floor);
-            // Apply the yield split: adding each tranche's share of earnings to their effective NAVs
-            jtEffectiveNAV += jtYield;
-            stEffectiveNAV += (stGain - jtYield);
-            yieldDistributed = true;
+            if (stGain != 0) {
+                // Compute the time weighted average JT share of yield
+                uint256 elapsed = block.timestamp - $.lastDistributionTimestamp;
+                // Preemptively accrue all yield to ST and return if last yield distribution was in the same block
+                // No need to update yield share accumulator and timestamp so return false for yieldDistributed
+                if (elapsed == 0) {
+                    stEffectiveNAV += stGain;
+                } else {
+                    // Compute the time weighted JT yield share of this distribution scaled by WAD
+                    uint256 jtYieldShareWAD = _twJTYieldShareAccruedWAD / elapsed;
+                    // Round in favor of the senior tranche
+                    uint256 jtYield = stGain.mulDiv(jtYieldShareWAD, ConstantsLib.WAD, Math.Rounding.Floor);
+                    // Apply the yield split: adding each tranche's share of earnings to their effective NAVs
+                    jtEffectiveNAV += jtYield;
+                    stEffectiveNAV += (stGain - jtYield);
+                    yieldDistributed = true;
+                }
+            }
         }
 
         // Enforce the NAV conservation invariant
@@ -442,13 +441,12 @@ abstract contract RoycoKernel is Initializable, IRoycoKernel, UUPSUpgradeable, R
                     // The actual amount withdrawn was the delta in ST raw NAV and the coverage applied from JT
                     uint256 coverageRealized = uint256(-deltaJT);
                     $.lastSTEffectiveNAV = Math.saturatingSub($.lastSTEffectiveNAV, (uint256(-deltaST) + coverageRealized));
-                    // We need to adjust debts by accounting for the realized coverage
-                    // Coverage being realized means that debts are being settled
-                    // For ST Coverage Debt: The withdrawing senior LP has realized its proportional share of past covered losses, settling the realized portion between JT and ST
-                    $.lastSTCoverageDebt -= coverageRealized;
+                    // We need to adjust debts by accounting for the realized coverage as settling debts
                     // For JT Coverage Debt: The withdrawing senior LP has realized its proportional share of past uncovered losses and associated recovery optionality
                     uint256 totalCoverageClaim = _getSeniorClaimOnJuniorNAV();
                     $.lastJTCoverageDebt = $.lastJTCoverageDebt.mulDiv((totalCoverageClaim - coverageRealized), totalCoverageClaim, Math.Rounding.Ceil); // Round in favor of senior
+                    // For ST Coverage Debt: The withdrawing senior LP has realized its proportional share of past covered losses, settling the realized portion between JT and ST
+                    $.lastSTCoverageDebt -= coverageRealized;
                 } else {
                     // Apply the withdrawal to the senior tranche's effective NAV
                     $.lastSTEffectiveNAV = Math.saturatingSub($.lastSTEffectiveNAV, uint256(-deltaST));
@@ -463,6 +461,9 @@ abstract contract RoycoKernel is Initializable, IRoycoKernel, UUPSUpgradeable, R
                 else $.lastJTEffectiveNAV = Math.saturatingSub($.lastJTEffectiveNAV, uint256(-deltaJT));
             }
         }
+
+        // Enforce the NAV conservation invariant
+        require($.lastSTRawNAV + $.lastJTRawNAV == $.lastSTEffectiveNAV + $.lastJTEffectiveNAV, NAV_CONSERVATION_VIOLATION());
     }
 
     /**
