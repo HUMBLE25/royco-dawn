@@ -13,10 +13,10 @@ enum ExecutionModel {
 }
 
 /**
- * @title IBaseKernel
+ * @title IRoycoKernel
  *
  */
-interface IBaseKernel {
+interface IRoycoKernel {
     function jtMaxDeposit(address _receiver) external view returns (uint256);
     function jtMaxWithdraw(address _owner) external view returns (uint256);
     function jtTotalAssets() external view returns (uint256);

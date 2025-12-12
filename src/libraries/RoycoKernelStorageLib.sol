@@ -25,7 +25,7 @@ enum Operation {
  *                For example, beta is 0 when JT is in the RFR and 1 when JT is in the same opportunity as senior
  * @custom:field rdm - The market's Reward Distribution Model (RDM), responsible for determining the ST's yield split between ST and JT
  */
-struct BaseKernelInitParams {
+struct RoycoKernelInitParams {
     address seniorTranche;
     address juniorTranche;
     uint64 coverageWAD;
@@ -34,7 +34,7 @@ struct BaseKernelInitParams {
 }
 
 /// @notice Storage state for the Royco Base Kernel
-/// @custom:storage-location erc7201:Royco.storage.BaseKernelState
+/// @custom:storage-location erc7201:Royco.storage.RoycoKernelState
 /// @custom:field seniorTranche - The address of the Royco senior tranche associated with this kernel
 /// @custom:field coverageWAD - The coverage ratio that the senior tranche is expected to be protected by scaled by WAD
 /// @custom:field juniorTranche - The address of the Royco junior tranche associated with this kernel
@@ -50,7 +50,7 @@ struct BaseKernelInitParams {
 /// @custom:field twJTYieldShareAccruedWAD - The time-weighted junior tranche yield share (RDM output) since the last yield distribution
 /// @custom:field lastAccrualTimestamp - The last time the time-weighted JT yield share accumulator was updated
 /// @custom:field lastDistributionTimestamp - The last time a yield distribution occurred
-struct BaseKernelState {
+struct RoycoKernelState {
     address seniorTranche;
     uint64 coverageWAD;
     address juniorTranche;
@@ -67,18 +67,18 @@ struct BaseKernelState {
     uint32 lastDistributionTimestamp;
 }
 
-/// @title BaseKernelStorageLib
+/// @title RoycoKernelStorageLib
 /// @notice Library for managing Royco Base Kernel storage using the ERC7201 pattern
 /// @dev Provides functions to safely access the set and get the base kernel state
-library BaseKernelStorageLib {
-    /// @dev Storage slot for BaseKernelState using ERC-7201 pattern
-    // keccak256(abi.encode(uint256(keccak256("Royco.storage.BaseKernelState")) - 1)) & ~bytes32(uint256(0xff))
+library RoycoKernelStorageLib {
+    /// @dev Storage slot for RoycoKernelState using ERC-7201 pattern
+    // keccak256(abi.encode(uint256(keccak256("Royco.storage.RoycoKernelState")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant BASE_KERNEL_STORAGE_SLOT = 0x0e1123d8194dcf603de811512b2b6334f106b53313663d6b2df1a2b814038e00;
 
-    /// @notice Returns a storage pointer to the BaseKernelState storage
+    /// @notice Returns a storage pointer to the RoycoKernelState storage
     /// @dev Uses ERC-7201 storage slot pattern for collision-resistant storage
     /// @return $ Storage pointer to the base kernel state
-    function _getBaseKernelStorage() internal pure returns (BaseKernelState storage $) {
+    function _getRoycoKernelStorage() internal pure returns (RoycoKernelState storage $) {
         assembly ("memory-safe") {
             $.slot := BASE_KERNEL_STORAGE_SLOT
         }
@@ -86,9 +86,9 @@ library BaseKernelStorageLib {
 
     /// @notice Initializes the base kernel state
     /// @param _params The initialization parameters for the base kernel
-    function __BaseKernel_init(BaseKernelInitParams memory _params) internal {
+    function __RoycoKernel_init(RoycoKernelInitParams memory _params) internal {
         // Set the initial state of the base kernel
-        BaseKernelState storage $ = _getBaseKernelStorage();
+        RoycoKernelState storage $ = _getRoycoKernelStorage();
         $.seniorTranche = _params.seniorTranche;
         $.coverageWAD = _params.coverageWAD;
         $.juniorTranche = _params.juniorTranche;

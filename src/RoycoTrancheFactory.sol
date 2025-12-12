@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import { ERC1967Proxy } from "../lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import { ExecutionModel, IBaseKernel } from "./interfaces/kernel/IBaseKernel.sol";
+import { ExecutionModel, IRoycoKernel } from "./interfaces/kernel/IRoycoKernel.sol";
 import { TrancheDeploymentParams } from "./libraries/Types.sol";
 import { RoycoJT } from "./tranches/junior/RoycoJT.sol";
 import { RoycoST } from "./tranches/senior/RoycoST.sol";
@@ -83,10 +83,10 @@ contract RoycoTrancheFactory {
             require(kernel == _jtParams.kernel, KernelMismatch());
         }
 
-        // Verify kernel implements IBaseKernel by checking it returns valid execution models
+        // Verify kernel implements IRoycoKernel by checking it returns valid execution models
         // This will revert if the kernel doesn't implement the interface
-        ExecutionModel depositModel = IBaseKernel(kernel).ST_DEPOSIT_EXECUTION_MODEL();
-        ExecutionModel withdrawModel = IBaseKernel(kernel).ST_WITHDRAWAL_EXECUTION_MODEL();
+        ExecutionModel depositModel = IRoycoKernel(kernel).ST_DEPOSIT_EXECUTION_MODEL();
+        ExecutionModel withdrawModel = IRoycoKernel(kernel).ST_WITHDRAWAL_EXECUTION_MODEL();
         require(depositModel == ExecutionModel.SYNC || depositModel == ExecutionModel.ASYNC, InvalidDepositModel());
         require(withdrawModel == ExecutionModel.SYNC || withdrawModel == ExecutionModel.ASYNC, InvalidWithdrawModel());
 

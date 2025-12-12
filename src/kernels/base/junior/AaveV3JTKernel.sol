@@ -6,20 +6,20 @@ import { Math } from "../../../../lib/openzeppelin-contracts/contracts/utils/mat
 import { IPool } from "../../../interfaces/aave/IPool.sol";
 import { IPoolAddressesProvider } from "../../../interfaces/aave/IPoolAddressesProvider.sol";
 import { IPoolDataProvider } from "../../../interfaces/aave/IPoolDataProvider.sol";
-import { ExecutionModel, IBaseKernel } from "../../../interfaces/kernel/IBaseKernel.sol";
-import { BaseKernelState, BaseKernelStorageLib, Operation } from "../../../libraries/BaseKernelStorageLib.sol";
+import { ExecutionModel, IRoycoKernel } from "../../../interfaces/kernel/IRoycoKernel.sol";
+import { Operation, RoycoKernelState, RoycoKernelStorageLib } from "../../../libraries/RoycoKernelStorageLib.sol";
 import { AaveV3KernelState, AaveV3KernelStorageLib } from "../../../libraries/kernels/AaveV3KernelStorageLib.sol";
-import { BaseKernel } from "../BaseKernel.sol";
+import { RoycoKernel } from "../RoycoKernel.sol";
 import { BaseAsyncJTRedemptionDelayKernel } from "./BaseAsyncJTRedemptionDelayKernel.sol";
 
-abstract contract AaveV3JTKernel is BaseKernel, BaseAsyncJTRedemptionDelayKernel {
+abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKernel {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
-    /// @inheritdoc IBaseKernel
+    /// @inheritdoc IRoycoKernel
     ExecutionModel public constant JT_DEPOSIT_EXECUTION_MODEL = ExecutionModel.SYNC;
 
-    /// @inheritdoc IBaseKernel
+    /// @inheritdoc IRoycoKernel
     ExecutionModel public constant JT_WITHDRAWAL_EXECUTION_MODEL = ExecutionModel.ASYNC;
 
     /// @notice Thrown when the JT base asset is not a supported reserve token in the Aave V3 Pool
@@ -45,12 +45,12 @@ abstract contract AaveV3JTKernel is BaseKernel, BaseAsyncJTRedemptionDelayKernel
         AaveV3KernelStorageLib.__AaveV3Kernel_init(_aaveV3Pool, address(IPool(_aaveV3Pool).ADDRESSES_PROVIDER()), _jtAsset, jtAssetAToken);
     }
 
-    /// @inheritdoc IBaseKernel
-    function getJTTotalEffectiveAssets() public view override(IBaseKernel) returns (uint256) {
+    /// @inheritdoc IRoycoKernel
+    function getJTTotalEffectiveAssets() public view override(IRoycoKernel) returns (uint256) {
         return _getJuniorTrancheEffectiveNAV();
     }
 
-    /// @inheritdoc IBaseKernel
+    /// @inheritdoc IRoycoKernel
     function jtDeposit(
         address,
         uint256 _assets,
@@ -58,7 +58,7 @@ abstract contract AaveV3JTKernel is BaseKernel, BaseAsyncJTRedemptionDelayKernel
         address
     )
         external
-        override(IBaseKernel)
+        override(IRoycoKernel)
         onlyJuniorTranche
         syncNAVs(Operation.JT_DEPOSIT)
         whenNotPaused
@@ -71,7 +71,7 @@ abstract contract AaveV3JTKernel is BaseKernel, BaseAsyncJTRedemptionDelayKernel
         totalUnderlyingShares = _getJuniorTrancheEffectiveNAV();
     }
 
-    /// @inheritdoc IBaseKernel
+    /// @inheritdoc IRoycoKernel
     function jtRedeem(
         address _asset,
         uint256 _shares,
@@ -80,7 +80,7 @@ abstract contract AaveV3JTKernel is BaseKernel, BaseAsyncJTRedemptionDelayKernel
         address _receiver
     )
         external
-        override(IBaseKernel)
+        override(IRoycoKernel)
         onlyJuniorTranche
         syncNAVsAndEnforceCoverage(Operation.JT_WITHDRAW)
         returns (uint256 assetsWithdrawn)
@@ -97,21 +97,21 @@ abstract contract AaveV3JTKernel is BaseKernel, BaseAsyncJTRedemptionDelayKernel
         IPool(AaveV3KernelStorageLib._getAaveV3KernelStorage().pool).withdraw(_asset, (assetsWithdrawn - stAssetsToWithdraw), _receiver);
     }
 
-    /// @inheritdoc BaseKernel
-    function _claimSeniorAssetsFromJunior(address _asset, uint256 _assets, address _receiver) internal override(BaseKernel) {
+    /// @inheritdoc RoycoKernel
+    function _claimSeniorAssetsFromJunior(address _asset, uint256 _assets, address _receiver) internal override(RoycoKernel) {
         IPool(AaveV3KernelStorageLib._getAaveV3KernelStorage().pool).withdraw(_asset, _assets, _receiver);
     }
 
-    /// @inheritdoc BaseKernel
-    function _getJuniorTrancheRawNAV() internal view override(BaseKernel) returns (uint256) {
+    /// @inheritdoc RoycoKernel
+    function _getJuniorTrancheRawNAV() internal view override(RoycoKernel) returns (uint256) {
         // The tranche's balance of the AToken is the total assets it is owed from the Aave pool
         /// @dev This does not treat illiquidity in the Aave pool as a loss: we assume that total lent will be withdrawable at some point
         AaveV3KernelState storage $ = AaveV3KernelStorageLib._getAaveV3KernelStorage();
         return IERC20($.aToken).balanceOf(address(this));
     }
 
-    /// @inheritdoc BaseKernel
-    function _maxJTDepositGlobally(address) internal view override(BaseKernel) returns (uint256) {
+    /// @inheritdoc RoycoKernel
+    function _maxJTDepositGlobally(address) internal view override(RoycoKernel) returns (uint256) {
         // Retrieve the Pool's data provider and asset
         AaveV3KernelState storage $ = AaveV3KernelStorageLib._getAaveV3KernelStorage();
         IPoolDataProvider poolDataProvider = IPoolDataProvider(IPoolAddressesProvider($.poolAddressesProvider).getPoolDataProvider());
@@ -135,8 +135,8 @@ abstract contract AaveV3JTKernel is BaseKernel, BaseAsyncJTRedemptionDelayKernel
         return (currentlySupplied >= supplyCap) ? 0 : (supplyCap - currentlySupplied);
     }
 
-    /// @inheritdoc BaseKernel
-    function _maxJTWithdrawalGlobally(address) internal view override(BaseKernel) returns (uint256) {
+    /// @inheritdoc RoycoKernel
+    function _maxJTWithdrawalGlobally(address) internal view override(RoycoKernel) returns (uint256) {
         // Retrieve the Pool's data provider and asset
         AaveV3KernelState storage $ = AaveV3KernelStorageLib._getAaveV3KernelStorage();
         IPoolDataProvider poolDataProvider = IPoolDataProvider(IPoolAddressesProvider($.poolAddressesProvider).getPoolDataProvider());

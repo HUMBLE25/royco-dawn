@@ -4,23 +4,23 @@ pragma solidity ^0.8.28;
 import { IERC4626 } from "../../../../lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 import { IERC20, SafeERC20 } from "../../../../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import { Math } from "../../../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
-import { ExecutionModel, IBaseKernel } from "../../../interfaces/kernel/IBaseKernel.sol";
-import { BaseKernelState, BaseKernelStorageLib, Operation } from "../../../libraries/BaseKernelStorageLib.sol";
+import { ExecutionModel, IRoycoKernel } from "../../../interfaces/kernel/IRoycoKernel.sol";
+import { Operation, RoycoKernelState, RoycoKernelStorageLib } from "../../../libraries/RoycoKernelStorageLib.sol";
 import { RequestRedeemSharesBehavior } from "../../../libraries/Types.sol";
 import { ERC4626STKernelStorageLib } from "../../../libraries/kernels/ERC4626STKernelStorageLib.sol";
-import { BaseKernel } from "../BaseKernel.sol";
+import { RoycoKernel } from "../RoycoKernel.sol";
 
-abstract contract ERC4626STKernel is BaseKernel {
+abstract contract ERC4626STKernel is RoycoKernel {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
-    /// @inheritdoc IBaseKernel
+    /// @inheritdoc IRoycoKernel
     ExecutionModel public constant ST_DEPOSIT_EXECUTION_MODEL = ExecutionModel.SYNC;
 
-    /// @inheritdoc IBaseKernel
+    /// @inheritdoc IRoycoKernel
     ExecutionModel public constant ST_WITHDRAWAL_EXECUTION_MODEL = ExecutionModel.SYNC;
 
-    /// @inheritdoc IBaseKernel
+    /// @inheritdoc IRoycoKernel
     RequestRedeemSharesBehavior public constant ST_REQUEST_REDEEM_SHARES_BEHAVIOR = RequestRedeemSharesBehavior.BURN_ON_REDEEM;
 
     /// @notice Thrown when the ST base asset is different the the ERC4626 vault's base asset
@@ -43,12 +43,12 @@ abstract contract ERC4626STKernel is BaseKernel {
         ERC4626STKernelStorageLib.__ERC4626STKernel_init(_vault, _stAsset);
     }
 
-    /// @inheritdoc IBaseKernel
-    function getSTTotalEffectiveAssets() external view override(IBaseKernel) returns (uint256) {
+    /// @inheritdoc IRoycoKernel
+    function getSTTotalEffectiveAssets() external view override(IRoycoKernel) returns (uint256) {
         return _getSeniorTrancheEffectiveNAV();
     }
 
-    /// @inheritdoc IBaseKernel
+    /// @inheritdoc IRoycoKernel
     function stDeposit(
         address,
         uint256 _assets,
@@ -56,7 +56,7 @@ abstract contract ERC4626STKernel is BaseKernel {
         address
     )
         external
-        override(IBaseKernel)
+        override(IRoycoKernel)
         onlySeniorTranche
         whenNotPaused
         syncNAVsAndEnforceCoverage(Operation.ST_DEPOSIT)
@@ -75,7 +75,7 @@ abstract contract ERC4626STKernel is BaseKernel {
         effectiveNAVToMintAt = _getSeniorTrancheEffectiveNAV();
     }
 
-    /// @inheritdoc IBaseKernel
+    /// @inheritdoc IRoycoKernel
     function stRedeem(
         address _asset,
         uint256 _shares,
@@ -84,7 +84,7 @@ abstract contract ERC4626STKernel is BaseKernel {
         address _receiver
     )
         external
-        override(IBaseKernel)
+        override(IRoycoKernel)
         onlySeniorTranche
         whenNotPaused
         syncNAVs(Operation.ST_WITHDRAW)
@@ -92,7 +92,7 @@ abstract contract ERC4626STKernel is BaseKernel {
     {
         // Get the storage pointer to the base kernel state
         // We can assume that all NAV and debt values are synced
-        BaseKernelState storage $ = BaseKernelStorageLib._getBaseKernelStorage();
+        RoycoKernelState storage $ = RoycoKernelStorageLib._getRoycoKernelStorage();
         // Compute the assets expected to be received on withdrawal based on the ST's effective NAV
         assetsWithdrawn = _shares.mulDiv($.lastSTEffectiveNAV, _totalShares, Math.Rounding.Floor);
 
@@ -114,13 +114,13 @@ abstract contract ERC4626STKernel is BaseKernel {
         return _assets;
     }
 
-    /// @inheritdoc BaseKernel
-    function _claimJuniorAssetsFromSenior(address, uint256 _assets, address _receiver) internal override(BaseKernel) {
+    /// @inheritdoc RoycoKernel
+    function _claimJuniorAssetsFromSenior(address, uint256 _assets, address _receiver) internal override(RoycoKernel) {
         IERC4626(ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault).withdraw(_assets, _receiver, address(this));
     }
 
-    /// @inheritdoc BaseKernel
-    function _getSeniorTrancheRawNAV() internal view override(BaseKernel) returns (uint256) {
+    /// @inheritdoc RoycoKernel
+    function _getSeniorTrancheRawNAV() internal view override(RoycoKernel) returns (uint256) {
         // Must use preview redeem for the tranche owned shares
         // Max withdraw will mistake illiquidity for NAV losses
         address vault = ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault;
@@ -128,14 +128,14 @@ abstract contract ERC4626STKernel is BaseKernel {
         return IERC4626(vault).previewRedeem(trancheSharesBalance);
     }
 
-    /// @inheritdoc BaseKernel
-    function _maxSTDepositGlobally(address) internal view override(BaseKernel) returns (uint256) {
+    /// @inheritdoc RoycoKernel
+    function _maxSTDepositGlobally(address) internal view override(RoycoKernel) returns (uint256) {
         // Max deposit takes global withdrawal limits into account
         return IERC4626(ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault).maxDeposit(address(this));
     }
 
-    /// @inheritdoc BaseKernel
-    function _maxSTWithdrawalGlobally(address) internal view override(BaseKernel) returns (uint256) {
+    /// @inheritdoc RoycoKernel
+    function _maxSTWithdrawalGlobally(address) internal view override(RoycoKernel) returns (uint256) {
         // Max withdraw takes global withdrawal limits into account
         return IERC4626(ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault).maxWithdraw(address(this));
     }

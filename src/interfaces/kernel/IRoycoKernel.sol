@@ -4,10 +4,10 @@ pragma solidity ^0.8.28;
 import { ExecutionModel, RequestRedeemSharesBehavior } from "../../libraries/Types.sol";
 
 /**
- * @title IBaseKernel
+ * @title IRoycoKernel
  *
  */
-interface IBaseKernel {
+interface IRoycoKernel {
     function ST_REQUEST_REDEEM_SHARES_BEHAVIOR() external pure returns (RequestRedeemSharesBehavior);
     function JT_REQUEST_REDEEM_SHARES_BEHAVIOR() external pure returns (RequestRedeemSharesBehavior);
 
@@ -42,7 +42,15 @@ interface IBaseKernel {
     )
         external
         returns (uint256 valueAllocated, uint256 effectiveNAVToMintAt);
-    function stRedeem(address _asset, uint256 _shares, uint256 _totalShares, address _controller, address _receiver) external returns (uint256 assetsWithdrawn);
+    function stRedeem(
+        address _asset,
+        uint256 _shares,
+        uint256 _totalShares,
+        address _controller,
+        address _receiver
+    )
+        external
+        returns (uint256 assetsWithdrawn);
 
     function jtMaxDeposit(address _asset, address _receiver) external view returns (uint256);
     function jtMaxWithdraw(address _asset, address _owner) external view returns (uint256);
@@ -56,5 +64,13 @@ interface IBaseKernel {
     )
         external
         returns (uint256 valueAllocated, uint256 effectiveNAVToMintAt);
-    function jtRedeem(address _asset, uint256 _shares, uint256 _totalShares, address _controller, address _receiver) external returns (uint256 assetsWithdrawn);
+    function jtRedeem(
+        address _asset,
+        uint256 _shares,
+        uint256 _totalShares,
+        address _controller,
+        address _receiver
+    )
+        external
+        returns (uint256 assetsWithdrawn);
 }

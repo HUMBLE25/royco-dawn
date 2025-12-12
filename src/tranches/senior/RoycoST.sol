@@ -3,10 +3,10 @@ pragma solidity ^0.8.28;
 
 import { TrancheDeploymentParams } from "../../libraries/Types.sol";
 import { TrancheType } from "../../libraries/Types.sol";
-import { BaseRoycoTranche } from "../BaseRoycoTranche.sol";
+import { RoycoVaultTranche } from "../RoycoVaultTranche.sol";
 
 // TODO: ST and JT base asset can have different decimals
-contract RoycoST is BaseRoycoTranche {
+contract RoycoST is RoycoVaultTranche {
     /// @notice Initializes the Royco senior tranche
     /// @param _stParams Deployment parameters including name, symbol, kernel, and kernel initialization data for the senior tranche
     /// @param _asset The underlying asset for the tranche
@@ -18,8 +18,8 @@ contract RoycoST is BaseRoycoTranche {
         __RoycoTranche_init(_stParams, _asset, _owner, _pauser, _marketId);
     }
 
-    /// @inheritdoc BaseRoycoTranche
-    function TRANCHE_TYPE() public pure virtual override(BaseRoycoTranche) returns (TrancheType) {
+    /// @inheritdoc RoycoVaultTranche
+    function TRANCHE_TYPE() public pure virtual override(RoycoVaultTranche) returns (TrancheType) {
         return TrancheType.SENIOR;
     }
 }

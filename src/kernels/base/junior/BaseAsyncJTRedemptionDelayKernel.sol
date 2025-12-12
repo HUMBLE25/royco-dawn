@@ -5,14 +5,14 @@ import { Math } from "../../../../lib/openzeppelin-contracts/contracts/utils/mat
 import { RoycoAuth } from "../../../auth/RoycoAuth.sol";
 import { RoycoRoles } from "../../../auth/RoycoRoles.sol";
 import { IAsyncJTWithdrawalKernel } from "../../../interfaces/kernel/IAsyncJTWithdrawalKernel.sol";
-import { IBaseKernel } from "../../../interfaces/kernel/IBaseKernel.sol";
+import { IRoycoKernel } from "../../../interfaces/kernel/IRoycoKernel.sol";
 import { ConstantsLib } from "../../../libraries/ConstantsLib.sol";
 import { RequestRedeemSharesBehavior } from "../../../libraries/Types.sol";
-import { BaseKernel } from "../BaseKernel.sol";
+import { RoycoKernel } from "../RoycoKernel.sol";
 
 /// @title BaseAsyncJTRedemptionDelayKernel
 /// @notice Abstract base contract for the junior tranche redemption delay kernel
-abstract contract BaseAsyncJTRedemptionDelayKernel is IAsyncJTWithdrawalKernel, IBaseKernel, RoycoAuth, BaseKernel {
+abstract contract BaseAsyncJTRedemptionDelayKernel is IAsyncJTWithdrawalKernel, IRoycoKernel, RoycoAuth, RoycoKernel {
     using Math for uint256;
 
     // keccak256(abi.encode(uint256(keccak256("Royco.storage.BaseAsyncJTRedemptionDelayKernel")) - 1)) & ~bytes32(uint256(0xff))

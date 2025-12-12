@@ -5,18 +5,17 @@ import { UUPSUpgradeable } from "../../../lib/openzeppelin-contracts-upgradeable
 import { Initializable } from "../../../lib/openzeppelin-contracts/contracts/proxy/utils/Initializable.sol";
 import { RoycoAuth, RoycoRoles } from "../../auth/RoycoAuth.sol";
 import { IRDM } from "../../interfaces/IRDM.sol";
-import { IBaseKernel } from "../../interfaces/kernel/IBaseKernel.sol";
-import { BaseKernelInitParams, BaseKernelState, BaseKernelStorageLib, Operation } from "../../libraries/BaseKernelStorageLib.sol";
+import { IRoycoKernel } from "../../interfaces/kernel/IRoycoKernel.sol";
+import { Operation, RoycoKernelInitParams, RoycoKernelState, RoycoKernelStorageLib } from "../../libraries/RoycoKernelStorageLib.sol";
 import { ConstantsLib, Math, UtilsLib } from "../../libraries/UtilsLib.sol";
 
 /**
- * @title BaseKernel
- * @notice Base abstract contract for kernel implementations that provides delegate call protection
- * @dev Provides the foundational functionality for kernel contracts including delegatecall enforcement
- * @dev All kernel contracts should inherit from this base contract to ensure proper execution context
- *      and use the modifier as stipulated by the IBaseKernel interface.
+ * @title RoycoKernel
+ * @notice Abstract contract for Royco kernel implementations
+ * @dev Provides the foundational logic for kernel contracts including re and post operation NAV reconciliation, coverage enforcement logic,
+ *      and base wiring for tranche synchronization primitives. All concrete kernel implementations should inherit from the Royco Kernel.
  */
-abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, RoycoAuth {
+abstract contract RoycoKernel is Initializable, IRoycoKernel, UUPSUpgradeable, RoycoAuth {
     using Math for uint256;
 
     /// @notice Thrown when the market's coverage requirement is unsatisfied
@@ -42,7 +41,7 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
     }
 
     function _onlySeniorTranche() internal view {
-        require(msg.sender == BaseKernelStorageLib._getBaseKernelStorage().seniorTranche, ONLY_SENIOR_TRANCHE());
+        require(msg.sender == RoycoKernelStorageLib._getRoycoKernelStorage().seniorTranche, ONLY_SENIOR_TRANCHE());
     }
 
     /// @dev Permissions the function to only the market's junior tranche
@@ -53,7 +52,7 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
     }
 
     function _onlyJuniorTranche() internal view {
-        require(msg.sender == BaseKernelStorageLib._getBaseKernelStorage().juniorTranche, ONLY_JUNIOR_TRANCHE());
+        require(msg.sender == RoycoKernelStorageLib._getRoycoKernelStorage().juniorTranche, ONLY_JUNIOR_TRANCHE());
     }
 
     /**
@@ -101,11 +100,11 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
      * @param _owner The initial owner of the base kernel
      * @param _pauser The initial pauser of the base kernel
      */
-    function __BaseKernel_init(BaseKernelInitParams memory _params, address _owner, address _pauser) internal onlyInitializing {
+    function __RoycoKernel_init(RoycoKernelInitParams memory _params, address _owner, address _pauser) internal onlyInitializing {
         // Initialize the auth state of the kernel
         __RoycoAuth_init(_owner, _pauser);
         // Initialize the base kernel state
-        __BaseKernel_init_unchained(_params);
+        __RoycoKernel_init_unchained(_params);
     }
 
     /**
@@ -113,7 +112,7 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
      * @dev Checks the initial market's configuration and initializes the base kernel state
      * @param _params The initialization parameters for the base kernel
      */
-    function __BaseKernel_init_unchained(BaseKernelInitParams memory _params) internal onlyInitializing {
+    function __RoycoKernel_init_unchained(RoycoKernelInitParams memory _params) internal onlyInitializing {
         // Ensure that the coverage requirement is valid
         require(_params.coverageWAD < ConstantsLib.WAD && _params.coverageWAD >= ConstantsLib.MIN_COVERAGE_WAD);
         // Ensure that JT withdrawals are not permanently bricked
@@ -121,46 +120,46 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
         // Ensure that the tranche address and RDM are not null
         require((bytes20(_params.seniorTranche) & bytes20(_params.juniorTranche) & bytes20(_params.rdm)) != bytes20(0));
         // Initialize the base kernel state
-        BaseKernelStorageLib.__BaseKernel_init(_params);
+        RoycoKernelStorageLib.__RoycoKernel_init(_params);
     }
 
-    /// @inheritdoc IBaseKernel
-    function stMaxDeposit(address, address _receiver) external view override(IBaseKernel) returns (uint256) {
+    /// @inheritdoc IRoycoKernel
+    function stMaxDeposit(address, address _receiver) external view override(IRoycoKernel) returns (uint256) {
         return Math.min(_maxSTDepositGlobally(_receiver), _maxSTDepositGivenCoverage());
     }
 
-    /// @inheritdoc IBaseKernel
-    function stMaxWithdraw(address, address _owner) external view override(IBaseKernel) returns (uint256) {
+    /// @inheritdoc IRoycoKernel
+    function stMaxWithdraw(address, address _owner) external view override(IRoycoKernel) returns (uint256) {
         return _maxSTWithdrawalGlobally(_owner);
     }
 
-    /// @inheritdoc IBaseKernel
-    function jtMaxDeposit(address, address _receiver) external view override(IBaseKernel) returns (uint256) {
+    /// @inheritdoc IRoycoKernel
+    function jtMaxDeposit(address, address _receiver) external view override(IRoycoKernel) returns (uint256) {
         return _maxJTDepositGlobally(_receiver);
     }
 
-    /// @inheritdoc IBaseKernel
-    function jtMaxWithdraw(address, address _owner) external view override(IBaseKernel) returns (uint256) {
+    /// @inheritdoc IRoycoKernel
+    function jtMaxWithdraw(address, address _owner) external view override(IRoycoKernel) returns (uint256) {
         return Math.min(_maxJTWithdrawalGlobally(_owner), _maxJTWithdrawalGivenCoverage());
     }
 
-    /// @inheritdoc IBaseKernel
-    function getSTRawNAV() external view override(IBaseKernel) returns (uint256) {
+    /// @inheritdoc IRoycoKernel
+    function getSTRawNAV() external view override(IRoycoKernel) returns (uint256) {
         return _getSeniorTrancheRawNAV();
     }
 
-    /// @inheritdoc IBaseKernel
-    function getJTRawNAV() external view override(IBaseKernel) returns (uint256) {
+    /// @inheritdoc IRoycoKernel
+    function getJTRawNAV() external view override(IRoycoKernel) returns (uint256) {
         return _getJuniorTrancheRawNAV();
     }
 
-    /// @inheritdoc IBaseKernel
-    function getSTEffectiveNAV() external view override(IBaseKernel) returns (uint256) {
+    /// @inheritdoc IRoycoKernel
+    function getSTEffectiveNAV() external view override(IRoycoKernel) returns (uint256) {
         return _getSeniorTrancheEffectiveNAV();
     }
 
-    /// @inheritdoc IBaseKernel
-    function getJTEffectiveNAV() external view override(IBaseKernel) returns (uint256) {
+    /// @inheritdoc IRoycoKernel
+    function getJTEffectiveNAV() external view override(IRoycoKernel) returns (uint256) {
         return _getJuniorTrancheEffectiveNAV();
     }
 
@@ -193,7 +192,7 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
      */
     function _preOpSyncTrancheNAVs() internal returns (uint256 stRawNAV, uint256 jtRawNAV, uint256 stEffectiveNAV, uint256 jtEffectiveNAV) {
         // Get the storage pointer to the base kernel state
-        BaseKernelState storage $ = BaseKernelStorageLib._getBaseKernelStorage();
+        RoycoKernelState storage $ = RoycoKernelStorageLib._getRoycoKernelStorage();
 
         // Accrue the yield distribution owed to JT since the last tranche interaction
         uint256 twJTYieldShareAccruedWAD = $.twJTYieldShareAccruedWAD = _previewJTYieldShareAccrual();
@@ -245,7 +244,7 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
         )
     {
         // Get the storage pointer to the base kernel state
-        BaseKernelState storage $ = BaseKernelStorageLib._getBaseKernelStorage();
+        RoycoKernelState storage $ = RoycoKernelStorageLib._getRoycoKernelStorage();
 
         // Compute the delta in the raw NAV of the junior tranche
         // The delta represents the unrealized JT PNL of the underlying investment since the last NAV checkpoints
@@ -374,7 +373,7 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
      */
     function _previewJTYieldShareAccrual() internal view returns (uint192) {
         // Get the storage pointer to the base kernel state
-        BaseKernelState storage $ = BaseKernelStorageLib._getBaseKernelStorage();
+        RoycoKernelState storage $ = RoycoKernelStorageLib._getRoycoKernelStorage();
 
         // Get the last update timestamp
         uint256 lastUpdate = $.lastAccrualTimestamp;
@@ -398,7 +397,7 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
      */
     function _postOpSyncTrancheNAVs(Operation _op) internal {
         // Get the storage pointer to the base kernel state
-        BaseKernelState storage $ = BaseKernelStorageLib._getBaseKernelStorage();
+        RoycoKernelState storage $ = RoycoKernelStorageLib._getRoycoKernelStorage();
         if (_op == Operation.ST_DEPOSIT) {
             // Compute the delta in the raw NAV of the senior tranche
             // The deltas represent the NAV changes after a deposit and withdrawal
@@ -483,7 +482,7 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
      */
     function _enforceCoverage() internal view {
         // Get the storage pointer to the base kernel state
-        BaseKernelState storage $ = BaseKernelStorageLib._getBaseKernelStorage();
+        RoycoKernelState storage $ = RoycoKernelStorageLib._getRoycoKernelStorage();
         // Compute the utilization and enforce that the senior tranche is properly collateralized based on persisted NAVs
         uint256 utilization = UtilsLib.computeUtilization($.lastSTRawNAV, $.lastJTRawNAV, $.betaWAD, $.coverageWAD, $.lastJTEffectiveNAV);
         require(ConstantsLib.WAD >= utilization, INSUFFICIENT_COVERAGE());
@@ -498,7 +497,7 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
      */
     function _maxSTDepositGivenCoverage() internal view returns (uint256) {
         // Get the storage pointer to the base kernel state
-        BaseKernelState storage $ = BaseKernelStorageLib._getBaseKernelStorage();
+        RoycoKernelState storage $ = RoycoKernelStorageLib._getRoycoKernelStorage();
         // Solve for x, rounding in favor of senior protection
         // Compute the total covered assets by the junior tranche loss absorption buffer
         uint256 totalCoveredAssets = _getJuniorTrancheEffectiveNAV().mulDiv(ConstantsLib.WAD, $.coverageWAD, Math.Rounding.Floor);
@@ -519,7 +518,7 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
      */
     function _maxJTWithdrawalGivenCoverage() internal view returns (uint256) {
         // Get the storage pointer to the base kernel state and cache beta and coverage
-        BaseKernelState storage $ = BaseKernelStorageLib._getBaseKernelStorage();
+        RoycoKernelState storage $ = RoycoKernelStorageLib._getRoycoKernelStorage();
         uint256 betaWAD = $.betaWAD;
         uint256 coverageWAD = $.coverageWAD;
         // Solve for y, rounding in favor of senior protection
@@ -555,7 +554,7 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
     /// @dev ST's coverage debt represents ST's economic claim on JT's assets right now
     /// @dev This claim consists of coverage that has been applied and is currently callable by ST LPs (subject to JT liquidity constraints)
     function _getSeniorClaimOnJuniorNAV() internal view returns (uint256) {
-        return BaseKernelStorageLib._getBaseKernelStorage().lastSTCoverageDebt;
+        return RoycoKernelStorageLib._getRoycoKernelStorage().lastSTCoverageDebt;
     }
 
     /// @notice Returns JT's total claim on ST's assets at this point in time

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import { ExecutionModel, IBaseKernel, RequestRedeemSharesBehavior } from "../interfaces/kernel/IBaseKernel.sol";
+import { ExecutionModel, IRoycoKernel, RequestRedeemSharesBehavior } from "../interfaces/kernel/IRoycoKernel.sol";
 import { TrancheType } from "./Types.sol";
 
 /// @notice Storage state for Royco Tranche contracts
@@ -58,14 +58,14 @@ library RoycoTrancheStorageLib {
         $.kernel = _kernel;
         $.marketId = _marketId;
         $.decimalsOffset = _decimalsOffset;
-        $.REQUEST_REDEEM_SHARES_ST_BEHAVIOR = IBaseKernel(_kernel).ST_REQUEST_REDEEM_SHARES_BEHAVIOR();
-        $.REQUEST_REDEEM_SHARES_JT_BEHAVIOR = IBaseKernel(_kernel).JT_REQUEST_REDEEM_SHARES_BEHAVIOR();
+        $.REQUEST_REDEEM_SHARES_ST_BEHAVIOR = IRoycoKernel(_kernel).ST_REQUEST_REDEEM_SHARES_BEHAVIOR();
+        $.REQUEST_REDEEM_SHARES_JT_BEHAVIOR = IRoycoKernel(_kernel).JT_REQUEST_REDEEM_SHARES_BEHAVIOR();
         if (_trancheType == TrancheType.SENIOR) {
-            $.DEPOSIT_EXECUTION_MODEL = IBaseKernel(_kernel).ST_DEPOSIT_EXECUTION_MODEL();
-            $.WITHDRAW_EXECUTION_MODEL = IBaseKernel(_kernel).ST_WITHDRAWAL_EXECUTION_MODEL();
+            $.DEPOSIT_EXECUTION_MODEL = IRoycoKernel(_kernel).ST_DEPOSIT_EXECUTION_MODEL();
+            $.WITHDRAW_EXECUTION_MODEL = IRoycoKernel(_kernel).ST_WITHDRAWAL_EXECUTION_MODEL();
         } else {
-            $.DEPOSIT_EXECUTION_MODEL = IBaseKernel(_kernel).JT_DEPOSIT_EXECUTION_MODEL();
-            $.WITHDRAW_EXECUTION_MODEL = IBaseKernel(_kernel).JT_WITHDRAWAL_EXECUTION_MODEL();
+            $.DEPOSIT_EXECUTION_MODEL = IRoycoKernel(_kernel).JT_DEPOSIT_EXECUTION_MODEL();
+            $.WITHDRAW_EXECUTION_MODEL = IRoycoKernel(_kernel).JT_WITHDRAWAL_EXECUTION_MODEL();
         }
     }
 }
