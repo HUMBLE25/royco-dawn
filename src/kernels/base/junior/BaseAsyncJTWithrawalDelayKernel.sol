@@ -6,6 +6,7 @@ import { RoycoAuth } from "../../../auth/RoycoAuth.sol";
 import { RoycoRoles } from "../../../auth/RoycoRoles.sol";
 import { IAsyncJTWithdrawalKernel } from "../../../interfaces/kernel/IAsyncJTWithdrawalKernel.sol";
 import { IBaseKernel } from "../../../interfaces/kernel/IBaseKernel.sol";
+import { RequestRedeemSharesBehavior } from "../../../libraries/Types.sol";
 import { BaseKernel } from "../BaseKernel.sol";
 
 /// @title BaseAsyncJTWithrawalDelayKernel
@@ -15,6 +16,8 @@ abstract contract BaseAsyncJTWithrawalDelayKernel is IAsyncJTWithdrawalKernel, I
 
     // keccak256(abi.encode(uint256(keccak256("Royco.storage.BaseAsyncJTWithdrawalDelayKernel")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant BaseAsyncJTWithdrawalDelayKernelStorageLocation = 0xb5c6c83047900617b0d8e0a777db642d7504e41a6e0a65096bced63526c1bf00;
+
+    RequestRedeemSharesBehavior public constant JT_REQUEST_REDEEM_SHARES_BEHAVIOR = RequestRedeemSharesBehavior.BURN_ON_REDEEM;
 
     /// @dev Emitted when the withdrawal delay is updated
     event WithdrawalDelayUpdated(uint256 withdrawalDelaySeconds);

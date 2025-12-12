@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import { ExecutionModel, IBaseKernel } from "../interfaces/kernel/IBaseKernel.sol";
+import { ExecutionModel, IBaseKernel, RequestRedeemSharesBehavior } from "../interfaces/kernel/IBaseKernel.sol";
 import { TrancheType } from "./Types.sol";
 
 /// @notice Storage state for Royco Tranche contracts
@@ -12,6 +12,8 @@ import { TrancheType } from "./Types.sol";
 /// @custom:field decimalsOffset - Decimals offset for share token precision
 /// @custom:field DEPOSIT_EXECUTION_MODEL - The kernel execution model for deposit operations
 /// @custom:field WITHDRAW_EXECUTION_MODEL - The kernel execution model for withdrawal operations
+/// @custom:field REQUEST_REDEEM_SHARES_ST_BEHAVIOR - The behavior of the shares when a redeem request is made for the senior tranche
+/// @custom:field REQUEST_REDEEM_SHARES_JT_BEHAVIOR - The behavior of the shares when a redeem request is made for the junior tranche
 /// @custom:field isOperator - Nested mapping tracking operator approvals for owners
 struct RoycoTrancheState {
     address royco;
@@ -20,6 +22,8 @@ struct RoycoTrancheState {
     uint8 decimalsOffset;
     ExecutionModel DEPOSIT_EXECUTION_MODEL;
     ExecutionModel WITHDRAW_EXECUTION_MODEL;
+    RequestRedeemSharesBehavior REQUEST_REDEEM_SHARES_ST_BEHAVIOR;
+    RequestRedeemSharesBehavior REQUEST_REDEEM_SHARES_JT_BEHAVIOR;
     mapping(address owner => mapping(address operator => bool isOperator)) isOperator;
 }
 
@@ -54,6 +58,8 @@ library RoycoTrancheStorageLib {
         $.kernel = _kernel;
         $.marketId = _marketId;
         $.decimalsOffset = _decimalsOffset;
+        $.REQUEST_REDEEM_SHARES_ST_BEHAVIOR = IBaseKernel(_kernel).ST_REQUEST_REDEEM_SHARES_BEHAVIOR();
+        $.REQUEST_REDEEM_SHARES_JT_BEHAVIOR = IBaseKernel(_kernel).JT_REQUEST_REDEEM_SHARES_BEHAVIOR();
         if (_trancheType == TrancheType.SENIOR) {
             $.DEPOSIT_EXECUTION_MODEL = IBaseKernel(_kernel).ST_DEPOSIT_EXECUTION_MODEL();
             $.WITHDRAW_EXECUTION_MODEL = IBaseKernel(_kernel).ST_WITHDRAWAL_EXECUTION_MODEL();

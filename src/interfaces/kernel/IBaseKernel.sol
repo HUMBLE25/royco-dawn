@@ -1,22 +1,16 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-/**
- * @title ExecutionModel
- * @dev Defines the execution semantics for the deposit or withdrawal flow of a vault
- * @custom:type SYNC Refers to the flow being synchronous (the vault uses ERC4626 for this flow)
- * @custom:type ASYNC Refers to the flow being asynchronous (the vault uses ERC7540 for this flow)
- */
-enum ExecutionModel {
-    SYNC,
-    ASYNC
-}
+import { ExecutionModel, RequestRedeemSharesBehavior } from "../../libraries/Types.sol";
 
 /**
  * @title IBaseKernel
  *
  */
 interface IBaseKernel {
+    function ST_REQUEST_REDEEM_SHARES_BEHAVIOR() external pure returns (RequestRedeemSharesBehavior);
+    function JT_REQUEST_REDEEM_SHARES_BEHAVIOR() external pure returns (RequestRedeemSharesBehavior);
+
     function ST_DEPOSIT_EXECUTION_MODEL() external pure returns (ExecutionModel);
     function ST_WITHDRAWAL_EXECUTION_MODEL() external pure returns (ExecutionModel);
 

@@ -15,9 +15,9 @@ import { IAsyncJTDepositKernel } from "../interfaces/kernel/IAsyncJTDepositKerne
 import { IAsyncJTWithdrawalKernel } from "../interfaces/kernel/IAsyncJTWithdrawalKernel.sol";
 import { IAsyncSTDepositKernel } from "../interfaces/kernel/IAsyncSTDepositKernel.sol";
 import { IAsyncSTWithdrawalKernel } from "../interfaces/kernel/IAsyncSTWithdrawalKernel.sol";
-import { ExecutionModel, IBaseKernel } from "../interfaces/kernel/IBaseKernel.sol";
+import { ExecutionModel, IBaseKernel, RequestRedeemSharesBehavior } from "../interfaces/kernel/IBaseKernel.sol";
 import { IERC165, IERC7540, IERC7575, IERC7887, IRoycoTranche } from "../interfaces/tranche/IRoycoTranche.sol";
-import { RoycoTrancheStorageLib } from "../libraries/RoycoTrancheStorageLib.sol";
+import { RoycoTrancheState, RoycoTrancheStorageLib } from "../libraries/RoycoTrancheStorageLib.sol";
 import { TrancheType } from "../libraries/Types.sol";
 import { Action, TrancheDeploymentParams } from "../libraries/Types.sol";
 
@@ -43,7 +43,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
     error ERC4626ZeroDepositAmount();
 
     /// @notice Modifier to ensure the functionality is disabled
-    // forge-lint: disable-next-line(unwrapped-modifier-logic)
+    /// forge-lint: disable-next-item(unwrapped-modifier-logic)
     modifier disabled() {
         revert DISABLED();
         _;
@@ -52,6 +52,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
     /// @notice Modifier to ensure the specified action uses a synchronous execution model
     /// @param _action The action to check (DEPOSIT or WITHDRAW)
     /// @dev Reverts if the execution model for the action is asynchronous
+    /// forge-lint: disable-next-item(unwrapped-modifier-logic)
     modifier executionIsSync(Action _action) {
         require(_isSync(_action), DISABLED());
         _;
@@ -60,6 +61,7 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
     /// @notice Modifier to ensure the specified action uses an asynchronous execution model
     /// @param _action The action to check (DEPOSIT or WITHDRAW)
     /// @dev Reverts if the execution model for the action is synchronous
+    /// forge-lint: disable-next-item(unwrapped-modifier-logic)
     modifier executionIsAsync(Action _action) {
         require(!_isSync(_action), DISABLED());
         _;
@@ -339,9 +341,10 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         virtual
         override(IERC7540)
         executionIsAsync(Action.DEPOSIT)
-        returns (uint256)
+        returns (uint256 pendingAssets)
     {
-        return (TRANCHE_TYPE() == TrancheType.SENIOR
+        pendingAssets =
+        (TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTDepositKernel(_kernel()).stPendingDepositRequest(_requestId, _controller)
                 : IAsyncJTDepositKernel(_kernel()).jtPendingDepositRequest(_requestId, _controller));
     }
@@ -385,15 +388,21 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
         if (msg.sender != _owner && !RoycoTrancheStorageLib._getRoycoTrancheStorage().isOperator[_owner][msg.sender]) {
             _spendAllowance(_owner, msg.sender, _shares);
         }
-        // Transfer and lock the requested shares being redeemed from the owner to the tranche
-        /// @dev Don't burn the shares so that total supply remains unchanged while this request is unclaimed
-        _transfer(_owner, address(this), _shares);
 
         // Queue the redemption request and get the request ID from the kernel
         requestId =
         (TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTWithdrawalKernel(_kernel()).stRequestWithdrawal(msg.sender, _shares, totalSupply(), _controller)
                 : IAsyncJTWithdrawalKernel(_kernel()).jtRequestWithdrawal(msg.sender, _shares, totalSupply(), _controller));
+
+        // Handle the shares being redeemed from the owner
+        if (_requestRedeemSharesBehavior() == RequestRedeemSharesBehavior.BURN_ON_REDEEM) {
+            // Transfer and lock the requested shares being redeemed from the owner to the tranche
+            _transfer(_owner, address(this), _shares);
+        } else {
+            // Burn the shares being redeemed from the owner immediately after the request is made
+            _burn(_owner, _shares);
+        }
 
         emit RedeemRequest(_controller, _owner, requestId, msg.sender, _shares);
     }
@@ -639,9 +648,8 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
             if (_caller != _owner) _spendAllowance(_owner, _caller, _shares);
             // Burn the shares being redeemed from the owner
             _burn(_owner, _shares);
-        } else {
+        } else if (_requestRedeemSharesBehavior() == RequestRedeemSharesBehavior.BURN_ON_REDEEM) {
             // No need to spend allowance, that was already done during requestRedeem
-            // If withdrawals are asynchronous, burn the shares that were locked in the tranche on requesting the redemption
             _burn(address(this), _shares);
         }
 
@@ -662,6 +670,12 @@ abstract contract BaseRoycoTranche is IRoycoTranche, RoycoAuth, UUPSUpgradeable,
     /// @inheritdoc ERC4626Upgradeable
     function _decimalsOffset() internal view virtual override(ERC4626Upgradeable) returns (uint8) {
         return RoycoTrancheStorageLib._getRoycoTrancheStorage().decimalsOffset;
+    }
+
+    function _requestRedeemSharesBehavior() internal view virtual returns (RequestRedeemSharesBehavior) {
+        return (TRANCHE_TYPE() == TrancheType.SENIOR
+                ? RoycoTrancheStorageLib._getRoycoTrancheStorage().REQUEST_REDEEM_SHARES_ST_BEHAVIOR
+                : RoycoTrancheStorageLib._getRoycoTrancheStorage().REQUEST_REDEEM_SHARES_JT_BEHAVIOR);
     }
 
     function _kernel() internal view virtual returns (address) {

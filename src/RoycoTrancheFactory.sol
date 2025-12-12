@@ -32,9 +32,9 @@ contract RoycoTrancheFactory {
     event MarketDeployed(address indexed seniorTranche, address indexed juniorTranche, address indexed kernel, bytes32 marketId, address asset, address owner);
 
     /// @notice The implementation address for RoycoST
-    address public immutable roycoSTImplementation;
+    address public immutable ROYCO_ST_IMPLEMENTATION;
     /// @notice The implementation address for RoycoJT
-    address public immutable roycoJTImplementation;
+    address public immutable ROYCO_JT_IMPLEMENTATION;
 
     /// @notice Initializes the factory with tranche implementation addresses
     /// @param _roycoSTImplementation The implementation address for the senior tranche
@@ -42,8 +42,8 @@ contract RoycoTrancheFactory {
     constructor(address _roycoSTImplementation, address _roycoJTImplementation) {
         require(_roycoSTImplementation != address(0), InvalidSTImplementation());
         require(_roycoJTImplementation != address(0), InvalidJTImplementation());
-        roycoSTImplementation = _roycoSTImplementation;
-        roycoJTImplementation = _roycoJTImplementation;
+        ROYCO_ST_IMPLEMENTATION = _roycoSTImplementation;
+        ROYCO_JT_IMPLEMENTATION = _roycoJTImplementation;
     }
 
     /// @notice Deploys a new market with senior tranche, junior tranche, and kernel
@@ -97,10 +97,10 @@ contract RoycoTrancheFactory {
         jtParams.kernel = kernel;
 
         // Deploy senior tranche proxy first
-        seniorTranche = _deployTranche(roycoSTImplementation, abi.encodeCall(RoycoST.initialize, (stParams, _asset, _owner, _pauser, _marketId)));
+        seniorTranche = _deployTranche(ROYCO_ST_IMPLEMENTATION, abi.encodeCall(RoycoST.initialize, (stParams, _asset, _owner, _pauser, _marketId)));
 
         // Deploy junior tranche proxy
-        juniorTranche = _deployTranche(roycoJTImplementation, abi.encodeCall(RoycoJT.initialize, (jtParams, _asset, _owner, _pauser, _marketId)));
+        juniorTranche = _deployTranche(ROYCO_JT_IMPLEMENTATION, abi.encodeCall(RoycoJT.initialize, (jtParams, _asset, _owner, _pauser, _marketId)));
 
         emit MarketDeployed(seniorTranche, juniorTranche, kernel, _marketId, _asset, _owner);
 

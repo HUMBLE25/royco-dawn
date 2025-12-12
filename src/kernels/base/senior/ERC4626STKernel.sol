@@ -7,6 +7,7 @@ import { Math } from "../../../../lib/openzeppelin-contracts/contracts/utils/mat
 import { ExecutionModel, IBaseKernel } from "../../../interfaces/kernel/IBaseKernel.sol";
 import { BaseKernelState, BaseKernelStorageLib, Operation } from "../../../libraries/BaseKernelStorageLib.sol";
 import { ConstantsLib } from "../../../libraries/ConstantsLib.sol";
+import { RequestRedeemSharesBehavior } from "../../../libraries/Types.sol";
 import { ERC4626STKernelStorageLib } from "../../../libraries/kernels/ERC4626STKernelStorageLib.sol";
 import { BaseKernel } from "../BaseKernel.sol";
 
@@ -19,6 +20,9 @@ abstract contract ERC4626STKernel is BaseKernel {
 
     /// @inheritdoc IBaseKernel
     ExecutionModel public constant ST_WITHDRAWAL_EXECUTION_MODEL = ExecutionModel.SYNC;
+
+    /// @inheritdoc IBaseKernel
+    RequestRedeemSharesBehavior public constant ST_REQUEST_REDEEM_SHARES_BEHAVIOR = RequestRedeemSharesBehavior.BURN_ON_REDEEM;
 
     /// @notice Thrown when the ST base asset is different the the ERC4626 vault's base asset
     error TRANCHE_AND_VAULT_ASSET_MISMATCH();

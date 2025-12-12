@@ -82,6 +82,7 @@ abstract contract RoycoAuth is AccessControlEnumerableUpgradeable, Ownable2StepU
     // keccak256(abi.encode(uint256(keccak256("Royco.storage.RoycoAuth")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant RoycoAuthStorageLocation = 0xc6351ca3982f48b7bceb4d41d4ea8768b3c95833ea37fa7955947ef4cfee2d00;
 
+    /// forge-lint: disable-next-item(unwrapped-modifier-logic)
     modifier checkRoleAndDelayIfGated(bytes32 role) {
         if (!_checkRoleAndDelayIfGated(role)) {
             return;
