@@ -363,7 +363,7 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
             yieldDistributed = true;
         }
 
-        // Enforce NAV conservation invariant
+        // Enforce the NAV conservation invariant
         require(stRawNAV + jtRawNAV == stEffectiveNAV + jtEffectiveNAV, NAV_CONSERVATION_VIOLATION());
     }
 
@@ -444,9 +444,18 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
                     uint256 coverageRealized = uint256(-deltaJT);
                     $.lastSTEffectiveNAV = Math.saturatingSub($.lastSTEffectiveNAV, (uint256(-deltaST) + coverageRealized));
                     /// We need to adjust debts by accounting for the realized coverage
-                    // Coverage being realized means that
-                    uint256 stCoverageDebtErased = Math.min(coverageRealized, $.lastSTCoverageDebt);
-                    if (stCoverageDebtErased != 0) $.lastSTCoverageDebt -= stCoverageDebtErased;
+                    // Coverage being realized means that debts needs to proportionally decrease
+                    // Compute the percentage of pre-op coverage remaining after this realization
+                    uint256 percentageCoverageRemainingWAD =
+                        ConstantsLib.WAD - coverageRealized.mulDiv(ConstantsLib.WAD, _getSeniorClaimOnJuniorNAV(), Math.Rounding.Floor);
+                    // Scale down ST's coverage liability to JT by the remaining fraction of ST's coverage claim
+                    // The withdrawing senior LP has realized its proportional share of past covered losses
+                    // The realized portion has been effectively settled by the exiting senior LP
+                    $.lastSTCoverageDebt = $.lastSTCoverageDebt.mulDiv(percentageCoverageRemainingWAD, ConstantsLib.WAD, Math.Rounding.Floor);
+                    // Scale down JT's recovery liability to ST by the same remaining fraction
+                    // The withdrawing senior LP has realized its proportional share of past uncovered losses and associated recovery optionality
+                    // Thus, the JT debt to ST should shrink in line with the reduced senior exposure
+                    $.lastJTCoverageDebt = $.lastJTCoverageDebt.mulDiv(percentageCoverageRemainingWAD, ConstantsLib.WAD, Math.Rounding.Floor);
                 } else {
                     // Apply the withdrawal to the senior tranche's effective NAV
                     $.lastSTEffectiveNAV = Math.saturatingSub($.lastSTEffectiveNAV, uint256(-deltaST));
@@ -454,9 +463,8 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
             } else if (_op == Operation.JT_WITHDRAW) {
                 // JT withdrawals must decrease JT NAV and leave ST NAV decreased or unchanged (yield claiming)
                 require(deltaJT < 0 && deltaST <= 0, INVALID_POST_OP_STATE(_op));
-                // Junior withdrew: The NAV deltas include the discrete withdrawal amount in addition to any yield pulled from ST to JT
-                // If the withdrawal used ST capital to claim yield when facilitating this JT withdrawal
-                // If ST delta was negative, the actual amount withdrawn by JT was the delta in JT raw NAV and the yield claimed from ST
+                // Junior withdrew: The NAV deltas include the discrete withdrawal amount in addition to any assets (yield + debt repayments) pulled from ST to JT
+                // If ST delta was negative, the actual amount withdrawn by JT was the delta in JT raw NAV and the assets claimed from ST
                 if (deltaST < 0) $.lastJTEffectiveNAV = Math.saturatingSub($.lastJTEffectiveNAV, (uint256(-deltaJT) + uint256(-deltaST)));
                 // Apply the pure withdrawal to the junior tranche's effective NAV
                 else $.lastJTEffectiveNAV = Math.saturatingSub($.lastJTEffectiveNAV, uint256(-deltaJT));
@@ -482,7 +490,7 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
     function _enforceCoverage() internal view {
         // Get the storage pointer to the base kernel state
         BaseKernelState storage $ = BaseKernelStorageLib._getBaseKernelStorage();
-        // Compute the utilization and enforce that the senior tranche is properly collateralized
+        // Compute the utilization and enforce that the senior tranche is properly collateralized based on persisted NAVs
         uint256 utilization = UtilsLib.computeUtilization($.lastSTRawNAV, $.lastJTRawNAV, $.betaWAD, $.coverageWAD, $.lastJTEffectiveNAV);
         require(ConstantsLib.WAD >= utilization, INSUFFICIENT_COVERAGE());
     }
@@ -533,31 +541,33 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
         return surplusJTAssets.mulDiv(ConstantsLib.WAD, coverageRetentionWAD, Math.Rounding.Floor);
     }
 
-    function _computeFractionOfTotalAssetsAllocatedWAD(uint256 _assets, uint256 _totalAssets) internal pure virtual returns (uint256) {
+    function _computeFractionOfTotalAssetsAllocatedWAD(uint256 _assets, uint256 _totalAssets) internal pure returns (uint256) {
         return _assets.mulDiv(ConstantsLib.WAD, _totalAssets + 1, Math.Rounding.Floor);
     }
 
     /// @notice Returns the effective net asset value of the senior tranche
     /// @dev Includes applied coverage, ST yield distribution, and uncovered losses
-    function _getSeniorTrancheEffectiveNAV() internal view virtual returns (uint256 stEffectiveNAV) {
+    function _getSeniorTrancheEffectiveNAV() internal view returns (uint256 stEffectiveNAV) {
         (,, stEffectiveNAV,,,,) = _previewEffectiveNAVs(_previewJTYieldShareAccrual());
     }
 
     /// @notice Returns the effective net asset value of the junior tranche
     /// @dev Includes provided coverage, JT yield, ST yield distribution, and JT losses
-    function _getJuniorTrancheEffectiveNAV() internal view virtual returns (uint256 jtEffectiveNAV) {
+    function _getJuniorTrancheEffectiveNAV() internal view returns (uint256 jtEffectiveNAV) {
         (,,, jtEffectiveNAV,,,) = _previewEffectiveNAVs(_previewJTYieldShareAccrual());
     }
 
-    /// @notice Returns the ST's total claim on JT's assets at this point in time
-    /// @dev ST's coverage debt is indicative of coverage that has been applied from JT to ST and is currently callable by ST LPs
-    function _getSeniorClaimOnJuniorNAV() internal view virtual returns (uint256) {
+    /// @notice Returns ST's total claim on JT's assets at this point in time
+    /// @dev ST's coverage debt represents ST's economic claim on JT's assets right now
+    /// @dev This claim consists of coverage that has been applied and is currently callable by ST LPs (subject to JT liquidity constraints)
+    function _getSeniorClaimOnJuniorNAV() internal view returns (uint256) {
         return BaseKernelStorageLib._getBaseKernelStorage().lastSTCoverageDebt;
     }
 
-    /// @notice Returns the JT's total claim on ST's assets at this point in time
-    /// @dev Any positive delta between JT's effective and raw NAVs consists of yield and ST coverage debt repayments that is currently callable by JT LPs
-    function _getJuniorClaimOnSeniorNAV() internal view virtual returns (uint256) {
+    /// @notice Returns JT's total claim on ST's assets at this point in time
+    /// @dev Any positive delta between JT's effective and raw NAVs represents JT's economic claim on ST's assets right now
+    /// @dev This claim consists of ST yield distribution to JT and ST coverage debt repayments that are currently callable by JT LPs (subject to ST liquidity constraints)
+    function _getJuniorClaimOnSeniorNAV() internal view returns (uint256) {
         return Math.saturatingSub(_getJuniorTrancheEffectiveNAV(), _getJuniorTrancheRawNAV());
     }
 
@@ -610,18 +620,18 @@ abstract contract BaseKernel is Initializable, IBaseKernel, UUPSUpgradeable, Roy
     /**
      * @notice Covers senior tranche losses from the junior tranche's controlled assets
      * @param _asset The asset to cover losses in
-     * @param _coverageAssets The assets provided by JT to ST as loss coverage
-     * @param _receiver The receiver of the coverage assets
+     * @param _assets The assets to claim
+     * @param _receiver The receiver of the assets
      */
-    function _coverSTLossesFromJT(address _asset, uint256 _coverageAssets, address _receiver) internal virtual;
+    function _claimSeniorAssetsFromJunior(address _asset, uint256 _assets, address _receiver) internal virtual;
 
     /**
-     * @notice Claims junior tranche yield from the senior tranche's controlled assets
-     * @param _asset The asset to claim yield in
-     * @param _yieldAssets The assets to claim as yield
-     * @param _receiver The receiver of the yield assets
+     * @notice Claims junior tranche yield and debt repayment from the senior tranche's controlled assets
+     * @param _asset The asset to claim yield and debt repayment in
+     * @param _assets The assets to claim
+     * @param _receiver The receiver of the assets
      */
-    function _claimJTYieldFromST(address _asset, uint256 _yieldAssets, address _receiver) internal virtual;
+    function _claimJuniorAssetsFromSenior(address _asset, uint256 _assets, address _receiver) internal virtual;
 
     /// @inheritdoc UUPSUpgradeable
     /// @dev Will revert if the caller is not the upgrader role

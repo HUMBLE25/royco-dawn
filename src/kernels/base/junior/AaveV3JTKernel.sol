@@ -86,23 +86,20 @@ abstract contract AaveV3JTKernel is BaseKernel, BaseAsyncJTRedemptionDelayKernel
         returns (uint256 assetsWithdrawn)
     {
         require(_shares <= _jtClaimableRedeemRequest(_controller), INSUFFICIENT_CLAIMABLE_SHARES(_shares, _jtClaimableRedeemRequest(_controller)));
-        BaseKernelState storage $ = BaseKernelStorageLib._getBaseKernelStorage();
-
         // Calculate the value of the shares to claim and update the controller's redemption request
         assetsWithdrawn = _processClaimableRedeemRequest(_controller, _shares, _totalShares);
 
-        // Compute the yield to claim from the ST
-        uint256 yieldToClaim = _shares.mulDiv(Math.saturatingSub($.lastJTEffectiveNAV, $.lastJTRawNAV), _totalShares, Math.Rounding.Floor);
-        // Pull any yield that needs to be realized from ST
-        if (yieldToClaim != 0) _claimJTYieldFromST(_asset, yieldToClaim, _receiver);
+        // Compute and claim the assets that need to be pulled from ST for this withdrawal
+        uint256 stAssetsToWithdraw = _shares.mulDiv(_getJuniorClaimOnSeniorNAV(), _totalShares, Math.Rounding.Floor);
+        if (stAssetsToWithdraw != 0) _claimJuniorAssetsFromSenior(_asset, stAssetsToWithdraw, _receiver);
 
         // Facilitate the remainder of the withdrawal from JT exposure
-        IPool(AaveV3KernelStorageLib._getAaveV3KernelStorage().pool).withdraw(_asset, (assetsWithdrawn - yieldToClaim), _receiver);
+        IPool(AaveV3KernelStorageLib._getAaveV3KernelStorage().pool).withdraw(_asset, (assetsWithdrawn - stAssetsToWithdraw), _receiver);
     }
 
     /// @inheritdoc BaseKernel
-    function _coverSTLossesFromJT(address _asset, uint256 _coverageAssets, address _receiver) internal override(BaseKernel) {
-        IPool(AaveV3KernelStorageLib._getAaveV3KernelStorage().pool).withdraw(_asset, _coverageAssets, _receiver);
+    function _claimSeniorAssetsFromJunior(address _asset, uint256 _assets, address _receiver) internal override(BaseKernel) {
+        IPool(AaveV3KernelStorageLib._getAaveV3KernelStorage().pool).withdraw(_asset, _assets, _receiver);
     }
 
     /// @inheritdoc BaseKernel

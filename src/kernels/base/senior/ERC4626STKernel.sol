@@ -96,14 +96,12 @@ abstract contract ERC4626STKernel is BaseKernel {
         // Compute the assets expected to be received on withdrawal based on the ST's effective NAV
         assetsWithdrawn = _shares.mulDiv($.lastSTEffectiveNAV, _totalShares, Math.Rounding.Floor);
 
-        // Compute the coverage that needs to pulled from JT for this withdrawal
-        uint256 coverageToRealize = _shares.mulDiv(BaseKernelStorageLib._getBaseKernelStorage().lastSTCoverageDebt, _totalShares, Math.Rounding.Floor);
-        coverageToRealize = Math.min(coverageToRealize, _getJuniorTrancheRawNAV());
-        // Pull any coverge that needs to be realized from JT
-        if (coverageToRealize != 0) _coverSTLossesFromJT(_asset, coverageToRealize, _receiver);
+        // Compute and claim the assets that need to pulled from JT for this withdrawal
+        uint256 jtAssetsToWithdraw = _shares.mulDiv(_getSeniorClaimOnJuniorNAV(), _totalShares, Math.Rounding.Floor);
+        if (jtAssetsToWithdraw != 0) _claimSeniorAssetsFromJunior(_asset, jtAssetsToWithdraw, _receiver);
 
         // Facilitate the remainder of the withdrawal from ST exposure
-        IERC4626(ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault).withdraw((assetsWithdrawn - coverageToRealize), _receiver, address(this));
+        IERC4626(ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault).withdraw((assetsWithdrawn - jtAssetsToWithdraw), _receiver, address(this));
     }
 
     /**
@@ -117,8 +115,8 @@ abstract contract ERC4626STKernel is BaseKernel {
     }
 
     /// @inheritdoc BaseKernel
-    function _claimJTYieldFromST(address, uint256 _yieldAssets, address _receiver) internal override(BaseKernel) {
-        IERC4626(ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault).withdraw(_yieldAssets, _receiver, address(this));
+    function _claimJuniorAssetsFromSenior(address, uint256 _assets, address _receiver) internal override(BaseKernel) {
+        IERC4626(ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault).withdraw(_assets, _receiver, address(this));
     }
 
     /// @inheritdoc BaseKernel
