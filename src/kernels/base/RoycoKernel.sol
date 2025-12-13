@@ -287,11 +287,11 @@ abstract contract RoycoKernel is IRoycoKernel, UUPSUpgradeable, RoycoAuth {
             /// @dev STEP_ST_INCURS_RESIDUAL_LOSSES: Residual loss after emptying JT's remaning loss-absorption buffer are incurred by ST
             if (jtLoss != 0) {
                 // The excess loss is absorbed by ST
-                stEffectiveNAV = Math.saturatingSub(stEffectiveNAV, jtLoss);
+                stEffectiveNAV -= jtLoss;
                 // Repay ST debt to JT
                 // This is equivalent to retroactively reducing previously applied coverage
                 // Thus, the liability is flipped to JT debt to ST
-                stCoverageDebt = Math.saturatingSub(stCoverageDebt, jtLoss);
+                stCoverageDebt -= jtLoss;
                 jtCoverageDebt += jtLoss;
             }
             /// @dev STEP_APPLY_JT_GAIN: The JT assets appreciated in value
@@ -336,7 +336,8 @@ abstract contract RoycoKernel is IRoycoKernel, UUPSUpgradeable, RoycoAuth {
             /// @dev STEP_ST_INCURS_RESIDUAL_LOSSES: Apply any uncovered losses by JT to ST
             uint256 netStLoss = stLoss - coverageApplied;
             if (netStLoss != 0) {
-                stEffectiveNAV = Math.saturatingSub(stEffectiveNAV, netStLoss);
+                // Apply residual losses to ST
+                stEffectiveNAV -= netStLoss;
                 // The uncovered portion of the ST loss is a JT liability to ST
                 jtCoverageDebt += netStLoss;
             }
@@ -466,23 +467,25 @@ abstract contract RoycoKernel is IRoycoKernel, UUPSUpgradeable, RoycoAuth {
                 if (deltaJT < 0) {
                     // The actual amount withdrawn was the delta in ST raw NAV and the coverage applied from JT
                     uint256 coverageRealized = uint256(-deltaJT);
-                    $.lastSTEffectiveNAV = Math.saturatingSub(preWithdrawalSTEffectiveNAV, (uint256(-deltaST) + coverageRealized));
+                    $.lastSTEffectiveNAV = preWithdrawalSTEffectiveNAV - (uint256(-deltaST) + coverageRealized);
                     // The withdrawing senior LP has realized its proportional share of past covered losses, settling the realized portion between JT and ST
                     $.lastSTCoverageDebt -= coverageRealized;
                 } else {
                     // Apply the withdrawal to the senior tranche's effective NAV
-                    $.lastSTEffectiveNAV = Math.saturatingSub(preWithdrawalSTEffectiveNAV, uint256(-deltaST));
+                    $.lastSTEffectiveNAV = preWithdrawalSTEffectiveNAV - uint256(-deltaST);
                 }
                 // The withdrawing senior LP has realized its proportional share of past uncovered losses and associated recovery optionality
-                $.lastJTCoverageDebt = $.lastJTCoverageDebt.mulDiv($.lastSTEffectiveNAV, preWithdrawalSTEffectiveNAV, Math.Rounding.Ceil); // Round in favor of senior
+                // Round in favor of senior
+                $.lastJTCoverageDebt = $.lastJTCoverageDebt.mulDiv($.lastSTEffectiveNAV, preWithdrawalSTEffectiveNAV, Math.Rounding.Ceil);
             } else if (_op == Operation.JT_WITHDRAW) {
                 // JT withdrawals must decrease JT NAV and leave ST NAV decreased or unchanged (yield claiming)
                 require(deltaJT < 0 && deltaST <= 0, INVALID_POST_OP_STATE(_op));
                 // Junior withdrew: The NAV deltas include the discrete withdrawal amount in addition to any assets (yield + debt repayments) pulled from ST to JT
+                // JT LPs cannot settle debts on withdrawal since they don't have discretion on when coverage applied to ST (stCoverageDebt) and uncovered ST losses (jtCoverageDebt) can be realized
                 // If ST delta was negative, the actual amount withdrawn by JT was the delta in JT raw NAV and the assets claimed from ST
-                if (deltaST < 0) $.lastJTEffectiveNAV = Math.saturatingSub($.lastJTEffectiveNAV, (uint256(-deltaJT) + uint256(-deltaST)));
+                if (deltaST < 0) $.lastJTEffectiveNAV -= (uint256(-deltaJT) + uint256(-deltaST));
                 // Apply the pure withdrawal to the junior tranche's effective NAV
-                else $.lastJTEffectiveNAV = Math.saturatingSub($.lastJTEffectiveNAV, uint256(-deltaJT));
+                else $.lastJTEffectiveNAV -= uint256(-deltaJT);
             }
         }
         // Enforce the NAV conservation invariant
@@ -551,7 +554,7 @@ abstract contract RoycoKernel is IRoycoKernel, UUPSUpgradeable, RoycoAuth {
         // Compute the minimum junior tranche assets required to cover the exposure as per the market's coverage requirement
         uint256 requiredJTAssets = totalCoveredExposure.mulDiv(coverageWAD, ConstantsLib.WAD, Math.Rounding.Ceil);
         // Compute the surplus coverage currently provided by the junior tranche based on its currently remaining loss-absorption buffer
-        uint256 surplusJTAssets = _getJuniorTrancheEffectiveNAV().saturatingSub(requiredJTAssets);
+        uint256 surplusJTAssets = Math.saturatingSub(_getJuniorTrancheEffectiveNAV(), requiredJTAssets);
         // Compute how much coverage the system retains per 1 unit of JT assets withdrawn scaled by WAD
         uint256 coverageRetentionWAD = ConstantsLib.WAD - betaWAD.mulDiv(coverageWAD, ConstantsLib.WAD, Math.Rounding.Floor);
         // Return how much of the surplus can be withdrawn while satisfying the coverage requirement
