@@ -135,8 +135,8 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoAuth, UUPSUpgrad
     }
 
     /// @inheritdoc IRoycoVaultTranche
-    function getNAV() public view override(IRoycoVaultTranche) returns (uint256) {
-        return (TRANCHE_TYPE() == TrancheType.SENIOR ? IRoycoKernel(_kernel()).getSTEffectiveNAV() : IRoycoKernel(_kernel()).getJTEffectiveNAV());
+    function getRawNAV() public view override(IRoycoVaultTranche) returns (uint256) {
+        return (TRANCHE_TYPE() == TrancheType.SENIOR ? IRoycoKernel(_kernel()).getSTRawNAV() : IRoycoKernel(_kernel()).getJTRawNAV());
     }
 
     /// @inheritdoc ERC4626Upgradeable
@@ -667,6 +667,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoAuth, UUPSUpgrad
         onlyRole(RoycoRoles.ROYCO_KERNEL)
     {
         // Compute the shares to be minted to the protocol fee recipient to satisfy the ratio of total assets that the fee represents
+        // Subtract fee assets from total tranche assets because fees are included in total tranche assets
         // Round in favor of the tranche
         uint256 protocolFeeSharesToMint = _convertToShares(_protocolFeeAssets, totalSupply(), (_totalTrancheAssets - _protocolFeeAssets), Math.Rounding.Floor);
         _mint(_protocolFeeRecipient, protocolFeeSharesToMint);

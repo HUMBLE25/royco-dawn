@@ -461,20 +461,20 @@ abstract contract RoycoKernel is IRoycoKernel, UUPSUpgradeable, RoycoAuth {
                 require((deltaST < 0 && deltaJT <= 0) || (deltaST == 0 && deltaJT < 0), INVALID_POST_OP_STATE(_op));
                 // Senior withdrew: The NAV deltas include the discrete withdrawal amount in addition to any coverage pulled from JT to ST
                 // If the withdrawal used JT capital as coverage to facilitate this ST withdrawal
+                uint256 preWithdrawalSTEffectiveNAV = $.lastSTEffectiveNAV;
                 if (deltaJT < 0) {
                     // The actual amount withdrawn was the delta in ST raw NAV and the coverage applied from JT
                     uint256 coverageRealized = uint256(-deltaJT);
-                    $.lastSTEffectiveNAV = Math.saturatingSub($.lastSTEffectiveNAV, (uint256(-deltaST) + coverageRealized));
-                    // We need to adjust debts by accounting for the realized coverage as settling debts
-                    // For JT Coverage Debt: The withdrawing senior LP has realized its proportional share of past uncovered losses and associated recovery optionality
-                    uint256 totalCoverageClaim = _getSeniorClaimOnJuniorNAV();
-                    $.lastJTCoverageDebt = $.lastJTCoverageDebt.mulDiv((totalCoverageClaim - coverageRealized), totalCoverageClaim, Math.Rounding.Ceil); // Round in favor of senior
-                    // For ST Coverage Debt: The withdrawing senior LP has realized its proportional share of past covered losses, settling the realized portion between JT and ST
+                    $.lastSTEffectiveNAV = Math.saturatingSub(preWithdrawalSTEffectiveNAV, (uint256(-deltaST) + coverageRealized));
+                    // The withdrawing senior LP has realized its proportional share of past covered losses, settling the realized portion between JT and ST
                     $.lastSTCoverageDebt -= coverageRealized;
                 } else {
                     // Apply the withdrawal to the senior tranche's effective NAV
-                    $.lastSTEffectiveNAV = Math.saturatingSub($.lastSTEffectiveNAV, uint256(-deltaST));
+                    $.lastSTEffectiveNAV = Math.saturatingSub(preWithdrawalSTEffectiveNAV, uint256(-deltaST));
                 }
+                // The withdrawing senior LP has realized its proportional share of past uncovered losses and associated recovery optionality
+                $.lastJTCoverageDebt =
+                    $.lastJTCoverageDebt.mulDiv((preWithdrawalSTEffectiveNAV - $.lastSTEffectiveNAV), preWithdrawalSTEffectiveNAV, Math.Rounding.Ceil); // Round in favor of senior
             } else if (_op == Operation.JT_WITHDRAW) {
                 // JT withdrawals must decrease JT NAV and leave ST NAV decreased or unchanged (yield claiming)
                 require(deltaJT < 0 && deltaST <= 0, INVALID_POST_OP_STATE(_op));

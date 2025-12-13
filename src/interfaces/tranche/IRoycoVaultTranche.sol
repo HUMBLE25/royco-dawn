@@ -7,9 +7,9 @@ import { IERC7575 } from "./IERC7575.sol";
 import { IERC7887 } from "./IERC7887.sol";
 
 interface IRoycoVaultTranche is IERC165, IERC7540, IERC7575, IERC7887 {
-    /// @notice Returns the net asset value controlled by the tranche
+    /// @notice Returns the net asset value of the tranche's invested assets
     /// @dev The NAV is expressed in the tranche's base asset
-    function getNAV() external view returns (uint256);
+    function getRawNAV() external view returns (uint256);
 
     /**
      * @notice Mints tranche shares to the protocol fee recipient, representing ownership over the fee assets of the tranche
