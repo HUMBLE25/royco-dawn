@@ -476,7 +476,8 @@ abstract contract RoycoKernel is IRoycoKernel, UUPSUpgradeable, RoycoAuth {
                 }
                 // The withdrawing senior LP has realized its proportional share of past uncovered losses and associated recovery optionality
                 // Round in favor of senior
-                $.lastJTCoverageDebt = $.lastJTCoverageDebt.mulDiv($.lastSTEffectiveNAV, preWithdrawalSTEffectiveNAV, Math.Rounding.Ceil);
+                uint256 jtCoverageDebt = $.lastJTCoverageDebt;
+                if (jtCoverageDebt != 0) $.lastJTCoverageDebt = jtCoverageDebt.mulDiv($.lastSTEffectiveNAV, preWithdrawalSTEffectiveNAV, Math.Rounding.Ceil);
             } else if (_op == Operation.JT_WITHDRAW) {
                 // JT withdrawals must decrease JT NAV and leave ST NAV decreased or unchanged (yield claiming)
                 require(deltaJT < 0 && deltaST <= 0, INVALID_POST_OP_STATE(_op));
