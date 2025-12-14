@@ -200,36 +200,36 @@ abstract contract RoycoKernel is IRoycoKernel, UUPSUpgradeable, RoycoAuth {
         uint256 twJTYieldShareAccruedWAD = $.twJTYieldShareAccruedWAD = _previewJTYieldShareAccrual();
         $.lastAccrualTimestamp = uint32(block.timestamp);
 
-        // Preview the new NAVs of each tranche based on PNL(s) of the underlying investment(s)
+        // Preview the new NAVs and protocol fees accrued for each tranche based on PNL(s) of the underlying investment(s)
         uint256 stCoverageDebt;
         uint256 jtCoverageDebt;
         uint256 stProtocolFeeTaken;
         uint256 jtProtocolFeeTaken;
-        (stRawNAV, jtRawNAV, stEffectiveNAV, jtEffectiveNAV, stCoverageDebt, jtCoverageDebt, stProtocolFeeTaken, jtProtocolFeeTaken) =
+        bool yieldDistributed;
+        (stRawNAV, jtRawNAV, stEffectiveNAV, jtEffectiveNAV, stCoverageDebt, jtCoverageDebt, stProtocolFeeTaken, jtProtocolFeeTaken, yieldDistributed) =
             _previewEffectiveNAVs(twJTYieldShareAccruedWAD);
 
-        // If ST yield was distributed:
-        // 1. Reset the accumulator and update the last yield distribution timestamp
-        // 2. Mint protocol fee shares to protocol fee recipient
-        address protocolFeeRecipient = $.protocolFeeRecipient;
-        if (stProtocolFeeTaken > 0) {
+        // ST yield was split between ST and JT
+        if (yieldDistributed) {
+            // Reset the accumulator and update the last yield distribution timestamp
             delete $.twJTYieldShareAccruedWAD;
             $.lastDistributionTimestamp = uint32(block.timestamp);
-            IRoycoVaultTranche($.seniorTranche).mintProtocolFeeShares(stProtocolFeeTaken, stEffectiveNAV, protocolFeeRecipient);
         }
 
-        // If JT yield was distributed, mint protocol fee shares to protocol fee recipient
-        if (jtProtocolFeeTaken > 0) {
-            IRoycoVaultTranche($.juniorTranche).mintProtocolFeeShares(jtProtocolFeeTaken, jtEffectiveNAV, protocolFeeRecipient);
-        }
-
-        // Checkpoint the computed NAVs
+        // Checkpoint the mark to market NAVs and debts
         $.lastSTRawNAV = stRawNAV;
         $.lastJTRawNAV = jtRawNAV;
         $.lastSTEffectiveNAV = stEffectiveNAV;
         $.lastJTEffectiveNAV = jtEffectiveNAV;
         $.lastSTCoverageDebt = stCoverageDebt;
         $.lastJTCoverageDebt = jtCoverageDebt;
+
+        // Collect protocol fees
+        address protocolFeeRecipient = $.protocolFeeRecipient;
+        // If ST yield was distributed, Mint ST protocol fee shares to the protocol fee recipient
+        if (stProtocolFeeTaken > 0) IRoycoVaultTranche($.seniorTranche).mintProtocolFeeShares(stProtocolFeeTaken, stEffectiveNAV, protocolFeeRecipient);
+        // If JT yield was distributed, Mint JT protocol fee shares to the protocol fee recipient
+        if (jtProtocolFeeTaken > 0) IRoycoVaultTranche($.juniorTranche).mintProtocolFeeShares(jtProtocolFeeTaken, jtEffectiveNAV, protocolFeeRecipient);
     }
 
     /**
@@ -244,6 +244,7 @@ abstract contract RoycoKernel is IRoycoKernel, UUPSUpgradeable, RoycoAuth {
      * @return jtCoverageDebt The losses that ST incurred after exhausting the JT loss-absorption buffer: represents the first claim on capital the senior tranche has on future recoveries
      * @return stProtocolFeeTaken The protocol fee taken on ST yield on this sync
      * @return jtProtocolFeeTaken The protocol fee taken on JT yield on this sync
+     * @return yieldDistributed A boolean indicating whether ST yield was split between ST and JT
      */
     function _previewEffectiveNAVs(uint256 _twJTYieldShareAccruedWAD)
         internal
@@ -256,7 +257,8 @@ abstract contract RoycoKernel is IRoycoKernel, UUPSUpgradeable, RoycoAuth {
             uint256 stCoverageDebt,
             uint256 jtCoverageDebt,
             uint256 stProtocolFeeTaken,
-            uint256 jtProtocolFeeTaken
+            uint256 jtProtocolFeeTaken,
+            bool yieldDistributed
         )
     {
         // Get the storage pointer to the base kernel state
@@ -279,7 +281,7 @@ abstract contract RoycoKernel is IRoycoKernel, UUPSUpgradeable, RoycoAuth {
             uint256 jtLoss = uint256(-deltaJT);
             uint256 jtAbsorbableLoss = Math.min(jtLoss, jtEffectiveNAV);
             if (jtAbsorbableLoss != 0) {
-                // Incure the maximum absorbable losses to remaining JT loss capital
+                // Incur the maximum absorbable losses to remaining JT loss capital
                 jtEffectiveNAV -= jtAbsorbableLoss;
                 // Reduce the residual JT loss by the loss absorbed
                 jtLoss -= jtAbsorbableLoss;
@@ -380,6 +382,7 @@ abstract contract RoycoKernel is IRoycoKernel, UUPSUpgradeable, RoycoAuth {
                         jtEffectiveNAV += jtGain;
                         stGain -= jtGain;
                     }
+                    yieldDistributed = true;
                 }
                 // Compute the protocol fee taken on this ST yield accrual (will be used to mint shares to the protocol fee recipient) at the updated JT effective NAV
                 stProtocolFeeTaken = stGain.mulDiv(protocolFeeWAD, ConstantsLib.WAD, Math.Rounding.Floor);
@@ -569,13 +572,13 @@ abstract contract RoycoKernel is IRoycoKernel, UUPSUpgradeable, RoycoAuth {
     /// @notice Returns the effective net asset value of the senior tranche
     /// @dev Includes applied coverage, ST yield distribution, and uncovered losses
     function _getSeniorTrancheEffectiveNAV() internal view returns (uint256 stEffectiveNAV) {
-        (,, stEffectiveNAV,,,,,) = _previewEffectiveNAVs(_previewJTYieldShareAccrual());
+        (,, stEffectiveNAV,,,,,,) = _previewEffectiveNAVs(_previewJTYieldShareAccrual());
     }
 
     /// @notice Returns the effective net asset value of the junior tranche
     /// @dev Includes provided coverage, JT yield, ST yield distribution, and JT losses
     function _getJuniorTrancheEffectiveNAV() internal view returns (uint256 jtEffectiveNAV) {
-        (,,, jtEffectiveNAV,,,,) = _previewEffectiveNAVs(_previewJTYieldShareAccrual());
+        (,,, jtEffectiveNAV,,,,,) = _previewEffectiveNAVs(_previewJTYieldShareAccrual());
     }
 
     /// @notice Returns ST's total claim on JT's assets at this point in time
