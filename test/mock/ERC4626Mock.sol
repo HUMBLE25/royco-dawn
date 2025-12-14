@@ -11,7 +11,9 @@ contract ERC4626Mock is ERC4626 {
 
     address internal immutable RESERVE_ADDRESS;
 
-    constructor(address underlying) ERC4626(IERC20(underlying)) ERC20("ERC4626Mock", "E4626M") { }
+    constructor(address _underlying, address _reserveAddress) ERC4626(IERC20(_underlying)) ERC20("ERC4626Mock", "E4626M") {
+        RESERVE_ADDRESS = _reserveAddress;
+    }
 
     function setSharePrice(uint256 sharePrice) external {
         uint256 requiredTotalAssets = sharePrice * (totalSupply() + 10 ** _decimalsOffset()) - 1;

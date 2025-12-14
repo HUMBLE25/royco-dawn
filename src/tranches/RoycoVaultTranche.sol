@@ -21,8 +21,6 @@ import { RoycoTrancheStorageLib } from "../libraries/RoycoTrancheStorageLib.sol"
 import { TrancheType } from "../libraries/Types.sol";
 import { Action, TrancheDeploymentParams } from "../libraries/Types.sol";
 
-// TODO: Check call share conversions across the codebase for whether they include virtual shares / decimal offset in their calculations
-
 /// @title RoycoVaultTranche
 /// @notice Abstract base contract implementing core functionality for Royco tranches
 /// @dev This contract provides common tranche operations including ERC4626 vault functionality,
@@ -215,10 +213,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoAuth, UUPSUpgrad
         onlyCallerOrOperator(_controller)
         returns (uint256 shares)
     {
-        // Assert that the user's deposited assets fall under the max limit
-        uint256 maxDepositableAssets = maxDeposit(_receiver);
         require(_assets != 0, MUST_DEPOSIT_NON_ZERO_ASSETS());
-        require(_assets <= maxDepositableAssets, ERC4626ExceededMaxDeposit(_receiver, _assets, maxDepositableAssets));
 
         IRoycoKernel kernel = IRoycoKernel(_kernel());
         IERC20 asset = IERC20(asset());
@@ -237,7 +232,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoAuth, UUPSUpgrad
         // valueAllocated represents the value of the assets deposited in the asset that the tranche's NAV is denominated in
         // shares are minted to the user at the effective NAV of the tranche
         // effectiveNAVToMintAt is the effective NAV of the tranche before the deposit is made, ie. the NAV at which the shares will be minted
-        shares = valueAllocated.mulDiv(_withVirtualShares(totalSupply()), effectiveNAVToMintAt + 1, Math.Rounding.Floor);
+        shares = _convertToShares(valueAllocated, totalSupply(), effectiveNAVToMintAt, Math.Rounding.Floor);
 
         // Mint the shares to the receiver
         _mint(_receiver, shares);
@@ -282,10 +277,6 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoAuth, UUPSUpgrad
         returns (uint256 assets)
     {
         require(_shares != 0, MUST_REQUEST_NON_ZERO_SHARES());
-
-        // Assert that the shares being redeeemed by the user fall under the permissible limits
-        uint256 maxRedeemableShares = maxRedeem(_controller);
-        require(_shares <= maxRedeemableShares, ERC4626ExceededMaxRedeem(_controller, _shares, maxRedeemableShares));
 
         // Process the withdrawal from the underlying investment opportunity
         // It is expected that the kernel transfers the assets directly to the receiver
@@ -725,12 +716,12 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoAuth, UUPSUpgrad
 
     /// @dev Returns the amount of shares that have a claim on the specified amount of tranche controlled assets
     function _convertToShares(uint256 _assets, uint256 _totalSupply, uint256 _totalAssets, Math.Rounding rounding) internal view returns (uint256) {
-        return _assets.mulDiv(_totalSupply + 10 ** _decimalsOffset(), _totalAssets + 1, rounding);
+        return _assets.mulDiv(_withVirtualShares(_totalSupply), _withVirtualAssets(_totalAssets), rounding);
     }
 
     /// @dev Returns the amount of tranche controlled assets that the specified shares have a claim on
     function _convertToAssets(uint256 _shares, uint256 _totalSupply, uint256 _totalAssets, Math.Rounding rounding) internal view returns (uint256) {
-        return _shares.mulDiv(_totalAssets + 1, _totalSupply + 10 ** _decimalsOffset(), rounding);
+        return _shares.mulDiv(_withVirtualAssets(_totalAssets), _withVirtualShares(_totalSupply), rounding);
     }
 
     /// @inheritdoc UUPSUpgradeable
@@ -761,5 +752,9 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoAuth, UUPSUpgrad
 
     function _withVirtualShares(uint256 _shares) internal view returns (uint256) {
         return _shares + 10 ** _decimalsOffset();
+    }
+
+    function _withVirtualAssets(uint256 _assets) internal pure returns (uint256) {
+        return _assets + 1;
     }
 }

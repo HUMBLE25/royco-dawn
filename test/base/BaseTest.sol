@@ -79,6 +79,18 @@ contract BaseTest is Test {
     uint96 internal DEFAULT_BETA_WAD = 1e18; // 100% beta (same opportunity)
     uint64 internal DEFAULT_PROTOCOL_FEE_WAD = 0.01e18; // 1% protocol fee
 
+    /// -----------------------------------------
+    /// Mainnet Fork Addresses
+    /// -----------------------------------------
+    uint256 internal forkId;
+    address internal constant ETHEREUM_MAINNET_USDC_ADDRESS = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
+    address internal constant ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS = 0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2;
+    mapping(uint256 chainId => mapping(address asset => address aTokenAddress)) internal aTokenAddresses;
+
+    constructor() {
+        aTokenAddresses[1][ETHEREUM_MAINNET_USDC_ADDRESS] = 0x98C23E9d8f34FEFb1B7BD6a91B7FF122F4e16F5c;
+    }
+
     modifier prankModifier(address _pranker) {
         vm.startPrank(_pranker);
         _;
@@ -86,21 +98,35 @@ contract BaseTest is Test {
     }
 
     function _setUpRoyco() internal virtual {
+        _setupFork();
         _setupWallets();
         _setupAssets(10_000_000_000);
 
         // Deploy RDM
         rdm = new StaticCurveRDM();
+        vm.label(address(rdm), "RDM");
 
         // Deploy tranche implementations
         stImplementation = new RoycoST();
         jtImplementation = new RoycoJT();
+        vm.label(address(stImplementation), "STImpl");
+        vm.label(address(jtImplementation), "JTImpl");
 
         // Deploy kernel implementation
         erc4626ST_AaveV3JT_KernelImplementation = new ERC4626ST_AaveV3JT_Kernel();
+        vm.label(address(erc4626ST_AaveV3JT_KernelImplementation), "KernelImpl");
 
         // Deploy factory
         factory = new RoycoTrancheFactory(address(stImplementation), address(jtImplementation));
+        vm.label(address(factory), "Factory");
+    }
+
+    function _setupFork() internal {
+        (uint256 forkBlock, string memory forkRpcUrl) = _forkConfiguration();
+        if (bytes(forkRpcUrl).length > 0) {
+            require(forkBlock != 0, "Fork block is required");
+            vm.createSelectFork(forkRpcUrl, forkBlock);
+        }
     }
 
     function _setupAssets(uint256 _seedAmount) internal {
@@ -240,5 +266,12 @@ contract BaseTest is Test {
     /// @return kernelProxy The deployed proxy address
     function _deployKernel(address _kernelImplementation, bytes memory _kernelInitData) internal returns (address kernelProxy) {
         kernelProxy = address(new ERC1967Proxy(_kernelImplementation, _kernelInitData));
+    }
+
+    /// @notice Returns the fork configuration
+    /// @return forkBlock The fork block
+    /// @return forkRpcUrl The fork RPC URL
+    function _forkConfiguration() internal virtual returns (uint256 forkBlock, string memory forkRpcUrl) {
+        return (0, "");
     }
 }
