@@ -157,21 +157,30 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoAuth, UUPSUpgrad
     function maxWithdraw(address _owner) public view virtual override(ERC4626Upgradeable) disabled returns (uint256) { }
 
     /// @inheritdoc ERC4626Upgradeable
-    /// @dev Should be overridden by junior tranches to check for withdrawal capacity
     function maxRedeem(address _owner) public view virtual override(ERC4626Upgradeable) returns (uint256) {
-        uint256 maxWithdrawable = (
+        uint256 maxWithdrawableAssets = (
             TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IRoycoKernel(_kernel()).stMaxWithdraw(asset(), _owner)
                 : IRoycoKernel(_kernel()).jtMaxWithdraw(asset(), _owner)
         );
+        if (maxWithdrawableAssets == 0) return 0;
 
-        return maxWithdrawable.mulDiv(totalSupply(), totalAssets(), Math.Rounding.Floor);
+        // Get the post-sync tranche state: applying NAV reconciliation and fee share minting
+        (uint256 trancheTotalAssets, uint256 trancheTotalShares) = _previewPostSyncTrancheState();
+
+        // Compute the max withdrawable shares based on max withdrawable assets
+        uint256 maxRedeemableShares = _convertToShares(maxWithdrawableAssets, trancheTotalShares, trancheTotalAssets, Math.Rounding.Floor);
+
+        // Return the minimum of the max redeemable shares and the balance of the owner
+        return Math.min(maxRedeemableShares, balanceOf(_owner));
     }
 
     /// @inheritdoc ERC4626Upgradeable
     /// @dev Disabled if deposit execution is asynchronous as per ERC7540
     function previewDeposit(uint256 _assets) public view virtual override(ERC4626Upgradeable) executionIsSync(Action.DEPOSIT) returns (uint256) {
-        return super.previewDeposit(_assets);
+        // Get the post-sync tranche state: applying NAV reconciliation and fee share minting
+        (uint256 trancheTotalAssets, uint256 trancheTotalShares) = _previewPostSyncTrancheState();
+        return _convertToShares(_assets, trancheTotalShares, trancheTotalAssets, Math.Rounding.Floor);
     }
 
     /// @inheritdoc ERC4626Upgradeable
@@ -185,7 +194,9 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoAuth, UUPSUpgrad
     /// @inheritdoc ERC4626Upgradeable
     /// @dev Disabled if withdrawal execution is asynchronous as per ERC7540
     function previewRedeem(uint256 _shares) public view virtual override(ERC4626Upgradeable) executionIsSync(Action.WITHDRAW) returns (uint256) {
-        return super.previewRedeem(_shares);
+        // Get the post-sync tranche state: applying NAV reconciliation and fee share minting
+        (uint256 trancheTotalAssets, uint256 trancheTotalShares) = _previewPostSyncTrancheState();
+        return _convertToAssets(_shares, trancheTotalShares, trancheTotalAssets, Math.Rounding.Floor);
     }
 
     /// @inheritdoc ERC4626Upgradeable
@@ -658,7 +669,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoAuth, UUPSUpgrad
     /// @inheritdoc IRoycoVaultTranche
     function mintProtocolFeeShares(
         uint256 _protocolFeeAssets,
-        uint256 _totalTrancheAssets,
+        uint256 _trancheTotalAssets,
         address _protocolFeeRecipient
     )
         external
@@ -669,8 +680,8 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoAuth, UUPSUpgrad
         // Compute the shares to be minted to the protocol fee recipient to satisfy the ratio of total assets that the fee represents
         // Subtract fee assets from total tranche assets because fees are included in total tranche assets
         // Round in favor of the tranche
-        uint256 protocolFeeSharesToMint = _convertToShares(_protocolFeeAssets, totalSupply(), (_totalTrancheAssets - _protocolFeeAssets), Math.Rounding.Floor);
-        _mint(_protocolFeeRecipient, protocolFeeSharesToMint);
+        uint256 protocolFeeSharesToMint = _convertToShares(_protocolFeeAssets, totalSupply(), (_trancheTotalAssets - _protocolFeeAssets), Math.Rounding.Floor);
+        if (protocolFeeSharesToMint != 0) _mint(_protocolFeeRecipient, protocolFeeSharesToMint);
     }
 
     /// @inheritdoc IERC7575
@@ -710,7 +721,32 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoAuth, UUPSUpgrad
         emit Withdraw(_caller, _receiver, _owner, _assets, _shares);
     }
 
-    /// @dev Returns the amount of shares that have a claim on the tranche's assets specified
+    /**
+     * @notice Returns the total tranche assets and shares after previewing a NAV synchronization in the kernel
+     * @return trancheTotalAssets The total tranche controlled assets
+     * @return trancheTotalShares The total supply of tranche shares (including marginally minted fee shares)
+     */
+    function _previewPostSyncTrancheState() internal view returns (uint256 trancheTotalAssets, uint256 trancheTotalShares) {
+        // Get the post-sync state of the kernel for the tranche
+        IRoycoKernel kernel = IRoycoKernel(_kernel());
+        uint256 protocolFeeAssetsAccrued;
+        if (TRANCHE_TYPE() == TrancheType.SENIOR) {
+            (,, trancheTotalAssets,, protocolFeeAssetsAccrued,) = kernel.previewSyncTrancheNAVs();
+        } else {
+            (,,, trancheTotalAssets,, protocolFeeAssetsAccrued) = kernel.previewSyncTrancheNAVs();
+        }
+
+        // Convert the fee assets accrued to shares
+        trancheTotalShares = totalSupply();
+        // If fees were accrued, fee shares will be minted
+        if (protocolFeeAssetsAccrued != 0) {
+            // Simulate minting the fee shares and add them to the tranche's total shares
+            trancheTotalShares +=
+                _convertToShares(protocolFeeAssetsAccrued, trancheTotalShares, (trancheTotalAssets - protocolFeeAssetsAccrued), Math.Rounding.Floor);
+        }
+    }
+
+    /// @dev Returns the amount of shares that have a claim on the specified amount of tranche controlled assets
     function _convertToShares(uint256 _assets, uint256 _totalSupply, uint256 _totalAssets, Math.Rounding rounding) internal view returns (uint256) {
         return _assets.mulDiv(_totalSupply + 10 ** _decimalsOffset(), _totalAssets + 1, rounding);
     }

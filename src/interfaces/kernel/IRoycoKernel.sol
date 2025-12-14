@@ -26,9 +26,14 @@ interface IRoycoKernel {
     function getSTTotalEffectiveAssets() external view returns (uint256);
     function getJTTotalEffectiveAssets() external view returns (uint256);
 
-    function syncTrancheNAVs() external returns (uint256 stRawNAV, uint256 jtRawNAV, uint256 stEffectiveNAV, uint256 jtEffectiveNAV);
+    function syncTrancheNAVs()
+        external
+        returns (uint256 stRawNAV, uint256 jtRawNAV, uint256 stEffectiveNAV, uint256 jtEffectiveNAV, uint256 stProtocolFeeTaken, uint256 jtProtocolFeeTaken);
 
-    // function previewSyncTrancheNAVs() external returns (uint256 stRawNAV, uint256 jtRawNAV, uint256 stEffectiveNAV, uint256 jtEffectiveNAV);
+    function previewSyncTrancheNAVs()
+        external
+        view
+        returns (uint256 stRawNAV, uint256 jtRawNAV, uint256 stEffectiveNAV, uint256 jtEffectiveNAV, uint256 stProtocolFeeTaken, uint256 jtProtocolFeeTaken);
 
     function stMaxDeposit(address _asset, address _receiver) external view returns (uint256);
     function stMaxWithdraw(address _asset, address _owner) external view returns (uint256);

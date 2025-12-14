@@ -36,23 +36,15 @@ abstract contract RoycoKernel is IRoycoKernel, UUPSUpgradeable, RoycoAuth {
     /// @dev Permissions the function to only the market's senior tranche
     /// @dev Should be placed on all ST deposit and withdraw functions
     modifier onlySeniorTranche() {
-        _onlySeniorTranche();
-        _;
-    }
-
-    function _onlySeniorTranche() internal view {
         require(msg.sender == RoycoKernelStorageLib._getRoycoKernelStorage().seniorTranche, ONLY_SENIOR_TRANCHE());
+        _;
     }
 
     /// @dev Permissions the function to only the market's junior tranche
     /// @dev Should be placed on all JT deposit and withdraw functions
     modifier onlyJuniorTranche() {
-        _onlyJuniorTranche();
-        _;
-    }
-
-    function _onlyJuniorTranche() internal view {
         require(msg.sender == RoycoKernelStorageLib._getRoycoKernelStorage().juniorTranche, ONLY_JUNIOR_TRANCHE());
+        _;
     }
 
     /**
@@ -166,20 +158,43 @@ abstract contract RoycoKernel is IRoycoKernel, UUPSUpgradeable, RoycoAuth {
     }
 
     /**
-     * @notice Synchronizes the raw and effective NAVs of both tranches
+     * @notice Synchronizes and persists the raw and effective NAVs of both tranches
      * @dev Only performs a pre-op sync because there is no operation being executed in the same function call as this sync
      * @return stRawNAV The senior tranche's raw NAV: the pure value of its investment
      * @return jtRawNAV The junior tranche's raw NAV: the pure value of its investment
      * @return stEffectiveNAV The senior tranche's effective NAV, including applied coverage, ST yield distribution, and uncovered losses
      * @return jtEffectiveNAV The junior tranche's effective NAV, including provided coverage, JT yield, ST yield distribution, and JT losses
+     * @return stProtocolFeeTaken The protocol fee taken on ST yield on this sync
+     * @return jtProtocolFeeTaken The protocol fee taken on JT yield on this sync
      */
     function syncTrancheNAVs()
         external
+        override(IRoycoKernel)
         onlyRole(RoycoRoles.SYNC_ROLE)
         whenNotPaused
-        returns (uint256 stRawNAV, uint256 jtRawNAV, uint256 stEffectiveNAV, uint256 jtEffectiveNAV)
+        returns (uint256 stRawNAV, uint256 jtRawNAV, uint256 stEffectiveNAV, uint256 jtEffectiveNAV, uint256 stProtocolFeeTaken, uint256 jtProtocolFeeTaken)
     {
         return _preOpSyncTrancheNAVs();
+    }
+
+    /**
+     * @notice Previews a synchronization of the raw and effective NAVs of both tranches
+     * @return stRawNAV The senior tranche's raw NAV: the pure value of its investment
+     * @return jtRawNAV The junior tranche's raw NAV: the pure value of its investment
+     * @return stEffectiveNAV The senior tranche's effective NAV, including applied coverage, ST yield distribution, and uncovered losses
+     * @return jtEffectiveNAV The junior tranche's effective NAV, including provided coverage, JT yield, ST yield distribution, and JT losses
+     * @return stProtocolFeeTaken The protocol fee taken on ST yield on this sync
+     * @return jtProtocolFeeTaken The protocol fee taken on JT yield on this sync
+     */
+    function previewSyncTrancheNAVs()
+        external
+        view
+        override(IRoycoKernel)
+        onlyRole(RoycoRoles.SYNC_ROLE)
+        whenNotPaused
+        returns (uint256 stRawNAV, uint256 jtRawNAV, uint256 stEffectiveNAV, uint256 jtEffectiveNAV, uint256 stProtocolFeeTaken, uint256 jtProtocolFeeTaken)
+    {
+        (stRawNAV, jtRawNAV, stEffectiveNAV, jtEffectiveNAV,,, stProtocolFeeTaken, jtProtocolFeeTaken,) = _previewSyncTrancheNAVs(_previewJTYieldShareAccrual());
     }
 
     /**
@@ -191,8 +206,13 @@ abstract contract RoycoKernel is IRoycoKernel, UUPSUpgradeable, RoycoAuth {
      * @return jtRawNAV The junior tranche's raw NAV: the pure value of its investment
      * @return stEffectiveNAV The senior tranche's effective NAV, including applied coverage, ST yield distribution, and uncovered losses
      * @return jtEffectiveNAV The junior tranche's effective NAV, including provided coverage, JT yield, ST yield distribution, and JT losses
+     * @return stProtocolFeeTaken The protocol fee taken on ST yield on this sync
+     * @return jtProtocolFeeTaken The protocol fee taken on JT yield on this sync
      */
-    function _preOpSyncTrancheNAVs() internal returns (uint256 stRawNAV, uint256 jtRawNAV, uint256 stEffectiveNAV, uint256 jtEffectiveNAV) {
+    function _preOpSyncTrancheNAVs()
+        internal
+        returns (uint256 stRawNAV, uint256 jtRawNAV, uint256 stEffectiveNAV, uint256 jtEffectiveNAV, uint256 stProtocolFeeTaken, uint256 jtProtocolFeeTaken)
+    {
         // Get the storage pointer to the base kernel state
         RoycoKernelState storage $ = RoycoKernelStorageLib._getRoycoKernelStorage();
 
@@ -203,11 +223,9 @@ abstract contract RoycoKernel is IRoycoKernel, UUPSUpgradeable, RoycoAuth {
         // Preview the new NAVs and protocol fees accrued for each tranche based on PNL(s) of the underlying investment(s)
         uint256 stCoverageDebt;
         uint256 jtCoverageDebt;
-        uint256 stProtocolFeeTaken;
-        uint256 jtProtocolFeeTaken;
         bool yieldDistributed;
         (stRawNAV, jtRawNAV, stEffectiveNAV, jtEffectiveNAV, stCoverageDebt, jtCoverageDebt, stProtocolFeeTaken, jtProtocolFeeTaken, yieldDistributed) =
-            _previewEffectiveNAVs(twJTYieldShareAccruedWAD);
+            _previewSyncTrancheNAVs(twJTYieldShareAccruedWAD);
 
         // ST yield was split between ST and JT
         if (yieldDistributed) {
@@ -233,8 +251,7 @@ abstract contract RoycoKernel is IRoycoKernel, UUPSUpgradeable, RoycoAuth {
     }
 
     /**
-     * @notice Previews the current raw and effective NAVs of each tranche
-     * @dev Computes PnL deltas in raw NAVs since the last sync and applies JT PnL, ST losses with applicable JT coverage, and ST yield distribution
+     * @notice Previews a synchronization of tranche NAVs based on the underlying PNL(s) and their effects on the current state of the loss waterfall
      * @param _twJTYieldShareAccruedWAD The accumulated time-weighted JT yield share since the last yield distribution
      * @return stRawNAV The senior tranche's raw NAV: the pure value of its investment
      * @return jtRawNAV The junior tranche's raw NAV: the pure value of its investment
@@ -246,7 +263,7 @@ abstract contract RoycoKernel is IRoycoKernel, UUPSUpgradeable, RoycoAuth {
      * @return jtProtocolFeeTaken The protocol fee taken on JT yield on this sync
      * @return yieldDistributed A boolean indicating whether ST yield was split between ST and JT
      */
-    function _previewEffectiveNAVs(uint256 _twJTYieldShareAccruedWAD)
+    function _previewSyncTrancheNAVs(uint256 _twJTYieldShareAccruedWAD)
         internal
         view
         returns (
@@ -490,6 +507,9 @@ abstract contract RoycoKernel is IRoycoKernel, UUPSUpgradeable, RoycoAuth {
                 if (deltaST < 0) $.lastJTEffectiveNAV -= (uint256(-deltaJT) + uint256(-deltaST));
                 // Apply the pure withdrawal to the junior tranche's effective NAV
                 else $.lastJTEffectiveNAV -= uint256(-deltaJT);
+
+                // TODO: Should we explicitly enforce this?
+                // require($.lastJTEffectiveNAV + $.lastSTCoverageDebt >= jtRawNAV);
             }
         }
         // Enforce the NAV conservation invariant
@@ -572,13 +592,13 @@ abstract contract RoycoKernel is IRoycoKernel, UUPSUpgradeable, RoycoAuth {
     /// @notice Returns the effective net asset value of the senior tranche
     /// @dev Includes applied coverage, ST yield distribution, and uncovered losses
     function _getSeniorTrancheEffectiveNAV() internal view returns (uint256 stEffectiveNAV) {
-        (,, stEffectiveNAV,,,,,,) = _previewEffectiveNAVs(_previewJTYieldShareAccrual());
+        (,, stEffectiveNAV,,,,,,) = _previewSyncTrancheNAVs(_previewJTYieldShareAccrual());
     }
 
     /// @notice Returns the effective net asset value of the junior tranche
     /// @dev Includes provided coverage, JT yield, ST yield distribution, and JT losses
     function _getJuniorTrancheEffectiveNAV() internal view returns (uint256 jtEffectiveNAV) {
-        (,,, jtEffectiveNAV,,,,,) = _previewEffectiveNAVs(_previewJTYieldShareAccrual());
+        (,,, jtEffectiveNAV,,,,,) = _previewSyncTrancheNAVs(_previewJTYieldShareAccrual());
     }
 
     /// @notice Returns ST's total claim on JT's assets at this point in time
