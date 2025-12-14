@@ -549,13 +549,15 @@ abstract contract RoycoKernel is IRoycoKernel, UUPSUpgradeable, RoycoAuth {
     function _maxSTDepositGivenCoverage() internal view returns (uint256) {
         // Get the storage pointer to the base kernel state
         RoycoKernelState storage $ = RoycoKernelStorageLib._getRoycoKernelStorage();
+        // Preview a NAV sync to get the market's current state
+        (uint256 stRawNAV, uint256 jtRawNAV,, uint256 jtEffectiveNAV,,,,,) = _previewSyncTrancheNAVs(_previewJTYieldShareAccrual());
         // Solve for x, rounding in favor of senior protection
         // Compute the total covered assets by the junior tranche loss absorption buffer
-        uint256 totalCoveredAssets = _getJuniorTrancheEffectiveNAV().mulDiv(ConstantsLib.WAD, $.coverageWAD, Math.Rounding.Floor);
+        uint256 totalCoveredAssets = jtEffectiveNAV.mulDiv(ConstantsLib.WAD, $.coverageWAD, Math.Rounding.Floor);
         // Compute the assets required to cover current junior tranche exposure
-        uint256 jtCoverageRequired = _getJuniorTrancheRawNAV().mulDiv($.betaWAD, ConstantsLib.WAD, Math.Rounding.Ceil);
+        uint256 jtCoverageRequired = jtRawNAV.mulDiv($.betaWAD, ConstantsLib.WAD, Math.Rounding.Ceil);
         // Compute the assets required to cover current senior tranche exposure
-        uint256 stCoverageRequired = _getSeniorTrancheRawNAV();
+        uint256 stCoverageRequired = stRawNAV;
         // Compute the amount of assets that can be deposited into senior while retaining full coverage
         return totalCoveredAssets.saturatingSub(jtCoverageRequired).saturatingSub(stCoverageRequired);
     }
@@ -572,13 +574,15 @@ abstract contract RoycoKernel is IRoycoKernel, UUPSUpgradeable, RoycoAuth {
         RoycoKernelState storage $ = RoycoKernelStorageLib._getRoycoKernelStorage();
         uint256 betaWAD = $.betaWAD;
         uint256 coverageWAD = $.coverageWAD;
+        // Preview a NAV sync to get the market's current state
+        (uint256 stRawNAV, uint256 jtRawNAV,, uint256 jtEffectiveNAV,,,,,) = _previewSyncTrancheNAVs(_previewJTYieldShareAccrual());
         // Solve for y, rounding in favor of senior protection
         // Compute the total covered exposure of the underlying investment
-        uint256 totalCoveredExposure = _getSeniorTrancheRawNAV() + _getJuniorTrancheRawNAV().mulDiv(betaWAD, ConstantsLib.WAD, Math.Rounding.Ceil);
+        uint256 totalCoveredExposure = stRawNAV + jtRawNAV.mulDiv(betaWAD, ConstantsLib.WAD, Math.Rounding.Ceil);
         // Compute the minimum junior tranche assets required to cover the exposure as per the market's coverage requirement
         uint256 requiredJTAssets = totalCoveredExposure.mulDiv(coverageWAD, ConstantsLib.WAD, Math.Rounding.Ceil);
         // Compute the surplus coverage currently provided by the junior tranche based on its currently remaining loss-absorption buffer
-        uint256 surplusJTAssets = Math.saturatingSub(_getJuniorTrancheEffectiveNAV(), requiredJTAssets);
+        uint256 surplusJTAssets = Math.saturatingSub(jtEffectiveNAV, requiredJTAssets);
         // Compute how much coverage the system retains per 1 unit of JT assets withdrawn scaled by WAD
         uint256 coverageRetentionWAD = ConstantsLib.WAD - betaWAD.mulDiv(coverageWAD, ConstantsLib.WAD, Math.Rounding.Floor);
         // Return how much of the surplus can be withdrawn while satisfying the coverage requirement
