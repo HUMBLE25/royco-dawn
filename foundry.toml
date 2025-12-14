@@ -8,7 +8,7 @@ bytecode_hash = "none"
 cbor_metadata = false
 sparse_mode = false
 build_info = true
-evm_version="cancun"
+evm_version="prague"
 via_ir = true
 deny = "never"
 fs_permissions = [{ access = "read", path = "./out"}]

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import { TrancheDeploymentParams } from "../../libraries/Types.sol";
-import { TrancheType } from "../../libraries/Types.sol";
-import { RoycoVaultTranche } from "../RoycoVaultTranche.sol";
+import { TrancheDeploymentParams } from "../libraries/Types.sol";
+import { TrancheType } from "../libraries/Types.sol";
+import { RoycoVaultTranche } from "./RoycoVaultTranche.sol";
 
 // TODO: ST and JT base asset can have different decimals
 contract RoycoST is RoycoVaultTranche {

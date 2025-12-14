@@ -7,7 +7,7 @@ import { IPool } from "../../../interfaces/aave/IPool.sol";
 import { IPoolAddressesProvider } from "../../../interfaces/aave/IPoolAddressesProvider.sol";
 import { IPoolDataProvider } from "../../../interfaces/aave/IPoolDataProvider.sol";
 import { ExecutionModel, IRoycoKernel } from "../../../interfaces/kernel/IRoycoKernel.sol";
-import { Operation, RoycoKernelState, RoycoKernelStorageLib } from "../../../libraries/RoycoKernelStorageLib.sol";
+import { Operation } from "../../../libraries/RoycoKernelStorageLib.sol";
 import { AaveV3KernelState, AaveV3KernelStorageLib } from "../../../libraries/kernels/AaveV3KernelStorageLib.sol";
 import { RoycoKernel } from "../RoycoKernel.sol";
 import { BaseAsyncJTRedemptionDelayKernel } from "./BaseAsyncJTRedemptionDelayKernel.sol";
