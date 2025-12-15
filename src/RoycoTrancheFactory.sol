@@ -60,10 +60,10 @@ contract RoycoTrancheFactory {
     /// @return seniorTranche The address of the deployed senior tranche proxy
     /// @return juniorTranche The address of the deployed junior tranche proxy
     function deployMarket(
-        string calldata _seniorTrancheName,
-        string calldata _seniorTrancheSymbol,
-        string calldata _juniorTrancheName,
-        string calldata _juniorTrancheSymbol,
+        string memory _seniorTrancheName,
+        string memory _seniorTrancheSymbol,
+        string memory _juniorTrancheName,
+        string memory _juniorTrancheSymbol,
         address _seniorAsset,
         address _juniorAsset,
         address _kernelImplementation,

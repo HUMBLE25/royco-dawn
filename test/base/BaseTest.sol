@@ -9,6 +9,7 @@ import { RoycoTrancheFactory } from "../../src/RoycoTrancheFactory.sol";
 import { RoycoAuth, RoycoRoles } from "../../src/auth/RoycoAuth.sol";
 import { IRoycoKernel } from "../../src/interfaces/kernel/IRoycoKernel.sol";
 import { ERC4626ST_AaveV3JT_Kernel } from "../../src/kernels/ERC4626ST_AaveV3JT_Kernel.sol";
+import { RoycoKernel } from "../../src/kernels/base/RoycoKernel.sol";
 import { ConstantsLib } from "../../src/libraries/ConstantsLib.sol";
 import { RoycoKernelInitParams } from "../../src/libraries/RoycoKernelStorageLib.sol";
 import { StaticCurveRDM } from "../../src/rdm/StaticCurveRDM.sol";
@@ -17,6 +18,13 @@ import { RoycoST } from "../../src/tranches/RoycoST.sol";
 import { RoycoVaultTranche } from "../../src/tranches/RoycoVaultTranche.sol";
 
 contract BaseTest is Test {
+    struct TrancheState {
+        uint256 rawNAV;
+        uint256 effectiveNAV;
+        uint256 totalEffectiveAssets;
+        uint256 protocolFeeValue;
+    }
+
     // -----------------------------------------
     // Test Wallets
     // -----------------------------------------
@@ -60,11 +68,18 @@ contract BaseTest is Test {
     // Royco Deployments
     // -----------------------------------------
 
+    // Initial Deployments
     RoycoTrancheFactory public factory;
     StaticCurveRDM public rdm;
     RoycoST public stImplementation;
     RoycoJT public jtImplementation;
     ERC4626ST_AaveV3JT_Kernel public erc4626ST_AaveV3JT_KernelImplementation;
+
+    // Deployed Later in the concrete tests
+    RoycoVaultTranche internal seniorTranche;
+    RoycoVaultTranche internal juniorTranche;
+    RoycoKernel internal kernel;
+    bytes32 internal marketId;
 
     // -----------------------------------------
     // Royco Deployments Parameters
@@ -75,9 +90,9 @@ contract BaseTest is Test {
     string internal SENIOR_TRANCH_SYMBOL = "RST";
     string internal JUNIOR_TRANCH_NAME = "Royco Junior Tranche";
     string internal JUNIOR_TRANCH_SYMBOL = "RJT";
-    uint64 internal DEFAULT_COVERAGE_WAD = 0.2e18; // 20% coverage
-    uint96 internal DEFAULT_BETA_WAD = 1e18; // 100% beta (same opportunity)
-    uint64 internal DEFAULT_PROTOCOL_FEE_WAD = 0.01e18; // 1% protocol fee
+    uint64 internal COVERAGE_WAD = 0.2e18; // 20% coverage
+    uint96 internal BETA_WAD = 0; // Different opportunities
+    uint64 internal PROTOCOL_FEE_WAD = 0.01e18; // 1% protocol fee
 
     /// -----------------------------------------
     /// Mainnet Fork Addresses
@@ -178,6 +193,17 @@ contract BaseTest is Test {
         providers.push(DAN_ADDRESS);
     }
 
+    function _setDeployedMarket(RoycoVaultTranche _seniorTranche, RoycoVaultTranche _juniorTranche, RoycoKernel _kernel, bytes32 _marketId) internal {
+        seniorTranche = _seniorTranche;
+        juniorTranche = _juniorTranche;
+        kernel = _kernel;
+        marketId = _marketId;
+
+        vm.label(address(seniorTranche), "ST");
+        vm.label(address(juniorTranche), "JT");
+        vm.label(address(kernel), "Kernel");
+    }
+
     function _initWallet(string memory _name, uint256 _amount) internal returns (Vm.Wallet memory) {
         Vm.Wallet memory wallet = vm.createWallet(_name);
         vm.label(wallet.addr, _name);
@@ -258,6 +284,56 @@ contract BaseTest is Test {
 
         seniorTranche = RoycoVaultTranche(_seniorTranche);
         juniorTranche = RoycoVaultTranche(_juniorTranche);
+    }
+
+    /// @notice Verifies the preview NAVs of the senior and junior tranches
+    /// @param _seniorTrancheState The state of the senior tranche
+    /// @param _juniorTrancheState The state of the junior tranche
+    function _verifyPreviewNAVs(TrancheState memory _seniorTrancheState, TrancheState memory _juniorTrancheState, uint256 maxAbsDelta) internal {
+        assertTrue(address(seniorTranche) != address(0), "Senior tranche is not deployed");
+        assertTrue(address(juniorTranche) != address(0), "Junior tranche is not deployed");
+
+        assertApproxEqAbs(seniorTranche.getRawNAV(), _seniorTrancheState.rawNAV, maxAbsDelta, "ST raw NAV mismatch");
+        assertApproxEqAbs(seniorTranche.getEffectiveNAV(), _seniorTrancheState.effectiveNAV, maxAbsDelta, "ST effective NAV mismatch");
+        assertApproxEqAbs(seniorTranche.totalAssets(), _seniorTrancheState.totalEffectiveAssets, maxAbsDelta, "ST total effective assets mismatch");
+
+        assertApproxEqAbs(juniorTranche.getRawNAV(), _juniorTrancheState.rawNAV, maxAbsDelta, "JT raw NAV mismatch");
+        assertApproxEqAbs(juniorTranche.getEffectiveNAV(), _juniorTrancheState.effectiveNAV, maxAbsDelta, "JT effective NAV mismatch");
+        assertApproxEqAbs(juniorTranche.totalAssets(), _juniorTrancheState.totalEffectiveAssets, maxAbsDelta, "JT total effective assets mismatch");
+    }
+
+    /// @notice Verifies the fee taken by the senior and junior tranches
+    /// @param _seniorTrancheState The state of the senior tranche
+    /// @param _juniorTrancheState The state of the junior tranche
+    /// @param _feeRecipient The address of the fee recipient
+    function _verifyFeeTaken(TrancheState storage _seniorTrancheState, TrancheState storage _juniorTrancheState, address _feeRecipient) internal {
+        uint256 seniorFeeShares = seniorTranche.balanceOf(_feeRecipient);
+        uint256 seniorFeeSharesValue = seniorTranche.convertToAssets(seniorFeeShares);
+        assertEq(seniorFeeSharesValue, _seniorTrancheState.protocolFeeValue, "ST protocol fee value mismatch");
+
+        uint256 juniorFeeShares = juniorTranche.balanceOf(_feeRecipient);
+        uint256 juniorFeeSharesValue = juniorTranche.convertToAssets(juniorFeeShares);
+        assertEq(juniorFeeSharesValue, _juniorTrancheState.protocolFeeValue, "JT protocol fee value mismatch");
+    }
+
+    /// @notice Updates the state of the senior and junior tranches on a deposit
+    /// @param _trancheState The state of the tranche
+    /// @param _assets The amount of assets deposited
+    /// @param _assetsValue The value of the assets deposited
+    function _updateOnDeposit(TrancheState storage _trancheState, uint256 _assets, uint256 _assetsValue) internal {
+        _trancheState.rawNAV += _assetsValue;
+        _trancheState.effectiveNAV += _assetsValue;
+        _trancheState.totalEffectiveAssets += _assets;
+    }
+
+    /// @notice Updates the state of the senior and junior tranches on a withdrawal
+    /// @param _trancheState The state of the tranche
+    /// @param _assets The amount of assets withdrawn
+    /// @param _assetsValue The value of the assets withdrawn
+    function _updateOnWithdraw(TrancheState storage _trancheState, uint256 _assets, uint256 _assetsValue) internal {
+        _trancheState.rawNAV -= _assetsValue;
+        _trancheState.effectiveNAV -= _assetsValue;
+        _trancheState.totalEffectiveAssets -= _assets;
     }
 
     /// @notice Deploys a kernel using ERC1967 proxy

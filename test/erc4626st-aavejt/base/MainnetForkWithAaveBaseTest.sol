@@ -11,15 +11,22 @@ import { BaseTest } from "../../base/BaseTest.sol";
 import { ERC4626Mock } from "../../mock/ERC4626Mock.sol";
 
 abstract contract MainnetForkWithAaveTestBase is BaseTest {
+    uint256 internal constant AAVE_MAX_ABS_NAV_DELTA = 2;
+
     Vm.Wallet internal RESERVE;
     address internal RESERVE_ADDRESS;
 
     // Deployed contracts
     ERC4626Mock internal mockStUnderlyingVault;
-    RoycoVaultTranche internal seniorTranche;
-    RoycoVaultTranche internal juniorTranche;
     ERC4626ST_AaveV3JT_Kernel internal erc4626STAaveV3JTKernel;
-    bytes32 internal marketId;
+
+    // External Contracts
+    IERC20 internal usdc = IERC20(ETHEREUM_MAINNET_USDC_ADDRESS);
+    IERC20 internal aToken = IERC20(aTokenAddresses[1][ETHEREUM_MAINNET_USDC_ADDRESS]);
+
+    constructor() {
+        BETA_WAD = 0; // Different opportunities
+    }
 
     function _setUpRoyco() internal override {
         // Setup wallets
@@ -40,10 +47,10 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
         IERC20(ETHEREUM_MAINNET_USDC_ADDRESS).approve(address(mockStUnderlyingVault), type(uint256).max);
 
         // Deploy the markets
-        (seniorTranche, juniorTranche, erc4626STAaveV3JTKernel, marketId) = _deployMarketWithKernel();
-        vm.label(address(seniorTranche), "ST");
-        vm.label(address(juniorTranche), "JT");
-        vm.label(address(erc4626STAaveV3JTKernel), "Kernel");
+        (RoycoVaultTranche seniorTranche_, RoycoVaultTranche juniorTranche_, ERC4626ST_AaveV3JT_Kernel erc4626STAaveV3JTKernel_, bytes32 marketId_) =
+            _deployMarketWithKernel();
+        _setDeployedMarket(seniorTranche_, juniorTranche_, erc4626STAaveV3JTKernel_, marketId_);
+        erc4626STAaveV3JTKernel = erc4626STAaveV3JTKernel_;
     }
 
     /// @notice Deals USDC tokens to all configured addresses for mainnet fork tests
@@ -90,11 +97,11 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
         RoycoKernelInitParams memory params = RoycoKernelInitParams({
             seniorTranche: address(seniorTranche_),
             juniorTranche: address(juniorTranche_),
-            coverageWAD: DEFAULT_COVERAGE_WAD,
-            betaWAD: DEFAULT_BETA_WAD,
+            coverageWAD: COVERAGE_WAD,
+            betaWAD: BETA_WAD,
             rdm: address(rdm),
             protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS,
-            protocolFeeWAD: DEFAULT_PROTOCOL_FEE_WAD
+            protocolFeeWAD: PROTOCOL_FEE_WAD
         });
 
         // Initialize the kernel

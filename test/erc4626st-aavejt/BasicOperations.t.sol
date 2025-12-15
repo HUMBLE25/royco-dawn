@@ -5,8 +5,9 @@ import { IERC20 } from "../../lib/openzeppelin-contracts/contracts/token/ERC20/I
 import { MainnetForkWithAaveTestBase } from "./base/MainnetForkWithAaveBaseTest.sol";
 
 contract BasicOperationsTest is MainnetForkWithAaveTestBase {
-    IERC20 internal usdc = IERC20(ETHEREUM_MAINNET_USDC_ADDRESS);
-    IERC20 internal aToken = IERC20(aTokenAddresses[1][ETHEREUM_MAINNET_USDC_ADDRESS]);
+    // Test State Trackers
+    TrancheState internal seniorTrancheState;
+    TrancheState internal juniorTrancheState;
 
     function setUp() public {
         _setUpRoyco();
@@ -26,6 +27,10 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         uint256 initialTrancheShares = juniorTranche.balanceOf(depositor);
         uint256 initialTrancheTotalSupply = juniorTranche.totalSupply();
 
+        // Assert that initially all tranche parameters are 0
+        _verifyPreviewNAVs(seniorTrancheState, juniorTrancheState, AAVE_MAX_ABS_NAV_DELTA);
+        _verifyFeeTaken(seniorTrancheState, juniorTrancheState, PROTOCOL_FEE_RECIPIENT_ADDRESS);
+
         // Approve the junior tranche to spend assets
         vm.prank(depositor);
         usdc.approve(address(juniorTranche), _assets);
@@ -33,6 +38,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         // Deposit into junior tranche
         vm.prank(depositor);
         uint256 shares = juniorTranche.deposit(_assets, depositor, depositor);
+        _updateOnDeposit(juniorTrancheState, _assets, _assets);
 
         // Verify shares were minted
         assertGt(shares, 0, "Shares should be greater than 0");
@@ -43,6 +49,12 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         assertEq(usdc.balanceOf(depositor), initialDepositorBalance - _assets, "Depositor balance should decrease by assets amount");
 
         // Verify that an equivalent amount of aTokens were minted
-        assertApproxEqAbs(aToken.balanceOf(address(erc4626STAaveV3JTKernel)), _assets, 2, "An equivalent amount of aTokens should be minted");
+        assertApproxEqAbs(
+            aToken.balanceOf(address(erc4626STAaveV3JTKernel)), _assets, AAVE_MAX_ABS_NAV_DELTA, "An equivalent amount of aTokens should be minted"
+        );
+
+        // Verify that the tranche state has been updated
+        _verifyPreviewNAVs(seniorTrancheState, juniorTrancheState, AAVE_MAX_ABS_NAV_DELTA);
+        _verifyFeeTaken(seniorTrancheState, juniorTrancheState, PROTOCOL_FEE_RECIPIENT_ADDRESS);
     }
 }

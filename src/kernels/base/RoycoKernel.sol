@@ -157,6 +157,11 @@ abstract contract RoycoKernel is IRoycoKernel, UUPSUpgradeable, RoycoAuth {
         return _getJuniorTrancheEffectiveNAV();
     }
 
+    /// @inheritdoc IRoycoKernel
+    function getKernelState() external view override(IRoycoKernel) returns (RoycoKernelState memory) {
+        return RoycoKernelStorageLib._getRoycoKernelStorage();
+    }
+
     /**
      * @notice Synchronizes and persists the raw and effective NAVs of both tranches
      * @dev Only performs a pre-op sync because there is no operation being executed in the same function call as this sync
@@ -190,8 +195,6 @@ abstract contract RoycoKernel is IRoycoKernel, UUPSUpgradeable, RoycoAuth {
         external
         view
         override(IRoycoKernel)
-        onlyRole(RoycoRoles.SYNC_ROLE)
-        whenNotPaused
         returns (uint256 stRawNAV, uint256 jtRawNAV, uint256 stEffectiveNAV, uint256 jtEffectiveNAV, uint256 stProtocolFeeTaken, uint256 jtProtocolFeeTaken)
     {
         (stRawNAV, jtRawNAV, stEffectiveNAV, jtEffectiveNAV,,, stProtocolFeeTaken, jtProtocolFeeTaken,) = _previewSyncTrancheNAVs(_previewJTYieldShareAccrual());
