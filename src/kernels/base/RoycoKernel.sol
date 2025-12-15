@@ -465,7 +465,7 @@ abstract contract RoycoKernel is IRoycoKernel, UUPSUpgradeable, RoycoAuth {
             $.lastJTRawNAV = jtRawNAV;
             // Apply the deposit to the junior tranche's effective NAV
             $.lastJTEffectiveNAV += uint256(deltaJT);
-        } else {
+        } else if (_op == Operation.ST_WITHDRAW || _op == Operation.JT_WITHDRAW) {
             // Compute the deltas in the raw NAVs of each tranche after an operation's execution and cache the raw NAVs
             // The deltas represent the NAV changes after a deposit and withdrawal
             uint256 stRawNAV = _getSeniorTrancheRawNAV();
@@ -512,6 +512,8 @@ abstract contract RoycoKernel is IRoycoKernel, UUPSUpgradeable, RoycoAuth {
                 // require($.lastJTEffectiveNAV + $.lastSTCoverageDebt >= jtRawNAV);
             }
         }
+        // We ignore the following operations: ST_REQUEST_DEPOSIT, ST_REQUEST_REDEEM, JT_REQUEST_DEPOSIT, JT_REQUEST_REDEEM
+
         // Enforce the NAV conservation invariant
         require(($.lastSTRawNAV + $.lastJTRawNAV) == ($.lastSTEffectiveNAV + $.lastJTEffectiveNAV), NAV_CONSERVATION_VIOLATION());
     }

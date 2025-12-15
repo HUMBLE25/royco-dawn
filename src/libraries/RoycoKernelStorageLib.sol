@@ -8,12 +8,20 @@ pragma solidity ^0.8.28;
  * @custom:type ST_WITHDRAW Withdrawing assets from the senior tranche
  * @custom:type JT_DEPOSIT Depositing assets into the junior tranche
  * @custom:type JT_WITHDRAW Withdrawing assets from the junior tranche
+ * @custom:type ST_REQUEST_DEPOSIT Requesting a deposit for the senior tranche
+ * @custom:type ST_REQUEST_REDEEM Requesting a redemption for the senior tranche
+ * @custom:type JT_REQUEST_DEPOSIT Requesting a deposit for the junior tranche
+ * @custom:type JT_REQUEST_REDEEM Requesting a redemption for the junior tranche
  */
 enum Operation {
     ST_DEPOSIT,
     ST_WITHDRAW,
+    ST_REQUEST_DEPOSIT,
+    ST_REQUEST_REDEEM,
     JT_DEPOSIT,
-    JT_WITHDRAW
+    JT_WITHDRAW,
+    JT_REQUEST_DEPOSIT,
+    JT_REQUEST_REDEEM
 }
 
 /**

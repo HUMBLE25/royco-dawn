@@ -7,6 +7,7 @@ import { RoycoRoles } from "../../../auth/RoycoRoles.sol";
 import { IAsyncJTWithdrawalKernel } from "../../../interfaces/kernel/IAsyncJTWithdrawalKernel.sol";
 import { IRoycoKernel } from "../../../interfaces/kernel/IRoycoKernel.sol";
 import { ConstantsLib } from "../../../libraries/ConstantsLib.sol";
+import { Operation } from "../../../libraries/RoycoKernelStorageLib.sol";
 import { RequestRedeemSharesBehavior } from "../../../libraries/Types.sol";
 import { RoycoKernel } from "../RoycoKernel.sol";
 
@@ -66,7 +67,18 @@ abstract contract BaseAsyncJTRedemptionDelayKernel is IAsyncJTWithdrawalKernel, 
     // =============================
 
     /// @inheritdoc IAsyncJTWithdrawalKernel
-    function jtRequestRedeem(address, uint256 _shares, uint256 _totalShares, address _controller) external onlyJuniorTranche returns (uint256 requestId) {
+    function jtRequestRedeem(
+        address,
+        uint256 _shares,
+        uint256 _totalShares,
+        address _controller
+    )
+        external
+        onlyJuniorTranche
+        syncNAVs(Operation.JT_REQUEST_REDEEM)
+        whenNotPaused
+        returns (uint256 requestId)
+    {
         BaseAsyncJTRedemptionDelayKernelState storage $ = _getBaseAsyncJTRedemptionDelayKernelState();
 
         Redemption storage redemption = $.redemptions[_controller];
@@ -133,7 +145,7 @@ abstract contract BaseAsyncJTRedemptionDelayKernel is IAsyncJTWithdrawalKernel, 
     // =============================
 
     /// @inheritdoc IAsyncJTWithdrawalKernel
-    function jtCancelRedeemRequest(uint256 _requestId, address _controller) external onlyJuniorTranche {
+    function jtCancelRedeemRequest(uint256 _requestId, address _controller) external onlyJuniorTranche whenNotPaused {
         require(_requestId == ConstantsLib.ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, INVALID_REQUEST_ID(_requestId));
         BaseAsyncJTRedemptionDelayKernelState storage $ = _getBaseAsyncJTRedemptionDelayKernelState();
         Redemption storage redemption = $.redemptions[_controller];
@@ -143,7 +155,7 @@ abstract contract BaseAsyncJTRedemptionDelayKernel is IAsyncJTWithdrawalKernel, 
     }
 
     /// @inheritdoc IAsyncJTWithdrawalKernel
-    function jtClaimCancelRedeemRequest(uint256 _requestId, address, address _controller) external onlyJuniorTranche returns (uint256 shares) {
+    function jtClaimCancelRedeemRequest(uint256 _requestId, address, address _controller) external onlyJuniorTranche whenNotPaused returns (uint256 shares) {
         require(_requestId == ConstantsLib.ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, INVALID_REQUEST_ID(_requestId));
         BaseAsyncJTRedemptionDelayKernelState storage $ = _getBaseAsyncJTRedemptionDelayKernelState();
         Redemption memory redemption = $.redemptions[_controller];
