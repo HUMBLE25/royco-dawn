@@ -726,7 +726,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoAuth, UUPSUpgrad
 
     /// @inheritdoc UUPSUpgradeable
     /// @dev Will revert if the caller is not the upgrader role
-    function _authorizeUpgrade(address newImplementation) internal override onlyRole(RoycoRoles.UPGRADER_ROLE) { }
+    function _authorizeUpgrade(address newImplementation) internal override checkRoleAndDelayIfGated(RoycoRoles.UPGRADER_ROLE) { }
 
     /// @dev Returns if the specified action employs a synchronous execution model
     function _isSync(Action _action) internal view returns (bool) {

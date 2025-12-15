@@ -683,5 +683,5 @@ abstract contract RoycoKernel is IRoycoKernel, UUPSUpgradeable, RoycoAuth {
 
     /// @inheritdoc UUPSUpgradeable
     /// @dev Will revert if the caller is not the upgrader role
-    function _authorizeUpgrade(address newImplementation) internal override onlyRole(RoycoRoles.UPGRADER_ROLE) { }
+    function _authorizeUpgrade(address newImplementation) internal override checkRoleAndDelayIfGated(RoycoRoles.UPGRADER_ROLE) { }
 }
