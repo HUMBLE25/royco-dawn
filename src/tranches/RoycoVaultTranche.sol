@@ -247,19 +247,19 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoAuth, UUPSUpgrad
     {
         require(_assets != 0, MUST_DEPOSIT_NON_ZERO_ASSETS());
 
-        IRoycoKernel kernel = IRoycoKernel(kernel());
+        IRoycoKernel kernel_ = IRoycoKernel(kernel());
         IERC20 asset = IERC20(asset());
 
         // Transfer the assets from the receiver to the kernel, if the deposit is synchronous
         // If the deposit is asynchronous, the assets were transferred in during requestDeposit
         if (_isSync(Action.DEPOSIT)) {
-            asset.safeTransferFrom(_receiver, address(kernel), _assets);
+            asset.safeTransferFrom(_receiver, address(kernel_), _assets);
         }
 
         // Deposit the assets into the underlying investment opportunity and get the fraction of total assets allocated
         (uint256 valueAllocated, uint256 effectiveNAVToMintAt) = (TRANCHE_TYPE() == TrancheType.SENIOR
-                ? kernel.stDeposit(address(asset), _assets, _controller, _receiver)
-                : kernel.jtDeposit(address(asset), _assets, _controller, _receiver));
+                ? kernel_.stDeposit(address(asset), _assets, _controller, _receiver)
+                : kernel_.jtDeposit(address(asset), _assets, _controller, _receiver));
 
         // valueAllocated represents the value of the assets deposited in the asset that the tranche's NAV is denominated in
         // shares are minted to the user at the effective NAV of the tranche

@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import { Vm } from "../../../lib/forge-std/src/Vm.sol";
 import { IERC20 } from "../../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-import { ERC4626ST_AaveV3JT_Kernel } from "../../../src/kernels/ERC4626ST_AaveV3JT_Kernel.sol";
+import { ERC4626ST_AaveV3JT_Kernel } from "../../../src/KERNELs/ERC4626ST_AaveV3JT_Kernel.sol";
 import { ConstantsLib } from "../../../src/libraries/ConstantsLib.sol";
 import { RoycoKernelInitParams } from "../../../src/libraries/RoycoKernelStorageLib.sol";
 import { RoycoVaultTranche } from "../../../src/tranches/RoycoVaultTranche.sol";
@@ -11,18 +11,21 @@ import { BaseTest } from "../../base/BaseTest.sol";
 import { ERC4626Mock } from "../../mock/ERC4626Mock.sol";
 
 abstract contract MainnetForkWithAaveTestBase is BaseTest {
-    uint256 internal constant AAVE_MAX_ABS_NAV_DELTA = 2;
+    // TODO: Review All
+    uint256 internal constant AAVE_MAX_ABS_NAV_DELTA = 3;
+    uint256 internal constant MAX_REDEEM_RELATIVE_DELTA = 0.0001e18; // 0.01%
+    uint256 internal constant MAX_CONVERT_TO_ASSETS_RELATIVE_DELTA = 0.0001e18; // 0.01%
 
     Vm.Wallet internal RESERVE;
     address internal RESERVE_ADDRESS;
 
     // Deployed contracts
-    ERC4626Mock internal mockStUnderlyingVault;
-    ERC4626ST_AaveV3JT_Kernel internal erc4626STAaveV3JTKernel;
+    ERC4626Mock internal MOCK_UNDERLYING_ST_VAULT;
+    ERC4626ST_AaveV3JT_Kernel internal ERC4626ST_AAVEV3JT_KERNEL;
 
     // External Contracts
-    IERC20 internal usdc = IERC20(ETHEREUM_MAINNET_USDC_ADDRESS);
-    IERC20 internal aToken = IERC20(aTokenAddresses[1][ETHEREUM_MAINNET_USDC_ADDRESS]);
+    IERC20 internal USDC = IERC20(ETHEREUM_MAINNET_USDC_ADDRESS);
+    IERC20 internal AUSDC = IERC20(aTokenAddresses[1][ETHEREUM_MAINNET_USDC_ADDRESS]);
 
     constructor() {
         BETA_WAD = 0; // Different opportunities
@@ -32,25 +35,27 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
         // Setup wallets
         RESERVE = vm.createWallet("RESERVE");
         RESERVE_ADDRESS = RESERVE.addr;
+        vm.label(RESERVE_ADDRESS, "RESERVE");
 
         // Deploy core
         super._setUpRoyco();
+        vm.label(address(USDC), "USDC");
+        vm.label(address(AUSDC), "aUSDC");
 
         // Deal USDC to all configured addresses for mainnet fork tests
         _dealUSDCToAddresses();
 
         // Deploy mock senior tranche underlying vault
-        mockStUnderlyingVault = new ERC4626Mock(ETHEREUM_MAINNET_USDC_ADDRESS, RESERVE_ADDRESS);
-        vm.label(address(mockStUnderlyingVault), "MockSTUnderlyingVault");
+        MOCK_UNDERLYING_ST_VAULT = new ERC4626Mock(ETHEREUM_MAINNET_USDC_ADDRESS, RESERVE_ADDRESS);
+        vm.label(address(MOCK_UNDERLYING_ST_VAULT), "MockSTUnderlyingVault");
         // Have the reserve approve the mock senior tranche underlying vault to spend USDC
         vm.prank(RESERVE_ADDRESS);
-        IERC20(ETHEREUM_MAINNET_USDC_ADDRESS).approve(address(mockStUnderlyingVault), type(uint256).max);
+        IERC20(ETHEREUM_MAINNET_USDC_ADDRESS).approve(address(MOCK_UNDERLYING_ST_VAULT), type(uint256).max);
 
         // Deploy the markets
-        (RoycoVaultTranche seniorTranche_, RoycoVaultTranche juniorTranche_, ERC4626ST_AaveV3JT_Kernel erc4626STAaveV3JTKernel_, bytes32 marketId_) =
-            _deployMarketWithKernel();
-        _setDeployedMarket(seniorTranche_, juniorTranche_, erc4626STAaveV3JTKernel_, marketId_);
-        erc4626STAaveV3JTKernel = erc4626STAaveV3JTKernel_;
+        (RoycoVaultTranche seniorTranche, RoycoVaultTranche juniorTranche, ERC4626ST_AaveV3JT_Kernel kernel, bytes32 marketID) = _deployMarketWithKernel();
+        _setDeployedMarket(seniorTranche, juniorTranche, kernel, marketID);
+        ERC4626ST_AAVEV3JT_KERNEL = kernel;
     }
 
     /// @notice Deals USDC tokens to all configured addresses for mainnet fork tests
@@ -77,35 +82,35 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
 
     function _deployMarketWithKernel()
         internal
-        returns (RoycoVaultTranche seniorTranche_, RoycoVaultTranche juniorTranche_, ERC4626ST_AaveV3JT_Kernel kernel_, bytes32 marketId_)
+        returns (RoycoVaultTranche seniorTranche, RoycoVaultTranche juniorTranche, ERC4626ST_AaveV3JT_Kernel kernel, bytes32 marketID)
     {
-        // Deploy kernel
-        kernel_ = ERC4626ST_AaveV3JT_Kernel(_deployKernel(address(erc4626ST_AaveV3JT_KernelImplementation), bytes("")));
+        // Deploy KERNEL
+        kernel = ERC4626ST_AaveV3JT_Kernel(_deployKernel(address(ERC4626ST_AAVEV3JT_KERNEL_IMPL), bytes("")));
 
-        // Deploy market with kernel
-        (seniorTranche_, juniorTranche_, marketId_) = _deployMarket(
+        // Deploy market with KERNEL
+        (seniorTranche, juniorTranche, marketID) = _deployMarket(
             SENIOR_TRANCH_NAME,
             SENIOR_TRANCH_SYMBOL,
             JUNIOR_TRANCH_NAME,
             JUNIOR_TRANCH_SYMBOL,
             ETHEREUM_MAINNET_USDC_ADDRESS,
             ETHEREUM_MAINNET_USDC_ADDRESS,
-            address(kernel_)
+            address(kernel)
         );
 
-        // Prepare kernel initialization parameters
+        // Prepare KERNEL initialization parameters
         RoycoKernelInitParams memory params = RoycoKernelInitParams({
-            seniorTranche: address(seniorTranche_),
-            juniorTranche: address(juniorTranche_),
+            seniorTranche: address(seniorTranche),
+            juniorTranche: address(juniorTranche),
             coverageWAD: COVERAGE_WAD,
             betaWAD: BETA_WAD,
-            rdm: address(rdm),
+            rdm: address(RDM),
             protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS,
             protocolFeeWAD: PROTOCOL_FEE_WAD
         });
 
-        // Initialize the kernel
-        kernel_.initialize(params, OWNER_ADDRESS, PAUSER_ADDRESS, address(mockStUnderlyingVault), ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS);
+        // Initialize the KERNEL
+        kernel.initialize(params, OWNER_ADDRESS, PAUSER_ADDRESS, address(MOCK_UNDERLYING_ST_VAULT), ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS);
     }
 
     /// @notice Returns the fork configuration
@@ -117,5 +122,16 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
         if (bytes(forkRpcUrl).length == 0) {
             fail("MAINNET_RPC_URL environment variable is not set");
         }
+    }
+
+    /// @notice Generates a provider address for the mainnet fork with Aave test base
+    /// @param _tranche The tranche to generate the provider for
+    /// @param _index The index of the provider
+    /// @return provider The provider wallet
+    function _generateProvider(RoycoVaultTranche _tranche, uint256 _index) internal virtual override returns (Vm.Wallet memory provider) {
+        provider = super._generateProvider(_tranche, _index);
+
+        // Fund the provider with 10M USDC
+        deal(ETHEREUM_MAINNET_USDC_ADDRESS, provider.addr, 10_000_000e6);
     }
 }

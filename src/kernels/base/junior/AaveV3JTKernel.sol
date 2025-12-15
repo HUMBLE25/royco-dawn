@@ -8,6 +8,7 @@ import { IPoolAddressesProvider } from "../../../interfaces/aave/IPoolAddressesP
 import { IPoolDataProvider } from "../../../interfaces/aave/IPoolDataProvider.sol";
 import { ExecutionModel, IRoycoKernel } from "../../../interfaces/kernel/IRoycoKernel.sol";
 import { Operation } from "../../../libraries/RoycoKernelStorageLib.sol";
+import { RoycoKernelState, RoycoKernelStorageLib } from "../../../libraries/RoycoKernelStorageLib.sol";
 import { AaveV3KernelState, AaveV3KernelStorageLib } from "../../../libraries/kernels/AaveV3KernelStorageLib.sol";
 import { RoycoKernel } from "../RoycoKernel.sol";
 import { BaseAsyncJTRedemptionDelayKernel } from "./BaseAsyncJTRedemptionDelayKernel.sol";
@@ -62,13 +63,15 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
         onlyJuniorTranche
         syncNAVs(Operation.JT_DEPOSIT)
         whenNotPaused
-        returns (uint256 underlyingSharesAllocated, uint256 totalUnderlyingShares)
+        returns (uint256 valueAllocated, uint256 effectiveNAVToMintAt)
     {
-        // Max approval already given to the pool on initialization
+        // The effective NAV to mint at is the effective NAV of the tranche before the deposit is made, ie. the NAV at which the shares will be minted
+        // Assumes that _preOpSyncTrancheNAVs has already been called and the NAVs have been updated to reflect the deposit
+        effectiveNAVToMintAt = RoycoKernelStorageLib._getRoycoKernelStorage().lastJTEffectiveNAV;
+
         AaveV3KernelState storage $ = AaveV3KernelStorageLib._getAaveV3KernelStorage();
         IPool($.pool).supply($.asset, _assets, address(this), 0);
-        underlyingSharesAllocated = _assets;
-        totalUnderlyingShares = _getJuniorTrancheEffectiveNAV();
+        valueAllocated = _assets;
     }
 
     /// @inheritdoc IRoycoKernel

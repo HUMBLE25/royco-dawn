@@ -5,14 +5,14 @@ import { Test } from "../../lib/forge-std/src/Test.sol";
 import { Vm } from "../../lib/forge-std/src/Vm.sol";
 import { ERC20Mock } from "../../lib/openzeppelin-contracts/contracts/mocks/token/ERC20Mock.sol";
 import { ERC1967Proxy } from "../../lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import { ERC4626ST_AaveV3JT_Kernel } from "../../src/KERNELs/ERC4626ST_AaveV3JT_Kernel.sol";
+import { RoycoKernel } from "../../src/KERNELs/base/RoycoKernel.sol";
+import { StaticCurveRDM } from "../../src/RDM/StaticCurveRDM.sol";
 import { RoycoTrancheFactory } from "../../src/RoycoTrancheFactory.sol";
 import { RoycoAuth, RoycoRoles } from "../../src/auth/RoycoAuth.sol";
-import { IRoycoKernel } from "../../src/interfaces/kernel/IRoycoKernel.sol";
-import { ERC4626ST_AaveV3JT_Kernel } from "../../src/kernels/ERC4626ST_AaveV3JT_Kernel.sol";
-import { RoycoKernel } from "../../src/kernels/base/RoycoKernel.sol";
+import { IRoycoKernel } from "../../src/interfaces/KERNEL/IRoycoKernel.sol";
 import { ConstantsLib } from "../../src/libraries/ConstantsLib.sol";
 import { RoycoKernelInitParams } from "../../src/libraries/RoycoKernelStorageLib.sol";
-import { StaticCurveRDM } from "../../src/rdm/StaticCurveRDM.sol";
 import { RoycoJT } from "../../src/tranches/RoycoJT.sol";
 import { RoycoST } from "../../src/tranches/RoycoST.sol";
 import { RoycoVaultTranche } from "../../src/tranches/RoycoVaultTranche.sol";
@@ -23,6 +23,7 @@ contract BaseTest is Test {
         uint256 effectiveNAV;
         uint256 totalEffectiveAssets;
         uint256 protocolFeeValue;
+        uint256 totalShares;
     }
 
     // -----------------------------------------
@@ -59,27 +60,27 @@ contract BaseTest is Test {
     // Assets
     // -----------------------------------------
 
-    ERC20Mock internal mockUSDC;
-    ERC20Mock internal mockUSDT;
-    ERC20Mock internal mockDAI;
-    address[] internal assets;
+    ERC20Mock internal MOCK_USDC;
+    ERC20Mock internal MOCK_USDT;
+    ERC20Mock internal MOCK_DAI;
+    address[] internal ASSETS;
 
     // -----------------------------------------
     // Royco Deployments
     // -----------------------------------------
 
     // Initial Deployments
-    RoycoTrancheFactory public factory;
-    StaticCurveRDM public rdm;
-    RoycoST public stImplementation;
-    RoycoJT public jtImplementation;
-    ERC4626ST_AaveV3JT_Kernel public erc4626ST_AaveV3JT_KernelImplementation;
+    RoycoTrancheFactory public FACTORY;
+    StaticCurveRDM public RDM;
+    RoycoST public ST_IMPL;
+    RoycoJT public JT_IMPL;
+    ERC4626ST_AaveV3JT_Kernel public ERC4626ST_AAVEV3JT_KERNEL_IMPL;
 
     // Deployed Later in the concrete tests
-    RoycoVaultTranche internal seniorTranche;
-    RoycoVaultTranche internal juniorTranche;
-    RoycoKernel internal kernel;
-    bytes32 internal marketId;
+    RoycoVaultTranche internal ST;
+    RoycoVaultTranche internal JT;
+    RoycoKernel internal KERNEL;
+    bytes32 internal MARKET_ID;
 
     // -----------------------------------------
     // Royco Deployments Parameters
@@ -118,22 +119,22 @@ contract BaseTest is Test {
         _setupAssets(10_000_000_000);
 
         // Deploy RDM
-        rdm = new StaticCurveRDM();
-        vm.label(address(rdm), "RDM");
+        RDM = new StaticCurveRDM();
+        vm.label(address(RDM), "RDM");
 
         // Deploy tranche implementations
-        stImplementation = new RoycoST();
-        jtImplementation = new RoycoJT();
-        vm.label(address(stImplementation), "STImpl");
-        vm.label(address(jtImplementation), "JTImpl");
+        ST_IMPL = new RoycoST();
+        JT_IMPL = new RoycoJT();
+        vm.label(address(ST_IMPL), "STImpl");
+        vm.label(address(JT_IMPL), "JTImpl");
 
-        // Deploy kernel implementation
-        erc4626ST_AaveV3JT_KernelImplementation = new ERC4626ST_AaveV3JT_Kernel();
-        vm.label(address(erc4626ST_AaveV3JT_KernelImplementation), "KernelImpl");
+        // Deploy KERNEL implementation
+        ERC4626ST_AAVEV3JT_KERNEL_IMPL = new ERC4626ST_AaveV3JT_Kernel();
+        vm.label(address(ERC4626ST_AAVEV3JT_KERNEL_IMPL), "KernelImpl");
 
-        // Deploy factory
-        factory = new RoycoTrancheFactory(address(stImplementation), address(jtImplementation));
-        vm.label(address(factory), "Factory");
+        // Deploy FACTORY
+        FACTORY = new RoycoTrancheFactory(address(ST_IMPL), address(JT_IMPL));
+        vm.label(address(FACTORY), "Factory");
     }
 
     function _setupFork() internal {
@@ -145,23 +146,23 @@ contract BaseTest is Test {
     }
 
     function _setupAssets(uint256 _seedAmount) internal {
-        mockUSDC = new ERC20Mock();
-        mockUSDC.mint(OWNER_ADDRESS, _seedAmount * (10 ** 18));
-        mockUSDC.mint(ALICE_ADDRESS, _seedAmount * (10 ** 18));
-        mockUSDC.mint(BOB_ADDRESS, _seedAmount * (10 ** 18));
-        assets.push(address(mockUSDC));
+        MOCK_USDC = new ERC20Mock();
+        MOCK_USDC.mint(OWNER_ADDRESS, _seedAmount * (10 ** 18));
+        MOCK_USDC.mint(ALICE_ADDRESS, _seedAmount * (10 ** 18));
+        MOCK_USDC.mint(BOB_ADDRESS, _seedAmount * (10 ** 18));
+        ASSETS.push(address(MOCK_USDC));
 
-        mockUSDT = new ERC20Mock();
-        mockUSDT.mint(OWNER_ADDRESS, _seedAmount * (10 ** 18));
-        mockUSDT.mint(ALICE_ADDRESS, _seedAmount * (10 ** 18));
-        mockUSDT.mint(BOB_ADDRESS, _seedAmount * (10 ** 18));
-        assets.push(address(mockUSDT));
+        MOCK_USDT = new ERC20Mock();
+        MOCK_USDT.mint(OWNER_ADDRESS, _seedAmount * (10 ** 18));
+        MOCK_USDT.mint(ALICE_ADDRESS, _seedAmount * (10 ** 18));
+        MOCK_USDT.mint(BOB_ADDRESS, _seedAmount * (10 ** 18));
+        ASSETS.push(address(MOCK_USDT));
 
-        mockDAI = new ERC20Mock();
-        mockDAI.mint(OWNER_ADDRESS, _seedAmount * (10 ** 18));
-        mockDAI.mint(ALICE_ADDRESS, _seedAmount * (10 ** 18));
-        mockDAI.mint(BOB_ADDRESS, _seedAmount * (10 ** 18));
-        assets.push(address(mockDAI));
+        MOCK_DAI = new ERC20Mock();
+        MOCK_DAI.mint(OWNER_ADDRESS, _seedAmount * (10 ** 18));
+        MOCK_DAI.mint(ALICE_ADDRESS, _seedAmount * (10 ** 18));
+        MOCK_DAI.mint(BOB_ADDRESS, _seedAmount * (10 ** 18));
+        ASSETS.push(address(MOCK_DAI));
     }
 
     function _setupWallets() internal {
@@ -193,15 +194,15 @@ contract BaseTest is Test {
         providers.push(DAN_ADDRESS);
     }
 
-    function _setDeployedMarket(RoycoVaultTranche _seniorTranche, RoycoVaultTranche _juniorTranche, RoycoKernel _kernel, bytes32 _marketId) internal {
-        seniorTranche = _seniorTranche;
-        juniorTranche = _juniorTranche;
-        kernel = _kernel;
-        marketId = _marketId;
+    function _setDeployedMarket(RoycoVaultTranche _st, RoycoVaultTranche _jt, RoycoKernel _kernel, bytes32 _marketId) internal {
+        ST = _st;
+        JT = _jt;
+        KERNEL = _kernel;
+        MARKET_ID = _marketId;
 
-        vm.label(address(seniorTranche), "ST");
-        vm.label(address(juniorTranche), "JT");
-        vm.label(address(kernel), "Kernel");
+        vm.label(address(ST), "ST");
+        vm.label(address(JT), "JT");
+        vm.label(address(KERNEL), "Kernel");
     }
 
     function _initWallet(string memory _name, uint256 _amount) internal returns (Vm.Wallet memory) {
@@ -237,111 +238,120 @@ contract BaseTest is Test {
         }
     }
 
-    /// @notice Sets up roles for a kernel
-    /// @param _kernel The kernel address
+    /// @notice Sets up roles for a KERNEL
+    /// @param _kernel The KERNEL address
     /// @param _schedulerManager The scheduler manager address
-    /// @param _kernelAdmin The kernel admin address
+    /// @param _kernelAdmin The KERNEL admin address
     function _setUpKernelRoles(address _kernel, address _schedulerManager, address _kernelAdmin) internal prankModifier(OWNER_ADDRESS) {
         RoycoAuth __kernel = RoycoAuth(_kernel);
         __kernel.grantRole(RoycoRoles.SCHEDULER_MANAGER_ROLE, _schedulerManager);
         __kernel.grantRole(RoycoRoles.KERNEL_ADMIN_ROLE, _kernelAdmin);
     }
 
-    /// @notice Deploys a market using the factory
-    /// @param _seniorTrancheName Name of the senior tranche
-    /// @param _seniorTrancheSymbol Symbol of the senior tranche
-    /// @param _juniorTrancheName Name of the junior tranche
-    /// @param _juniorTrancheSymbol Symbol of the junior tranche
+    /// @notice Generates a provider address
+    /// @param index The index of the provider
+    /// @return provider The provider address
+    function _generateProvider(RoycoVaultTranche _tranche, uint256 index) internal virtual returns (Vm.Wallet memory provider) {
+        // Generate a unique wallet
+        string memory providerName = string(abi.encodePacked("PROVIDER", vm.toString(index)));
+        provider = _initWallet(providerName, 10_000_000e6);
+
+        // Grant Permissions
+        vm.startPrank(OWNER_ADDRESS);
+        _tranche.grantRole(RoycoRoles.DEPOSIT_ROLE, provider.addr);
+        _tranche.grantRole(RoycoRoles.REDEEM_ROLE, provider.addr);
+        vm.stopPrank();
+
+        return provider;
+    }
+
+    /// @notice Deploys a market using the FACTORY
+    /// @param _stName Name of the senior tranche
+    /// @param _stSymbol Symbol of the senior tranche
+    /// @param _jtName Name of the junior tranche
+    /// @param _jtSymbol Symbol of the junior tranche
     /// @param _seniorAsset Asset for the senior tranche
     /// @param _juniorAsset Asset for the junior tranche
-    /// @param _kernel Address of the kernel contract
+    /// @param _kernel Address of the KERNEL contract
     function _deployMarket(
-        string memory _seniorTrancheName,
-        string memory _seniorTrancheSymbol,
-        string memory _juniorTrancheName,
-        string memory _juniorTrancheSymbol,
+        string memory _stName,
+        string memory _stSymbol,
+        string memory _jtName,
+        string memory _jtSymbol,
         address _seniorAsset,
         address _juniorAsset,
         address _kernel
     )
         internal
-        returns (RoycoVaultTranche seniorTranche, RoycoVaultTranche juniorTranche, bytes32 marketId)
+        returns (RoycoVaultTranche ST, RoycoVaultTranche JT, bytes32 MARKET_ID)
     {
-        marketId = keccak256(abi.encode(_seniorTrancheName, _juniorTrancheName, block.timestamp));
+        MARKET_ID = keccak256(abi.encode(_stName, _jtName, block.timestamp));
 
-        (address _seniorTranche, address _juniorTranche) = factory.deployMarket(
-            _seniorTrancheName,
-            _seniorTrancheSymbol,
-            _juniorTrancheName,
-            _juniorTrancheSymbol,
-            _seniorAsset,
-            _juniorAsset,
-            _kernel,
-            OWNER_ADDRESS,
-            PAUSER_ADDRESS,
-            marketId
-        );
+        (address _st, address _jt) =
+            FACTORY.deployMarket(_stName, _stSymbol, _jtName, _jtSymbol, _seniorAsset, _juniorAsset, _kernel, OWNER_ADDRESS, PAUSER_ADDRESS, MARKET_ID);
 
-        seniorTranche = RoycoVaultTranche(_seniorTranche);
-        juniorTranche = RoycoVaultTranche(_juniorTranche);
+        ST = RoycoVaultTranche(_st);
+        JT = RoycoVaultTranche(_jt);
     }
 
     /// @notice Verifies the preview NAVs of the senior and junior tranches
-    /// @param _seniorTrancheState The state of the senior tranche
-    /// @param _juniorTrancheState The state of the junior tranche
-    function _verifyPreviewNAVs(TrancheState memory _seniorTrancheState, TrancheState memory _juniorTrancheState, uint256 maxAbsDelta) internal {
-        assertTrue(address(seniorTranche) != address(0), "Senior tranche is not deployed");
-        assertTrue(address(juniorTranche) != address(0), "Junior tranche is not deployed");
+    /// @param _stState The state of the senior tranche
+    /// @param _jtState The state of the junior tranche
+    function _verifyPreviewNAVs(TrancheState memory _stState, TrancheState memory _jtState, uint256 _maxAbsDelta) internal {
+        assertTrue(address(ST) != address(0), "Senior tranche is not deployed");
+        assertTrue(address(JT) != address(0), "Junior tranche is not deployed");
 
-        assertApproxEqAbs(seniorTranche.getRawNAV(), _seniorTrancheState.rawNAV, maxAbsDelta, "ST raw NAV mismatch");
-        assertApproxEqAbs(seniorTranche.getEffectiveNAV(), _seniorTrancheState.effectiveNAV, maxAbsDelta, "ST effective NAV mismatch");
-        assertApproxEqAbs(seniorTranche.totalAssets(), _seniorTrancheState.totalEffectiveAssets, maxAbsDelta, "ST total effective assets mismatch");
+        assertApproxEqAbs(ST.getRawNAV(), _stState.rawNAV, _maxAbsDelta, "ST raw NAV mismatch");
+        assertApproxEqAbs(ST.getEffectiveNAV(), _stState.effectiveNAV, _maxAbsDelta, "ST effective NAV mismatch");
+        assertApproxEqAbs(ST.totalAssets(), _stState.totalEffectiveAssets, _maxAbsDelta, "ST total effective ASSETS mismatch");
 
-        assertApproxEqAbs(juniorTranche.getRawNAV(), _juniorTrancheState.rawNAV, maxAbsDelta, "JT raw NAV mismatch");
-        assertApproxEqAbs(juniorTranche.getEffectiveNAV(), _juniorTrancheState.effectiveNAV, maxAbsDelta, "JT effective NAV mismatch");
-        assertApproxEqAbs(juniorTranche.totalAssets(), _juniorTrancheState.totalEffectiveAssets, maxAbsDelta, "JT total effective assets mismatch");
+        assertApproxEqAbs(JT.getRawNAV(), _jtState.rawNAV, _maxAbsDelta, "JT raw NAV mismatch");
+        assertApproxEqAbs(JT.getEffectiveNAV(), _jtState.effectiveNAV, _maxAbsDelta, "JT effective NAV mismatch");
+        assertApproxEqAbs(JT.totalAssets(), _jtState.totalEffectiveAssets, _maxAbsDelta, "JT total effective ASSETS mismatch");
     }
 
     /// @notice Verifies the fee taken by the senior and junior tranches
-    /// @param _seniorTrancheState The state of the senior tranche
-    /// @param _juniorTrancheState The state of the junior tranche
+    /// @param _stState The state of the senior tranche
+    /// @param _jtState The state of the junior tranche
     /// @param _feeRecipient The address of the fee recipient
-    function _verifyFeeTaken(TrancheState storage _seniorTrancheState, TrancheState storage _juniorTrancheState, address _feeRecipient) internal {
-        uint256 seniorFeeShares = seniorTranche.balanceOf(_feeRecipient);
-        uint256 seniorFeeSharesValue = seniorTranche.convertToAssets(seniorFeeShares);
-        assertEq(seniorFeeSharesValue, _seniorTrancheState.protocolFeeValue, "ST protocol fee value mismatch");
+    function _verifyFeeTaken(TrancheState storage _stState, TrancheState storage _jtState, address _feeRecipient) internal {
+        uint256 seniorFeeShares = ST.balanceOf(_feeRecipient);
+        uint256 seniorFeeSharesValue = ST.convertToAssets(seniorFeeShares);
+        assertEq(seniorFeeSharesValue, _stState.protocolFeeValue, "ST protocol fee value mismatch");
 
-        uint256 juniorFeeShares = juniorTranche.balanceOf(_feeRecipient);
-        uint256 juniorFeeSharesValue = juniorTranche.convertToAssets(juniorFeeShares);
-        assertEq(juniorFeeSharesValue, _juniorTrancheState.protocolFeeValue, "JT protocol fee value mismatch");
+        uint256 juniorFeeShares = JT.balanceOf(_feeRecipient);
+        uint256 juniorFeeSharesValue = JT.convertToAssets(juniorFeeShares);
+        assertEq(juniorFeeSharesValue, _jtState.protocolFeeValue, "JT protocol fee value mismatch");
     }
 
     /// @notice Updates the state of the senior and junior tranches on a deposit
     /// @param _trancheState The state of the tranche
-    /// @param _assets The amount of assets deposited
-    /// @param _assetsValue The value of the assets deposited
-    function _updateOnDeposit(TrancheState storage _trancheState, uint256 _assets, uint256 _assetsValue) internal {
+    /// @param _assets The amount of ASSETS deposited
+    /// @param _assetsValue The value of the ASSETS deposited
+    function _updateOnDeposit(TrancheState storage _trancheState, uint256 _assets, uint256 _assetsValue, uint256 _shares) internal {
         _trancheState.rawNAV += _assetsValue;
         _trancheState.effectiveNAV += _assetsValue;
         _trancheState.totalEffectiveAssets += _assets;
+        _trancheState.totalShares += _shares;
     }
 
     /// @notice Updates the state of the senior and junior tranches on a withdrawal
     /// @param _trancheState The state of the tranche
-    /// @param _assets The amount of assets withdrawn
-    /// @param _assetsValue The value of the assets withdrawn
-    function _updateOnWithdraw(TrancheState storage _trancheState, uint256 _assets, uint256 _assetsValue) internal {
+    /// @param _assets The amount of ASSETS withdrawn
+    /// @param _assetsValue The value of the ASSETS withdrawn
+    function _updateOnWithdraw(TrancheState storage _trancheState, uint256 _assets, uint256 _assetsValue, uint256 _shares) internal {
         _trancheState.rawNAV -= _assetsValue;
         _trancheState.effectiveNAV -= _assetsValue;
         _trancheState.totalEffectiveAssets -= _assets;
+        _trancheState.totalShares -= _shares;
     }
 
-    /// @notice Deploys a kernel using ERC1967 proxy
+    /// @notice Deploys a KERNEL using ERC1967 proxy
     /// @param _kernelImplementation The implementation address
     /// @param _kernelInitData The initialization data
-    /// @return kernelProxy The deployed proxy address
-    function _deployKernel(address _kernelImplementation, bytes memory _kernelInitData) internal returns (address kernelProxy) {
-        kernelProxy = address(new ERC1967Proxy(_kernelImplementation, _kernelInitData));
+    /// @return KERNELProxy The deployed proxy address
+    function _deployKernel(address _kernelImplementation, bytes memory _kernelInitData) internal returns (address KERNELProxy) {
+        KERNELProxy = address(new ERC1967Proxy(_kernelImplementation, _kernelInitData));
     }
 
     /// @notice Returns the fork configuration

@@ -62,6 +62,10 @@ abstract contract ERC4626STKernel is RoycoKernel {
         syncNAVsAndEnforceCoverage(Operation.ST_DEPOSIT)
         returns (uint256 valueAllocated, uint256 effectiveNAVToMintAt)
     {
+        // The effective NAV to mint at is the effective NAV of the tranche before the deposit is made, ie. the NAV at which the shares will be minted
+        // Assumes that _preOpSyncTrancheNAVs has already been called and the NAVs have been updated to reflect the deposit
+        effectiveNAVToMintAt = RoycoKernelStorageLib._getRoycoKernelStorage().lastSTEffectiveNAV;
+
         // Deposit the assets into the underlying investment vault
         address vault = ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault;
 
@@ -70,9 +74,6 @@ abstract contract ERC4626STKernel is RoycoKernel {
 
         // The value of the assets deposited is the value of the assets in the asset that the tranche's NAV is denominated in
         valueAllocated = _convertAssetsToValue(_assets);
-
-        // The effective NAV to mint at is the effective NAV of the tranche before the deposit is made, ie. the NAV at which the shares will be minted
-        effectiveNAVToMintAt = _getSeniorTrancheEffectiveNAV();
     }
 
     /// @inheritdoc IRoycoKernel

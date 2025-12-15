@@ -2,8 +2,8 @@
 pragma solidity ^0.8.28;
 
 import { IERC20Metadata } from "../../lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import { IRoycoKernel } from "../../src/interfaces/KERNEL/IRoycoKernel.sol";
 import { IPool } from "../../src/interfaces/aave/IPool.sol";
-import { IRoycoKernel } from "../../src/interfaces/kernel/IRoycoKernel.sol";
 import { RoycoKernelState } from "../../src/libraries/RoycoKernelStorageLib.sol";
 import { MainnetForkWithAaveTestBase } from "./base/MainnetForkWithAaveBaseTest.sol";
 
@@ -19,56 +19,54 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
     /// @notice Verifies senior tranche deployment parameters
     function test_SeniorTrancheDeployment() public {
         // Basic wiring
-        assertTrue(address(seniorTranche) != address(0), "Senior tranche not deployed");
+        assertTrue(address(ST) != address(0), "Senior tranche not deployed");
         // Kernel wiring
-        assertEq(seniorTranche.kernel(), address(kernel), "ST kernel address mismatch");
-        assertEq(seniorTranche.marketId(), marketId, "ST marketId mismatch");
+        assertEq(ST.kernel(), address(KERNEL), "ST KERNEL address mismatch");
+        assertEq(ST.marketId(), MARKET_ID, "ST MARKET_ID mismatch");
 
         // Asset and metadata
-        assertEq(address(seniorTranche.asset()), ETHEREUM_MAINNET_USDC_ADDRESS, "ST asset should be USDC");
-        assertEq(seniorTranche.name(), SENIOR_TRANCH_NAME, "ST name mismatch");
-        assertEq(seniorTranche.symbol(), SENIOR_TRANCH_SYMBOL, "ST symbol mismatch");
+        assertEq(address(ST.asset()), ETHEREUM_MAINNET_USDC_ADDRESS, "ST asset should be USDC");
+        assertEq(ST.name(), SENIOR_TRANCH_NAME, "ST name mismatch");
+        assertEq(ST.symbol(), SENIOR_TRANCH_SYMBOL, "ST symbol mismatch");
 
         // Initial NAV and totals
-        assertEq(seniorTranche.totalSupply(), 0, "ST initial totalSupply should be 0");
-        assertEq(seniorTranche.getRawNAV(), 0, "ST initial raw NAV should be 0");
-        assertEq(seniorTranche.getEffectiveNAV(), 0, "ST initial effective NAV should be 0");
-        assertEq(seniorTranche.totalAssets(), 0, "ST initial total assets should be 0");
+        assertEq(ST.totalSupply(), 0, "ST initial totalSupply should be 0");
+        assertEq(ST.getRawNAV(), 0, "ST initial raw NAV should be 0");
+        assertEq(ST.getEffectiveNAV(), 0, "ST initial effective NAV should be 0");
+        assertEq(ST.totalAssets(), 0, "ST initial total ASSETS should be 0");
     }
 
     /// @notice Verifies junior tranche deployment parameters
     function test_JuniorTrancheDeployment() public {
         // Basic wiring
-        assertTrue(address(juniorTranche) != address(0), "Junior tranche not deployed");
+        assertTrue(address(JT) != address(0), "Junior tranche not deployed");
         // Kernel wiring
-        assertEq(juniorTranche.kernel(), address(kernel), "JT kernel address mismatch");
-        assertEq(juniorTranche.marketId(), marketId, "JT marketId mismatch");
+        assertEq(JT.kernel(), address(KERNEL), "JT KERNEL address mismatch");
+        assertEq(JT.marketId(), MARKET_ID, "JT MARKET_ID mismatch");
 
         // Asset and metadata
-        assertEq(address(juniorTranche.asset()), ETHEREUM_MAINNET_USDC_ADDRESS, "JT asset should be USDC");
-        assertEq(juniorTranche.name(), JUNIOR_TRANCH_NAME, "JT name mismatch");
-        assertEq(juniorTranche.symbol(), JUNIOR_TRANCH_SYMBOL, "JT symbol mismatch");
+        assertEq(address(JT.asset()), ETHEREUM_MAINNET_USDC_ADDRESS, "JT asset should be USDC");
+        assertEq(JT.name(), JUNIOR_TRANCH_NAME, "JT name mismatch");
+        assertEq(JT.symbol(), JUNIOR_TRANCH_SYMBOL, "JT symbol mismatch");
 
         // Initial NAV and totals
-        assertEq(juniorTranche.totalSupply(), 0, "JT initial totalSupply should be 0");
-        assertEq(juniorTranche.getRawNAV(), 0, "JT initial raw NAV should be 0");
-        assertEq(juniorTranche.getEffectiveNAV(), 0, "JT initial effective NAV should be 0");
-        assertEq(juniorTranche.totalAssets(), 0, "JT initial total assets should be 0");
+        assertEq(JT.totalSupply(), 0, "JT initial totalSupply should be 0");
+        assertEq(JT.getRawNAV(), 0, "JT initial raw NAV should be 0");
+        assertEq(JT.getEffectiveNAV(), 0, "JT initial effective NAV should be 0");
+        assertEq(JT.totalAssets(), 0, "JT initial total ASSETS should be 0");
     }
 
-    /// @notice Verifies kernel deployment parameters and wiring
+    /// @notice Verifies KERNEL deployment parameters and wiring
     function test_KernelDeployment() public {
         // Basic wiring
-        assertTrue(address(erc4626STAaveV3JTKernel) != address(0), "Kernel not deployed");
+        assertTrue(address(KERNEL) != address(0), "Kernel not deployed");
 
-        IRoycoKernel kernelIface = IRoycoKernel(address(erc4626STAaveV3JTKernel));
-
-        // Verify kernel configuration via getKernelState
-        RoycoKernelState memory state = kernelIface.getKernelState();
+        // Verify KERNEL configuration via getKernelState
+        RoycoKernelState memory state = KERNEL.getKernelState();
 
         // Tranche wiring
-        assertEq(state.seniorTranche, address(seniorTranche), "Kernel seniorTranche mismatch");
-        assertEq(state.juniorTranche, address(juniorTranche), "Kernel juniorTranche mismatch");
+        assertEq(state.seniorTranche, address(ST), "Kernel ST mismatch");
+        assertEq(state.juniorTranche, address(JT), "Kernel JT mismatch");
 
         // Coverage, beta, protocol fee configuration
         assertEq(state.coverageWAD, COVERAGE_WAD, "Kernel coverageWAD mismatch");
@@ -78,16 +76,16 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         assertEq(state.protocolFeeWAD, PROTOCOL_FEE_WAD, "Kernel protocolFeeWAD mismatch");
 
         // RDM wiring
-        assertEq(state.rdm, address(rdm), "Kernel RDM mismatch");
+        assertEq(state.rdm, address(RDM), "Kernel RDM mismatch");
 
-        // Initial NAV / assets via kernel view functions
-        assertEq(kernelIface.getSTTotalEffectiveAssets(), 0, "Kernel ST total effective assets should be 0");
-        assertEq(kernelIface.getJTTotalEffectiveAssets(), 0, "Kernel JT total effective assets should be 0");
-        assertEq(kernelIface.getSTRawNAV(), 0, "Kernel ST raw NAV should be 0");
-        assertEq(kernelIface.getJTRawNAV(), 0, "Kernel JT raw NAV should be 0");
+        // Initial NAV / ASSETS via KERNEL view functions
+        assertEq(KERNEL.getSTTotalEffectiveAssets(), 0, "Kernel ST total effective ASSETS should be 0");
+        assertEq(KERNEL.getJTTotalEffectiveAssets(), 0, "Kernel JT total effective ASSETS should be 0");
+        assertEq(KERNEL.getSTRawNAV(), 0, "Kernel ST raw NAV should be 0");
+        assertEq(KERNEL.getJTRawNAV(), 0, "Kernel JT raw NAV should be 0");
 
-        // Aave wiring: pool and aToken mapping must be consistent
+        // Aave wiring: pool and AUSDC mapping must be consistent
         address expectedAToken = IPool(ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS).getReserveAToken(ETHEREUM_MAINNET_USDC_ADDRESS);
-        assertEq(expectedAToken, address(aToken), "aToken address should match Aave pool data");
+        assertEq(expectedAToken, address(AUSDC), "AUSDC address should match Aave pool data");
     }
 }
