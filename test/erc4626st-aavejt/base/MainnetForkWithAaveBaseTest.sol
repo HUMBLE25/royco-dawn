@@ -70,26 +70,26 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
 
     function _deployMarketWithKernel()
         internal
-        returns (RoycoVaultTranche seniorTranche, RoycoVaultTranche juniorTranche, ERC4626ST_AaveV3JT_Kernel kernel, bytes32 marketId)
+        returns (RoycoVaultTranche seniorTranche_, RoycoVaultTranche juniorTranche_, ERC4626ST_AaveV3JT_Kernel kernel_, bytes32 marketId_)
     {
         // Deploy kernel
-        kernel = ERC4626ST_AaveV3JT_Kernel(_deployKernel(address(erc4626ST_AaveV3JT_KernelImplementation), bytes("")));
+        kernel_ = ERC4626ST_AaveV3JT_Kernel(_deployKernel(address(erc4626ST_AaveV3JT_KernelImplementation), bytes("")));
 
         // Deploy market with kernel
-        (seniorTranche, juniorTranche, marketId) = _deployMarket(
+        (seniorTranche_, juniorTranche_, marketId_) = _deployMarket(
             SENIOR_TRANCH_NAME,
             SENIOR_TRANCH_SYMBOL,
             JUNIOR_TRANCH_NAME,
             JUNIOR_TRANCH_SYMBOL,
             ETHEREUM_MAINNET_USDC_ADDRESS,
             ETHEREUM_MAINNET_USDC_ADDRESS,
-            address(kernel)
+            address(kernel_)
         );
 
         // Prepare kernel initialization parameters
         RoycoKernelInitParams memory params = RoycoKernelInitParams({
-            seniorTranche: address(seniorTranche),
-            juniorTranche: address(juniorTranche),
+            seniorTranche: address(seniorTranche_),
+            juniorTranche: address(juniorTranche_),
             coverageWAD: DEFAULT_COVERAGE_WAD,
             betaWAD: DEFAULT_BETA_WAD,
             rdm: address(rdm),
@@ -98,7 +98,7 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
         });
 
         // Initialize the kernel
-        kernel.initialize(params, OWNER_ADDRESS, PAUSER_ADDRESS, address(mockStUnderlyingVault), ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS);
+        kernel_.initialize(params, OWNER_ADDRESS, PAUSER_ADDRESS, address(mockStUnderlyingVault), ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS);
     }
 
     /// @notice Returns the fork configuration

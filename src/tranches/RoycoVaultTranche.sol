@@ -45,12 +45,8 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoAuth, UUPSUpgrad
     /// @notice Thrown when the redeem amount is zero
     error MUST_CLAIM_NON_ZERO_SHARES();
 
-    /// @notice Modifier to ensure the functionality is disabled
-    /// forge-lint: disable-next-item(unwrapped-modifier-logic)
-    modifier disabled() {
-        revert DISABLED();
-        _;
-    }
+    /// @notice Thrown when the caller isn't the kernel
+    error ONLY_KERNEL();
 
     /// @notice Modifier to ensure the specified action uses a synchronous execution model
     /// @param _action The action to check (DEPOSIT or WITHDRAW)
@@ -146,11 +142,15 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoAuth, UUPSUpgrad
 
     /// @inheritdoc ERC4626Upgradeable
     /// @dev mint* flows are not supported
-    function maxMint(address _receiver) public view virtual override(ERC4626Upgradeable) disabled returns (uint256) { }
+    function maxMint(address) public view virtual override(ERC4626Upgradeable) returns (uint256) {
+        revert DISABLED();
+    }
 
     /// @inheritdoc ERC4626Upgradeable
     /// @dev withdraw* flows are not supported
-    function maxWithdraw(address _owner) public view virtual override(ERC4626Upgradeable) disabled returns (uint256) { }
+    function maxWithdraw(address) public view virtual override(ERC4626Upgradeable) returns (uint256) {
+        revert DISABLED();
+    }
 
     /// @inheritdoc ERC4626Upgradeable
     function maxRedeem(address _owner) public view virtual override(ERC4626Upgradeable) returns (uint256) {
@@ -187,11 +187,15 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoAuth, UUPSUpgrad
 
     /// @inheritdoc ERC4626Upgradeable
     /// @dev mint* flows are not supported
-    function previewMint(uint256 _shares) public view virtual override(ERC4626Upgradeable) disabled returns (uint256) { }
+    function previewMint(uint256) public view virtual override(ERC4626Upgradeable) returns (uint256) {
+        revert DISABLED();
+    }
 
     /// @inheritdoc ERC4626Upgradeable
     /// @dev withdraw* flows are not supported
-    function previewWithdraw(uint256 _assets) public view virtual override(ERC4626Upgradeable) disabled returns (uint256) { }
+    function previewWithdraw(uint256) public view virtual override(ERC4626Upgradeable) returns (uint256) {
+        revert DISABLED();
+    }
 
     /// @inheritdoc ERC4626Upgradeable
     /// @dev Disabled if withdrawal execution is asynchronous as per ERC7540
@@ -256,25 +260,21 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoAuth, UUPSUpgrad
 
     /// @inheritdoc ERC4626Upgradeable
     /// @dev mint* flows are not supported
-    function mint(uint256 _shares, address _receiver) public virtual override(ERC4626Upgradeable) disabled returns (uint256) { }
+    function mint(uint256, address) public virtual override(ERC4626Upgradeable) returns (uint256) {
+        revert DISABLED();
+    }
 
     /// @inheritdoc IERC7540
     /// @dev mint* flows are not supported
-    function mint(uint256 _shares, address _receiver, address _controller) public virtual override(IERC7540) disabled returns (uint256 assets) { }
+    function mint(uint256, address, address) public virtual override(IERC7540) returns (uint256) {
+        revert DISABLED();
+    }
 
     /// @inheritdoc IERC7540
     /// @dev withdraw* flows are not supported
-    function withdraw(
-        uint256 _assets,
-        address _receiver,
-        address _controller
-    )
-        public
-        virtual
-        override(ERC4626Upgradeable, IERC7540)
-        disabled
-        returns (uint256 shares)
-    { }
+    function withdraw(uint256, address, address) public virtual override(ERC4626Upgradeable, IERC7540) returns (uint256) {
+        revert DISABLED();
+    }
 
     /// @inheritdoc IERC7540
     function redeem(
@@ -525,7 +525,8 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoAuth, UUPSUpgrad
         executionIsAsync(Action.DEPOSIT)
         returns (uint256 assets)
     {
-        return (TRANCHE_TYPE() == TrancheType.SENIOR
+        assets =
+        (TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTDepositKernel(_kernel()).stClaimableCancelDepositRequest(_requestId, _controller)
                 : IAsyncJTDepositKernel(_kernel()).jtClaimableCancelDepositRequest(_requestId, _controller));
     }
@@ -608,7 +609,8 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoAuth, UUPSUpgrad
         executionIsAsync(Action.WITHDRAW)
         returns (uint256 shares)
     {
-        return (TRANCHE_TYPE() == TrancheType.SENIOR
+        shares =
+        (TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTWithdrawalKernel(_kernel()).stClaimableCancelRedeemRequest(_requestId, _controller)
                 : IAsyncJTWithdrawalKernel(_kernel()).jtClaimableCancelRedeemRequest(_requestId, _controller));
     }
@@ -656,8 +658,9 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoAuth, UUPSUpgrad
         external
         virtual
         override(IRoycoVaultTranche)
-        onlyRole(RoycoRoles.ROYCO_KERNEL)
     {
+        require(msg.sender == _kernel(), ONLY_KERNEL());
+
         // Compute the shares to be minted to the protocol fee recipient to satisfy the ratio of total assets that the fee represents
         // Subtract fee assets from total tranche assets because fees are included in total tranche assets
         // Round in favor of the tranche

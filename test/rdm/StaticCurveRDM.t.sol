@@ -107,7 +107,7 @@ contract StaticCurveRDMTest is BaseTest {
     }
 
     /// @notice Test utilization just above target (0.9 + epsilon)
-    function test_getJTYieldShare_utilizationJustAboveTarget() public {
+    function test_getJTYieldShare_utilizationJustAboveTarget() public view {
         // Setup: U = 0.900000000000000001 (just above 0.9)
         uint256 jtEffectiveNAV = 1e18;
         uint256 stRawNAV = 450_000_000_000_000_000;
@@ -271,7 +271,7 @@ contract StaticCurveRDMTest is BaseTest {
     // ============================================
 
     /// @notice Test with zero JT effective NAV (infinite utilization)
-    function test_getJTYieldShare_zeroJTEffectiveNAV() public {
+    function test_getJTYieldShare_zeroJTEffectiveNAV() public view {
         uint256 stRawNAV = 1e18;
         uint256 jtRawNAV = 1e18;
         uint256 betaWAD = BETA_100_PCT;
@@ -351,6 +351,7 @@ contract StaticCurveRDMTest is BaseTest {
         uint256 _jtEffectiveNAV
     )
         public
+        view
     {
         // Bound inputs to reasonable ranges to avoid overflow
         _stRawNAV = bound(_stRawNAV, 0, type(uint128).max);
@@ -374,6 +375,7 @@ contract StaticCurveRDMTest is BaseTest {
         uint256 _jtEffectiveNAV
     )
         public
+        view
     {
         // Bound inputs to reasonable ranges
         _stRawNAV = bound(_stRawNAV, 0, type(uint128).max);
@@ -401,6 +403,7 @@ contract StaticCurveRDMTest is BaseTest {
         uint256 _jtEffectiveNAV
     )
         public
+        view
     {
         // Bound inputs to reasonable ranges
         _stRawNAV = bound(_stRawNAV, 0, type(uint128).max);
@@ -431,6 +434,7 @@ contract StaticCurveRDMTest is BaseTest {
         uint256 _jtEffectiveNAV
     )
         public
+        view
     {
         // Bound inputs to reasonable ranges
         _stRawNAV = bound(_stRawNAV, 0, type(uint128).max);
@@ -459,6 +463,7 @@ contract StaticCurveRDMTest is BaseTest {
         uint256 _jtEffectiveNAV
     )
         public
+        view
     {
         // Bound inputs to reasonable ranges
         _stRawNAV = bound(_stRawNAV, 0, type(uint128).max);
@@ -487,6 +492,7 @@ contract StaticCurveRDMTest is BaseTest {
         uint256 _jtEffectiveNAV
     )
         public
+        view
     {
         // Bound inputs to reasonable ranges
         _stRawNAV = bound(_stRawNAV, 0, type(uint128).max);
