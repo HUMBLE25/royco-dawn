@@ -4,8 +4,6 @@ pragma solidity ^0.8.28;
 import { Initializable } from "../../lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/proxy/utils/Initializable.sol";
 import { IRDM } from "../interfaces/IRDM.sol";
 import { IRoycoAccountant, Operation } from "../interfaces/IRoycoAccountant.sol";
-
-import { IRoycoVaultTranche } from "../interfaces/tranche/IRoycoVaultTranche.sol";
 import { RoycoAccountantInitParams, RoycoAccountantState, RoycoAccountantStorageLib } from "../libraries/RoycoAccountantStorageLib.sol";
 import { SyncedNAVsPacket } from "../libraries/Types.sol";
 import { ConstantsLib, Math, UtilsLib } from "../libraries/UtilsLib.sol";
@@ -137,7 +135,7 @@ contract RoycoAccountant is Initializable, IRoycoAccountant {
                 // Apply the pure withdrawal to the junior tranche's effective NAV
                 else $.lastJTEffectiveNAV -= uint256(-deltaJT);
                 // Enforce the expected relationship between JT NAVs and ST coverage debt (outstanding applied coverage)
-                require($.lastJTEffectiveNAV + $.lastSTCoverageDebt >= _jtRawNAV);
+                require($.lastJTEffectiveNAV + $.lastSTCoverageDebt >= _jtRawNAV, INVALID_POST_OP_STATE(_op));
             }
         }
         // Enforce the NAV conservation invariant
