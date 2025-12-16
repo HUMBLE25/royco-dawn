@@ -28,11 +28,13 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
     ERC4626ST_AaveV3JT_Kernel internal ERC4626ST_AAVEV3JT_KERNEL;
 
     // External Contracts
-    IERC20 internal USDC = IERC20(ETHEREUM_MAINNET_USDC_ADDRESS);
-    IERC20 internal AUSDC = IERC20(aTokenAddresses[1][ETHEREUM_MAINNET_USDC_ADDRESS]);
+    IERC20 internal USDC;
+    IERC20 internal AUSDC;
 
     constructor() {
         BETA_WAD = 0; // Different opportunities
+        USDC = IERC20(ETHEREUM_MAINNET_USDC_ADDRESS);
+        AUSDC = IERC20(aTokenAddresses[1][ETHEREUM_MAINNET_USDC_ADDRESS]);
     }
 
     function _setUpRoyco() internal override {

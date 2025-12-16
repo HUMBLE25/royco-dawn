@@ -25,6 +25,8 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
     error UNSUPPORTED_RESERVE_TOKEN();
     /// @notice Thrown when the shares to redeem are greater than the claimable shares
     error INSUFFICIENT_CLAIMABLE_SHARES(uint256 sharesToRedeem, uint256 claimableShares);
+    /// @notice Thrown when a low-level call fails
+    error FAILED_CALL();
 
     /**
      * @notice Initializes a kernel where the junior tranche is deployed into Aave V3
@@ -133,13 +135,42 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
         if (supplyCap == 0) return type(uint256).max;
 
         // Compute the total reserve assets supplied and accrued to the treasury
-        (, uint256 totalAccruedToTreasury, uint256 totalLent,,,,,,,,,) = poolDataProvider.getReserveData(asset);
+        (uint256 totalAccruedToTreasury, uint256 totalLent) = _getTotalAccruedToTreasuryAndLent(poolDataProvider, asset);
         uint256 currentlySupplied = totalLent + totalAccruedToTreasury;
         // Supply cap was returned as whole tokens, so we must scale by underlying decimals
         supplyCap = supplyCap * (10 ** decimals);
 
         // If supply cap hit, no incremental supplies are permitted. Else, return the max suppliable amount within the cap.
         return (currentlySupplied >= supplyCap) ? 0 : (supplyCap - currentlySupplied);
+    }
+
+    /// @notice Helper function to get the total accrued to treasury and total lent from the pool data provider
+    /// @dev IPoolDataProvider.getReserveData returns a tuple of 11 words which saturates the stack
+    /// @dev Uses a low-level static call to the pool data provider to avoid stack too deep errors
+    function _getTotalAccruedToTreasuryAndLent(
+        IPoolDataProvider _poolDataProvider,
+        address _asset
+    )
+        internal
+        view
+        returns (uint256 totalAccruedToTreasury, uint256 totalLent)
+    {
+        bytes memory data = abi.encodeCall(IPoolDataProvider.getReserveData, (_asset));
+        bool success;
+        assembly ("memory-safe") {
+            // Load the free memory pointer, and allocate 0x60 bytes for the return data
+            let ptr := mload(0x40)
+            mstore(0x40, add(ptr, 0x60))
+
+            // Make the static call to the pool data provider
+            success := staticcall(gas(), _poolDataProvider, add(data, 0x20), mload(data), ptr, 0x60)
+
+            // Load the total accrued to treasury and total lent from the return data
+            // Refer IPoolDataProvider.getReserveData for the return data layout
+            totalAccruedToTreasury := mload(add(ptr, 0x20))
+            totalLent := mload(add(ptr, 0x40))
+        }
+        require(success, FAILED_CALL());
     }
 
     /// @inheritdoc RoycoKernel

@@ -457,4 +457,3 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         });
     }
 }
-
