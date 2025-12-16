@@ -119,30 +119,25 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
                 // Senior withdrew: The NAV deltas include the discrete withdrawal amount in addition to any coverage pulled from JT to ST
                 // If the withdrawal used JT capital as coverage to facilitate this ST withdrawal
                 NAV_UNIT preWithdrawalSTEffectiveNAV = $.lastSTEffectiveNAV;
-                if (deltaJT < 0) {
-                    // The actual amount withdrawn was the delta in ST raw NAV and the coverage applied from JT
-                    NAV_UNIT coverageRealized = toNAVUnits(-deltaJT);
-                    $.lastSTEffectiveNAV = preWithdrawalSTEffectiveNAV - (toNAVUnits(-deltaST) + coverageRealized);
-                    // The withdrawing senior LP has realized its proportional share of past covered losses, settling the realized portion between JT and ST
-                    $.lastSTCoverageDebt = $.lastSTCoverageDebt - coverageRealized;
-                } else {
-                    // Apply the withdrawal to the senior tranche's effective NAV
-                    $.lastSTEffectiveNAV = preWithdrawalSTEffectiveNAV - toNAVUnits(-deltaST);
+                // The actual amount withdrawn was the delta in ST raw NAV and the coverage applied from JT
+                $.lastSTEffectiveNAV = preWithdrawalSTEffectiveNAV - (toNAVUnits(-deltaST) + toNAVUnits(-deltaJT));
+                // Proportionally reduce system debts, rounding in favor of senior
+                // The withdrawing senior LP has realized its proportional share of past covered losses, settling the realized portion between JT and ST
+                NAV_UNIT coverageDebt = $.lastSTCoverageDebt;
+                if (coverageDebt != ZERO_NAV_UNITS) {
+                    $.lastSTCoverageDebt = coverageDebt.mulDiv($.lastSTEffectiveNAV, preWithdrawalSTEffectiveNAV, Math.Rounding.Floor);
                 }
                 // The withdrawing senior LP has realized its proportional share of past uncovered losses and associated recovery optionality
-                // Round in favor of senior
-                NAV_UNIT jtCoverageDebt = $.lastJTCoverageDebt;
-                if (jtCoverageDebt != ZERO_NAV_UNITS) {
-                    $.lastJTCoverageDebt = jtCoverageDebt.mulDiv($.lastSTEffectiveNAV, preWithdrawalSTEffectiveNAV, Math.Rounding.Ceil);
+                coverageDebt = $.lastJTCoverageDebt;
+                if (coverageDebt != ZERO_NAV_UNITS) {
+                    $.lastJTCoverageDebt = coverageDebt.mulDiv($.lastSTEffectiveNAV, preWithdrawalSTEffectiveNAV, Math.Rounding.Ceil);
                 }
             } else if (_op == Operation.JT_DECREASE_NAV) {
                 require(deltaJT <= 0 && deltaST <= 0, INVALID_POST_OP_STATE(_op));
                 // Junior withdrew: The NAV deltas include the discrete withdrawal amount in addition to any assets (yield + debt repayments) pulled from ST to JT
                 // JT LPs cannot settle debts on withdrawal since they don't have discretion on when coverage applied to ST (stCoverageDebt) and uncovered ST losses (jtCoverageDebt) can be realized
-                // If ST delta was negative, the actual amount withdrawn by JT was the delta in JT raw NAV and the assets claimed from ST
-                if (deltaST < 0) $.lastJTEffectiveNAV = $.lastSTEffectiveNAV - (toNAVUnits(-deltaJT) + toNAVUnits(-deltaST));
-                // Apply the pure withdrawal to the junior tranche's effective NAV
-                else $.lastJTEffectiveNAV = $.lastSTEffectiveNAV - toNAVUnits(-deltaJT);
+                // The actual amount withdrawn by JT was the delta in JT raw NAV and the assets claimed from ST
+                $.lastJTEffectiveNAV = $.lastJTEffectiveNAV - (toNAVUnits(-deltaJT) + toNAVUnits(-deltaST));
                 // Enforce the expected relationship between JT NAVs and ST coverage debt (outstanding applied coverage)
                 require($.lastJTEffectiveNAV + $.lastSTCoverageDebt >= _jtRawNAV, INVALID_POST_OP_STATE(_op));
             }
@@ -234,45 +229,6 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         uint256 coverageRetentionWAD = WAD - betaWAD.mulDiv(coverageWAD, WAD, Math.Rounding.Floor);
         // Return how much of the surplus can be withdrawn while satisfying the coverage requirement
         return surplusJTAssets.mulDiv(WAD, coverageRetentionWAD, Math.Rounding.Floor);
-    }
-
-    /// @inheritdoc IRoycoAccountant
-    function setRDM(address _rdm) external override(IRoycoAccountant) restricted {
-        // Ensure that the RDM is not null
-        require(_rdm != address(0), NULL_RDM_ADDRESS());
-        // Set the new RDM
-        RoycoAccountantStorageLib._getRoycoAccountantStorage().rdm = _rdm;
-    }
-
-    /// @inheritdoc IRoycoAccountant
-    function setProtocolFee(uint64 _protocolFeeWAD) external override(IRoycoAccountant) restricted {
-        // Ensure that the protocol fee percentage is valid
-        require(_protocolFeeWAD <= MAX_PROTOCOL_FEE_WAD, MAX_PROTOCOL_FEE_EXCEEDED());
-        // Set the new protocol fee percentage
-        RoycoAccountantStorageLib._getRoycoAccountantStorage().protocolFeeWAD = _protocolFeeWAD;
-    }
-
-    /// @inheritdoc IRoycoAccountant
-    function setCoverage(uint64 _coverageWAD) external override(IRoycoAccountant) restricted {
-        RoycoAccountantState storage $ = RoycoAccountantStorageLib._getRoycoAccountantStorage();
-        // Validate the new coverage requirement
-        _validateCoverageRequirement(_coverageWAD, $.betaWAD);
-        // Set the new coverage percentage
-        $.coverageWAD = _coverageWAD;
-    }
-
-    /// @inheritdoc IRoycoAccountant
-    function setBeta(uint96 _betaWAD) external override(IRoycoAccountant) restricted {
-        RoycoAccountantState storage $ = RoycoAccountantStorageLib._getRoycoAccountantStorage();
-        // Validate the new coverage requirement
-        _validateCoverageRequirement($.coverageWAD, _betaWAD);
-        // Set the new beta parameter
-        $.betaWAD = _betaWAD;
-    }
-
-    /// @inheritdoc IRoycoAccountant
-    function getState() external view override(IRoycoAccountant) returns (RoycoAccountantState memory) {
-        return RoycoAccountantStorageLib._getRoycoAccountantStorage();
     }
 
     /**
@@ -481,6 +437,45 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         if (jtYieldShareWAD > WAD) jtYieldShareWAD = WAD;
         // Apply the accural of JT yield share to the accumulator, weighted by the time elapsed
         return ($.twJTYieldShareAccruedWAD + uint192(jtYieldShareWAD * elapsed));
+    }
+
+    /// @inheritdoc IRoycoAccountant
+    function setRDM(address _rdm) external override(IRoycoAccountant) restricted {
+        // Ensure that the RDM is not null
+        require(_rdm != address(0), NULL_RDM_ADDRESS());
+        // Set the new RDM
+        RoycoAccountantStorageLib._getRoycoAccountantStorage().rdm = _rdm;
+    }
+
+    /// @inheritdoc IRoycoAccountant
+    function setProtocolFee(uint64 _protocolFeeWAD) external override(IRoycoAccountant) restricted {
+        // Ensure that the protocol fee percentage is valid
+        require(_protocolFeeWAD <= MAX_PROTOCOL_FEE_WAD, MAX_PROTOCOL_FEE_EXCEEDED());
+        // Set the new protocol fee percentage
+        RoycoAccountantStorageLib._getRoycoAccountantStorage().protocolFeeWAD = _protocolFeeWAD;
+    }
+
+    /// @inheritdoc IRoycoAccountant
+    function setCoverage(uint64 _coverageWAD) external override(IRoycoAccountant) restricted {
+        RoycoAccountantState storage $ = RoycoAccountantStorageLib._getRoycoAccountantStorage();
+        // Validate the new coverage requirement
+        _validateCoverageRequirement(_coverageWAD, $.betaWAD);
+        // Set the new coverage percentage
+        $.coverageWAD = _coverageWAD;
+    }
+
+    /// @inheritdoc IRoycoAccountant
+    function setBeta(uint96 _betaWAD) external override(IRoycoAccountant) restricted {
+        RoycoAccountantState storage $ = RoycoAccountantStorageLib._getRoycoAccountantStorage();
+        // Validate the new coverage requirement
+        _validateCoverageRequirement($.coverageWAD, _betaWAD);
+        // Set the new beta parameter
+        $.betaWAD = _betaWAD;
+    }
+
+    /// @inheritdoc IRoycoAccountant
+    function getState() external view override(IRoycoAccountant) returns (RoycoAccountantState memory) {
+        return RoycoAccountantStorageLib._getRoycoAccountantStorage();
     }
 
     /// @notice Validates the coverage requirement parameters of the market

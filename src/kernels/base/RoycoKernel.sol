@@ -4,8 +4,10 @@ pragma solidity ^0.8.28;
 import { RoycoBase } from "../../base/RoycoBase.sol";
 import { IRoycoKernel } from "../../interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoVaultTranche } from "../../interfaces/tranche/IRoycoVaultTranche.sol";
+import { ZERO_NAV_UNITS } from "../../libraries/Constants.sol";
 import { RoycoKernelInitParams, RoycoKernelState, RoycoKernelStorageLib } from "../../libraries/RoycoKernelStorageLib.sol";
-import { SyncedAccountingState } from "../../libraries/Types.sol";
+import { SyncedAccountingState, TrancheAssetClaims, TrancheType } from "../../libraries/Types.sol";
+import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib } from "../../libraries/Units.sol";
 import { Math } from "../../libraries/UtilsLib.sol";
 import { IRoycoAccountant, Operation } from "./../../interfaces/IRoycoAccountant.sol";
 
@@ -16,6 +18,8 @@ import { IRoycoAccountant, Operation } from "./../../interfaces/IRoycoAccountant
  *      and base wiring for tranche synchronization. All concrete kernel implementations should inherit from the Royco Kernel.
  */
 abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
+    using UnitsMathLib for NAV_UNIT;
+    using UnitsMathLib for TRANCHE_UNIT;
     using Math for uint256;
 
     /// @dev Permissions the function to only the market's senior tranche
@@ -60,23 +64,28 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     }
 
     /// @inheritdoc IRoycoKernel
-    function stMaxDeposit(address, address _receiver) external view override(IRoycoKernel) returns (uint256) {
-        return Math.min(_maxSTDepositGlobally(_receiver), _accountant().maxSTDepositGivenCoverage(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV()));
+    function stMaxDeposit(address _receiver) external view override(IRoycoKernel) returns (TRANCHE_UNIT) {
+        NAV_UNIT stMaxDepositableNAV = _accountant().maxSTDepositGivenCoverage(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV());
+        return Math.min(_maxSTDepositGlobally(_receiver), stConvertNAVUnitsToTrancheUnits(stMaxDepositableNAV));
     }
 
     /// @inheritdoc IRoycoKernel
-    function stMaxWithdraw(address, address _owner) external view override(IRoycoKernel) returns (uint256) {
-        return _maxSTWithdrawalGlobally(_owner);
+    function stMaxWithdraw(address _owner) external view override(IRoycoKernel) returns (NAV_UNIT) {
+        NAV_UNIT stEffectiveNAV = _accountant().previewSyncTrancheNAVs(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV()).stEffectiveNAV;
+        // TODO: account for liq constraints
+        return stEffectiveNAV;
     }
 
     /// @inheritdoc IRoycoKernel
-    function jtMaxDeposit(address, address _receiver) external view override(IRoycoKernel) returns (uint256) {
+    function jtMaxDeposit(address _receiver) external view override(IRoycoKernel) returns (TRANCHE_UNIT) {
         return _maxJTDepositGlobally(_receiver);
     }
 
     /// @inheritdoc IRoycoKernel
-    function jtMaxWithdraw(address, address _owner) external view override(IRoycoKernel) returns (uint256) {
-        return Math.min(_maxJTWithdrawalGlobally(_owner), _accountant().maxJTWithdrawalGivenCoverage(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV()));
+    function jtMaxWithdraw(address _owner) external view override(IRoycoKernel) returns (NAV_UNIT) {
+        NAV_UNIT jtMaxWithdrawableNAV = _accountant().maxSTDepositGivenCoverage(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV());
+        // TODO: account for liq constraints
+        return jtMaxWithdrawableNAV;
     }
 
     /// @inheritdoc IRoycoKernel
@@ -97,25 +106,42 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     /**
      * @notice Synchronizes and persists the raw and effective NAVs of both tranches
      * @dev Only executes a pre-op sync because there is no operation being executed in the same call as this sync
-     * @return state The NAV sync state containing all mark to market accounting data
+     * @return state The synced NAV, debt, and fee accounting containing all mark to market accounting data
+     * @return state The synced NAV, debt, and fee accounting containing all mark to market accounting data
      */
-    function syncTrancheNAVs() external override(IRoycoKernel) restricted returns (SyncedAccountingState memory state) {
+    function syncTrancheNAVs() external override(IRoycoKernel) restricted returns (SyncedAccountingState memory state, TrancheAssetClaims memory claims) {
         return _preOpSyncTrancheNAVs();
     }
 
     /**
      * @notice Previews a synchronization of the raw and effective NAVs of both tranches
      * @dev Does not mutate any state
-     * @return state The NAV sync state containing all mark to market accounting data
+     * @param _trancheType An enum representing which tranche to execute this preview for
+     * @return state The synced NAV, debt, and fee accounting containing all mark to market accounting data
      */
-    function previewSyncTrancheNAVs() public view override(IRoycoKernel) returns (SyncedAccountingState memory state) {
-        return _accountant().previewSyncTrancheNAVs(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV());
+    function previewSyncTrancheNAVs(TrancheType _trancheType)
+        public
+        view
+        override(IRoycoKernel)
+        returns (SyncedAccountingState memory state, TrancheAssetClaims memory claims)
+    {
+        state = _accountant().previewSyncTrancheNAVs(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV());
+
+        (NAV_UNIT stSelfNAVClaim, NAV_UNIT stNAVClaimOnJT, NAV_UNIT jtSelfNAVClaim, NAV_UNIT jtNAVClaimOnST) = _decomposeNAVClaims(state);
+
+        if (_trancheType == TrancheType.SENIOR) {
+            if (stSelfNAVClaim != ZERO_NAV_UNITS) claims.stAssets = stConvertNAVUnitsToTrancheUnits(stSelfNAVClaim);
+            if (stNAVClaimOnJT != ZERO_NAV_UNITS) claims.jtAssets = jtConvertNAVUnitsToTrancheUnits(stNAVClaimOnJT);
+        } else {
+            if (jtNAVClaimOnST != ZERO_NAV_UNITS) claims.stAssets = stConvertNAVUnitsToTrancheUnits(jtNAVClaimOnST);
+            if (jtSelfNAVClaim != ZERO_NAV_UNITS) claims.jtAssets = jtConvertNAVUnitsToTrancheUnits(jtSelfNAVClaim);
+        }
     }
 
     /**
      * @notice Invokes the accountant to do a pre-operation (deposit and withdrawal) NAV sync
      * @dev Should be called on every NAV mutating user operation
-     * @return state The NAV sync state containing all mark to market accounting data
+     * @return state The synced NAV, debt, and fee accounting containing all mark to market accounting data
      */
     function _preOpSyncTrancheNAVs() internal returns (SyncedAccountingState memory state) {
         // Execute the pre-op sync via the accountant
@@ -156,61 +182,83 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         _accountant().postOpSyncTrancheNAVsAndEnforceCoverage(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV(), _op);
     }
 
+    /**
+     * @notice Decomposes effective NAVs into self-backed NAV claims and cross-tranche NAV claims
+     * @param _state The synced NAV, debt, and fee accounting containing all mark to market accounting data
+     * @return stSelfNAVClaim The portion of ST's effective NAV that must be funded by ST’s raw NAV
+     * @return stNAVClaimOnJT The portion of ST's effective NAV that must be funded by JT’s raw NAV
+     * @return jtSelfNAVClaim The portion of JT's effective NAV that must be funded by JT’s raw NAV
+     * @return jtNAVClaimOnST The portion of JT's effective NAV that must be funded by ST’s raw NAV
+     */
+    function _decomposeNAVClaims(SyncedAccountingState memory _state)
+        internal
+        pure
+        returns (NAV_UNIT stSelfNAVClaim, NAV_UNIT stNAVClaimOnJT, NAV_UNIT jtSelfNAVClaim, NAV_UNIT jtNAVClaimOnST)
+    {
+        // Cross-tranche claims (only one direction should be non-zero under conservation)
+        stNAVClaimOnJT = UnitsMathLib.saturatingSub(_state.stEffectiveNAV, _state.stRawNAV);
+        jtNAVClaimOnST = UnitsMathLib.saturatingSub(_state.jtEffectiveNAV, _state.jtRawNAV);
+
+        // Self-backed portions (the remainder of each tranche’s effective NAV)
+        stSelfNAVClaim = UnitsMathLib.saturatingSub(_state.stRawNAV, jtNAVClaimOnST);
+        jtSelfNAVClaim = UnitsMathLib.saturatingSub(_state.jtRawNAV, stNAVClaimOnJT);
+    }
+
     /// @notice Returns this kernel's accountant casted to the IRoycoAccountant interface
     /// @return The Royco Accountant for this kernel
     function _accountant() internal view returns (IRoycoAccountant) {
         return IRoycoAccountant(RoycoKernelStorageLib._getRoycoKernelStorage().accountant);
     }
 
-    /// @notice Returns the raw net asset value of the senior tranche
+    /// @notice Returns the raw net asset value of the senior tranche denominated in the NAV units (USD, BTC, etc.) for this kernel
     /// @return The pure net asset value of the senior tranche invested assets
-    function _getSeniorTrancheRawNAV() internal view virtual returns (uint256);
+    function _getSeniorTrancheRawNAV() internal view virtual returns (NAV_UNIT);
 
-    /// @notice Returns the raw net asset value of the junior tranche
+    /// @notice Returns the raw net asset value of the junior tranche denominated in the NAV units (USD, BTC, etc.) for this kernel
     /// @return The pure net asset value of the junior tranche invested assets
-    function _getJuniorTrancheRawNAV() internal view virtual returns (uint256);
+    function _getJuniorTrancheRawNAV() internal view virtual returns (NAV_UNIT);
 
     /**
      * @notice Returns the maximum amount of assets that can be deposited into the senior tranche globally
      * @dev Implementation should consider protocol-wide limits and liquidity constraints
      * @param _receiver The receiver of the shares for the assets being deposited (used to enforce white/black lists)
      */
-    function _maxSTDepositGlobally(address _receiver) internal view virtual returns (uint256);
-
-    /**
-     * @notice Returns the maximum amount of assets that can be withdrawn from the senior tranche globally
-     * @dev Implementation should consider protocol-wide limits and liquidity constraints
-     * @param _owner The owner of the assets being withdrawn (used to enforce white/black lists)
-     */
-    function _maxSTWithdrawalGlobally(address _owner) internal view virtual returns (uint256);
+    function _maxSTDepositGlobally(address _receiver) internal view virtual returns (TRANCHE_UNIT);
 
     /**
      * @notice Returns the maximum amount of assets that can be deposited into the junior tranche globally
      * @dev Implementation should consider protocol-wide limits and liquidity constraints
      * @param _receiver The receiver of the shares for the assets being deposited (used to enforce white/black lists)
      */
-    function _maxJTDepositGlobally(address _receiver) internal view virtual returns (uint256);
+    function _maxJTDepositGlobally(address _receiver) internal view virtual returns (TRANCHE_UNIT);
+
+    /**
+     * @notice Returns the maximum amount of assets that can be withdrawn from the senior tranche globally
+     * @dev Implementation should consider protocol-wide limits and liquidity constraints
+     * @param _owner The owner of the assets being withdrawn (used to enforce white/black lists)
+     */
+    function _maxSTWithdrawalGlobally(address _owner) internal view virtual returns (TRANCHE_UNIT);
 
     /**
      * @notice Returns the maximum amount of assets that can be withdrawn from the junior tranche globally
      * @dev Implementation should consider protocol-wide limits and liquidity constraints
      * @param _owner The owner of the assets being withdrawn (used to enforce white/black lists)
      */
-    function _maxJTWithdrawalGlobally(address _owner) internal view virtual returns (uint256);
+    function _maxJTWithdrawalGlobally(address _owner) internal view virtual returns (TRANCHE_UNIT);
 
     /**
      * @notice Covers senior tranche losses from the junior tranche's controlled assets
      * @param _asset The asset to cover losses in
-     * @param _assets The assets to claim
+     * @param _nav The NAV to claim from JT to ST
      * @param _receiver The receiver of the assets
      */
-    function _claimSeniorAssetsFromJunior(address _asset, uint256 _assets, address _receiver) internal virtual;
+    function _claimSeniorNAVFromJunior(address _asset, NAV_UNIT _nav, address _receiver) internal virtual;
 
     /**
      * @notice Claims junior tranche yield and debt repayment from the senior tranche's controlled assets
      * @param _asset The asset to claim yield and debt repayment in
-     * @param _assets The assets to claim
+     * @param _nav The NAV to claim from S to ST
      * @param _receiver The receiver of the assets
      */
-    function _claimJuniorAssetsFromSenior(address _asset, uint256 _assets, address _receiver) internal virtual;
+    function _claimJuniorNAVFromSenior(address _asset, NAV_UNIT _nav, address _receiver) internal virtual;
 }

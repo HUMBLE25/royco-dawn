@@ -5,7 +5,7 @@ import { Math } from "../../../../lib/openzeppelin-contracts/contracts/utils/mat
 import { RoycoAuth } from "../../../auth/RoycoAuth.sol";
 import { IAsyncJTWithdrawalKernel } from "../../../interfaces/kernel/IAsyncJTWithdrawalKernel.sol";
 import { IRoycoKernel } from "../../../interfaces/kernel/IRoycoKernel.sol";
-import { ConstantsLib } from "../../../libraries/Constants.sol";
+import { ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID } from "../../../libraries/Constants.sol";
 import { RequestRedeemSharesBehavior } from "../../../libraries/Types.sol";
 import { RoycoKernel } from "../RoycoKernel.sol";
 

@@ -38,7 +38,7 @@ interface IRoycoAccountant {
      * @dev Persists updated NAV and debt checkpoints for the next sync to use as reference
      * @param _stRawNAV The senior tranche's current raw NAV: the pure value of its invested assets
      * @param _jtRawNAV The junior tranche's current raw NAV: the pure value of its invested assets
-     * @return state The NAV sync state containing all mark to market accounting data
+     * @return state The synced NAV, debt, and fee accounting containing all mark to market accounting data
      */
     function preOpSyncTrancheNAVs(NAV_UNIT _stRawNAV, NAV_UNIT _jtRawNAV) external returns (SyncedAccountingState memory state);
 
@@ -46,7 +46,7 @@ interface IRoycoAccountant {
      * @notice Previews a synchronization of tranche NAVs based on the underlying PNL(s) and their effects on the current state of the loss waterfall
      * @param _stRawNAV The senior tranche's current raw NAV: the pure value of its invested assets
      * @param _jtRawNAV The junior tranche's current raw NAV: the pure value of its invested assets
-     * @return state The NAV sync state containing all mark to market accounting data
+     * @return state The synced NAV, debt, and fee accounting containing all mark to market accounting data
      */
     function previewSyncTrancheNAVs(NAV_UNIT _stRawNAV, NAV_UNIT _jtRawNAV) external view returns (SyncedAccountingState memory state);
 
