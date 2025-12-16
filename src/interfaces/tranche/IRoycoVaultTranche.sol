@@ -21,12 +21,6 @@ interface IRoycoVaultTranche is IERC165, IRoycoAsyncVault, IRoycoAsyncCancellabl
     /// @return nav The raw net asset value of the tranche's invested assets
     function getRawNAV() external view returns (NAV_UNIT nav);
 
-    /// @notice Returns the effective net asset value of the tranche's invested assets
-    /// @dev Includes yield splits, coverage applications, etc.
-    /// @dev The NAV is expressed in the tranche's base asset
-    /// @return nav The effective net asset value of the tranche's invested assets
-    function getEffectiveNAV() external view returns (NAV_UNIT nav);
-
     /// @notice Returns the address of the kernel contract handling strategy logic
     function kernel() external view returns (address);
 
@@ -106,18 +100,6 @@ interface IRoycoVaultTranche is IERC165, IRoycoAsyncVault, IRoycoAsyncCancellabl
     )
         external
         returns (uint256 totalSharesIncludingVirtualShares);
-
-    /// @dev Overloaded previewClaim function for synchronous withdrawal execution
-    /// @param _shares The number of shares to claim
-    /// @return claims The breakdown of assets that the claimed shares have a claim on
-    /// @dev Disabled if withdrawal execution is asynchronous as per ERC7540
-    function previewClaim(uint256 _shares) external view returns (AssetClaims memory claims);
-
-    /// @dev Overloaded convertToClaims function for synchronous withdrawal execution
-    /// @param _shares The number of shares to convert
-    /// @return claims The breakdown of assets that the converted shares have a claim on
-    /// @dev Disabled if withdrawal execution is asynchronous as per ERC7540
-    function convertToClaims(uint256 _shares) external view returns (AssetClaims memory claims);
 
     /// @notice Returns the address of the tranche's deposit asset
     /// @return asset The address of the tranche's deposit asset
