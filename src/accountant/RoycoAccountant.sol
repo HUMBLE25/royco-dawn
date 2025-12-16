@@ -346,20 +346,21 @@ contract RoycoAccountant is Initializable, IRoycoAccountant {
                 // If the last yield distribution wasn't in this block, split the yield between ST and JT
                 if (elapsed != 0) {
                     // Compute the ST gain allocated to JT based on its time weighted yield share since the last distribution, rounding in favor of the senior tranche
-                    uint256 jtGain = stGain.mulDiv((_twJTYieldShareAccruedWAD / elapsed), ConstantsLib.WAD, Math.Rounding.Floor);
+                    uint256 jtGain = stGain.mulDiv(_twJTYieldShareAccruedWAD, (elapsed * ConstantsLib.WAD), Math.Rounding.Floor);
                     // Apply the yield split to JT's effective NAV
                     if (jtGain != 0) {
                         // Compute the protocol fee taken on this JT yield accrual (will be used to mint shares to the protocol fee recipient) at the updated JT effective NAV
                         jtProtocolFeeAccrued += jtGain.mulDiv(protocolFeeWAD, ConstantsLib.WAD, Math.Rounding.Floor);
                         jtEffectiveNAV += jtGain;
                         stGain -= jtGain;
-                        yieldDistributed = true;
                     }
                 }
                 // Compute the protocol fee taken on this ST yield accrual (will be used to mint shares to the protocol fee recipient) at the updated JT effective NAV
                 stProtocolFeeAccrued = stGain.mulDiv(protocolFeeWAD, ConstantsLib.WAD, Math.Rounding.Floor);
                 // Book the residual gain to the ST
                 stEffectiveNAV += stGain;
+                // Mark yield as distributed
+                yieldDistributed = true;
             }
         }
         // Enforce the NAV conservation invariant
