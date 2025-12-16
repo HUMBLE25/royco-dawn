@@ -5,6 +5,10 @@ import { IRoycoAccountant } from "../interfaces/IRoycoAccountant.sol";
 import { IRoycoKernel } from "../interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoVaultTranche } from "../interfaces/tranche/IRoycoVaultTranche.sol";
 
+type NAV_UNIT is uint256;
+
+type TRANCHE_UNIT is uint256;
+
 /// @custom:field name - The name of the tranche (should be prefixed with "Royco-ST" or "Royco-JT") share token
 /// @custom:field symbol - The symbol of the tranche (should be prefixed with "ST" or "JT") share token
 /// @custom:field kernel - The tranche kernel responsible for defining the execution model and logic of the tranche
@@ -15,7 +19,20 @@ struct TrancheDeploymentParams {
 }
 
 /**
- * @title SyncedNAVsPacket
+ * @title AssetClaims
+ * @dev The breakdown of assets that represent the value of a tranche's shares
+ * @custom:field nav - The net asset value in NAV units of this particular claim
+ * @custom:field stAssets - The discrete amount of senior tranche assets in this particular claim
+ * @custom:field stAssets - The discrete amount of junior tranche assets in this particular claim
+ */
+struct AssetClaims {
+    NAV_UNIT nav;
+    TRANCHE_UNIT stAssets;
+    TRANCHE_UNIT jtAssets;
+}
+
+/**
+ * @title AccountingState
  * @dev Contains all current mark to market NAV accounting data for the market's tranches
  * @custom:field stRawNAV - The senior tranche's current raw NAV: the pure value of its invested assets
  * @custom:field jtRawNAV - The junior tranche's current raw NAV: the pure value of its invested assets
@@ -26,15 +43,15 @@ struct TrancheDeploymentParams {
  * @custom:field stProtocolFeeAccrued - Protocol fee taken on ST yield on this sync
  * @custom:field jtProtocolFeeAccrued - Protocol fee taken on JT yield on this sync
  */
-struct SyncedNAVsPacket {
-    uint256 stRawNAV;
-    uint256 jtRawNAV;
-    uint256 stEffectiveNAV;
-    uint256 jtEffectiveNAV;
-    uint256 stCoverageDebt;
-    uint256 jtCoverageDebt;
-    uint256 stProtocolFeeAccrued;
-    uint256 jtProtocolFeeAccrued;
+struct AccountingState {
+    NAV_UNIT stRawNAV;
+    NAV_UNIT jtRawNAV;
+    NAV_UNIT stEffectiveNAV;
+    NAV_UNIT jtEffectiveNAV;
+    NAV_UNIT stCoverageDebt;
+    NAV_UNIT jtCoverageDebt;
+    NAV_UNIT stProtocolFeeAccrued;
+    NAV_UNIT jtProtocolFeeAccrued;
 }
 
 /**

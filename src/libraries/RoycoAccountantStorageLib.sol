@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
+import { NAV_UNIT } from "./Types.sol";
+
 /**
  * @notice Initialization parameters for the Royco Accountant
  * @custom:field kernel - The kernel that this accountant maintains accounting for
@@ -44,12 +46,12 @@ struct RoycoAccountantState {
     uint64 coverageWAD;
     uint96 betaWAD;
     address rdm;
-    uint256 lastSTRawNAV;
-    uint256 lastJTRawNAV;
-    uint256 lastSTEffectiveNAV;
-    uint256 lastJTEffectiveNAV;
-    uint256 lastJTCoverageDebt;
-    uint256 lastSTCoverageDebt;
+    NAV_UNIT lastSTRawNAV;
+    NAV_UNIT lastJTRawNAV;
+    NAV_UNIT lastSTEffectiveNAV;
+    NAV_UNIT lastJTEffectiveNAV;
+    NAV_UNIT lastJTCoverageDebt;
+    NAV_UNIT lastSTCoverageDebt;
     uint192 twJTYieldShareAccruedWAD;
     uint32 lastAccrualTimestamp;
     uint32 lastDistributionTimestamp;

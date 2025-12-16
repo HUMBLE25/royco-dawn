@@ -6,7 +6,7 @@ import { IERC20, SafeERC20 } from "../../../../lib/openzeppelin-contracts/contra
 import { Math } from "../../../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 import { ExecutionModel, IRoycoKernel, RequestRedeemSharesBehavior } from "../../../interfaces/kernel/IRoycoKernel.sol";
 import { ERC4626STKernelStorageLib } from "../../../libraries/kernels/ERC4626STKernelStorageLib.sol";
-import { Operation, RoycoKernel, SyncedNAVsPacket } from "../RoycoKernel.sol";
+import { AccountingState, Operation, RoycoKernel } from "../RoycoKernel.sol";
 
 abstract contract ERC4626STKernel is RoycoKernel {
     using SafeERC20 for IERC20;
@@ -88,13 +88,13 @@ abstract contract ERC4626STKernel is RoycoKernel {
         returns (uint256 assetsWithdrawn)
     {
         // Execute a pre-op sync on NAV accounting
-        SyncedNAVsPacket memory packet = _preOpSyncTrancheNAVs();
+        AccountingState memory state = _preOpSyncTrancheNAVs();
 
         // Compute the assets expected to be received on withdrawal based on the ST's effective NAV
-        assetsWithdrawn = _shares.mulDiv(packet.stEffectiveNAV, _totalShares, Math.Rounding.Floor);
+        assetsWithdrawn = _shares.mulDiv(state.stEffectiveNAV, _totalShares, Math.Rounding.Floor);
 
         // ST's coverage debt post-sync is the total applied coverage by JT to ST
-        uint256 totalAppliedCoverage = packet.stCoverageDebt;
+        uint256 totalAppliedCoverage = state.stCoverageDebt;
         // Compute and claim the assets that need to pulled from JT for this withdrawal, rounding in favor of ST
         uint256 jtAssetsToWithdraw = Math.min(_shares.mulDiv(totalAppliedCoverage, _totalShares, Math.Rounding.Ceil), totalAppliedCoverage);
         if (jtAssetsToWithdraw != 0) _claimSeniorAssetsFromJunior(_asset, jtAssetsToWithdraw, _receiver);

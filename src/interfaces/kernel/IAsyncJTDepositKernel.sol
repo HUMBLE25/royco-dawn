@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
+import { TRANCHE_UNIT } from "../../libraries/Types.sol";
+
 /**
  * @title IAsyncJTDepositKernel
  * @notice Interface for Royco kernels that employ an asynchronous deposit flow for the junior tranche
@@ -23,7 +25,7 @@ interface IAsyncJTDepositKernel {
      * @param _controller The controller corresponding to this request
      * @return pendingAssets The amount of assets pending deposit for the controller
      */
-    function jtPendingDepositRequest(uint256 _requestId, address _controller) external view returns (uint256 pendingAssets);
+    function jtPendingDepositRequest(uint256 _requestId, address _controller) external view returns (TRANCHE_UNIT pendingAssets);
 
     /**
      * @notice Returns the amount of assets claimable from a processed deposit request for a specified controller
@@ -31,7 +33,7 @@ interface IAsyncJTDepositKernel {
      * @param _controller The controller corresponding to this request
      * @return claimableAssets The amount of assets claimable from processed deposit request
      */
-    function jtClaimableDepositRequest(uint256 _requestId, address _controller) external view returns (uint256 claimableAssets);
+    function jtClaimableDepositRequest(uint256 _requestId, address _controller) external view returns (TRANCHE_UNIT claimableAssets);
 
     /**
      * @notice Claims a cancelled deposit request for a specified controller
@@ -41,7 +43,7 @@ interface IAsyncJTDepositKernel {
      * @param _controller The controller corresponding to this request
      * @return assets The amount of assets claimed from the cancelled deposit request
      */
-    function jtClaimCancelDepositRequest(uint256 _requestId, address _receiver, address _controller) external returns (uint256 assets);
+    function jtClaimCancelDepositRequest(uint256 _requestId, address _receiver, address _controller) external returns (TRANCHE_UNIT assets);
 
     /**
      * @notice Cancels a pending deposit request for the specified controller
@@ -68,5 +70,5 @@ interface IAsyncJTDepositKernel {
      * @param _controller The controller to query for claimable cancellation assets
      * @return assets The amount of assets claimable from deposit cancellation
      */
-    function jtClaimableCancelDepositRequest(uint256 _requestId, address _controller) external view returns (uint256 assets);
+    function jtClaimableCancelDepositRequest(uint256 _requestId, address _controller) external view returns (TRANCHE_UNIT assets);
 }

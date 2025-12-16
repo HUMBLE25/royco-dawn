@@ -18,7 +18,7 @@ import { ExecutionModel, IRoycoKernel, RequestRedeemSharesBehavior } from "../in
 import { IERC165, IERC7540, IERC7575, IERC7887, IRoycoVaultTranche } from "../interfaces/tranche/IRoycoVaultTranche.sol";
 import { RoycoTrancheStorageLib } from "../libraries/RoycoTrancheStorageLib.sol";
 import { TrancheType } from "../libraries/Types.sol";
-import { Action, SyncedNAVsPacket, TrancheDeploymentParams } from "../libraries/Types.sol";
+import { AccountingState, Action, TrancheDeploymentParams } from "../libraries/Types.sol";
 
 /// @title RoycoVaultTranche
 /// @notice Abstract base contract implementing core functionality for Royco tranches
@@ -143,15 +143,17 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC4626Upg
 
     /// @inheritdoc IRoycoVaultTranche
     function getEffectiveNAV() public view override(IRoycoVaultTranche) returns (uint256) {
-        SyncedNAVsPacket memory packet = IRoycoKernel(kernel()).previewSyncTrancheNAVs();
-        return (TRANCHE_TYPE() == TrancheType.SENIOR ? packet.stEffectiveNAV : packet.jtEffectiveNAV);
+        AccountingState memory state = IRoycoKernel(kernel()).previewSyncTrancheNAVs();
+        return (TRANCHE_TYPE() == TrancheType.SENIOR ? state.stEffectiveNAV : state.jtEffectiveNAV);
     }
 
     /// @inheritdoc ERC4626Upgradeable
     function maxDeposit(address _receiver) public view override(ERC4626Upgradeable) returns (uint256) {
-        return (TRANCHE_TYPE() == TrancheType.SENIOR
+        return (
+            TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IRoycoKernel(kernel()).stMaxDeposit(asset(), _receiver)
-                : IRoycoKernel(kernel()).jtMaxDeposit(asset(), _receiver));
+                : IRoycoKernel(kernel()).jtMaxDeposit(asset(), _receiver)
+        );
     }
 
     /// @inheritdoc ERC4626Upgradeable
@@ -168,10 +170,9 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC4626Upg
 
     /// @inheritdoc ERC4626Upgradeable
     function maxRedeem(address _owner) public view virtual override(ERC4626Upgradeable) returns (uint256) {
-        uint256 maxWithdrawableAssets =
-            (TRANCHE_TYPE() == TrancheType.SENIOR
-                ? IRoycoKernel(kernel()).stMaxWithdraw(asset(), _owner)
-                : IRoycoKernel(kernel()).jtMaxWithdraw(asset(), _owner));
+        uint256 maxWithdrawableAssets = (
+            TRANCHE_TYPE() == TrancheType.SENIOR ? IRoycoKernel(kernel()).stMaxWithdraw(asset(), _owner) : IRoycoKernel(kernel()).jtMaxWithdraw(asset(), _owner)
+        );
         if (maxWithdrawableAssets == 0) return 0;
 
         // Get the post-sync tranche state: applying NAV reconciliation and fee share minting
@@ -257,9 +258,11 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC4626Upg
         }
 
         // Deposit the assets into the underlying investment opportunity and get the fraction of total assets allocated
-        (uint256 valueAllocated, uint256 effectiveNAVToMintAt) = (TRANCHE_TYPE() == TrancheType.SENIOR
+        (uint256 valueAllocated, uint256 effectiveNAVToMintAt) = (
+            TRANCHE_TYPE() == TrancheType.SENIOR
                 ? kernel_.stDeposit(address(asset), _assets, _controller, _receiver)
-                : kernel_.jtDeposit(address(asset), _assets, _controller, _receiver));
+                : kernel_.jtDeposit(address(asset), _assets, _controller, _receiver)
+        );
 
         // valueAllocated represents the value of the assets deposited in the asset that the tranche's NAV is denominated in
         // shares are minted to the user at the effective NAV of the tranche
@@ -308,10 +311,11 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC4626Upg
 
         // Process the withdrawal from the underlying investment opportunity
         // It is expected that the kernel transfers the assets directly to the receiver
-        uint256 assetsWithdrawn =
-            (TRANCHE_TYPE() == TrancheType.SENIOR
+        uint256 assetsWithdrawn = (
+            TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IRoycoKernel(kernel()).stRedeem(asset(), _shares, _withVirtualShares(totalSupply()), _controller, _receiver)
-                : IRoycoKernel(kernel()).jtRedeem(asset(), _shares, _withVirtualShares(totalSupply()), _controller, _receiver));
+                : IRoycoKernel(kernel()).jtRedeem(asset(), _shares, _withVirtualShares(totalSupply()), _controller, _receiver)
+        );
         assets = assetsWithdrawn;
 
         // Account for the withdrawal
@@ -359,10 +363,11 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC4626Upg
         IERC20(asset()).safeTransferFrom(_owner, kernel_, _assets);
 
         // Queue the deposit request and get the request ID from the kernel
-        requestId =
-        (TRANCHE_TYPE() == TrancheType.SENIOR
+        requestId = (
+            TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTDepositKernel(kernel_).stRequestDeposit(msg.sender, _assets, _controller)
-                : IAsyncJTDepositKernel(kernel_).jtRequestDeposit(msg.sender, _assets, _controller));
+                : IAsyncJTDepositKernel(kernel_).jtRequestDeposit(msg.sender, _assets, _controller)
+        );
 
         emit DepositRequest(_controller, _owner, requestId, msg.sender, _assets);
     }
@@ -380,10 +385,11 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC4626Upg
         executionIsAsync(Action.DEPOSIT)
         returns (uint256 pendingAssets)
     {
-        pendingAssets =
-        (TRANCHE_TYPE() == TrancheType.SENIOR
+        pendingAssets = (
+            TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTDepositKernel(kernel()).stPendingDepositRequest(_requestId, _controller)
-                : IAsyncJTDepositKernel(kernel()).jtPendingDepositRequest(_requestId, _controller));
+                : IAsyncJTDepositKernel(kernel()).jtPendingDepositRequest(_requestId, _controller)
+        );
     }
 
     /// @inheritdoc IERC7540
@@ -399,9 +405,11 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC4626Upg
         executionIsAsync(Action.DEPOSIT)
         returns (uint256)
     {
-        return (TRANCHE_TYPE() == TrancheType.SENIOR
+        return (
+            TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTDepositKernel(kernel()).stClaimableDepositRequest(_requestId, _controller)
-                : IAsyncJTDepositKernel(kernel()).jtClaimableDepositRequest(_requestId, _controller));
+                : IAsyncJTDepositKernel(kernel()).jtClaimableDepositRequest(_requestId, _controller)
+        );
     }
 
     /// @inheritdoc IERC7540
@@ -427,10 +435,11 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC4626Upg
         }
 
         // Queue the redemption request and get the request ID from the kernel
-        requestId =
-        (TRANCHE_TYPE() == TrancheType.SENIOR
+        requestId = (
+            TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTWithdrawalKernel(kernel()).stRequestRedeem(msg.sender, _shares, _withVirtualShares(totalSupply()), _controller)
-                : IAsyncJTWithdrawalKernel(kernel()).jtRequestRedeem(msg.sender, _shares, _withVirtualShares(totalSupply()), _controller));
+                : IAsyncJTWithdrawalKernel(kernel()).jtRequestRedeem(msg.sender, _shares, _withVirtualShares(totalSupply()), _controller)
+        );
 
         // Handle the shares being redeemed from the owner
         if (_requestRedeemSharesBehavior() == RequestRedeemSharesBehavior.BURN_ON_REDEEM) {
@@ -457,10 +466,11 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC4626Upg
         executionIsAsync(Action.WITHDRAW)
         returns (uint256 pendingShares)
     {
-        pendingShares =
-        (TRANCHE_TYPE() == TrancheType.SENIOR
+        pendingShares = (
+            TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTWithdrawalKernel(kernel()).stPendingRedeemRequest(_requestId, _controller)
-                : IAsyncJTWithdrawalKernel(kernel()).jtPendingRedeemRequest(_requestId, _controller));
+                : IAsyncJTWithdrawalKernel(kernel()).jtPendingRedeemRequest(_requestId, _controller)
+        );
     }
 
     /// @inheritdoc IERC7540
@@ -476,9 +486,11 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC4626Upg
         executionIsAsync(Action.WITHDRAW)
         returns (uint256 claimableShares)
     {
-        return (TRANCHE_TYPE() == TrancheType.SENIOR
+        return (
+            TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTWithdrawalKernel(kernel()).stClaimableRedeemRequest(_requestId, _controller)
-                : IAsyncJTWithdrawalKernel(kernel()).jtClaimableRedeemRequest(_requestId, _controller));
+                : IAsyncJTWithdrawalKernel(kernel()).jtClaimableRedeemRequest(_requestId, _controller)
+        );
     }
 
     // =============================
@@ -521,9 +533,11 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC4626Upg
         executionIsAsync(Action.DEPOSIT)
         returns (bool isPending)
     {
-        return (TRANCHE_TYPE() == TrancheType.SENIOR
+        return (
+            TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTDepositKernel(kernel()).stPendingCancelDepositRequest(_requestId, _controller)
-                : IAsyncJTDepositKernel(kernel()).jtPendingCancelDepositRequest(_requestId, _controller));
+                : IAsyncJTDepositKernel(kernel()).jtPendingCancelDepositRequest(_requestId, _controller)
+        );
     }
 
     /// @inheritdoc IERC7887
@@ -539,10 +553,11 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC4626Upg
         executionIsAsync(Action.DEPOSIT)
         returns (uint256 assets)
     {
-        assets =
-        (TRANCHE_TYPE() == TrancheType.SENIOR
+        assets = (
+            TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTDepositKernel(kernel()).stClaimableCancelDepositRequest(_requestId, _controller)
-                : IAsyncJTDepositKernel(kernel()).jtClaimableCancelDepositRequest(_requestId, _controller));
+                : IAsyncJTDepositKernel(kernel()).jtClaimableCancelDepositRequest(_requestId, _controller)
+        );
     }
 
     /// @inheritdoc IERC7887
@@ -561,10 +576,11 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC4626Upg
         executionIsAsync(Action.DEPOSIT)
     {
         // Expect the kernel to transfer the assets to the receiver directly after the cancellation is processed
-        uint256 assets =
-            (TRANCHE_TYPE() == TrancheType.SENIOR
+        uint256 assets = (
+            TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTDepositKernel(kernel()).stClaimCancelDepositRequest(_requestId, _receiver, _controller)
-                : IAsyncJTDepositKernel(kernel()).jtClaimCancelDepositRequest(_requestId, _receiver, _controller));
+                : IAsyncJTDepositKernel(kernel()).jtClaimCancelDepositRequest(_requestId, _receiver, _controller)
+        );
 
         emit CancelDepositClaim(_controller, _receiver, _requestId, msg.sender, assets);
     }
@@ -605,9 +621,11 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC4626Upg
         executionIsAsync(Action.WITHDRAW)
         returns (bool isPending)
     {
-        return (TRANCHE_TYPE() == TrancheType.SENIOR
+        return (
+            TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTWithdrawalKernel(kernel()).stPendingCancelRedeemRequest(_requestId, _controller)
-                : IAsyncJTWithdrawalKernel(kernel()).jtPendingCancelRedeemRequest(_requestId, _controller));
+                : IAsyncJTWithdrawalKernel(kernel()).jtPendingCancelRedeemRequest(_requestId, _controller)
+        );
     }
 
     /// @inheritdoc IERC7887
@@ -623,10 +641,11 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC4626Upg
         executionIsAsync(Action.WITHDRAW)
         returns (uint256 shares)
     {
-        shares =
-        (TRANCHE_TYPE() == TrancheType.SENIOR
+        shares = (
+            TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTWithdrawalKernel(kernel()).stClaimableCancelRedeemRequest(_requestId, _controller)
-                : IAsyncJTWithdrawalKernel(kernel()).jtClaimableCancelRedeemRequest(_requestId, _controller));
+                : IAsyncJTWithdrawalKernel(kernel()).jtClaimableCancelRedeemRequest(_requestId, _controller)
+        );
     }
 
     /// @inheritdoc IERC7887
@@ -644,10 +663,11 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC4626Upg
         onlyCallerOrOperator(_owner)
         executionIsAsync(Action.WITHDRAW)
     {
-        uint256 shares =
-            (TRANCHE_TYPE() == TrancheType.SENIOR
+        uint256 shares = (
+            TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTWithdrawalKernel(kernel()).stClaimCancelRedeemRequest(_requestId, _receiver, _owner)
-                : IAsyncJTWithdrawalKernel(kernel()).jtClaimCancelRedeemRequest(_requestId, _receiver, _owner));
+                : IAsyncJTWithdrawalKernel(kernel()).jtClaimCancelRedeemRequest(_requestId, _receiver, _owner)
+        );
 
         require(shares != 0, MUST_CLAIM_NON_ZERO_SHARES());
 
@@ -727,14 +747,14 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC4626Upg
     function _previewPostSyncTrancheState() internal view returns (uint256 trancheTotalAssets, uint256 trancheTotalShares) {
         // Get the post-sync state of the kernel for the tranche
         IRoycoKernel kernel_ = IRoycoKernel(kernel());
-        SyncedNAVsPacket memory packet = kernel_.previewSyncTrancheNAVs();
+        AccountingState memory state = kernel_.previewSyncTrancheNAVs();
         uint256 protocolFeeAssetsAccrued;
         if (TRANCHE_TYPE() == TrancheType.SENIOR) {
-            trancheTotalAssets = packet.stEffectiveNAV;
-            protocolFeeAssetsAccrued = packet.stProtocolFeeAccrued;
+            trancheTotalAssets = state.stEffectiveNAV;
+            protocolFeeAssetsAccrued = state.stProtocolFeeAccrued;
         } else {
-            trancheTotalAssets = packet.jtEffectiveNAV;
-            protocolFeeAssetsAccrued = packet.jtProtocolFeeAccrued;
+            trancheTotalAssets = state.jtEffectiveNAV;
+            protocolFeeAssetsAccrued = state.jtProtocolFeeAccrued;
         }
 
         // Convert the fee assets accrued to shares
@@ -743,9 +763,8 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC4626Upg
         if (protocolFeeAssetsAccrued != 0) {
             // Simulate minting the fee shares and add them to the tranche's total shares
             // Deduct protocol fee assets accrued from the total assets since fees are included in total assets
-            trancheTotalShares += _convertToShares(
-                protocolFeeAssetsAccrued, trancheTotalShares, (trancheTotalAssets - protocolFeeAssetsAccrued), Math.Rounding.Floor
-            );
+            trancheTotalShares +=
+                _convertToShares(protocolFeeAssetsAccrued, trancheTotalShares, (trancheTotalAssets - protocolFeeAssetsAccrued), Math.Rounding.Floor);
         }
     }
 
@@ -761,9 +780,11 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC4626Upg
 
     /// @dev Returns if the specified action employs a synchronous execution model
     function _isSync(Action _action) internal view returns (bool) {
-        return (_action == Action.DEPOSIT
-                    ? RoycoTrancheStorageLib._getRoycoTrancheStorage().DEPOSIT_EXECUTION_MODEL
-                    : RoycoTrancheStorageLib._getRoycoTrancheStorage().WITHDRAW_EXECUTION_MODEL) == ExecutionModel.SYNC;
+        return (
+            _action == Action.DEPOSIT
+                ? RoycoTrancheStorageLib._getRoycoTrancheStorage().DEPOSIT_EXECUTION_MODEL
+                : RoycoTrancheStorageLib._getRoycoTrancheStorage().WITHDRAW_EXECUTION_MODEL
+        ) == ExecutionModel.SYNC;
     }
 
     /// @inheritdoc ERC4626Upgradeable
@@ -772,9 +793,11 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC4626Upg
     }
 
     function _requestRedeemSharesBehavior() internal view virtual returns (RequestRedeemSharesBehavior) {
-        return (TRANCHE_TYPE() == TrancheType.SENIOR
+        return (
+            TRANCHE_TYPE() == TrancheType.SENIOR
                 ? RoycoTrancheStorageLib._getRoycoTrancheStorage().REQUEST_REDEEM_SHARES_ST_BEHAVIOR
-                : RoycoTrancheStorageLib._getRoycoTrancheStorage().REQUEST_REDEEM_SHARES_JT_BEHAVIOR);
+                : RoycoTrancheStorageLib._getRoycoTrancheStorage().REQUEST_REDEEM_SHARES_JT_BEHAVIOR
+        );
     }
 
     function _withVirtualShares(uint256 _shares) internal view returns (uint256) {

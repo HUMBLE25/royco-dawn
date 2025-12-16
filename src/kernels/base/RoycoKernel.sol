@@ -5,7 +5,7 @@ import { RoycoBase } from "../../base/RoycoBase.sol";
 import { IRoycoKernel } from "../../interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoVaultTranche } from "../../interfaces/tranche/IRoycoVaultTranche.sol";
 import { RoycoKernelInitParams, RoycoKernelState, RoycoKernelStorageLib } from "../../libraries/RoycoKernelStorageLib.sol";
-import { SyncedNAVsPacket } from "../../libraries/Types.sol";
+import { AccountingState } from "../../libraries/Types.sol";
 import { Math } from "../../libraries/UtilsLib.sol";
 import { IRoycoAccountant, Operation } from "./../../interfaces/IRoycoAccountant.sol";
 
@@ -97,41 +97,41 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     /**
      * @notice Synchronizes and persists the raw and effective NAVs of both tranches
      * @dev Only executes a pre-op sync because there is no operation being executed in the same call as this sync
-     * @return packet The NAV sync packet containing all mark to market accounting data
+     * @return state The NAV sync state containing all mark to market accounting data
      */
-    function syncTrancheNAVs() external override(IRoycoKernel) restricted returns (SyncedNAVsPacket memory packet) {
+    function syncTrancheNAVs() external override(IRoycoKernel) restricted returns (AccountingState memory state) {
         return _preOpSyncTrancheNAVs();
     }
 
     /**
      * @notice Previews a synchronization of the raw and effective NAVs of both tranches
      * @dev Does not mutate any state
-     * @return packet The NAV sync packet containing all mark to market accounting data
+     * @return state The NAV sync state containing all mark to market accounting data
      */
-    function previewSyncTrancheNAVs() public view override(IRoycoKernel) returns (SyncedNAVsPacket memory packet) {
+    function previewSyncTrancheNAVs() public view override(IRoycoKernel) returns (AccountingState memory state) {
         return _accountant().previewSyncTrancheNAVs(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV());
     }
 
     /**
      * @notice Invokes the accountant to do a pre-operation (deposit and withdrawal) NAV sync
      * @dev Should be called on every NAV mutating user operation
-     * @return packet The NAV sync packet containing all mark to market accounting data
+     * @return state The NAV sync state containing all mark to market accounting data
      */
-    function _preOpSyncTrancheNAVs() internal returns (SyncedNAVsPacket memory packet) {
+    function _preOpSyncTrancheNAVs() internal returns (AccountingState memory state) {
         // Execute the pre-op sync via the accountant
-        packet = _accountant().preOpSyncTrancheNAVs(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV());
+        state = _accountant().preOpSyncTrancheNAVs(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV());
 
         // Collect any protocol fees accrued from the sync to the fee recipient
-        if (packet.stProtocolFeeAccrued != 0 || packet.jtProtocolFeeAccrued != 0) {
+        if (state.stProtocolFeeAccrued != 0 || state.jtProtocolFeeAccrued != 0) {
             RoycoKernelState storage $ = RoycoKernelStorageLib._getRoycoKernelStorage();
             address protocolFeeRecipient = $.protocolFeeRecipient;
             // If ST yield was distributed, Mint ST protocol fee shares to the protocol fee recipient
-            if (packet.stProtocolFeeAccrued != 0) {
-                IRoycoVaultTranche($.seniorTranche).mintProtocolFeeShares(packet.stProtocolFeeAccrued, packet.stEffectiveNAV, protocolFeeRecipient);
+            if (state.stProtocolFeeAccrued != 0) {
+                IRoycoVaultTranche($.seniorTranche).mintProtocolFeeShares(state.stProtocolFeeAccrued, state.stEffectiveNAV, protocolFeeRecipient);
             }
             // If JT yield was distributed, Mint JT protocol fee shares to the protocol fee recipient
-            if (packet.jtProtocolFeeAccrued != 0) {
-                IRoycoVaultTranche($.juniorTranche).mintProtocolFeeShares(packet.jtProtocolFeeAccrued, packet.jtEffectiveNAV, protocolFeeRecipient);
+            if (state.jtProtocolFeeAccrued != 0) {
+                IRoycoVaultTranche($.juniorTranche).mintProtocolFeeShares(state.jtProtocolFeeAccrued, state.jtEffectiveNAV, protocolFeeRecipient);
             }
         }
     }
