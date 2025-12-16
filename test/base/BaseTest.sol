@@ -6,12 +6,13 @@ import { Vm } from "../../lib/forge-std/src/Vm.sol";
 import { ERC20Mock } from "../../lib/openzeppelin-contracts/contracts/mocks/token/ERC20Mock.sol";
 import { ERC1967Proxy } from "../../lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import { ERC4626ST_AaveV3JT_Kernel } from "../../src/KERNELs/ERC4626ST_AaveV3JT_Kernel.sol";
-import { RoycoKernel } from "../../src/KERNELs/base/RoycoKernel.sol";
 import { StaticCurveRDM } from "../../src/RDM/StaticCurveRDM.sol";
 import { RoycoTrancheFactory } from "../../src/RoycoTrancheFactory.sol";
 import { RoycoAccountant } from "../../src/accountant/RoycoAccountant.sol";
-import { RoycoAuth, RoycoRoles } from "../../src/auth/RoycoAuth.sol";
+import { RoycoAuth } from "../../src/auth/RoycoAuth.sol";
+import { RoycoRoles } from "../../src/auth/RoycoRoles.sol";
 import { IRoycoKernel } from "../../src/interfaces/KERNEL/IRoycoKernel.sol";
+import { RoycoKernel } from "../../src/kernels/base/RoycoKernel.sol";
 import { ConstantsLib } from "../../src/libraries/ConstantsLib.sol";
 import { RoycoAccountantInitParams } from "../../src/libraries/RoycoAccountantStorageLib.sol";
 import { RoycoKernelInitParams } from "../../src/libraries/RoycoKernelStorageLib.sol";
@@ -19,7 +20,7 @@ import { RoycoJT } from "../../src/tranches/RoycoJT.sol";
 import { RoycoST } from "../../src/tranches/RoycoST.sol";
 import { RoycoVaultTranche } from "../../src/tranches/RoycoVaultTranche.sol";
 
-contract BaseTest is Test {
+contract BaseTest is Test, RoycoRoles {
     struct TrancheState {
         uint256 rawNAV;
         uint256 effectiveNAV;
@@ -83,6 +84,7 @@ contract BaseTest is Test {
     RoycoVaultTranche internal ST;
     RoycoVaultTranche internal JT;
     RoycoKernel internal KERNEL;
+    RoycoAccountant internal ACCOUNTANT;
     bytes32 internal MARKET_ID;
 
     // -----------------------------------------
@@ -140,8 +142,10 @@ contract BaseTest is Test {
         vm.label(address(ERC4626ST_AAVEV3JT_KERNEL_IMPL), "KernelImpl");
 
         // Deploy FACTORY
-        FACTORY = new RoycoTrancheFactory(address(ST_IMPL), address(JT_IMPL));
+        FACTORY = new RoycoTrancheFactory(OWNER_ADDRESS);
         vm.label(address(FACTORY), "Factory");
+
+        _setupFactoryAuth();
     }
 
     function _setupFork() internal {
@@ -201,10 +205,11 @@ contract BaseTest is Test {
         providers.push(DAN_ADDRESS);
     }
 
-    function _setDeployedMarket(RoycoVaultTranche _st, RoycoVaultTranche _jt, RoycoKernel _kernel, bytes32 _marketId) internal {
+    function _setDeployedMarket(RoycoVaultTranche _st, RoycoVaultTranche _jt, RoycoKernel _kernel, RoycoAccountant _accountant, bytes32 _marketId) internal {
         ST = _st;
         JT = _jt;
         KERNEL = _kernel;
+        ACCOUNTANT = _accountant;
         MARKET_ID = _marketId;
 
         vm.label(address(ST), "ST");
@@ -235,78 +240,44 @@ contract BaseTest is Test {
         internal
         prankModifier(OWNER_ADDRESS)
     {
-        RoycoVaultTranche tranche = RoycoVaultTranche(_tranche);
-        tranche.grantRole(RoycoRoles.PAUSER_ROLE, _pauser);
-        tranche.grantRole(RoycoRoles.UPGRADER_ROLE, _upgrader);
-        tranche.grantRole(RoycoRoles.SCHEDULER_MANAGER_ROLE, _schedulerManager);
+        FACTORY.grantRole(RoycoRoles.PAUSER_ROLE, _pauser, 0);
+        FACTORY.grantRole(RoycoRoles.UPGRADER_ROLE, _upgrader, 0);
+        FACTORY.grantRole(RoycoRoles.SCHEDULER_MANAGER_ROLE, _schedulerManager, 0);
         for (uint256 i = 0; i < _providers.length; i++) {
-            tranche.grantRole(RoycoRoles.DEPOSIT_ROLE, _providers[i]);
-            tranche.grantRole(RoycoRoles.REDEEM_ROLE, _providers[i]);
+            FACTORY.grantRole(RoycoRoles.DEPOSIT_ROLE, _providers[i], 0);
+            FACTORY.grantRole(RoycoRoles.REDEEM_ROLE, _providers[i], 0);
         }
     }
 
-    /// @notice Sets up roles for a KERNEL
-    /// @param _kernel The KERNEL address
+    /// @notice Sets up roles for a kernel
+    /// @param _kernel The kernel address
     /// @param _schedulerManager The scheduler manager address
-    /// @param _kernelAdmin The KERNEL admin address
+    /// @param _kernelAdmin The kernel admin address
     function _setUpKernelRoles(address _kernel, address _schedulerManager, address _kernelAdmin) internal prankModifier(OWNER_ADDRESS) {
-        RoycoAuth __kernel = RoycoAuth(_kernel);
-        __kernel.grantRole(RoycoRoles.SCHEDULER_MANAGER_ROLE, _schedulerManager);
-        __kernel.grantRole(RoycoRoles.KERNEL_ADMIN_ROLE, _kernelAdmin);
+        FACTORY.grantRole(RoycoRoles.SCHEDULER_MANAGER_ROLE, _schedulerManager, 0);
+        FACTORY.grantRole(RoycoRoles.KERNEL_ADMIN_ROLE, _kernelAdmin, 0);
+    }
+
+    /// @notice Sets up roles for the factory
+    function _setupFactoryAuth() internal prankModifier(OWNER_ADDRESS) {
+        bytes4[] memory selectors = new bytes4[](1);
+        selectors[0] = RoycoTrancheFactory.deployMarket.selector;
+        FACTORY.setTargetFunctionRole(address(FACTORY), selectors, type(uint64).max);
     }
 
     /// @notice Generates a provider address
     /// @param index The index of the provider
     /// @return provider The provider address
-    function _generateProvider(RoycoVaultTranche _tranche, uint256 index) internal virtual returns (Vm.Wallet memory provider) {
+    function _generateProvider(RoycoVaultTranche _tranche, uint256 index) internal virtual prankModifier(OWNER_ADDRESS) returns (Vm.Wallet memory provider) {
         // Generate a unique wallet
         string memory providerName = string(abi.encodePacked("PROVIDER", vm.toString(index)));
         provider = _initWallet(providerName, 10_000_000e6);
 
         // Grant Permissions
-        vm.startPrank(OWNER_ADDRESS);
-        _tranche.grantRole(RoycoRoles.DEPOSIT_ROLE, provider.addr);
-        _tranche.grantRole(RoycoRoles.REDEEM_ROLE, provider.addr);
-        vm.stopPrank();
+        FACTORY.grantRole(RoycoRoles.DEPOSIT_ROLE, provider.addr, 0);
+        FACTORY.grantRole(RoycoRoles.REDEEM_ROLE, provider.addr, 0);
 
         return provider;
-    }
-
-    /// @notice Deploys a market using the FACTORY
-    /// @param _stName Name of the senior tranche
-    /// @param _stSymbol Symbol of the senior tranche
-    /// @param _jtName Name of the junior tranche
-    /// @param _jtSymbol Symbol of the junior tranche
-    /// @param _seniorAsset Asset for the senior tranche
-    /// @param _juniorAsset Asset for the junior tranche
-    /// @param _kernel Address of the KERNEL contract
-    function _deployMarket(
-        string memory _stName,
-        string memory _stSymbol,
-        string memory _jtName,
-        string memory _jtSymbol,
-        address _seniorAsset,
-        address _juniorAsset,
-        address _kernel
-    )
-        internal
-        returns (RoycoVaultTranche ST, RoycoVaultTranche JT, bytes32 MARKET_ID)
-    {
-        MARKET_ID = keccak256(abi.encode(_stName, _jtName, block.timestamp));
-
-        (address _st, address _jt) =
-            FACTORY.deployMarket(_stName, _stSymbol, _jtName, _jtSymbol, _seniorAsset, _juniorAsset, _kernel, OWNER_ADDRESS, PAUSER_ADDRESS, MARKET_ID);
-
-        ST = RoycoVaultTranche(_st);
-        JT = RoycoVaultTranche(_jt);
-    }
-
-    /// @notice Deploys a accountant using ERC1967 proxy
-    /// @param _params The initialization parameters
-    function _deployAccountant(RoycoAccountantInitParams memory _params) internal returns (RoycoAccountant accountant) {
-        accountant = RoycoAccountant(
-            address(new ERC1967Proxy(address(ACCOUNTANT_IMPL), abi.encodeCall(RoycoAccountant.initialize, (_params, OWNER_ADDRESS, PAUSER_ADDRESS))))
-        );
     }
 
     /// @notice Verifies the preview NAVs of the senior and junior tranches

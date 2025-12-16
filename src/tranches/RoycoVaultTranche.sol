@@ -10,7 +10,7 @@ import {
 } from "../../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import { IAccessControlEnumerable } from "../../lib/openzeppelin-contracts/contracts/access/extensions/IAccessControlEnumerable.sol";
 import { SafeERC20 } from "../../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
-import { AccessControlEnumerableUpgradeable, RoycoAuth, RoycoRoles } from "../auth/RoycoAuth.sol";
+import { RoycoBase } from "../base/RoycoBase.sol";
 import { IAsyncJTDepositKernel } from "../interfaces/kernel/IAsyncJTDepositKernel.sol";
 import { IAsyncJTWithdrawalKernel } from "../interfaces/kernel/IAsyncJTWithdrawalKernel.sol";
 import { IAsyncSTDepositKernel } from "../interfaces/kernel/IAsyncSTDepositKernel.sol";
@@ -26,7 +26,7 @@ import { Action, SyncedNAVsPacket, TrancheDeploymentParams } from "../libraries/
 /// @dev This contract provides common tranche operations including ERC4626 vault functionality,
 ///      asynchronous deposit/withdrawal support via ERC7540, and request cancellation via ERC7887
 ///      All asset management and investment operations are delegated to the configured kernel
-abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoAuth, UUPSUpgradeable, ERC4626Upgradeable {
+abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC4626Upgradeable {
     using Math for uint256;
     using SafeERC20 for IERC20;
 
@@ -85,14 +85,12 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoAuth, UUPSUpgrad
     /// @dev This function initializes parent contracts and the tranche-specific state
     /// @param _trancheParams Deployment parameters including name, symbol, kernel, and kernel initialization data
     /// @param _asset The underlying asset for the tranche
-    /// @param _owner The initial owner of the tranche
-    /// @param _pauser The initial pauser of the tranche
+    /// @param _initialAuthority The initial authority for the tranche
     /// @param _marketId The identifier of the Royco market this tranche is linked to
     function __RoycoTranche_init(
         TrancheDeploymentParams calldata _trancheParams,
         address _asset,
-        address _owner,
-        address _pauser,
+        address _initialAuthority,
         bytes32 _marketId
     )
         internal
@@ -101,7 +99,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoAuth, UUPSUpgrad
         // Initialize the parent contracts
         __ERC20_init_unchained(_trancheParams.name, _trancheParams.symbol);
         __ERC4626_init_unchained(IERC20(_asset));
-        __RoycoAuth_init(_owner, _pauser);
+        __RoycoBase_init(_initialAuthority);
 
         // Initialize the Royco Tranche state
         __RoycoTranche_init_unchained(_asset, _trancheParams.kernel, _marketId);
@@ -241,7 +239,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoAuth, UUPSUpgrad
         public
         virtual
         override(IERC7540)
-        checkRoleAndDelayIfGated(RoycoRoles.DEPOSIT_ROLE)
+        restricted
         whenNotPaused
         onlyCallerOrOperator(_controller)
         returns (uint256 shares)
@@ -300,8 +298,8 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoAuth, UUPSUpgrad
         public
         virtual
         override(ERC4626Upgradeable, IERC7540)
+        restricted
         onlyCallerOrOperator(_controller)
-        checkRoleAndDelayIfGated(RoycoRoles.REDEEM_ROLE)
         whenNotPaused
         returns (uint256 assets)
     {
@@ -348,22 +346,22 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoAuth, UUPSUpgrad
         external
         virtual
         override(IERC7540)
-        checkRoleAndDelayIfGated(RoycoRoles.DEPOSIT_ROLE)
+        restricted
         whenNotPaused
         onlyCallerOrOperator(_owner)
         executionIsAsync(Action.DEPOSIT)
         returns (uint256 requestId)
     {
-        address kernel = kernel();
+        address kernel_ = kernel();
 
         // Transfer the assets from the owner to the kernel
-        IERC20(asset()).safeTransferFrom(_owner, kernel, _assets);
+        IERC20(asset()).safeTransferFrom(_owner, kernel_, _assets);
 
         // Queue the deposit request and get the request ID from the kernel
         requestId =
         (TRANCHE_TYPE() == TrancheType.SENIOR
-                ? IAsyncSTDepositKernel(kernel).stRequestDeposit(msg.sender, _assets, _controller)
-                : IAsyncJTDepositKernel(kernel).jtRequestDeposit(msg.sender, _assets, _controller));
+                ? IAsyncSTDepositKernel(kernel_).stRequestDeposit(msg.sender, _assets, _controller)
+                : IAsyncJTDepositKernel(kernel_).jtRequestDeposit(msg.sender, _assets, _controller));
 
         emit DepositRequest(_controller, _owner, requestId, msg.sender, _assets);
     }
@@ -415,7 +413,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoAuth, UUPSUpgrad
         external
         virtual
         override(IERC7540)
-        checkRoleAndDelayIfGated(RoycoRoles.REDEEM_ROLE)
+        restricted
         whenNotPaused
         executionIsAsync(Action.WITHDRAW)
         returns (uint256 requestId)
@@ -495,7 +493,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoAuth, UUPSUpgrad
         external
         virtual
         override(IERC7887)
-        checkRoleAndDelayIfGated(RoycoRoles.CANCEL_DEPOSIT_ROLE)
+        restricted
         whenNotPaused
         onlyCallerOrOperator(_controller)
         executionIsAsync(Action.DEPOSIT)
@@ -556,7 +554,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoAuth, UUPSUpgrad
         external
         virtual
         override(IERC7887)
-        checkRoleAndDelayIfGated(RoycoRoles.CANCEL_DEPOSIT_ROLE)
+        restricted
         whenNotPaused
         onlyCallerOrOperator(_controller)
         executionIsAsync(Action.DEPOSIT)
@@ -579,7 +577,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoAuth, UUPSUpgrad
         external
         virtual
         override(IERC7887)
-        checkRoleAndDelayIfGated(RoycoRoles.CANCEL_REDEEM_ROLE)
+        restricted
         whenNotPaused
         onlyCallerOrOperator(_controller)
         executionIsAsync(Action.WITHDRAW)
@@ -640,7 +638,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoAuth, UUPSUpgrad
         external
         virtual
         override(IERC7887)
-        checkRoleAndDelayIfGated(RoycoRoles.CANCEL_REDEEM_ROLE)
+        restricted
         whenNotPaused
         onlyCallerOrOperator(_owner)
         executionIsAsync(Action.WITHDRAW)
@@ -694,7 +692,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoAuth, UUPSUpgrad
     }
 
     /// @inheritdoc IERC165
-    function supportsInterface(bytes4 _interfaceId) public pure virtual override(IERC165, AccessControlEnumerableUpgradeable) returns (bool) {
+    function supportsInterface(bytes4 _interfaceId) public pure virtual override(IERC165) returns (bool) {
         return _interfaceId == type(IERC165).interfaceId || _interfaceId == type(ERC4626Upgradeable).interfaceId || _interfaceId == type(IERC7540).interfaceId
             || _interfaceId == type(IERC7575).interfaceId || _interfaceId == type(IERC7887).interfaceId || _interfaceId == type(IRoycoVaultTranche).interfaceId
             || _interfaceId == type(IAccessControlEnumerable).interfaceId;
@@ -727,8 +725,8 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoAuth, UUPSUpgrad
      */
     function _previewPostSyncTrancheState() internal view returns (uint256 trancheTotalAssets, uint256 trancheTotalShares) {
         // Get the post-sync state of the kernel for the tranche
-        IRoycoKernel kernel = IRoycoKernel(kernel());
-        SyncedNAVsPacket memory packet = kernel.previewSyncTrancheNAVs();
+        IRoycoKernel kernel_ = IRoycoKernel(kernel());
+        SyncedNAVsPacket memory packet = kernel_.previewSyncTrancheNAVs();
         uint256 protocolFeeAssetsAccrued;
         if (TRANCHE_TYPE() == TrancheType.SENIOR) {
             trancheTotalAssets = packet.stEffectiveNAV;
@@ -759,10 +757,6 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoAuth, UUPSUpgrad
     function _convertToAssets(uint256 _shares, uint256 _totalSupply, uint256 _totalAssets, Math.Rounding rounding) internal view returns (uint256) {
         return _shares.mulDiv(_withVirtualAssets(_totalAssets), _withVirtualShares(_totalSupply), rounding);
     }
-
-    /// @inheritdoc UUPSUpgradeable
-    /// @dev Will revert if the caller is not the upgrader role
-    function _authorizeUpgrade(address newImplementation) internal override checkRoleAndDelayIfGated(RoycoRoles.UPGRADER_ROLE) { }
 
     /// @dev Returns if the specified action employs a synchronous execution model
     function _isSync(Action _action) internal view returns (bool) {

@@ -5,9 +5,12 @@ import { Vm } from "../../../lib/forge-std/src/Vm.sol";
 import { IERC20 } from "../../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { ERC4626ST_AaveV3JT_Kernel } from "../../../src/KERNELs/ERC4626ST_AaveV3JT_Kernel.sol";
 import { RoycoAccountant } from "../../../src/accountant/RoycoAccountant.sol";
+import { RoycoKernel } from "../../../src/kernels/base/RoycoKernel.sol";
 import { ConstantsLib } from "../../../src/libraries/ConstantsLib.sol";
 import { RoycoAccountantInitParams } from "../../../src/libraries/RoycoAccountantStorageLib.sol";
 import { RoycoKernelInitParams } from "../../../src/libraries/RoycoKernelStorageLib.sol";
+import { DeployedContracts, IRoycoAccountant, IRoycoKernel, MarketDeploymentParams } from "../../../src/libraries/Types.sol";
+import { TrancheDeploymentParams } from "../../../src/libraries/Types.sol";
 import { RoycoVaultTranche } from "../../../src/tranches/RoycoVaultTranche.sol";
 import { BaseTest } from "../../base/BaseTest.sol";
 import { ERC4626Mock } from "../../mock/ERC4626Mock.sol";
@@ -24,7 +27,6 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
     // Deployed contracts
     ERC4626Mock internal MOCK_UNDERLYING_ST_VAULT;
     ERC4626ST_AaveV3JT_Kernel internal ERC4626ST_AAVEV3JT_KERNEL;
-    RoycoAccountant internal ACCOUNTANT;
 
     // External Contracts
     IERC20 internal USDC = IERC20(ETHEREUM_MAINNET_USDC_ADDRESS);
@@ -56,13 +58,14 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
         IERC20(ETHEREUM_MAINNET_USDC_ADDRESS).approve(address(MOCK_UNDERLYING_ST_VAULT), type(uint256).max);
 
         // Deploy the markets
-        (RoycoVaultTranche seniorTranche, RoycoVaultTranche juniorTranche, ERC4626ST_AaveV3JT_Kernel kernel, bytes32 marketID) = _deployMarketWithKernel();
-        _setDeployedMarket(seniorTranche, juniorTranche, kernel, marketID);
-        ERC4626ST_AAVEV3JT_KERNEL = kernel;
-
-        // Setup the roles on the tranches
-        _setUpTrancheRoles(address(ST), providers, PAUSER_ADDRESS, UPGRADER_ADDRESS, SCHEDULER_MANAGER_ADDRESS);
-        // _setUpTrancheRoles(address(JT), providers, PAUSER_ADDRESS, UPGRADER_ADDRESS, SCHEDULER_MANAGER_ADDRESS);
+        (DeployedContracts memory deployedContracts, bytes32 marketID) = _deployMarketWithKernel();
+        _setDeployedMarket(
+            RoycoVaultTranche(address(deployedContracts.seniorTranche)),
+            RoycoVaultTranche(address(deployedContracts.juniorTranche)),
+            RoycoKernel(address(deployedContracts.kernel)),
+            RoycoAccountant(address(deployedContracts.accountant)),
+            marketID
+        );
     }
 
     /// @notice Deals USDC tokens to all configured addresses for mainnet fork tests
@@ -87,41 +90,82 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
         deal(ETHEREUM_MAINNET_USDC_ADDRESS, RESERVE_ADDRESS, usdcAmount);
     }
 
-    function _deployMarketWithKernel()
-        internal
-        returns (RoycoVaultTranche seniorTranche, RoycoVaultTranche juniorTranche, ERC4626ST_AaveV3JT_Kernel kernel, bytes32 marketID)
-    {
-        // Deploy KERNEL
-        kernel = ERC4626ST_AaveV3JT_Kernel(_deployKernel(address(ERC4626ST_AAVEV3JT_KERNEL_IMPL), bytes("")));
+    function _deployMarketWithKernel() internal returns (DeployedContracts memory deployedContracts, bytes32 marketID) {
+        marketID = keccak256(abi.encodePacked(SENIOR_TRANCH_NAME, JUNIOR_TRANCH_NAME, block.timestamp));
 
-        // Deploy and initialize the accountant
-        ACCOUNTANT = _deployAccountant(
-            RoycoAccountantInitParams({
-                kernel: address(kernel), protocolFeeWAD: PROTOCOL_FEE_WAD, coverageWAD: COVERAGE_WAD, betaWAD: BETA_WAD, rdm: address(RDM)
+        // Precompute the expected addresses of the kernel and accountant
+        bytes32 salt = keccak256(abi.encodePacked("SALT"));
+        address expectedSeniorTrancheAddress = FACTORY.predictERC1967ProxyAddress(address(ST_IMPL), salt);
+        address expectedJuniorTrancheAddress = FACTORY.predictERC1967ProxyAddress(address(JT_IMPL), salt);
+        address expectedKernelAddress = FACTORY.predictERC1967ProxyAddress(address(ERC4626ST_AAVEV3JT_KERNEL_IMPL), salt);
+        address expectedAccountantAddress = FACTORY.predictERC1967ProxyAddress(address(ACCOUNTANT_IMPL), salt);
+
+        // Create the initialization data
+        bytes memory kernelInitializationData = abi.encodeCall(
+            ERC4626ST_AaveV3JT_Kernel.initialize,
+            (
+                RoycoKernelInitParams({
+                    seniorTranche: expectedSeniorTrancheAddress,
+                    juniorTranche: expectedJuniorTrancheAddress,
+                    accountant: expectedAccountantAddress,
+                    protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS
+                }),
+                address(FACTORY),
+                address(MOCK_UNDERLYING_ST_VAULT),
+                ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS
+            )
+        );
+        bytes memory accountantInitializationData = abi.encodeCall(
+            RoycoAccountant.initialize,
+            (
+                RoycoAccountantInitParams({
+                    kernel: expectedKernelAddress, protocolFeeWAD: PROTOCOL_FEE_WAD, coverageWAD: COVERAGE_WAD, betaWAD: BETA_WAD, rdm: address(RDM)
+                }),
+                address(FACTORY)
+            )
+        );
+        bytes memory seniorTrancheInitializationData = abi.encodeCall(
+            ST_IMPL.initialize,
+            (
+                TrancheDeploymentParams({ name: SENIOR_TRANCH_NAME, symbol: SENIOR_TRANCH_SYMBOL, kernel: expectedKernelAddress }),
+                ETHEREUM_MAINNET_USDC_ADDRESS,
+                address(FACTORY),
+                marketID
+            )
+        );
+        bytes memory juniorTrancheInitializationData = abi.encodeCall(
+            JT_IMPL.initialize,
+            (
+                TrancheDeploymentParams({ name: JUNIOR_TRANCH_NAME, symbol: JUNIOR_TRANCH_SYMBOL, kernel: expectedKernelAddress }),
+                ETHEREUM_MAINNET_USDC_ADDRESS,
+                address(FACTORY),
+                marketID
+            )
+        );
+
+        deployedContracts = FACTORY.deployMarket(
+            MarketDeploymentParams({
+                seniorTrancheName: SENIOR_TRANCH_NAME,
+                seniorTrancheSymbol: SENIOR_TRANCH_SYMBOL,
+                juniorTrancheName: JUNIOR_TRANCH_SYMBOL,
+                juniorTrancheSymbol: JUNIOR_TRANCH_SYMBOL,
+                seniorAsset: ETHEREUM_MAINNET_USDC_ADDRESS,
+                juniorAsset: ETHEREUM_MAINNET_USDC_ADDRESS,
+                marketId: marketID,
+                seniorTrancheImplementation: ST_IMPL,
+                juniorTrancheImplementation: JT_IMPL,
+                kernelImplementation: IRoycoKernel(address(ERC4626ST_AAVEV3JT_KERNEL_IMPL)),
+                seniorTrancheInitializationData: seniorTrancheInitializationData,
+                juniorTrancheInitializationData: juniorTrancheInitializationData,
+                accountantImplementation: IRoycoAccountant(address(ACCOUNTANT_IMPL)),
+                kernelInitializationData: kernelInitializationData,
+                accountantInitializationData: accountantInitializationData,
+                seniorTrancheProxyDeploymentSalt: salt,
+                juniorTrancheProxyDeploymentSalt: salt,
+                kernelProxyDeploymentSalt: salt,
+                accountantProxyDeploymentSalt: salt
             })
         );
-
-        // Deploy market with KERNEL
-        (seniorTranche, juniorTranche, marketID) = _deployMarket(
-            SENIOR_TRANCH_NAME,
-            SENIOR_TRANCH_SYMBOL,
-            JUNIOR_TRANCH_NAME,
-            JUNIOR_TRANCH_SYMBOL,
-            ETHEREUM_MAINNET_USDC_ADDRESS,
-            ETHEREUM_MAINNET_USDC_ADDRESS,
-            address(kernel)
-        );
-
-        // Prepare KERNEL initialization parameters
-        RoycoKernelInitParams memory params = RoycoKernelInitParams({
-            seniorTranche: address(seniorTranche),
-            juniorTranche: address(juniorTranche),
-            accountant: address(ACCOUNTANT),
-            protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS
-        });
-
-        // Initialize the KERNEL
-        kernel.initialize(params, OWNER_ADDRESS, PAUSER_ADDRESS, address(MOCK_UNDERLYING_ST_VAULT), ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS);
     }
 
     /// @notice Returns the fork configuration

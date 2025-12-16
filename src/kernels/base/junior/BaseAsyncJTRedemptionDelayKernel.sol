@@ -187,7 +187,7 @@ abstract contract BaseAsyncJTRedemptionDelayKernel is IAsyncJTWithdrawalKernel, 
 
     /// @notice Sets the redemption delay
     /// @param _redemptionDelaySeconds The new redemption delay in seconds
-    function setRedemptionDelay(uint256 _redemptionDelaySeconds) external onlyRole(RoycoRoles.KERNEL_ADMIN_ROLE) {
+    function setRedemptionDelay(uint256 _redemptionDelaySeconds) external restricted {
         _getBaseAsyncJTRedemptionDelayKernelState().redemptionDelaySeconds = _redemptionDelaySeconds;
         emit RedemptionDelayUpdated(_redemptionDelaySeconds);
     }

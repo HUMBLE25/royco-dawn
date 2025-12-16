@@ -1,18 +1,15 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
+import { RoycoBase } from "../base/RoycoBase.sol";
 import { IRDM } from "../interfaces/IRDM.sol";
 import { IRoycoAccountant, Operation } from "../interfaces/IRoycoAccountant.sol";
-
-import { UUPSUpgradeable } from "../../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
-import { RoycoAuth } from "../auth/RoycoAuth.sol";
-import { RoycoRoles } from "../auth/RoycoRoles.sol";
 import { IRoycoVaultTranche } from "../interfaces/tranche/IRoycoVaultTranche.sol";
 import { RoycoAccountantInitParams, RoycoAccountantState, RoycoAccountantStorageLib } from "../libraries/RoycoAccountantStorageLib.sol";
 import { SyncedNAVsPacket } from "../libraries/Types.sol";
 import { ConstantsLib, Math, UtilsLib } from "../libraries/UtilsLib.sol";
 
-contract RoycoAccountant is IRoycoAccountant, RoycoAuth, UUPSUpgradeable {
+contract RoycoAccountant is IRoycoAccountant, RoycoBase {
     using Math for uint256;
 
     /// @dev Enforces that the function is called by the accountant's Royco kernel
@@ -24,8 +21,9 @@ contract RoycoAccountant is IRoycoAccountant, RoycoAuth, UUPSUpgradeable {
     /**
      * @notice Initializes the Royco accountant state
      * @param _params The initialization parameters for the Royco accountant
+     * @param _initialAuthority The initial authority for the Royco accountant
      */
-    function initialize(RoycoAccountantInitParams calldata _params, address _owner, address _pauser) external initializer {
+    function initialize(RoycoAccountantInitParams calldata _params, address _initialAuthority) external initializer {
         // Ensure that the coverage requirement is valid
         require(_params.coverageWAD < ConstantsLib.WAD && _params.coverageWAD >= ConstantsLib.MIN_COVERAGE_WAD, INVALID_COVERAGE_CONFIG());
         // Ensure that JT withdrawals are not permanently bricked
@@ -34,10 +32,10 @@ contract RoycoAccountant is IRoycoAccountant, RoycoAuth, UUPSUpgradeable {
         require(_params.rdm != address(0), NULL_RDM_ADDRESS());
         // Ensure that the protocol fee configuration is valid
         require(_params.protocolFeeWAD <= ConstantsLib.MAX_PROTOCOL_FEE_WAD, MAX_PROTOCOL_FEE_EXCEEDED());
+        // Initialize the base state of the accountant
+        __RoycoBase_init(_initialAuthority);
         // Initialize the state of the accountant
         RoycoAccountantStorageLib.__RoycoAccountant_init(_params);
-        // Initialize the auth state of the accountant
-        __RoycoAuth_init(_owner, _pauser);
     }
 
     /// @inheritdoc IRoycoAccountant
@@ -411,7 +409,4 @@ contract RoycoAccountant is IRoycoAccountant, RoycoAuth, UUPSUpgradeable {
     function _computeRawNAVDelta(uint256 _currentRawNAV, uint256 _lastRawNAV) internal pure returns (int256 deltaNAV) {
         deltaNAV = int256(_currentRawNAV) - int256(_lastRawNAV);
     }
-
-    /// @inheritdoc UUPSUpgradeable
-    function _authorizeUpgrade(address) internal override checkRoleAndDelayIfGated(RoycoRoles.UPGRADER_ROLE) { }
 }
