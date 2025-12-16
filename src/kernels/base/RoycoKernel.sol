@@ -110,7 +110,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
      * @return packet The NAV sync packet containing all mark to market accounting data
      */
     function previewSyncTrancheNAVs() public view override(IRoycoKernel) returns (SyncedNAVsPacket memory packet) {
-        (packet,,) = _accountant().previewSyncTrancheNAVs(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV());
+        return _accountant().previewSyncTrancheNAVs(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV());
     }
 
     /**

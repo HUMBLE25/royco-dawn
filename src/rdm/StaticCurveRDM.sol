@@ -34,7 +34,7 @@ contract StaticCurveRDM is IRDM {
     uint256 public constant BASE_RATE_GTE_TARGET_UTIL = 0.225e18;
 
     /// @inheritdoc IRDM
-    function getJTYieldShare(
+    function previewJTYieldShare(
         uint256 _stRawNAV,
         uint256 _jtRawNAV,
         uint256 _betaWAD,
@@ -42,6 +42,36 @@ contract StaticCurveRDM is IRDM {
         uint256 _jtEffectiveNAV
     )
         external
+        pure
+        returns (uint256)
+    {
+        return _computeJTYieldShare(_stRawNAV, _jtRawNAV, _betaWAD, _coverageWAD, _jtEffectiveNAV);
+    }
+
+    /// @inheritdoc IRDM
+    function jtYieldShare(
+        uint256 _stRawNAV,
+        uint256 _jtRawNAV,
+        uint256 _betaWAD,
+        uint256 _coverageWAD,
+        uint256 _jtEffectiveNAV
+    )
+        external
+        pure
+        returns (uint256)
+    {
+        return _computeJTYieldShare(_stRawNAV, _jtRawNAV, _betaWAD, _coverageWAD, _jtEffectiveNAV);
+    }
+
+    /// @dev Pure helper to compute the instantaneous JT yield share based on the static curve's output
+    function _computeJTYieldShare(
+        uint256 _stRawNAV,
+        uint256 _jtRawNAV,
+        uint256 _betaWAD,
+        uint256 _coverageWAD,
+        uint256 _jtEffectiveNAV
+    )
+        internal
         pure
         returns (uint256)
     {
