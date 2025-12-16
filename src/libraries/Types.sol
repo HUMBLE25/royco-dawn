@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import { IRoycoAccountant } from "../interfaces/IRoycoAccountant.sol";
 import { IRoycoKernel } from "../interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoVaultTranche } from "../interfaces/tranche/IRoycoVaultTranche.sol";
+import { NAV_UNIT, TRANCHE_UNIT } from "./Units.sol";
 
 /// @custom:field name - The name of the tranche (should be prefixed with "Royco-ST" or "Royco-JT") share token
 /// @custom:field symbol - The symbol of the tranche (should be prefixed with "ST" or "JT") share token

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import { NAV_UNIT } from "./Types.sol";
+import { NAV_UNIT } from "./Units.sol";
 
 /**
  * @notice Initialization parameters for the Royco Accountant
