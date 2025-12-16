@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
+import { NAV_UNIT } from "../libraries/Types.sol";
+
 /**
  * @title IRDM - Reward Distribution Model Interface
  * @notice Interface for reward distribution models that determine how ST yield is distributed between tranches in Royco markets
@@ -20,11 +22,11 @@ interface IRDM {
      *                         It is implied that (WAD - jtRewardPercentageWAD) will be the percentage allocated to ST, excluding any protocol fees
      */
     function previewJTYieldShare(
-        uint256 _stRawNAV,
-        uint256 _jtRawNAV,
+        NAV_UNIT _stRawNAV,
+        NAV_UNIT _jtRawNAV,
         uint256 _betaWAD,
         uint256 _coverageWAD,
-        uint256 _jtEffectiveNAV
+        NAV_UNIT _jtEffectiveNAV
     )
         external
         view
@@ -44,11 +46,11 @@ interface IRDM {
      *                         It is implied that (WAD - jtRewardPercentageWAD) will be the percentage allocated to ST, excluding any protocol fees
      */
     function jtYieldShare(
-        uint256 _stRawNAV,
-        uint256 _jtRawNAV,
+        NAV_UNIT _stRawNAV,
+        NAV_UNIT _jtRawNAV,
         uint256 _betaWAD,
         uint256 _coverageWAD,
-        uint256 _jtEffectiveNAV
+        NAV_UNIT _jtEffectiveNAV
     )
         external
         returns (uint256 jtYieldShareWAD);

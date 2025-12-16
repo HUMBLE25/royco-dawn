@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import { RoycoAccountantState } from "../libraries/RoycoAccountantStorageLib.sol";
-import { Operation, SyncedNAVsPacket } from "../libraries/Types.sol";
+import { AccountingState, NAV_UNIT, Operation } from "../libraries/Types.sol";
 
 /**
  * @title IRoycoAccountant
@@ -37,17 +37,17 @@ interface IRoycoAccountant {
      * @dev Persists updated NAV and debt checkpoints for the next sync to use as reference
      * @param _stRawNAV The senior tranche's current raw NAV: the pure value of its invested assets
      * @param _jtRawNAV The junior tranche's current raw NAV: the pure value of its invested assets
-     * @return packet The NAV sync packet containing all mark to market accounting data
+     * @return state The NAV sync state containing all mark to market accounting data
      */
-    function preOpSyncTrancheNAVs(uint256 _stRawNAV, uint256 _jtRawNAV) external returns (SyncedNAVsPacket memory packet);
+    function preOpSyncTrancheNAVs(NAV_UNIT _stRawNAV, NAV_UNIT _jtRawNAV) external returns (AccountingState memory state);
 
     /**
      * @notice Previews a synchronization of tranche NAVs based on the underlying PNL(s) and their effects on the current state of the loss waterfall
      * @param _stRawNAV The senior tranche's current raw NAV: the pure value of its invested assets
      * @param _jtRawNAV The junior tranche's current raw NAV: the pure value of its invested assets
-     * @return packet The NAV sync packet containing all mark to market accounting data
+     * @return state The NAV sync state containing all mark to market accounting data
      */
-    function previewSyncTrancheNAVs(uint256 _stRawNAV, uint256 _jtRawNAV) external view returns (SyncedNAVsPacket memory packet);
+    function previewSyncTrancheNAVs(NAV_UNIT _stRawNAV, NAV_UNIT _jtRawNAV) external view returns (AccountingState memory state);
 
     /**
      * @notice Applies post-operation (deposit and withdrawal) raw NAV deltas to effective NAV checkpoints
@@ -56,7 +56,7 @@ interface IRoycoAccountant {
      * @param _jtRawNAV The junior tranche's current raw NAV: the pure value of its invested assets
      * @param _op The operation being executed in between the pre and post synchronizations
      */
-    function postOpSyncTrancheNAVs(uint256 _stRawNAV, uint256 _jtRawNAV, Operation _op) external;
+    function postOpSyncTrancheNAVs(NAV_UNIT _stRawNAV, NAV_UNIT _jtRawNAV, Operation _op) external;
 
     /**
      * @notice Applies post-operation (deposit and withdrawal) raw NAV deltas to effective NAV checkpoints and enforces the coverage condition of the market
@@ -66,7 +66,7 @@ interface IRoycoAccountant {
      * @param _jtRawNAV The junior tranche's current raw NAV: the pure value of its invested assets
      * @param _op The operation being executed in between the pre and post synchronizations
      */
-    function postOpSyncTrancheNAVsAndEnforceCoverage(uint256 _stRawNAV, uint256 _jtRawNAV, Operation _op) external;
+    function postOpSyncTrancheNAVsAndEnforceCoverage(NAV_UNIT _stRawNAV, NAV_UNIT _jtRawNAV, Operation _op) external;
 
     /**
      * @notice Returns if the market’s coverage requirement is satisfied
@@ -82,7 +82,7 @@ interface IRoycoAccountant {
      * @param _jtRawNAV The junior tranche's current raw NAV: the pure value of its invested assets
      * @return maxSTDeposit The maximum assets depositable into the senior tranche without violating the market's coverage requirement
      */
-    function maxSTDepositGivenCoverage(uint256 _stRawNAV, uint256 _jtRawNAV) external view returns (uint256 maxSTDeposit);
+    function maxSTDepositGivenCoverage(NAV_UNIT _stRawNAV, NAV_UNIT _jtRawNAV) external view returns (NAV_UNIT maxSTDeposit);
 
     /**
      * @notice Returns the maximum assets withdrawable from the junior tranche without violating the market's coverage requirement
@@ -91,7 +91,7 @@ interface IRoycoAccountant {
      * @param _jtRawNAV The junior tranche's current raw NAV: the pure value of its invested assets
      * @return maxJTWithdrawal The maximum assets withdrawable from the junior tranche without violating the market's coverage requirement
      */
-    function maxJTWithdrawalGivenCoverage(uint256 _stRawNAV, uint256 _jtRawNAV) external view returns (uint256 maxJTWithdrawal);
+    function maxJTWithdrawalGivenCoverage(NAV_UNIT _stRawNAV, NAV_UNIT _jtRawNAV) external view returns (NAV_UNIT maxJTWithdrawal);
 
     /**
      * @notice Returns the state of the accountant

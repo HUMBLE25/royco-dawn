@@ -2,19 +2,13 @@
 pragma solidity ^0.8.28;
 
 import { RoycoKernelState } from "../../libraries/RoycoKernelStorageLib.sol";
-import { ExecutionModel, RequestRedeemSharesBehavior, SyncedNAVsPacket } from "../../libraries/Types.sol";
+import { AccountingState, AssetClaims, ExecutionModel, NAV_UNIT, RequestRedeemSharesBehavior, TRANCHE_UNIT } from "../../libraries/Types.sol";
 
 /**
  * @title IRoycoKernel
  *
  */
 interface IRoycoKernel {
-    struct AssetBreakdown {
-        uint256 totalAssetsInNAVUnits;
-        uint256 stAssets;
-        uint256 jtAssets;
-    }
-
     /// @notice Thrown when any of the required initialization params are null
     error NULL_ADDRESS();
 
@@ -33,29 +27,22 @@ interface IRoycoKernel {
     function JT_DEPOSIT_EXECUTION_MODEL() external pure returns (ExecutionModel);
     function JT_WITHDRAWAL_EXECUTION_MODEL() external pure returns (ExecutionModel);
 
-    function getSTRawNAV() external view returns (uint256 assetsInNAVUnits);
-    function getJTRawNAV() external view returns (uint256 assetsInNAVUnits);
+    function getSTRawNAV() external view returns (NAV_UNIT nav);
+    function getJTRawNAV() external view returns (NAV_UNIT nav);
 
-    function getSTTotalEffectiveAssets() external view returns (AssetBreakdown memory breakdown);
-    function getJTTotalEffectiveAssets() external view returns (AssetBreakdown memory breakdown);
+    function getSTTotalEffectiveAssets() external view returns (AssetClaims memory claims);
+    function getJTTotalEffectiveAssets() external view returns (AssetClaims memory claims);
 
-    function syncTrancheNAVs() external returns (SyncedNAVsPacket memory packet);
+    function syncTrancheNAVs() external returns (AccountingState memory state);
 
-    function previewSyncTrancheNAVs() external view returns (SyncedNAVsPacket memory packet);
+    function previewSyncTrancheNAVs() external view returns (AccountingState memory state);
 
-    function stMaxDeposit(address _asset, address _receiver) external view returns (uint256 assets);
+    function stMaxDeposit(address _asset, address _receiver) external view returns (TRANCHE_UNIT assets);
 
-    function stMaxWithdrawableAssets(address _asset, address _owner) external view returns (AssetBreakdown memory breakdown);
+    function stMaxWithdrawableAssets(address _asset, address _owner) external view returns (AssetClaims memory claims);
 
     // Assumes that the funds are transferred to the kernel before the deposit call is made
-    function stDeposit(
-        address _asset,
-        uint256 _assets,
-        address _caller,
-        address _receiver
-    )
-        external
-        returns (uint256 valueAllocatedInNAVUnits, uint256 effectiveNAVToMintAt);
+    function stDeposit(address _asset, uint256 _assets, address _caller, address _receiver) external returns (NAV_UNIT valueAllocated, NAV_UNIT navToMintAt);
 
     function stRedeem(
         address _asset,
@@ -65,20 +52,13 @@ interface IRoycoKernel {
         address _receiver
     )
         external
-        returns (AssetBreakdown memory breakdown);
+        returns (AssetClaims memory claims);
 
-    function jtMaxDeposit(address _asset, address _receiver) external view returns (uint256 assets);
-    function jtMaxWithdrawableAssets(address _asset, address _owner) external view returns (AssetBreakdown memory breakdown);
+    function jtMaxDeposit(address _asset, address _receiver) external view returns (TRANCHE_UNIT assets);
+    function jtMaxWithdrawableAssets(address _asset, address _owner) external view returns (AssetClaims memory claims);
 
     // Assumes that the funds are transferred to the kernel before the deposit call is made
-    function jtDeposit(
-        address _asset,
-        uint256 _assets,
-        address _caller,
-        address _receiver
-    )
-        external
-        returns (uint256 valueAllocatedInNAVUnits, uint256 effectiveNAVToMintAt);
+    function jtDeposit(address _asset, uint256 _assets, address _caller, address _receiver) external returns (NAV_UNIT valueAllocated, NAV_UNIT navToMintAt);
 
     function jtRedeem(
         address _asset,
@@ -88,7 +68,7 @@ interface IRoycoKernel {
         address _receiver
     )
         external
-        returns (AssetBreakdown memory breakdown);
+        returns (AssetClaims memory claims);
 
     function getState() external view returns (RoycoKernelState memory);
 }

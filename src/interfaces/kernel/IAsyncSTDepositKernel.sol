@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
+import { TRANCHE_UNIT } from "../../libraries/Types.sol";
+
 /**
  * @title IAsyncSTDepositKernel
  * @notice Interface for Royco kernels that employ an asynchronous deposit flow for the senior tranche
@@ -24,7 +26,7 @@ interface IAsyncSTDepositKernel {
      * @param _controller The controller corresponding to this request
      * @return pendingAssets The amount of assets pending deposit for the controller
      */
-    function stPendingDepositRequest(uint256 _requestId, address _controller) external view returns (uint256 pendingAssets);
+    function stPendingDepositRequest(uint256 _requestId, address _controller) external view returns (TRANCHE_UNIT pendingAssets);
 
     /**
      * @notice Claims a cancelled deposit request for a specified controller
@@ -34,7 +36,7 @@ interface IAsyncSTDepositKernel {
      * @param _controller The controller corresponding to this request
      * @return assets The amount of assets claimed from the cancelled deposit request
      */
-    function stClaimCancelDepositRequest(uint256 _requestId, address _receiver, address _controller) external returns (uint256 assets);
+    function stClaimCancelDepositRequest(uint256 _requestId, address _receiver, address _controller) external returns (TRANCHE_UNIT assets);
 
     /**
      * @notice Returns the amount of assets claimable from a processed deposit request for a specified controller
@@ -42,7 +44,7 @@ interface IAsyncSTDepositKernel {
      * @param _controller The controller corresponding to this request
      * @return claimableAssets The amount of assets claimable from processed deposit request
      */
-    function stClaimableDepositRequest(uint256 _requestId, address _controller) external view returns (uint256 claimableAssets);
+    function stClaimableDepositRequest(uint256 _requestId, address _controller) external view returns (TRANCHE_UNIT claimableAssets);
 
     /**
      * @notice Cancels a pending deposit request for the specified controller
@@ -69,5 +71,5 @@ interface IAsyncSTDepositKernel {
      * @param _controller The controller to query for claimable cancellation assets
      * @return assets The amount of assets claimable from deposit cancellation
      */
-    function stClaimableCancelDepositRequest(uint256 _requestId, address _controller) external view returns (uint256 assets);
+    function stClaimableCancelDepositRequest(uint256 _requestId, address _controller) external view returns (TRANCHE_UNIT assets);
 }

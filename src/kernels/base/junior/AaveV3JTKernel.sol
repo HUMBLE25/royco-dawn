@@ -8,7 +8,7 @@ import { IPoolAddressesProvider } from "../../../interfaces/aave/IPoolAddressesP
 import { IPoolDataProvider } from "../../../interfaces/aave/IPoolDataProvider.sol";
 import { ExecutionModel, IRoycoKernel } from "../../../interfaces/kernel/IRoycoKernel.sol";
 import { AaveV3KernelState, AaveV3KernelStorageLib } from "../../../libraries/kernels/AaveV3KernelStorageLib.sol";
-import { Operation, RoycoKernel, SyncedNAVsPacket } from "../RoycoKernel.sol";
+import { AccountingState, Operation, RoycoKernel } from "../RoycoKernel.sol";
 import { BaseAsyncJTRedemptionDelayKernel } from "./BaseAsyncJTRedemptionDelayKernel.sol";
 
 abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKernel {
@@ -86,13 +86,13 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
         onlyJuniorTranche
         returns (uint256 assetsWithdrawn)
     {
-        SyncedNAVsPacket memory packet = _preOpSyncTrancheNAVs();
+        AccountingState memory state = _preOpSyncTrancheNAVs();
         require(_shares <= _jtClaimableRedeemRequest(_controller), INSUFFICIENT_CLAIMABLE_SHARES(_shares, _jtClaimableRedeemRequest(_controller)));
         // Calculate the value of the shares to claim and update the controller's redemption request
-        assetsWithdrawn = _processClaimableRedeemRequest(_controller, packet.jtEffectiveNAV, _shares, _totalShares);
+        assetsWithdrawn = _processClaimableRedeemRequest(_controller, state.jtEffectiveNAV, _shares, _totalShares);
 
         // The difference between the JT effective NAV and raw NAV is the amount of assets it is owed from ST raw NAV
-        uint256 totalJTClaimOnSTAssets = Math.saturatingSub(packet.jtEffectiveNAV, packet.jtRawNAV);
+        uint256 totalJTClaimOnSTAssets = Math.saturatingSub(state.jtEffectiveNAV, state.jtRawNAV);
         // Compute and claim the assets that need to be pulled from ST for this withdrawal, rounding in favor of the senior tranche
         uint256 stAssetsToWithdraw = _shares.mulDiv(totalJTClaimOnSTAssets, _totalShares, Math.Rounding.Floor);
         if (stAssetsToWithdraw != 0) _claimJuniorAssetsFromSenior(_asset, stAssetsToWithdraw, _receiver);
