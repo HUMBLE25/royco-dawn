@@ -56,6 +56,10 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
         (RoycoVaultTranche seniorTranche, RoycoVaultTranche juniorTranche, ERC4626ST_AaveV3JT_Kernel kernel, bytes32 marketID) = _deployMarketWithKernel();
         _setDeployedMarket(seniorTranche, juniorTranche, kernel, marketID);
         ERC4626ST_AAVEV3JT_KERNEL = kernel;
+
+        // Setup the roles on the tranches
+        _setUpTrancheRoles(address(ST), providers, PAUSER_ADDRESS, UPGRADER_ADDRESS, SCHEDULER_MANAGER_ADDRESS);
+        // _setUpTrancheRoles(address(JT), providers, PAUSER_ADDRESS, UPGRADER_ADDRESS, SCHEDULER_MANAGER_ADDRESS);
     }
 
     /// @notice Deals USDC tokens to all configured addresses for mainnet fork tests

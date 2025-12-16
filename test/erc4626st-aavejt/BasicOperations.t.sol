@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import { Vm } from "../../lib/forge-std/src/Vm.sol";
 import { IERC20 } from "../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import { RoycoKernel } from "../../src/kernels/base/RoycoKernel.sol";
 import { MainnetForkWithAaveTestBase } from "./base/MainnetForkWithAaveBaseTest.sol";
 
 contract BasicOperationsTest is MainnetForkWithAaveTestBase {
@@ -15,7 +16,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         _setUpTrancheRoles(address(JT), providers, PAUSER_ADDRESS, UPGRADER_ADDRESS, SCHEDULER_MANAGER_ADDRESS);
     }
 
-    function testFuzz_depositIntoJT(uint256 _assets) public {
+    function testFuzz_depositIntoJT(uint256 _assets) external {
         // Bound assets to reasonable range (avoid zero and very large amounts)
         _assets = bound(_assets, 1e6, 1_000_000e6); // Between 1 USDC and 1M USDC (6 decimals)
 
@@ -62,7 +63,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         _verifyFeeTaken(sTState, jTState, PROTOCOL_FEE_RECIPIENT_ADDRESS);
     }
 
-    function testFuzz_depositsIntoJT(uint256 _numDepositors, uint256 _amountSeed) public {
+    function testFuzz_multipleDepositsIntoJT(uint256 _numDepositors, uint256 _amountSeed) external {
         // Bound the number of depositors to a reasonable range (avoid zero and very large numbers)
         _numDepositors = bound(_numDepositors, 1, 10);
 
@@ -118,5 +119,25 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
             _verifyPreviewNAVs(sTState, jTState, AAVE_MAX_ABS_NAV_DELTA);
             _verifyFeeTaken(sTState, jTState, PROTOCOL_FEE_RECIPIENT_ADDRESS);
         }
+    }
+
+    function testFuzz_depositIntoST(uint256 _jtAssets) external {
+        // Bound assets to reasonable range (avoid zero and very large amounts)
+        _jtAssets = bound(_jtAssets, 1e6, 1_000_000e6); // Between 1 USDC and 1M USDC (6 decimals)
+
+        // There are no assets in JT initally, therefore depositing into ST should fail
+        address stDepositor = BOB_ADDRESS;
+        uint256 stDepositAmount = 1;
+
+        vm.startPrank(stDepositor);
+        USDC.approve(address(ST), stDepositAmount);
+        vm.expectRevert(abi.encodeWithSelector(RoycoKernel.INSUFFICIENT_COVERAGE.selector));
+        ST.deposit(stDepositAmount, stDepositor, stDepositor);
+        vm.stopPrank();
+
+        // Deposit assets into the junior tranche to allow deposits into the ST
+        address jtDepositor = ALICE_ADDRESS;
+        vm.prank(jtDepositor);
+        USDC.approve(address(ST), _jtAssets);
     }
 }

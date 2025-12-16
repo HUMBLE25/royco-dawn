@@ -194,9 +194,9 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoAuth, UUPSUpgrad
 
     /// @inheritdoc ERC4626Upgradeable
     function convertToShares(uint256 _assets) public view virtual override(ERC4626Upgradeable) returns (uint256) {
-        // Get the post-sync tranche state: applying NAV reconciliation. Excludes fee shares minted to the protocol fee recipient
-        (uint256 trancheTotalAssets,) = _previewPostSyncTrancheState();
-        return _convertToShares(_assets, totalSupply(), trancheTotalAssets, Math.Rounding.Floor);
+        // Get the post-sync tranche state: applying NAV reconciliation.
+        (uint256 trancheTotalAssets, uint256 trancheTotalShares) = _previewPostSyncTrancheState();
+        return _convertToShares(_assets, trancheTotalShares, trancheTotalAssets, Math.Rounding.Floor);
     }
 
     /// @inheritdoc ERC4626Upgradeable
@@ -221,9 +221,9 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoAuth, UUPSUpgrad
 
     /// @inheritdoc ERC4626Upgradeable
     function convertToAssets(uint256 _shares) public view virtual override(ERC4626Upgradeable) returns (uint256) {
-        // Get the post-sync tranche state: applying NAV reconciliation. Excludes fee shares minted to the protocol fee recipient
-        (uint256 trancheTotalAssets,) = _previewPostSyncTrancheState();
-        return _convertToAssets(_shares, totalSupply(), trancheTotalAssets, Math.Rounding.Floor);
+        // Get the post-sync tranche state: applying NAV reconciliation.
+        (uint256 trancheTotalAssets, uint256 trancheTotalShares) = _previewPostSyncTrancheState();
+        return _convertToAssets(_shares, trancheTotalShares, trancheTotalAssets, Math.Rounding.Floor);
     }
 
     /// @inheritdoc ERC4626Upgradeable
