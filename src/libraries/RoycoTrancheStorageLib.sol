@@ -4,18 +4,20 @@ pragma solidity ^0.8.28;
 import { ExecutionModel, IRoycoKernel, RequestRedeemSharesBehavior } from "../interfaces/kernel/IRoycoKernel.sol";
 import { TrancheType } from "./Types.sol";
 
-/// @notice Storage state for Royco Tranche contracts
-/// @custom:storage-location erc7201:Royco.storage.RoycoTrancheState
-/// @custom:field kernel - The address of the kernel contract handling strategy logic
-/// @custom:field underlyingAssetDecimals - The decimals of the tranche's underlying asset
-/// @custom:field asset - The address of the tranche's deposit asset
-/// @custom:field marketId - The identifier of the Royco market this tranche is linked to
-/// @custom:field decimalsOffset - Decimals offset for share token precision
-/// @custom:field DEPOSIT_EXECUTION_MODEL - The kernel execution model for deposit operations
-/// @custom:field WITHDRAW_EXECUTION_MODEL - The kernel execution model for withdrawal operations
-/// @custom:field REQUEST_REDEEM_SHARES_ST_BEHAVIOR - The behavior of the shares when a redeem request is made for the senior tranche
-/// @custom:field REQUEST_REDEEM_SHARES_JT_BEHAVIOR - The behavior of the shares when a redeem request is made for the junior tranche
-/// @custom:field isOperator - Nested mapping tracking operator approvals for owners
+/**
+ * @notice Storage state for Royco Tranche contracts
+ * @custom:storage-location erc7201:Royco.storage.RoycoTrancheState
+ * @custom:field kernel - The address of the kernel contract handling strategy logic
+ * @custom:field underlyingAssetDecimals - The decimals of the tranche's underlying asset
+ * @custom:field asset - The address of the tranche's deposit asset
+ * @custom:field marketId - The identifier of the Royco market this tranche is linked to
+ * @custom:field decimalsOffset - Decimals offset for share token precision
+ * @custom:field DEPOSIT_EXECUTION_MODEL - The kernel execution model for deposit operations
+ * @custom:field WITHDRAW_EXECUTION_MODEL - The kernel execution model for withdrawal operations
+ * @custom:field REQUEST_REDEEM_SHARES_ST_BEHAVIOR - The behavior of the shares when a redeem request is made for the senior tranche
+ * @custom:field REQUEST_REDEEM_SHARES_JT_BEHAVIOR - The behavior of the shares when a redeem request is made for the junior tranche
+ * @custom:field isOperator - Nested mapping tracking operator approvals for owners
+ */
 struct RoycoTrancheState {
     address kernel;
     uint8 underlyingAssetDecimals;
@@ -29,32 +31,42 @@ struct RoycoTrancheState {
     mapping(address owner => mapping(address operator => bool isOperator)) isOperator;
 }
 
-/// @title RoycoTrancheStorageLib
-/// @notice Library for managing Royco Tranche storage using ERC-7201 pattern
-/// @dev Provides functions to safely access and modify tranche state
+/**
+ * @title RoycoTrancheStorageLib
+ * @notice Library for managing Royco Tranche storage using ERC-7201 pattern
+ * @dev Provides functions to safely access and modify tranche state
+ */
 library RoycoTrancheStorageLib {
-    /// @dev Storage slot for RoycoTrancheState using ERC-7201 pattern
+    /**
+     * @dev Storage slot for RoycoTrancheState using ERC-7201 pattern
+     */
     // keccak256(abi.encode(uint256(keccak256("Royco.storage.RoycoTrancheState")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant ROYCO_TRANCHE_STORAGE_SLOT = 0x25265df6fdb5acadb02f38e62cea4bba666d308120ed42c208a4ef005c50ec00;
 
-    /// @notice Returns a reference to the RoycoTrancheState storage
-    /// @dev Uses ERC-7201 storage slot pattern for collision-resistant storage
-    /// @return $ Storage reference to the tranche state
+    /**
+     * @notice Returns a reference to the RoycoTrancheState storage
+     * @dev Uses ERC-7201 storage slot pattern for collision-resistant storage
+     * @return $ Storage reference to the tranche state
+     */
     function _getRoycoTrancheStorage() internal pure returns (RoycoTrancheState storage $) {
         assembly ("memory-safe") {
             $.slot := ROYCO_TRANCHE_STORAGE_SLOT
         }
     }
 
-    /// @notice Initializes the tranche storage state
-    /// @dev Sets up all initial parameters and validates fee constraints
-    /// @param _kernel The address of the kernel contract handling strategy logic
-    /// @param _asset The address of the tranche's deposit asset
-    /// @param _marketId The identifier of the Royco market this tranche is linked to
-    /// @param _underlyingAssetDecimals The decimals of the tranche's underlying asset
-    /// @param _decimalsOffset Decimals offset for share token precision
+    /**
+     * @notice Initializes the tranche storage state
+     * @dev Sets up all initial parameters and validates fee constraints
+     * @param _kernel The address of the kernel contract handling strategy logic
+     * @param _asset The address of the tranche's deposit asset
+     * @param _marketId The identifier of the Royco market this tranche is linked to
+     * @param _underlyingAssetDecimals The decimals of the tranche's underlying asset
+     * @param _decimalsOffset Decimals offset for share token precision
+     */
 
-    /// @param _trancheType The type of the tranche
+    /**
+     * @param _trancheType The type of the tranche
+     */
     function __RoycoTranche_init(
         address _kernel,
         address _asset,

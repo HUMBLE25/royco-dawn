@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import { IRDM } from "../interfaces/IRDM.sol";
-
 import { Math } from "../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
+import { IRDM } from "../interfaces/IRDM.sol";
 import { WAD } from "../libraries/Constants.sol";
 import { NAV_UNIT } from "../libraries/Units.sol";
 import { UtilsLib } from "../libraries/UtilsLib.sol";
@@ -25,16 +24,24 @@ contract StaticCurveRDM is IRDM {
      */
     uint256 public constant TARGET_UTILIZATION = 0.9e18;
 
-    /// @dev The slope when the market's utilization is less than the target utilization (scaled to WAD precision)
+    /**
+     * @dev The slope when the market's utilization is less than the target utilization (scaled to WAD precision)
+     */
     uint256 public constant SLOPE_LT_TARGET_UTIL = 0.25e18;
 
-    /// @dev The slope when the market's utilization is greater than or equal to the target utilization (scaled to WAD precision)
+    /**
+     * @dev The slope when the market's utilization is greater than or equal to the target utilization (scaled to WAD precision)
+     */
     uint256 public constant SLOPE_GTE_TARGET_UTIL = 7.75e18;
 
-    /// @dev The base rate paid to the junior tranche when the utilization is exactly at the target (scaled to WAD precision)
+    /**
+     * @dev The base rate paid to the junior tranche when the utilization is exactly at the target (scaled to WAD precision)
+     */
     uint256 public constant BASE_RATE_GTE_TARGET_UTIL = 0.225e18;
 
-    /// @inheritdoc IRDM
+    /**
+     * @inheritdoc IRDM
+     */
     function previewJTYieldShare(
         NAV_UNIT _stRawNAV,
         NAV_UNIT _jtRawNAV,
@@ -49,7 +56,9 @@ contract StaticCurveRDM is IRDM {
         return _computeJTYieldShare(_stRawNAV, _jtRawNAV, _betaWAD, _coverageWAD, _jtEffectiveNAV);
     }
 
-    /// @inheritdoc IRDM
+    /**
+     * @inheritdoc IRDM
+     */
     function jtYieldShare(
         NAV_UNIT _stRawNAV,
         NAV_UNIT _jtRawNAV,
@@ -64,7 +73,9 @@ contract StaticCurveRDM is IRDM {
         return _computeJTYieldShare(_stRawNAV, _jtRawNAV, _betaWAD, _coverageWAD, _jtEffectiveNAV);
     }
 
-    /// @dev Pure helper to compute the instantaneous JT yield share based on the static curve's output
+    /**
+     * @dev Pure helper to compute the instantaneous JT yield share based on the static curve's output
+     */
     function _computeJTYieldShare(
         NAV_UNIT _stRawNAV,
         NAV_UNIT _jtRawNAV,

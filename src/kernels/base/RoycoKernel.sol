@@ -18,15 +18,19 @@ import { IRoycoAccountant, Operation } from "./../../interfaces/IRoycoAccountant
 abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     using Math for uint256;
 
-    /// @dev Permissions the function to only the market's senior tranche
-    /// @dev Should be placed on all ST deposit and withdraw functions
+    /**
+     * @dev Permissions the function to only the market's senior tranche
+     * @dev Should be placed on all ST deposit and withdraw functions
+     */
     modifier onlySeniorTranche() {
         require(msg.sender == RoycoKernelStorageLib._getRoycoKernelStorage().seniorTranche, ONLY_SENIOR_TRANCHE());
         _;
     }
 
-    /// @dev Permissions the function to only the market's junior tranche
-    /// @dev Should be placed on all JT deposit and withdraw functions
+    /**
+     * @dev Permissions the function to only the market's junior tranche
+     * @dev Should be placed on all JT deposit and withdraw functions
+     */
     modifier onlyJuniorTranche() {
         require(msg.sender == RoycoKernelStorageLib._getRoycoKernelStorage().juniorTranche, ONLY_JUNIOR_TRANCHE());
         _;
@@ -59,37 +63,51 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         RoycoKernelStorageLib.__RoycoKernel_init(_params);
     }
 
-    /// @inheritdoc IRoycoKernel
+    /**
+     * @inheritdoc IRoycoKernel
+     */
     function stMaxDeposit(address, address _receiver) external view override(IRoycoKernel) returns (uint256) {
         return Math.min(_maxSTDepositGlobally(_receiver), _accountant().maxSTDepositGivenCoverage(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV()));
     }
 
-    /// @inheritdoc IRoycoKernel
+    /**
+     * @inheritdoc IRoycoKernel
+     */
     function stMaxWithdraw(address, address _owner) external view override(IRoycoKernel) returns (uint256) {
         return _maxSTWithdrawalGlobally(_owner);
     }
 
-    /// @inheritdoc IRoycoKernel
+    /**
+     * @inheritdoc IRoycoKernel
+     */
     function jtMaxDeposit(address, address _receiver) external view override(IRoycoKernel) returns (uint256) {
         return _maxJTDepositGlobally(_receiver);
     }
 
-    /// @inheritdoc IRoycoKernel
+    /**
+     * @inheritdoc IRoycoKernel
+     */
     function jtMaxWithdraw(address, address _owner) external view override(IRoycoKernel) returns (uint256) {
         return Math.min(_maxJTWithdrawalGlobally(_owner), _accountant().maxJTWithdrawalGivenCoverage(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV()));
     }
 
-    /// @inheritdoc IRoycoKernel
+    /**
+     * @inheritdoc IRoycoKernel
+     */
     function getSTRawNAV() external view override(IRoycoKernel) returns (uint256) {
         return _getSeniorTrancheRawNAV();
     }
 
-    /// @inheritdoc IRoycoKernel
+    /**
+     * @inheritdoc IRoycoKernel
+     */
     function getJTRawNAV() external view override(IRoycoKernel) returns (uint256) {
         return _getJuniorTrancheRawNAV();
     }
 
-    /// @inheritdoc IRoycoKernel
+    /**
+     * @inheritdoc IRoycoKernel
+     */
     function getState() external view override(IRoycoKernel) returns (RoycoKernelState memory) {
         return RoycoKernelStorageLib._getRoycoKernelStorage();
     }
@@ -156,18 +174,24 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         _accountant().postOpSyncTrancheNAVsAndEnforceCoverage(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV(), _op);
     }
 
-    /// @notice Returns this kernel's accountant casted to the IRoycoAccountant interface
-    /// @return The Royco Accountant for this kernel
+    /**
+     * @notice Returns this kernel's accountant casted to the IRoycoAccountant interface
+     * @return The Royco Accountant for this kernel
+     */
     function _accountant() internal view returns (IRoycoAccountant) {
         return IRoycoAccountant(RoycoKernelStorageLib._getRoycoKernelStorage().accountant);
     }
 
-    /// @notice Returns the raw net asset value of the senior tranche
-    /// @return The pure net asset value of the senior tranche invested assets
+    /**
+     * @notice Returns the raw net asset value of the senior tranche
+     * @return The pure net asset value of the senior tranche invested assets
+     */
     function _getSeniorTrancheRawNAV() internal view virtual returns (uint256);
 
-    /// @notice Returns the raw net asset value of the junior tranche
-    /// @return The pure net asset value of the junior tranche invested assets
+    /**
+     * @notice Returns the raw net asset value of the junior tranche
+     * @return The pure net asset value of the junior tranche invested assets
+     */
     function _getJuniorTrancheRawNAV() internal view virtual returns (uint256);
 
     /**

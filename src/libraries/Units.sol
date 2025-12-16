@@ -3,15 +3,21 @@ pragma solidity ^0.8.28;
 
 import { Math } from "../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 
-/// @dev The unit of measurement for NAV values
-/// @dev This unit is expected to expressed in the same asset (USD, EUR, BTC, etc) and precision (RAY, WAD, etc.) for the ST and JT tranches of a Royco market
+/**
+ * @dev The unit of measurement for NAV values
+ * @dev This unit is expected to expressed in the same asset (USD, EUR, BTC, etc) and precision (RAY, WAD, etc.) for the ST and JT tranches of a Royco market
+ */
 type NAV_UNIT is uint256;
 
-/// @dev The unit of measurement for tranche assets
+/**
+ *  @dev The unit of measurement for tranche assets
+ */
 type TRANCHE_UNIT is uint256;
 
-/// @title UnitsMathLib
-/// @notice Math library wrapper for Royco's units of measurement
+/**
+ * @title UnitsMathLib
+ * @notice Math library wrapper for Royco's units of measurement
+ */
 library UnitsMathLib {
     /**
      * @notice Computes the minimum of two NAV unit denominated quantities
@@ -92,9 +98,11 @@ library UnitsMathLib {
     }
 }
 
-/// ----------------------
-/// NAV_UNIT Helpers
-/// ----------------------
+/**
+ * ----------------------
+ * NAV_UNIT Helpers
+ * ----------------------
+ */
 
 function toNAVUnits(uint256 _assets) pure returns (NAV_UNIT) {
     return NAV_UNIT.wrap(_assets);
@@ -161,9 +169,11 @@ using {
     notEqualsNAVUnits as !=
 } for NAV_UNIT global;
 
-/// ----------------------
-/// TRANCHE_UNIT Helpers
-/// ----------------------
+/**
+ * ----------------------
+ * TRANCHE_UNIT Helpers
+ * ----------------------
+ */
 
 function toTrancheUnits(uint256 _assets) pure returns (TRANCHE_UNIT) {
     return TRANCHE_UNIT.wrap(_assets);

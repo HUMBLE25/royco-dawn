@@ -9,8 +9,10 @@ import { ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID } from "../../../libraries
 import { RequestRedeemSharesBehavior } from "../../../libraries/Types.sol";
 import { RoycoKernel } from "../RoycoKernel.sol";
 
-/// @title BaseAsyncJTRedemptionDelayKernel
-/// @notice Abstract base contract for the junior tranche redemption delay kernel
+/**
+ * @title BaseAsyncJTRedemptionDelayKernel
+ * @notice Abstract base contract for the junior tranche redemption delay kernel
+ */
 abstract contract BaseAsyncJTRedemptionDelayKernel is IAsyncJTWithdrawalKernel, IRoycoKernel, RoycoAuth, RoycoKernel {
     using Math for uint256;
 
@@ -19,26 +21,44 @@ abstract contract BaseAsyncJTRedemptionDelayKernel is IAsyncJTWithdrawalKernel, 
 
     RequestRedeemSharesBehavior public constant JT_REQUEST_REDEEM_SHARES_BEHAVIOR = RequestRedeemSharesBehavior.BURN_ON_REDEEM;
 
-    /// @dev Emitted when the redemption delay is updated
+    /**
+     * @dev Emitted when the redemption delay is updated
+     */
     event RedemptionDelayUpdated(uint256 redemptionDelaySeconds);
 
-    /// @notice Thrown when the redemption delay is zero
+    /**
+     * @notice Thrown when the redemption delay is zero
+     */
     error INVALID_WITHDRAWAL_DELAY_SECONDS(uint256 redemptionDelaySeconds);
-    /// @notice Thrown when the total shares to withdraw is less than the shares to redeem
+    /**
+     * @notice Thrown when the total shares to withdraw is less than the shares to redeem
+     */
     error INSUFFICIENT_SHARES(uint256 sharesToRedeem, uint256 totalSharesToRedeem);
-    /// @notice Thrown when the redemption is not allowed
+    /**
+     * @notice Thrown when the redemption is not allowed
+     */
     error WITHDRAWAL_NOT_ALLOWED(uint256 redemptionAllowedAtTimestamp);
-    /// @notice Thrown when the request ID is invalid
+    /**
+     * @notice Thrown when the request ID is invalid
+     */
     error INVALID_REQUEST_ID(uint256 requestId);
-    /// @notice Thrown when the redemption is cancelled and the controller is trying to claim before requesting again
+    /**
+     * @notice Thrown when the redemption is cancelled and the controller is trying to claim before requesting again
+     */
     error WITHDRAWAL_CANCELLED__CLAIM_BEFORE_REQUESTING_AGAIN();
-    /// @notice Thrown when the redemption is already canceled
+    /**
+     * @notice Thrown when the redemption is already canceled
+     */
     error WITHDRAWAL_ALREADY_CANCELED();
-    /// @notice Thrown when the shares to claim are zero
+    /**
+     * @notice Thrown when the shares to claim are zero
+     */
     error MUST_CLAIM_NON_ZERO_SHARES();
 
-    /// @custom:storage-location erc7201:Royco.storage.BaseAsyncJTRedemptionDelayKernelState
-    /// forge-lint: disable-next-item(pascal-case-struct)
+    /**
+     * @custom:storage-location erc7201:Royco.storage.BaseAsyncJTRedemptionDelayKernelState
+     * forge-lint: disable-next-item(pascal-case-struct)
+     */
     struct BaseAsyncJTRedemptionDelayKernelState {
         uint256 redemptionDelaySeconds;
         mapping(address controller => Redemption redemption) redemptions;
@@ -64,7 +84,9 @@ abstract contract BaseAsyncJTRedemptionDelayKernel is IAsyncJTWithdrawalKernel, 
     // ERC7540 Asynchronous flow functions
     // =============================
 
-    /// @inheritdoc IAsyncJTWithdrawalKernel
+    /**
+     * @inheritdoc IAsyncJTWithdrawalKernel
+     */
     function jtRequestRedeem(
         address,
         uint256 _shares,
@@ -95,7 +117,9 @@ abstract contract BaseAsyncJTRedemptionDelayKernel is IAsyncJTWithdrawalKernel, 
         redemption.redemptionAllowedAtTimestamp = block.timestamp + $.redemptionDelaySeconds;
     }
 
-    /// @inheritdoc IAsyncJTWithdrawalKernel
+    /**
+     * @inheritdoc IAsyncJTWithdrawalKernel
+     */
     function jtPendingRedeemRequest(uint256 _requestId, address _controller) external view onlyJuniorTranche returns (uint256 pendingShares) {
         require(_requestId == ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, INVALID_REQUEST_ID(_requestId));
         BaseAsyncJTRedemptionDelayKernelState storage $ = _getBaseAsyncJTRedemptionDelayKernelState();
@@ -114,7 +138,9 @@ abstract contract BaseAsyncJTRedemptionDelayKernel is IAsyncJTWithdrawalKernel, 
         pendingShares = redemption.totalJTSharesToRedeem;
     }
 
-    /// @inheritdoc IAsyncJTWithdrawalKernel
+    /**
+     * @inheritdoc IAsyncJTWithdrawalKernel
+     */
     function jtClaimableRedeemRequest(uint256 _requestId, address _controller) external view onlyJuniorTranche returns (uint256 claimableShares) {
         require(_requestId == ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, INVALID_REQUEST_ID(_requestId));
 
@@ -142,7 +168,9 @@ abstract contract BaseAsyncJTRedemptionDelayKernel is IAsyncJTWithdrawalKernel, 
     // ERC7887 Cancelation functions
     // =============================
 
-    /// @inheritdoc IAsyncJTWithdrawalKernel
+    /**
+     * @inheritdoc IAsyncJTWithdrawalKernel
+     */
     function jtCancelRedeemRequest(uint256 _requestId, address _controller) external onlyJuniorTranche whenNotPaused {
         require(_requestId == ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, INVALID_REQUEST_ID(_requestId));
         BaseAsyncJTRedemptionDelayKernelState storage $ = _getBaseAsyncJTRedemptionDelayKernelState();
@@ -152,7 +180,9 @@ abstract contract BaseAsyncJTRedemptionDelayKernel is IAsyncJTWithdrawalKernel, 
         redemption.isCanceled = true;
     }
 
-    /// @inheritdoc IAsyncJTWithdrawalKernel
+    /**
+     * @inheritdoc IAsyncJTWithdrawalKernel
+     */
     function jtClaimCancelRedeemRequest(uint256 _requestId, address, address _controller) external onlyJuniorTranche whenNotPaused returns (uint256 shares) {
         require(_requestId == ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, INVALID_REQUEST_ID(_requestId));
         BaseAsyncJTRedemptionDelayKernelState storage $ = _getBaseAsyncJTRedemptionDelayKernelState();
@@ -165,7 +195,9 @@ abstract contract BaseAsyncJTRedemptionDelayKernel is IAsyncJTWithdrawalKernel, 
         delete $.redemptions[_controller];
     }
 
-    /// @inheritdoc IAsyncJTWithdrawalKernel
+    /**
+     * @inheritdoc IAsyncJTWithdrawalKernel
+     */
     function jtClaimableCancelRedeemRequest(uint256 _requestId, address _controller) external view onlyJuniorTranche returns (uint256 shares) {
         require(_requestId == ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, INVALID_REQUEST_ID(_requestId));
         BaseAsyncJTRedemptionDelayKernelState storage $ = _getBaseAsyncJTRedemptionDelayKernelState();
@@ -178,31 +210,39 @@ abstract contract BaseAsyncJTRedemptionDelayKernel is IAsyncJTWithdrawalKernel, 
         shares = $.redemptions[_controller].totalJTSharesToRedeem;
     }
 
-    /// @inheritdoc IAsyncJTWithdrawalKernel
+    /**
+     * @inheritdoc IAsyncJTWithdrawalKernel
+     */
     function jtPendingCancelRedeemRequest(uint256, address) external view onlyJuniorTranche returns (bool isPending) {
         // Cancelation requests are always processed instantly, so there is no pending cancelation
         isPending = false;
     }
 
-    /// @notice Sets the redemption delay
-    /// @param _redemptionDelaySeconds The new redemption delay in seconds
+    /**
+     * @notice Sets the redemption delay
+     * @param _redemptionDelaySeconds The new redemption delay in seconds
+     */
     function setRedemptionDelay(uint256 _redemptionDelaySeconds) external restricted {
         _getBaseAsyncJTRedemptionDelayKernelState().redemptionDelaySeconds = _redemptionDelaySeconds;
         emit RedemptionDelayUpdated(_redemptionDelaySeconds);
     }
 
-    /// @notice Returns the redemption delay
-    /// @return redemptionDelaySeconds The redemption delay in seconds
+    /**
+     * @notice Returns the redemption delay
+     * @return redemptionDelaySeconds The redemption delay in seconds
+     */
     function redemptionDelay() external view returns (uint256) {
         return _getBaseAsyncJTRedemptionDelayKernelState().redemptionDelaySeconds;
     }
 
-    /// @notice Accounts for the total JT shares claimed from a claimable redemption request
-    /// @param _controller The controller that is allowed to operate the claim
-    /// @param _currentJTEffectiveNAV The current effective NAV of JT
-    /// @param _sharesToRedeem The amount of JT shares to redeem
-    /// @param _totalShares The total number of JT shares to withdraw
-    /// @return valueClaimed The value of the shares claimed from the redemption request
+    /**
+     * @notice Accounts for the total JT shares claimed from a claimable redemption request
+     * @param _controller The controller that is allowed to operate the claim
+     * @param _currentJTEffectiveNAV The current effective NAV of JT
+     * @param _sharesToRedeem The amount of JT shares to redeem
+     * @param _totalShares The total number of JT shares to withdraw
+     * @return valueClaimed The value of the shares claimed from the redemption request
+     */
     function _processClaimableRedeemRequest(
         address _controller,
         uint256 _currentJTEffectiveNAV,
@@ -232,11 +272,13 @@ abstract contract BaseAsyncJTRedemptionDelayKernel is IAsyncJTWithdrawalKernel, 
         }
     }
 
-    /// @notice Computes the value of a redemption request
-    /// @param _currentJTEffectiveNAV The current effective NAV of JT
-    /// @param _shares The amount of JT shares to redeem
-    /// @param _totalShares The total number of JT shares to withdraw
-    /// @return value The value of the redemption request
+    /**
+     * @notice Computes the value of a redemption request
+     * @param _currentJTEffectiveNAV The current effective NAV of JT
+     * @param _shares The amount of JT shares to redeem
+     * @param _totalShares The total number of JT shares to withdraw
+     * @return value The value of the redemption request
+     */
     function _redemptionValue(uint256 _currentJTEffectiveNAV, uint256 _shares, uint256 _totalShares) internal pure returns (uint256 value) {
         return _shares.mulDiv(_currentJTEffectiveNAV, _totalShares, Math.Rounding.Floor);
     }

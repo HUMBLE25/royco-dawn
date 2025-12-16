@@ -4,8 +4,6 @@ pragma solidity ^0.8.28;
 /**
  * @title IAsyncSTWithdrawalKernel
  * @notice Interface for Royco kernels that employ an asynchronous withdrawal flow for the senior tranche
- * @dev We mandate that kernels implement the cancellation functions because of the market's utilization changing between request and claim
- *      if the underlying investment opportunity supports it
  */
 interface IAsyncSTWithdrawalKernel {
     /**
@@ -36,8 +34,6 @@ interface IAsyncSTWithdrawalKernel {
     /**
      * @notice Cancels a pending redeem request for the specified controller
      * @dev This function is only relevant if the kernel supports redeem cancellation
-     * @dev Must be called via a delegatecall (reliant on address(this))
-     * @dev The contract delegatecalling this function must have a pending redeem request with this requestId and/or controller
      * @param _requestId The request ID of this deposit request
      * @param _controller The controller that is allowed to operate the cancellation
      */
@@ -46,6 +42,7 @@ interface IAsyncSTWithdrawalKernel {
     /**
      * @notice Claims a cancelled redeem request for a specified controller
      * @dev This function is only relevant if the kernel supports redeem cancellation
+     * @dev The tranche calling this function must have a pending redeem request with this requestId and/or controller
      * @param _requestId The request ID of this deposit request
      * @param _receiver The receiver of the cancelled redeem assets
      * @param _controller The controller corresponding to this request

@@ -11,13 +11,19 @@ import { NAV_UNIT, TRANCHE_UNIT } from "../../libraries/Units.sol";
  *
  */
 interface IRoycoKernel {
-    /// @notice Thrown when any of the required initialization params are null
+    /**
+     * @notice Thrown when any of the required initialization params are null
+     */
     error NULL_ADDRESS();
 
-    /// @notice Thrown when the caller of a permissioned function isn't the market's senior tranche
+    /**
+     * @notice Thrown when the caller of a permissioned function isn't the market's senior tranche
+     */
     error ONLY_SENIOR_TRANCHE();
 
-    /// @notice Thrown when the caller of a permissioned function isn't the market's junior tranche
+    /**
+     * @notice Thrown when the caller of a permissioned function isn't the market's junior tranche
+     */
     error ONLY_JUNIOR_TRANCHE();
 
     function ST_REQUEST_REDEEM_SHARES_BEHAVIOR() external pure returns (RequestRedeemSharesBehavior);
@@ -52,24 +58,32 @@ interface IRoycoKernel {
 
     function jtMaxWithdrawableAssets(address _owner) external view returns (NAV_UNIT maxWithdrawableNAV);
 
-    /// @notice Converts the specified ST assets denominated in its tranche units to the kernel's NAV units
-    /// @param _stAssets The ST assets denominated in tranche units to convert to the kernel's NAV units
-    /// @return The specified ST assets denominated in its tranche units converted to the kernel's NAV units
+    /**
+     * @notice Converts the specified ST assets denominated in its tranche units to the kernel's NAV units
+     * @param _stAssets The ST assets denominated in tranche units to convert to the kernel's NAV units
+     * @return The specified ST assets denominated in its tranche units converted to the kernel's NAV units
+     */
     function stConvertTrancheUnitsToNAVUnits(TRANCHE_UNIT _stAssets) external view returns (NAV_UNIT);
 
-    /// @notice Converts the specified JT assets denominated in its tranche units to the kernel's NAV units
-    /// @param _jtAssets The JT assets denominated in tranche units to convert to the kernel's NAV units
-    /// @return The specified JT assets denominated in its tranche units converted to the kernel's NAV units
+    /**
+     * @notice Converts the specified JT assets denominated in its tranche units to the kernel's NAV units
+     * @param _jtAssets The JT assets denominated in tranche units to convert to the kernel's NAV units
+     * @return The specified JT assets denominated in its tranche units converted to the kernel's NAV units
+     */
     function jtConvertTrancheUnitsToNAVUnits(TRANCHE_UNIT _jtAssets) external view returns (NAV_UNIT);
 
-    /// @notice Converts the specified assets denominated in the kernel's NAV units to assets denominated in ST's tranche units
-    /// @param _navAssets The NAV of the assets denominated in the kernel's NAV units to convert to assets denominated in ST's tranche units
-    /// @return The specified NAV of the assets denominated in the kernel's NAV units converted to assets denominated in ST's tranche units
+    /**
+     * @notice Converts the specified assets denominated in the kernel's NAV units to assets denominated in ST's tranche units
+     * @param _navAssets The NAV of the assets denominated in the kernel's NAV units to convert to assets denominated in ST's tranche units
+     * @return The specified NAV of the assets denominated in the kernel's NAV units converted to assets denominated in ST's tranche units
+     */
     function stConvertNAVUnitsToTrancheUnits(NAV_UNIT _navAssets) external view returns (TRANCHE_UNIT);
 
-    /// @notice Converts the specified assets denominated in the kernel's NAV units to assets denominated in JT's tranche units
-    /// @param _navAssets The NAV of the assets denominated in the kernel's NAV units to convert to assets denominated in JT's tranche units
-    /// @return The specified NAV of the assets denominated in the kernel's NAV units converted to assets denominated in JT's tranche units
+    /**
+     * @notice Converts the specified assets denominated in the kernel's NAV units to assets denominated in JT's tranche units
+     * @param _navAssets The NAV of the assets denominated in the kernel's NAV units to convert to assets denominated in JT's tranche units
+     * @return The specified NAV of the assets denominated in the kernel's NAV units converted to assets denominated in JT's tranche units
+     */
     function jtConvertNAVUnitsToTrancheUnits(NAV_UNIT _navAssets) external view returns (TRANCHE_UNIT);
 
     // Assumes that the funds are transferred to the kernel before the deposit call is made

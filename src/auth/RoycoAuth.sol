@@ -15,12 +15,16 @@ abstract contract RoycoAuth is AccessManagedUpgradeable, PausableUpgradeable, IR
         __Pausable_init();
     }
 
-    /// @inheritdoc IRoycoAuth
+    /**
+     * @inheritdoc IRoycoAuth
+     */
     function pause() external virtual restricted {
         _pause();
     }
 
-    /// @inheritdoc IRoycoAuth
+    /**
+     * @inheritdoc IRoycoAuth
+     */
     function unpause() external virtual restricted {
         _unpause();
     }
