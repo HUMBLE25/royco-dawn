@@ -92,4 +92,10 @@ interface IRoycoAccountant {
      * @return maxJTWithdrawal The maximum assets withdrawable from the junior tranche without violating the market's coverage requirement
      */
     function maxJTWithdrawalGivenCoverage(uint256 _stRawNAV, uint256 _jtRawNAV) external view returns (uint256 maxJTWithdrawal);
+
+    /**
+     * @notice Returns the state of the accountant
+     * @return state The state of the accountant
+     */
+    function getState() external view returns (RoycoAccountantState memory state);
 }

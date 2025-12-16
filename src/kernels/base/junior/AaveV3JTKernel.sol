@@ -64,7 +64,7 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
     {
         // Execute a pre-op sync on NAV accounting
         valueAllocated = _assets;
-        effectiveNAVToMintAt = (_preOpSyncTrancheNAVs()).stEffectiveNAV;
+        effectiveNAVToMintAt = (_preOpSyncTrancheNAVs()).jtEffectiveNAV;
 
         // Max approval already given to the pool on initialization
         IPool(AaveV3KernelStorageLib._getAaveV3KernelStorage().pool).supply(_asset, _assets, address(this), 0);
