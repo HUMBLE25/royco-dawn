@@ -277,6 +277,76 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         FACTORY.deployMarket(params);
     }
 
+    function test_deployMarket_revertsOnInvalidAccessManagerForAccountant() public {
+        bytes32 salt = keccak256(abi.encodePacked("SALT", "INVALID_ACCESS_MANAGER_ACCOUNTANT"));
+        (MarketDeploymentParams memory params,) = _buildValidMarketParamsForSalt(salt);
+
+        // Rebuild only the accountant initialization data with an invalid authority
+        address expectedKernelAddress = FACTORY.predictERC1967ProxyAddress(address(ERC4626ST_AAVEV3JT_KERNEL_IMPL), salt);
+
+        params.accountantInitializationData = abi.encodeCall(
+            RoycoAccountant.initialize,
+            (
+                RoycoAccountantInitParams({
+                    kernel: expectedKernelAddress, protocolFeeWAD: PROTOCOL_FEE_WAD, coverageWAD: COVERAGE_WAD, betaWAD: BETA_WAD, rdm: address(RDM)
+                }),
+                OWNER_ADDRESS // invalid authority: should be FACTORY
+            )
+        );
+
+        vm.expectRevert(RoycoFactory.InvalidAccessManager.selector);
+        FACTORY.deployMarket(params);
+    }
+
+    function test_deployMarket_revertsOnInvalidAccessManagerForKernel() public {
+        bytes32 salt = keccak256(abi.encodePacked("SALT", "INVALID_ACCESS_MANAGER_KERNEL"));
+        (MarketDeploymentParams memory params,) = _buildValidMarketParamsForSalt(salt);
+
+        // Rebuild only the kernel initialization data with an invalid authority
+        address expectedSeniorTrancheAddress = FACTORY.predictERC1967ProxyAddress(address(ST_IMPL), salt);
+        address expectedJuniorTrancheAddress = FACTORY.predictERC1967ProxyAddress(address(JT_IMPL), salt);
+        address expectedAccountantAddress = FACTORY.predictERC1967ProxyAddress(address(ACCOUNTANT_IMPL), salt);
+
+        params.kernelInitializationData = abi.encodeCall(
+            ERC4626ST_AaveV3JT_Kernel.initialize,
+            (
+                RoycoKernelInitParams({
+                    seniorTranche: expectedSeniorTrancheAddress,
+                    juniorTranche: expectedJuniorTrancheAddress,
+                    accountant: expectedAccountantAddress,
+                    protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS
+                }),
+                OWNER_ADDRESS, // invalid authority: should be FACTORY
+                address(MOCK_UNDERLYING_ST_VAULT),
+                ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS
+            )
+        );
+
+        vm.expectRevert(RoycoFactory.InvalidAccessManager.selector);
+        FACTORY.deployMarket(params);
+    }
+
+    function test_deployMarket_revertsOnInvalidAccessManagerForJuniorTranche() public {
+        bytes32 salt = keccak256(abi.encodePacked("SALT", "INVALID_ACCESS_MANAGER_JT"));
+        (MarketDeploymentParams memory params, bytes32 marketId) = _buildValidMarketParamsForSalt(salt);
+
+        // Rebuild only the junior tranche initialization data with an invalid authority
+        address expectedKernelAddress = FACTORY.predictERC1967ProxyAddress(address(ERC4626ST_AAVEV3JT_KERNEL_IMPL), salt);
+
+        params.juniorTrancheInitializationData = abi.encodeCall(
+            JT_IMPL.initialize,
+            (
+                TrancheDeploymentParams({ name: JUNIOR_TRANCH_NAME, symbol: JUNIOR_TRANCH_SYMBOL, kernel: expectedKernelAddress }),
+                ETHEREUM_MAINNET_USDC_ADDRESS,
+                OWNER_ADDRESS, // invalid authority: should be FACTORY
+                marketId
+            )
+        );
+
+        vm.expectRevert(RoycoFactory.InvalidAccessManager.selector);
+        FACTORY.deployMarket(params);
+    }
+
     function test_deployMarket_revertsOnInvalidKernelOnSeniorTranche() public {
         bytes32 salt = keccak256(abi.encodePacked("SALT", "INVALID_KERNEL_ST"));
         (MarketDeploymentParams memory params, bytes32 marketId) = _buildValidMarketParamsForSalt(salt);

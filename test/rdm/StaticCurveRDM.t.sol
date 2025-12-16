@@ -513,4 +513,54 @@ contract StaticCurveRDMTest is BaseTest {
             assertLt(result, 0.1e18, "Result should be small for very small utilization");
         }
     }
+
+    function test_jtYieldShare_matchesPreview() public view {
+        uint256 jtEffectiveNAV = 1e18;
+        uint256 stRawNAV = 0.4e18;
+        uint256 jtRawNAV = 0.4e18;
+        uint256 betaWAD = BETA_100_PCT;
+        uint256 coverageWAD = COVERAGE_100_PCT;
+
+        uint256 preview = RDM.previewJTYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
+        uint256 actual = RDM.jtYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
+
+        assertEq(actual, preview, "jtYieldShare should equal previewJTYieldShare");
+    }
+
+    /// @notice When utilization >= 1, jtYieldShare should return 1.0 (WAD)
+    function test_jtYieldShare_utilizationAtOrAboveOne() public view {
+        // Same setup as test_previewJTYieldShare_utilizationAtOne
+        uint256 jtEffectiveNAV = 1e18;
+        uint256 stRawNAV = 0.5e18;
+        uint256 jtRawNAV = 0.5e18;
+        uint256 betaWAD = BETA_100_PCT;
+        uint256 coverageWAD = COVERAGE_100_PCT;
+
+        uint256 utilization = UtilsLib.computeUtilization(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
+        assertGe(utilization, WAD, "Utilization should be >= 1.0");
+
+        uint256 result = RDM.jtYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
+        assertEq(result, WAD, "At U>=1.0, jtYieldShare should be 1.0 (100%)");
+    }
+
+    /// @notice When TARGET_UTILIZATION <= utilization < 1, jtYieldShare should use the second leg of the curve
+    function test_jtYieldShare_utilizationBetweenTargetAndOne() public view {
+        // Choose U = 0.95 as a representative point between TARGET_UTILIZATION (0.9) and 1.0
+        uint256 jtEffectiveNAV = 1e18;
+        uint256 stRawNAV = 0.475e18;
+        uint256 jtRawNAV = 0.475e18;
+        uint256 betaWAD = BETA_100_PCT;
+        uint256 coverageWAD = COVERAGE_100_PCT;
+
+        uint256 utilization = UtilsLib.computeUtilization(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
+        assertGe(utilization, TARGET_UTILIZATION, "Utilization should be >= TARGET_UTILIZATION");
+        assertLt(utilization, WAD, "Utilization should be < 1.0");
+
+        uint256 result = RDM.jtYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
+
+        // Second leg: R(U) = 7.75 * (U - 0.9) + 0.225
+        uint256 expected = SLOPE_GTE_TARGET_UTIL.mulDiv((utilization - TARGET_UTILIZATION), WAD, Math.Rounding.Floor) + BASE_RATE_GTE_TARGET_UTIL;
+
+        assertEq(result, expected, "For TARGET_UTILIZATION <= U < 1.0, jtYieldShare should use the second leg formula");
+    }
 }
