@@ -224,6 +224,9 @@ contract RoycoAccountant is Initializable, IRoycoAccountant {
 
     /**
      * @notice Syncs all tranche NAVs and debts based on unrealized PNLs of the underlying investment(s)
+     * @param _stRawNAV The senior tranche's current raw NAV: the pure value of its invested assets
+     * @param _jtRawNAV The junior tranche's current raw NAV: the pure value of its invested assets
+     * @param _twJTYieldShareAccruedWAD The currently accrued time-weighted JT yield share RDM output since the last distribution, scaled by WAD
      * @return packet A struct containing all synced NAV, debt, and fee data after executing the sync
      * @return yieldDistributed A boolean indicating whether ST yield was split between ST and JT
      */
