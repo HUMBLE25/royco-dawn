@@ -6,17 +6,17 @@ import { IERC20, SafeERC20 } from "../../../../lib/openzeppelin-contracts/contra
 import { Math } from "../../../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 import { ExecutionModel, IRoycoKernel, RequestRedeemSharesBehavior } from "../../../interfaces/kernel/IRoycoKernel.sol";
 import { ERC4626STKernelStorageLib } from "../../../libraries/kernels/ERC4626STKernelStorageLib.sol";
-import { AccountingState, Operation, RoycoKernel } from "../RoycoKernel.sol";
+import { Operation, RoycoKernel, SyncedAccountingState } from "../RoycoKernel.sol";
 
 abstract contract ERC4626STKernel is RoycoKernel {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
     /// @inheritdoc IRoycoKernel
-    ExecutionModel public constant ST_DEPOSIT_EXECUTION_MODEL = ExecutionModel.SYNC;
+    ExecutionModel public constant ST_INCREASE_NAV_EXECUTION_MODEL = ExecutionModel.SYNC;
 
     /// @inheritdoc IRoycoKernel
-    ExecutionModel public constant ST_WITHDRAWAL_EXECUTION_MODEL = ExecutionModel.SYNC;
+    ExecutionModel public constant ST_DECREASE_NAVAL_EXECUTION_MODEL = ExecutionModel.SYNC;
 
     /// @inheritdoc IRoycoKernel
     RequestRedeemSharesBehavior public constant ST_REQUEST_REDEEM_SHARES_BEHAVIOR = RequestRedeemSharesBehavior.BURN_ON_REDEEM;
@@ -70,7 +70,7 @@ abstract contract ERC4626STKernel is RoycoKernel {
         valueAllocated = _convertAssetsToValue(_assets);
 
         // Execute a post-op sync on NAV accounting and enforce the market's coverage requirement
-        _postOpSyncTrancheNAVsAndEnforceCoverage(Operation.ST_DEPOSIT);
+        _postOpSyncTrancheNAVsAndEnforceCoverage(Operation.ST_INCREASE_NAV);
     }
 
     /// @inheritdoc IRoycoKernel
@@ -88,7 +88,7 @@ abstract contract ERC4626STKernel is RoycoKernel {
         returns (uint256 assetsWithdrawn)
     {
         // Execute a pre-op sync on NAV accounting
-        AccountingState memory state = _preOpSyncTrancheNAVs();
+        SyncedAccountingState memory state = _preOpSyncTrancheNAVs();
 
         // Compute the assets expected to be received on withdrawal based on the ST's effective NAV
         assetsWithdrawn = _shares.mulDiv(state.stEffectiveNAV, _totalShares, Math.Rounding.Floor);
@@ -104,7 +104,7 @@ abstract contract ERC4626STKernel is RoycoKernel {
         IERC4626(ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault).withdraw((assetsWithdrawn - jtAssetsToWithdraw), _receiver, address(this));
 
         // Execute a post-op sync on NAV accounting
-        _postOpSyncTrancheNAVs(Operation.ST_WITHDRAW);
+        _postOpSyncTrancheNAVs(Operation.ST_DECREASE_NAV);
     }
 
     /**

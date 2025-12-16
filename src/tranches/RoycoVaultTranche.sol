@@ -18,7 +18,7 @@ import { ExecutionModel, IRoycoKernel, RequestRedeemSharesBehavior } from "../in
 import { IERC165, IERC7540, IERC7575, IERC7887, IRoycoVaultTranche } from "../interfaces/tranche/IRoycoVaultTranche.sol";
 import { RoycoTrancheStorageLib } from "../libraries/RoycoTrancheStorageLib.sol";
 import { TrancheType } from "../libraries/Types.sol";
-import { AccountingState, Action, TrancheDeploymentParams } from "../libraries/Types.sol";
+import { Action, SyncedAccountingState, TrancheDeploymentParams } from "../libraries/Types.sol";
 
 /// @title RoycoVaultTranche
 /// @notice Abstract base contract implementing core functionality for Royco tranches
@@ -39,7 +39,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC4626Upg
     error MUST_REQUEST_NON_ZERO_SHARES();
 
     /// @notice Thrown when the deposit amount is zero
-    error MUST_DEPOSIT_NON_ZERO_ASSETS();
+    error MUST_INCREASE_NAV_NON_ZERO_ASSETS();
 
     /// @notice Thrown when the redeem amount is zero
     error MUST_CLAIM_NON_ZERO_SHARES();
@@ -144,7 +144,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC4626Upg
 
     /// @inheritdoc IRoycoVaultTranche
     function getEffectiveNAV() public view override(IRoycoVaultTranche) returns (uint256) {
-        AccountingState memory state = IRoycoKernel(kernel()).previewSyncTrancheNAVs();
+        SyncedAccountingState memory state = IRoycoKernel(kernel()).previewSyncTrancheNAVs();
         return (TRANCHE_TYPE() == TrancheType.SENIOR ? state.stEffectiveNAV : state.jtEffectiveNAV);
     }
 
@@ -247,7 +247,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC4626Upg
         onlyCallerOrOperator(_controller)
         returns (uint256 shares)
     {
-        require(_assets != 0, MUST_DEPOSIT_NON_ZERO_ASSETS());
+        require(_assets != 0, MUST_INCREASE_NAV_NON_ZERO_ASSETS());
 
         IRoycoKernel kernel_ = IRoycoKernel(kernel());
         IERC20 asset = IERC20(asset());
@@ -748,7 +748,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC4626Upg
     function _previewPostSyncTrancheState() internal view returns (uint256 trancheTotalAssets, uint256 trancheTotalShares) {
         // Get the post-sync state of the kernel for the tranche
         IRoycoKernel kernel_ = IRoycoKernel(kernel());
-        AccountingState memory state = kernel_.previewSyncTrancheNAVs();
+        SyncedAccountingState memory state = kernel_.previewSyncTrancheNAVs();
         uint256 protocolFeeAssetsAccrued;
         if (TRANCHE_TYPE() == TrancheType.SENIOR) {
             trancheTotalAssets = state.stEffectiveNAV;

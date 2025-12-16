@@ -2,7 +2,8 @@
 pragma solidity ^0.8.28;
 
 import { RoycoAccountantState } from "../libraries/RoycoAccountantStorageLib.sol";
-import { AccountingState, NAV_UNIT, Operation } from "../libraries/Types.sol";
+import { Operation, SyncedAccountingState } from "../libraries/Types.sol";
+import { NAV_UNIT } from "../libraries/Units.sol";
 
 /**
  * @title IRoycoAccountant
@@ -39,7 +40,7 @@ interface IRoycoAccountant {
      * @param _jtRawNAV The junior tranche's current raw NAV: the pure value of its invested assets
      * @return state The NAV sync state containing all mark to market accounting data
      */
-    function preOpSyncTrancheNAVs(NAV_UNIT _stRawNAV, NAV_UNIT _jtRawNAV) external returns (AccountingState memory state);
+    function preOpSyncTrancheNAVs(NAV_UNIT _stRawNAV, NAV_UNIT _jtRawNAV) external returns (SyncedAccountingState memory state);
 
     /**
      * @notice Previews a synchronization of tranche NAVs based on the underlying PNL(s) and their effects on the current state of the loss waterfall
@@ -47,7 +48,7 @@ interface IRoycoAccountant {
      * @param _jtRawNAV The junior tranche's current raw NAV: the pure value of its invested assets
      * @return state The NAV sync state containing all mark to market accounting data
      */
-    function previewSyncTrancheNAVs(NAV_UNIT _stRawNAV, NAV_UNIT _jtRawNAV) external view returns (AccountingState memory state);
+    function previewSyncTrancheNAVs(NAV_UNIT _stRawNAV, NAV_UNIT _jtRawNAV) external view returns (SyncedAccountingState memory state);
 
     /**
      * @notice Applies post-operation (deposit and withdrawal) raw NAV deltas to effective NAV checkpoints
@@ -92,6 +93,34 @@ interface IRoycoAccountant {
      * @return maxJTWithdrawal The maximum assets withdrawable from the junior tranche without violating the market's coverage requirement
      */
     function maxJTWithdrawalGivenCoverage(NAV_UNIT _stRawNAV, NAV_UNIT _jtRawNAV) external view returns (NAV_UNIT maxJTWithdrawal);
+
+    /**
+     * @notice Updates the RDM (Reward Distribution Model) address
+     * @dev Only callable by a designated admin
+     * @param _rdm The new RDM address to set
+     */
+    function setRDM(address _rdm) external;
+
+    /**
+     * @notice Updates the protocol fee percentage
+     * @dev Only callable by a designated admin
+     * @param _protocolFeeWAD The new protocol fee percentage in WAD format
+     */
+    function setProtocolFee(uint64 _protocolFeeWAD) external;
+
+    /**
+     * @notice Updates the coverage percentage requirement
+     * @dev Only callable by a designated admin
+     * @param _coverageWAD The new coverage percentage in WAD format
+     */
+    function setCoverage(uint64 _coverageWAD) external;
+
+    /**
+     * @notice Updates the beta sensitivity parameter
+     * @dev Only callable by a designated admin
+     * @param _betaWAD The new beta parameter in WAD format representing JT's sensitivity to downside stress
+     */
+    function setBeta(uint96 _betaWAD) external;
 
     /**
      * @notice Returns the state of the accountant

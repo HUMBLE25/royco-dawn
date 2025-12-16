@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import { IRDM } from "../interfaces/IRDM.sol";
 
 import { Math } from "../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
-import { ConstantsLib } from "../libraries/ConstantsLib.sol";
+import { ConstantsLib } from "../libraries/Constants.sol";
 import { UtilsLib } from "../libraries/UtilsLib.sol";
 
 /**
@@ -24,13 +24,13 @@ contract StaticCurveRDM is IRDM {
      */
     uint256 public constant TARGET_UTILIZATION = 0.9e18;
 
-    /// @dev The slope when the market's utilization is less than the target utilization (scaled by WAD)
+    /// @dev The slope when the market's utilization is less than the target utilization (scaled to WAD precision)
     uint256 public constant SLOPE_LT_TARGET_UTIL = 0.25e18;
 
-    /// @dev The slope when the market's utilization is greater than or equal to the target utilization (scaled by WAD)
+    /// @dev The slope when the market's utilization is greater than or equal to the target utilization (scaled to WAD precision)
     uint256 public constant SLOPE_GTE_TARGET_UTIL = 7.75e18;
 
-    /// @dev The base rate paid to the junior tranche when the utilization is exactly at the target (scaled by WAD)
+    /// @dev The base rate paid to the junior tranche when the utilization is exactly at the target (scaled to WAD precision)
     uint256 public constant BASE_RATE_GTE_TARGET_UTIL = 0.225e18;
 
     /// @inheritdoc IRDM
@@ -93,15 +93,15 @@ contract StaticCurveRDM is IRDM {
         uint256 utilization = UtilsLib.computeUtilization(_stRawNAV, _jtRawNAV, _betaWAD, _coverageWAD, _jtEffectiveNAV);
 
         // Compute R(U), rounding in favor the senior tranche
-        if (utilization >= ConstantsLib.WAD) {
+        if (utilization >= WAD) {
             // If utilization is greater than or equal to 1, apply the third leg of R(U)
-            return ConstantsLib.WAD;
+            return WAD;
         } else if (utilization >= TARGET_UTILIZATION) {
             // If utilization is at or above the kink (target) but less than 1, apply the second leg of R(U)
-            return SLOPE_GTE_TARGET_UTIL.mulDiv((utilization - TARGET_UTILIZATION), ConstantsLib.WAD, Math.Rounding.Floor) + BASE_RATE_GTE_TARGET_UTIL;
+            return SLOPE_GTE_TARGET_UTIL.mulDiv((utilization - TARGET_UTILIZATION), WAD, Math.Rounding.Floor) + BASE_RATE_GTE_TARGET_UTIL;
         } else {
             // If utilization is below the kink (target), apply the first leg of R(U)
-            return SLOPE_LT_TARGET_UTIL.mulDiv(utilization, ConstantsLib.WAD, Math.Rounding.Floor);
+            return SLOPE_LT_TARGET_UTIL.mulDiv(utilization, WAD, Math.Rounding.Floor);
         }
     }
 }
