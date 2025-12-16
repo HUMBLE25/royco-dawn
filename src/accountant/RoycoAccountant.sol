@@ -23,7 +23,7 @@ contract RoycoAccountant is Initializable, IRoycoAccountant {
      * @notice Initializes the Royco accountant state
      * @param _params The initialization parameters for the Royco accountant
      */
-    function initialize(RoycoAccountantInitParams calldata _params) internal initializer {
+    function initialize(RoycoAccountantInitParams calldata _params) external initializer {
         // Ensure that the coverage requirement is valid
         require(_params.coverageWAD < ConstantsLib.WAD && _params.coverageWAD >= ConstantsLib.MIN_COVERAGE_WAD, INVALID_COVERAGE_CONFIG());
         // Ensure that JT withdrawals are not permanently bricked
@@ -136,9 +136,8 @@ contract RoycoAccountant is Initializable, IRoycoAccountant {
                 if (deltaST < 0) $.lastJTEffectiveNAV -= (uint256(-deltaJT) + uint256(-deltaST));
                 // Apply the pure withdrawal to the junior tranche's effective NAV
                 else $.lastJTEffectiveNAV -= uint256(-deltaJT);
-
-                // TODO: Enforce the expected relationship between JT NAVs and ST coverage debt (currently applied and pullable coverage)
-                // require($.lastJTEffectiveNAV + $.lastSTCoverageDebt >= _jtRawNAV);
+                // Enforce the expected relationship between JT NAVs and ST coverage debt (outstanding applied coverage)
+                require($.lastJTEffectiveNAV + $.lastSTCoverageDebt >= _jtRawNAV);
             }
         }
         // Enforce the NAV conservation invariant
