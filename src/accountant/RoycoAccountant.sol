@@ -4,12 +4,15 @@ pragma solidity ^0.8.28;
 import { RoycoBase } from "../base/RoycoBase.sol";
 import { IRDM } from "../interfaces/IRDM.sol";
 import { IRoycoAccountant, Operation } from "../interfaces/IRoycoAccountant.sol";
+import { MAX_PROTOCOL_FEE_WAD, MIN_COVERAGE_WAD, WAD, ZERO_NAV_UNITS } from "../libraries/Constants.sol";
 import { RoycoAccountantInitParams, RoycoAccountantState, RoycoAccountantStorageLib } from "../libraries/RoycoAccountantStorageLib.sol";
-import { AccountingState, NAV_UNIT } from "../libraries/Types.sol";
-import { ConstantsLib, Math, UtilsLib } from "../libraries/UtilsLib.sol";
+import { NAV_UNIT, SyncedAccountingState } from "../libraries/Types.sol";
+import { UnitsMathLib, toNAVUnits } from "../libraries/Units.sol";
+import { Math, UtilsLib } from "../libraries/UtilsLib.sol";
 
 contract RoycoAccountant is IRoycoAccountant, RoycoBase {
     using Math for uint256;
+    using UnitsMathLib for NAV_UNIT;
 
     /// @dev Enforces that the function is called by the accountant's Royco kernel
     modifier onlyRoycoKernel() {
@@ -23,23 +26,16 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
      * @param _initialAuthority The initial authority for the Royco accountant
      */
     function initialize(RoycoAccountantInitParams calldata _params, address _initialAuthority) external initializer {
-        // Ensure that the coverage requirement is valid
-        require(_params.coverageWAD < ConstantsLib.WAD && _params.coverageWAD >= ConstantsLib.MIN_COVERAGE_WAD, INVALID_COVERAGE_CONFIG());
-        // Ensure that JT withdrawals are not permanently bricked
-        require(uint256(_params.coverageWAD).mulDiv(_params.betaWAD, ConstantsLib.WAD, Math.Rounding.Ceil) < ConstantsLib.WAD, INVALID_COVERAGE_CONFIG());
+        // Validate the inital coverage requirement
+        _validateCoverageRequirement(_params.coverageWAD, _params.betaWAD);
         // Ensure that the RDM is not null
         require(_params.rdm != address(0), NULL_RDM_ADDRESS());
-        // Ensure that the protocol fee configuration is valid
-        require(_params.protocolFeeWAD <= ConstantsLib.MAX_PROTOCOL_FEE_WAD, MAX_PROTOCOL_FEE_EXCEEDED());
+        // Ensure that the protocol fee percentage is valid
+        require(_params.protocolFeeWAD <= MAX_PROTOCOL_FEE_WAD, MAX_PROTOCOL_FEE_EXCEEDED());
         // Initialize the base state of the accountant
         __RoycoBase_init(_initialAuthority);
         // Initialize the state of the accountant
         RoycoAccountantStorageLib.__RoycoAccountant_init(_params);
-    }
-
-    /// @inheritdoc IRoycoAccountant
-    function getState() external view override(IRoycoAccountant) returns (RoycoAccountantState memory) {
-        return RoycoAccountantStorageLib._getRoycoAccountantStorage();
     }
 
     /// @inheritdoc IRoycoAccountant
@@ -50,7 +46,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         external
         override(IRoycoAccountant)
         onlyRoycoKernel
-        returns (AccountingState memory state)
+        returns (SyncedAccountingState memory state)
     {
         // Get the storage pointer to the base kernel state
         RoycoAccountantState storage $ = RoycoAccountantStorageLib._getRoycoAccountantStorage();
@@ -76,7 +72,15 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
     }
 
     /// @inheritdoc IRoycoAccountant
-    function previewSyncTrancheNAVs(NAV_UNIT _stRawNAV, NAV_UNIT _jtRawNAV) public view override(IRoycoAccountant) returns (AccountingState memory state) {
+    function previewSyncTrancheNAVs(
+        NAV_UNIT _stRawNAV,
+        NAV_UNIT _jtRawNAV
+    )
+        public
+        view
+        override(IRoycoAccountant)
+        returns (SyncedAccountingState memory state)
+    {
         (state,) = _previewSyncTrancheNAVs(_stRawNAV, _jtRawNAV, _previewJTYieldShareAccrual());
     }
 
@@ -84,64 +88,61 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
     function postOpSyncTrancheNAVs(NAV_UNIT _stRawNAV, NAV_UNIT _jtRawNAV, Operation _op) public override(IRoycoAccountant) onlyRoycoKernel {
         // Get the storage pointer to the base kernel state
         RoycoAccountantState storage $ = RoycoAccountantStorageLib._getRoycoAccountantStorage();
-        if (_op == Operation.ST_DEPOSIT) {
-            // Compute the delta in the raw NAV of the senior tranche: deposits must increase NAV
-            int256 deltaST = _computeRawNAVDelta(_stRawNAV, $.lastSTRawNAV);
-            require(deltaST > 0, INVALID_POST_OP_STATE(_op));
+        if (_op == Operation.ST_INCREASE_NAV) {
+            // Compute the delta in the raw NAV of the senior tranche
+            int256 deltaST = UnitsMathLib.computeNAVDelta(_stRawNAV, $.lastSTRawNAV);
+            require(deltaST >= 0, INVALID_POST_OP_STATE(_op));
             // Update the post-operation raw NAV ST checkpoint
             $.lastSTRawNAV = _stRawNAV;
             // Apply the deposit to the senior tranche's effective NAV
-            $.lastSTEffectiveNAV += uint256(deltaST);
-        } else if (_op == Operation.JT_DEPOSIT) {
-            // Compute the delta in the raw NAV of the junior tranche: deposits must increase NAV
-            int256 deltaJT = _computeRawNAVDelta(_jtRawNAV, $.lastJTRawNAV);
-            require(deltaJT > 0, INVALID_POST_OP_STATE(_op));
+            $.lastSTEffectiveNAV = $.lastSTEffectiveNAV + toNAVUnits(deltaST);
+        } else if (_op == Operation.JT_INCREASE_NAV) {
+            // Compute the delta in the raw NAV of the junior tranche
+            int256 deltaJT = UnitsMathLib.computeNAVDelta(_jtRawNAV, $.lastJTRawNAV);
+            require(deltaJT >= 0, INVALID_POST_OP_STATE(_op));
             // Update the post-operation raw NAV ST checkpoint
             $.lastJTRawNAV = _jtRawNAV;
             // Apply the deposit to the junior tranche's effective NAV
-            $.lastJTEffectiveNAV += uint256(deltaJT);
+            $.lastJTEffectiveNAV = $.lastJTEffectiveNAV + toNAVUnits(deltaJT);
         } else {
             // Compute the deltas in the raw NAVs of each tranche after an operation's execution and cache the raw NAVs
             // The deltas represent the NAV changes after a deposit and withdrawal
-            int256 deltaST = _computeRawNAVDelta(_stRawNAV, $.lastSTRawNAV);
-            int256 deltaJT = _computeRawNAVDelta(_jtRawNAV, $.lastJTRawNAV);
+            int256 deltaST = UnitsMathLib.computeNAVDelta(_stRawNAV, $.lastSTRawNAV);
+            int256 deltaJT = UnitsMathLib.computeNAVDelta(_jtRawNAV, $.lastJTRawNAV);
 
             // Update the post-operation raw NAV checkpoints
             $.lastSTRawNAV = _stRawNAV;
             $.lastJTRawNAV = _jtRawNAV;
 
-            if (_op == Operation.ST_WITHDRAW) {
-                // ST withdrawals must decrease ST NAV and leave JT NAV decreased or unchanged (coverage realization)
-                // Or they must leave ST NAV unchanged and decrease JT NAV (pure coverage realization)
-                require((deltaST < 0 && deltaJT <= 0) || (deltaST == 0 && deltaJT < 0), INVALID_POST_OP_STATE(_op));
+            if (_op == Operation.ST_DECREASE_NAV) {
+                require(deltaST <= 0 && deltaJT <= 0, INVALID_POST_OP_STATE(_op));
                 // Senior withdrew: The NAV deltas include the discrete withdrawal amount in addition to any coverage pulled from JT to ST
                 // If the withdrawal used JT capital as coverage to facilitate this ST withdrawal
-                uint256 preWithdrawalSTEffectiveNAV = $.lastSTEffectiveNAV;
+                NAV_UNIT preWithdrawalSTEffectiveNAV = $.lastSTEffectiveNAV;
                 if (deltaJT < 0) {
                     // The actual amount withdrawn was the delta in ST raw NAV and the coverage applied from JT
-                    uint256 coverageRealized = uint256(-deltaJT);
-                    $.lastSTEffectiveNAV = preWithdrawalSTEffectiveNAV - (uint256(-deltaST) + coverageRealized);
+                    NAV_UNIT coverageRealized = toNAVUnits(-deltaJT);
+                    $.lastSTEffectiveNAV = preWithdrawalSTEffectiveNAV - (toNAVUnits(-deltaST) + coverageRealized);
                     // The withdrawing senior LP has realized its proportional share of past covered losses, settling the realized portion between JT and ST
-                    $.lastSTCoverageDebt -= coverageRealized;
+                    $.lastSTCoverageDebt = $.lastSTCoverageDebt - coverageRealized;
                 } else {
                     // Apply the withdrawal to the senior tranche's effective NAV
-                    $.lastSTEffectiveNAV = preWithdrawalSTEffectiveNAV - uint256(-deltaST);
+                    $.lastSTEffectiveNAV = preWithdrawalSTEffectiveNAV - toNAVUnits(-deltaST);
                 }
                 // The withdrawing senior LP has realized its proportional share of past uncovered losses and associated recovery optionality
                 // Round in favor of senior
-                uint256 jtCoverageDebt = $.lastJTCoverageDebt;
-                if (jtCoverageDebt != 0) {
+                NAV_UNIT jtCoverageDebt = $.lastJTCoverageDebt;
+                if (jtCoverageDebt != ZERO_NAV_UNITS) {
                     $.lastJTCoverageDebt = jtCoverageDebt.mulDiv($.lastSTEffectiveNAV, preWithdrawalSTEffectiveNAV, Math.Rounding.Ceil);
                 }
-            } else if (_op == Operation.JT_WITHDRAW) {
-                // JT withdrawals must decrease JT NAV and leave ST NAV decreased or unchanged (yield claiming)
-                require(deltaJT < 0 && deltaST <= 0, INVALID_POST_OP_STATE(_op));
+            } else if (_op == Operation.JT_DECREASE_NAV) {
+                require(deltaJT <= 0 && deltaST <= 0, INVALID_POST_OP_STATE(_op));
                 // Junior withdrew: The NAV deltas include the discrete withdrawal amount in addition to any assets (yield + debt repayments) pulled from ST to JT
                 // JT LPs cannot settle debts on withdrawal since they don't have discretion on when coverage applied to ST (stCoverageDebt) and uncovered ST losses (jtCoverageDebt) can be realized
                 // If ST delta was negative, the actual amount withdrawn by JT was the delta in JT raw NAV and the assets claimed from ST
-                if (deltaST < 0) $.lastJTEffectiveNAV -= (uint256(-deltaJT) + uint256(-deltaST));
+                if (deltaST < 0) $.lastJTEffectiveNAV = $.lastSTEffectiveNAV - (toNAVUnits(-deltaJT) + toNAVUnits(-deltaST));
                 // Apply the pure withdrawal to the junior tranche's effective NAV
-                else $.lastJTEffectiveNAV -= uint256(-deltaJT);
+                else $.lastJTEffectiveNAV = $.lastSTEffectiveNAV - toNAVUnits(-deltaJT);
                 // Enforce the expected relationship between JT NAVs and ST coverage debt (outstanding applied coverage)
                 require($.lastJTEffectiveNAV + $.lastSTCoverageDebt >= _jtRawNAV, INVALID_POST_OP_STATE(_op));
             }
@@ -151,7 +152,15 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
     }
 
     /// @inheritdoc IRoycoAccountant
-    function postOpSyncTrancheNAVsAndEnforceCoverage(uint256 _stRawNAV, uint256 _jtRawNAV, Operation _op) external override(IRoycoAccountant) onlyRoycoKernel {
+    function postOpSyncTrancheNAVsAndEnforceCoverage(
+        NAV_UNIT _stRawNAV,
+        NAV_UNIT _jtRawNAV,
+        Operation _op
+    )
+        external
+        override(IRoycoAccountant)
+        onlyRoycoKernel
+    {
         // Execute a post-op NAV synchronization
         postOpSyncTrancheNAVs(_stRawNAV, _jtRawNAV, _op);
         // Enforce the market's coverage requirement
@@ -176,7 +185,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         RoycoAccountantState storage $ = RoycoAccountantStorageLib._getRoycoAccountantStorage();
         // Compute the utilization and return whether or not the senior tranche is properly collateralized based on persisted NAVs
         uint256 utilization = UtilsLib.computeUtilization($.lastSTRawNAV, $.lastJTRawNAV, $.betaWAD, $.coverageWAD, $.lastJTEffectiveNAV);
-        return (utilization <= ConstantsLib.WAD);
+        return (utilization <= WAD);
     }
 
     /**
@@ -185,18 +194,18 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
      * @dev Max assets depositable into ST, x: JT_EFFECTIVE_NAV = ((ST_RAW_NAV + x) + (JT_RAW_NAV * BETA_%)) * COV_%
      *      Isolate x: x = (JT_EFFECTIVE_NAV / COV_%) - (JT_RAW_NAV * BETA_%) - ST_RAW_NAV
      */
-    function maxSTDepositGivenCoverage(uint256 _stRawNAV, uint256 _jtRawNAV) external view override(IRoycoAccountant) onlyRoycoKernel returns (uint256) {
+    function maxSTDepositGivenCoverage(NAV_UNIT _stRawNAV, NAV_UNIT _jtRawNAV) external view override(IRoycoAccountant) returns (NAV_UNIT) {
         // Get the storage pointer to the base kernel state
         RoycoAccountantState storage $ = RoycoAccountantStorageLib._getRoycoAccountantStorage();
         // Preview a NAV sync to get the market's current state
-        (AccountingState memory state,) = _previewSyncTrancheNAVs(_stRawNAV, _jtRawNAV, _previewJTYieldShareAccrual());
+        (SyncedAccountingState memory state,) = _previewSyncTrancheNAVs(_stRawNAV, _jtRawNAV, _previewJTYieldShareAccrual());
         // Solve for x, rounding in favor of senior protection
         // Compute the total covered assets by the junior tranche loss absorption buffer
-        uint256 totalCoveredAssets = state.jtEffectiveNAV.mulDiv(ConstantsLib.WAD, $.coverageWAD, Math.Rounding.Floor);
+        NAV_UNIT totalCoveredAssets = state.jtEffectiveNAV.mulDiv(WAD, $.coverageWAD, Math.Rounding.Floor);
         // Compute the assets required to cover current junior tranche exposure
-        uint256 jtCoverageRequired = _jtRawNAV.mulDiv($.betaWAD, ConstantsLib.WAD, Math.Rounding.Ceil);
+        NAV_UNIT jtCoverageRequired = _jtRawNAV.mulDiv($.betaWAD, WAD, Math.Rounding.Ceil);
         // Compute the assets required to cover current senior tranche exposure
-        uint256 stCoverageRequired = _stRawNAV;
+        NAV_UNIT stCoverageRequired = _stRawNAV;
         // Compute the amount of assets that can be deposited into senior while retaining full coverage
         return totalCoveredAssets.saturatingSub(jtCoverageRequired).saturatingSub(stCoverageRequired);
     }
@@ -207,50 +216,89 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
      * @dev Max assets withdrawable from JT, y: (JT_EFFECTIVE_NAV - y) = (ST_RAW_NAV + ((JT_RAW_NAV - y) * BETA_%)) * COV_%
      *      Isolate y: y = (JT_EFFECTIVE_NAV - (COV_% * (ST_RAW_NAV + (JT_RAW_NAV * BETA_%)))) / (1 - (BETA_% * COV_%))
      */
-    function maxJTWithdrawalGivenCoverage(uint256 _stRawNAV, uint256 _jtRawNAV) external view override(IRoycoAccountant) onlyRoycoKernel returns (uint256) {
+    function maxJTWithdrawalGivenCoverage(NAV_UNIT _stRawNAV, NAV_UNIT _jtRawNAV) external view override(IRoycoAccountant) returns (NAV_UNIT) {
         // Get the storage pointer to the base kernel state and cache beta and coverage
         RoycoAccountantState storage $ = RoycoAccountantStorageLib._getRoycoAccountantStorage();
         uint256 betaWAD = $.betaWAD;
         uint256 coverageWAD = $.coverageWAD;
         // Preview a NAV sync to get the market's current state
-        (AccountingState memory state,) = _previewSyncTrancheNAVs(_stRawNAV, _jtRawNAV, _previewJTYieldShareAccrual());
+        (SyncedAccountingState memory state,) = _previewSyncTrancheNAVs(_stRawNAV, _jtRawNAV, _previewJTYieldShareAccrual());
         // Solve for y, rounding in favor of senior protection
         // Compute the total covered exposure of the underlying investment
-        uint256 totalCoveredExposure = _stRawNAV + _jtRawNAV.mulDiv(betaWAD, ConstantsLib.WAD, Math.Rounding.Ceil);
+        NAV_UNIT totalCoveredExposure = _stRawNAV + _jtRawNAV.mulDiv(betaWAD, WAD, Math.Rounding.Ceil);
         // Compute the minimum junior tranche assets required to cover the exposure as per the market's coverage requirement
-        uint256 requiredJTAssets = totalCoveredExposure.mulDiv(coverageWAD, ConstantsLib.WAD, Math.Rounding.Ceil);
+        NAV_UNIT requiredJTAssets = totalCoveredExposure.mulDiv(coverageWAD, WAD, Math.Rounding.Ceil);
         // Compute the surplus coverage currently provided by the junior tranche based on its currently remaining loss-absorption buffer
-        uint256 surplusJTAssets = Math.saturatingSub(state.jtEffectiveNAV, requiredJTAssets);
-        // Compute how much coverage the system retains per 1 unit of JT assets withdrawn scaled by WAD
-        uint256 coverageRetentionWAD = ConstantsLib.WAD - betaWAD.mulDiv(coverageWAD, ConstantsLib.WAD, Math.Rounding.Floor);
+        NAV_UNIT surplusJTAssets = UnitsMathLib.saturatingSub(state.jtEffectiveNAV, requiredJTAssets);
+        // Compute how much coverage the system retains per 1 unit of JT assets withdrawn scaled to WAD precision
+        uint256 coverageRetentionWAD = WAD - betaWAD.mulDiv(coverageWAD, WAD, Math.Rounding.Floor);
         // Return how much of the surplus can be withdrawn while satisfying the coverage requirement
-        return surplusJTAssets.mulDiv(ConstantsLib.WAD, coverageRetentionWAD, Math.Rounding.Floor);
+        return surplusJTAssets.mulDiv(WAD, coverageRetentionWAD, Math.Rounding.Floor);
+    }
+
+    /// @inheritdoc IRoycoAccountant
+    function setRDM(address _rdm) external override(IRoycoAccountant) restricted {
+        // Ensure that the RDM is not null
+        require(_rdm != address(0), NULL_RDM_ADDRESS());
+        // Set the new RDM
+        RoycoAccountantStorageLib._getRoycoAccountantStorage().rdm = _rdm;
+    }
+
+    /// @inheritdoc IRoycoAccountant
+    function setProtocolFee(uint64 _protocolFeeWAD) external override(IRoycoAccountant) restricted {
+        // Ensure that the protocol fee percentage is valid
+        require(_protocolFeeWAD <= MAX_PROTOCOL_FEE_WAD, MAX_PROTOCOL_FEE_EXCEEDED());
+        // Set the new protocol fee percentage
+        RoycoAccountantStorageLib._getRoycoAccountantStorage().protocolFeeWAD = _protocolFeeWAD;
+    }
+
+    /// @inheritdoc IRoycoAccountant
+    function setCoverage(uint64 _coverageWAD) external override(IRoycoAccountant) restricted {
+        RoycoAccountantState storage $ = RoycoAccountantStorageLib._getRoycoAccountantStorage();
+        // Validate the new coverage requirement
+        _validateCoverageRequirement(_coverageWAD, $.betaWAD);
+        // Set the new coverage percentage
+        $.coverageWAD = _coverageWAD;
+    }
+
+    /// @inheritdoc IRoycoAccountant
+    function setBeta(uint96 _betaWAD) external override(IRoycoAccountant) restricted {
+        RoycoAccountantState storage $ = RoycoAccountantStorageLib._getRoycoAccountantStorage();
+        // Validate the new coverage requirement
+        _validateCoverageRequirement($.coverageWAD, _betaWAD);
+        // Set the new beta parameter
+        $.betaWAD = _betaWAD;
+    }
+
+    /// @inheritdoc IRoycoAccountant
+    function getState() external view override(IRoycoAccountant) returns (RoycoAccountantState memory) {
+        return RoycoAccountantStorageLib._getRoycoAccountantStorage();
     }
 
     /**
      * @notice Syncs all tranche NAVs and debts based on unrealized PNLs of the underlying investment(s)
      * @param _stRawNAV The senior tranche's current raw NAV: the pure value of its invested assets
      * @param _jtRawNAV The junior tranche's current raw NAV: the pure value of its invested assets
-     * @param _twJTYieldShareAccruedWAD The currently accrued time-weighted JT yield share RDM output since the last distribution, scaled by WAD
+     * @param _twJTYieldShareAccruedWAD The currently accrued time-weighted JT yield share RDM output since the last distribution, scaled to WAD precision
      * @return state A struct containing all synced NAV, debt, and fee data after executing the sync
      * @return yieldDistributed A boolean indicating whether ST yield was split between ST and JT
      */
     function _previewSyncTrancheNAVs(
-        uint256 _stRawNAV,
-        uint256 _jtRawNAV,
+        NAV_UNIT _stRawNAV,
+        NAV_UNIT _jtRawNAV,
         uint192 _twJTYieldShareAccruedWAD
     )
         internal
         view
-        returns (AccountingState memory state, bool yieldDistributed)
+        returns (SyncedAccountingState memory state, bool yieldDistributed)
     {
         // Get the storage pointer to the base kernel state
         RoycoAccountantState storage $ = RoycoAccountantStorageLib._getRoycoAccountantStorage();
 
         // Compute the deltas in the raw NAVs of each tranche
         // The deltas represent the unrealized PNL of the underlying investment since the last NAV checkpoints
-        int256 deltaST = _computeRawNAVDelta(_stRawNAV, $.lastSTRawNAV);
-        int256 deltaJT = _computeRawNAVDelta(_jtRawNAV, $.lastJTRawNAV);
+        int256 deltaST = UnitsMathLib.computeNAVDelta(_stRawNAV, $.lastSTRawNAV);
+        int256 deltaJT = UnitsMathLib.computeNAVDelta(_jtRawNAV, $.lastJTRawNAV);
 
         // Cache the last checkpointed effective NAV and coverage debt for each tranche
         NAV_UNIT stEffectiveNAV = $.lastSTEffectiveNAV;
@@ -263,110 +311,110 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         /// @dev STEP_APPLY_JT_LOSS: The JT assets depreciated in value
         if (deltaJT < 0) {
             /// @dev STEP_JT_ABSORB_LOSS: JT's remaning loss-absorption buffer incurs as much of the loss as possible
-            uint256 jtLoss = uint256(-deltaJT);
-            uint256 jtAbsorbableLoss = Math.min(jtLoss, jtEffectiveNAV);
-            if (jtAbsorbableLoss != 0) {
+            NAV_UNIT jtLoss = toNAVUnits(-deltaJT);
+            NAV_UNIT jtAbsorbableLoss = UnitsMathLib.min(jtLoss, jtEffectiveNAV);
+            if (jtAbsorbableLoss != ZERO_NAV_UNITS) {
                 // Incur the maximum absorbable losses to remaining JT loss capital
-                jtEffectiveNAV -= jtAbsorbableLoss;
+                jtEffectiveNAV = jtEffectiveNAV - jtAbsorbableLoss;
                 // Reduce the residual JT loss by the loss absorbed
-                jtLoss -= jtAbsorbableLoss;
+                jtLoss = jtLoss - jtAbsorbableLoss;
             }
             /// @dev STEP_ST_INCURS_RESIDUAL_LOSSES: Residual loss after emptying JT's remaning loss-absorption buffer are incurred by ST
-            if (jtLoss != 0) {
+            if (jtLoss != ZERO_NAV_UNITS) {
                 // The excess loss is absorbed by ST
-                stEffectiveNAV -= jtLoss;
+                stEffectiveNAV = stEffectiveNAV - jtLoss;
                 // Repay ST debt to JT
                 // This is equivalent to retroactively reducing previously applied coverage
                 // Thus, the liability is flipped to JT debt to ST
-                stCoverageDebt -= jtLoss;
-                jtCoverageDebt += jtLoss;
+                stCoverageDebt = stCoverageDebt - jtLoss;
+                jtCoverageDebt = jtCoverageDebt + jtLoss;
             }
             /// @dev STEP_APPLY_JT_GAIN: The JT assets appreciated in value
         } else if (deltaJT > 0) {
-            uint256 jtGain = uint256(deltaJT);
+            NAV_UNIT jtGain = toNAVUnits(deltaJT);
             /// @dev STEP_REPAY_JT_COVERAGE_DEBT: Pay off any JT debt to ST (previously uncovered losses)
-            uint256 jtDebtRepayment = Math.min(jtGain, jtCoverageDebt);
-            if (jtDebtRepayment != 0) {
+            NAV_UNIT jtDebtRepayment = UnitsMathLib.min(jtGain, jtCoverageDebt);
+            if (jtDebtRepayment != ZERO_NAV_UNITS) {
                 // Repay JT debt to ST
                 // This is equivalent to retroactively applying coverage for previously uncovered losses
                 // Thus, the liability is flipped to ST debt to JT
-                jtCoverageDebt -= jtDebtRepayment;
-                stCoverageDebt += jtDebtRepayment;
+                jtCoverageDebt = jtCoverageDebt - jtDebtRepayment;
+                stCoverageDebt = stCoverageDebt + jtDebtRepayment;
                 // Apply the repayment (retroactive coverage) to the ST
-                stEffectiveNAV += jtDebtRepayment;
-                jtGain -= jtDebtRepayment;
+                stEffectiveNAV = stEffectiveNAV + jtDebtRepayment;
+                jtGain = jtGain - jtDebtRepayment;
             }
             /// @dev STEP_JT_ACCRUES_RESIDUAL_GAINS: JT accrues any remaining appreciation after repaying liabilities
-            if (jtGain != 0) {
+            if (jtGain != ZERO_NAV_UNITS) {
                 // Compute the protocol fee taken on this JT yield accrual - will be used to mint JT shares to the protocol fee recipient at the updated JT effective NAV
-                jtProtocolFeeAccrued = jtGain.mulDiv($.protocolFeeWAD, ConstantsLib.WAD, Math.Rounding.Floor);
+                jtProtocolFeeAccrued = jtGain.mulDiv($.protocolFeeWAD, WAD, Math.Rounding.Floor);
                 // Book the residual gains to the JT
-                jtEffectiveNAV += jtGain;
+                jtEffectiveNAV = jtEffectiveNAV + jtGain;
             }
         }
 
         /// @dev STEP_APPLY_ST_LOSS: The ST assets depreciated in value
         if (deltaST < 0) {
-            uint256 stLoss = uint256(-deltaST);
+            NAV_UNIT stLoss = toNAVUnits(-deltaST);
             /// @dev STEP_APPLY_JT_COVERAGE_TO_ST: Apply any possible coverage to ST provided by JT's loss-absorption buffer
-            uint256 coverageApplied = Math.min(stLoss, jtEffectiveNAV);
-            if (coverageApplied != 0) {
-                jtEffectiveNAV -= coverageApplied;
+            NAV_UNIT coverageApplied = UnitsMathLib.min(stLoss, jtEffectiveNAV);
+            if (coverageApplied != ZERO_NAV_UNITS) {
+                jtEffectiveNAV = jtEffectiveNAV - coverageApplied;
                 // Any coverage provided is a ST liability to JT
-                stCoverageDebt += coverageApplied;
+                stCoverageDebt = stCoverageDebt + coverageApplied;
             }
             /// @dev STEP_ST_INCURS_RESIDUAL_LOSSES: Apply any uncovered losses by JT to ST
-            uint256 netStLoss = stLoss - coverageApplied;
-            if (netStLoss != 0) {
+            NAV_UNIT netStLoss = stLoss - coverageApplied;
+            if (netStLoss != ZERO_NAV_UNITS) {
                 // Apply residual losses to ST
-                stEffectiveNAV -= netStLoss;
+                stEffectiveNAV = stEffectiveNAV - netStLoss;
                 // The uncovered portion of the ST loss is a JT liability to ST
-                jtCoverageDebt += netStLoss;
+                jtCoverageDebt = jtCoverageDebt + netStLoss;
             }
             /// @dev STEP_APPLY_ST_GAIN: The ST assets appreciated in value
         } else if (deltaST > 0) {
-            uint256 stGain = uint256(deltaST);
+            NAV_UNIT stGain = toNAVUnits(deltaST);
             /// @dev STEP_REPAY_JT_COVERAGE_DEBT: The first priority of repayment to reverse the loss-waterfall is making ST whole again
             // Repay JT debt to ST: previously uncovered ST losses
-            uint256 debtRepayment = Math.min(stGain, jtCoverageDebt);
-            if (debtRepayment != 0) {
+            NAV_UNIT debtRepayment = UnitsMathLib.min(stGain, jtCoverageDebt);
+            if (debtRepayment != ZERO_NAV_UNITS) {
                 // Pay back JT debt to ST: making ST whole again
-                stEffectiveNAV += debtRepayment;
-                jtCoverageDebt -= debtRepayment;
+                stEffectiveNAV = stEffectiveNAV + debtRepayment;
+                jtCoverageDebt = jtCoverageDebt - debtRepayment;
                 // Deduct the repayment from the ST gains and return if no gains are left
-                stGain -= debtRepayment;
+                stGain = stGain - debtRepayment;
             }
             /// @dev STEP_REPAY_ST_COVERAGE_DEBT: The second priority of repayment to reverse the loss-waterfall is making JT whole again
             // Repay ST debt to JT: previously applied coverage from JT to ST
-            debtRepayment = Math.min(stGain, stCoverageDebt);
-            if (debtRepayment != 0) {
+            debtRepayment = UnitsMathLib.min(stGain, stCoverageDebt);
+            if (debtRepayment != ZERO_NAV_UNITS) {
                 // Pay back ST debt to JT: making JT whole again
-                jtEffectiveNAV += debtRepayment;
-                stCoverageDebt -= debtRepayment;
+                jtEffectiveNAV = (jtEffectiveNAV + debtRepayment);
+                stCoverageDebt = (stCoverageDebt - debtRepayment);
                 // Deduct the repayment from the remaining ST gains and return if no gains are left
-                stGain -= debtRepayment;
+                stGain = (stGain - debtRepayment);
             }
             /// @dev STEP_DISTRIBUTE_YIELD: There are no remaining debts in the system, the residual gains will be used to distribute yield to both tranches
-            if (stGain != 0) {
+            if (stGain != ZERO_NAV_UNITS) {
                 // Compute the time weighted average JT share of yield
                 uint256 elapsed = block.timestamp - $.lastDistributionTimestamp;
                 uint256 protocolFeeWAD = $.protocolFeeWAD;
                 // If the last yield distribution wasn't in this block, split the yield between ST and JT
                 if (elapsed != 0) {
                     // Compute the ST gain allocated to JT based on its time weighted yield share since the last distribution, rounding in favor of the senior tranche
-                    uint256 jtGain = stGain.mulDiv(_twJTYieldShareAccruedWAD, (elapsed * ConstantsLib.WAD), Math.Rounding.Floor);
+                    NAV_UNIT jtGain = stGain.mulDiv(_twJTYieldShareAccruedWAD, (elapsed * WAD), Math.Rounding.Floor);
                     // Apply the yield split to JT's effective NAV
-                    if (jtGain != 0) {
+                    if (jtGain != ZERO_NAV_UNITS) {
                         // Compute the protocol fee taken on this JT yield accrual (will be used to mint shares to the protocol fee recipient) at the updated JT effective NAV
-                        jtProtocolFeeAccrued += jtGain.mulDiv(protocolFeeWAD, ConstantsLib.WAD, Math.Rounding.Floor);
-                        jtEffectiveNAV += jtGain;
-                        stGain -= jtGain;
+                        jtProtocolFeeAccrued = (jtProtocolFeeAccrued + jtGain.mulDiv(protocolFeeWAD, WAD, Math.Rounding.Floor));
+                        jtEffectiveNAV = (jtEffectiveNAV + jtGain);
+                        stGain = (stGain - jtGain);
                     }
                 }
                 // Compute the protocol fee taken on this ST yield accrual (will be used to mint shares to the protocol fee recipient) at the updated JT effective NAV
-                stProtocolFeeAccrued = stGain.mulDiv(protocolFeeWAD, ConstantsLib.WAD, Math.Rounding.Floor);
+                stProtocolFeeAccrued = stGain.mulDiv(protocolFeeWAD, WAD, Math.Rounding.Floor);
                 // Book the residual gain to the ST
-                stEffectiveNAV += stGain;
+                stEffectiveNAV = (stEffectiveNAV + stGain);
                 // Mark yield as distributed
                 yieldDistributed = true;
             }
@@ -374,8 +422,9 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         // Enforce the NAV conservation invariant
         require((_stRawNAV + _jtRawNAV) == (stEffectiveNAV + jtEffectiveNAV), NAV_CONSERVATION_VIOLATION());
         // Construct the synced NAVs state to return to the caller
-        state =
-            AccountingState(_stRawNAV, _jtRawNAV, stEffectiveNAV, jtEffectiveNAV, stCoverageDebt, jtCoverageDebt, stProtocolFeeAccrued, jtProtocolFeeAccrued);
+        state = SyncedAccountingState(
+            _stRawNAV, _jtRawNAV, stEffectiveNAV, jtEffectiveNAV, stCoverageDebt, jtCoverageDebt, stProtocolFeeAccrued, jtProtocolFeeAccrued
+        );
     }
 
     /**
@@ -399,8 +448,10 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         // Preemptively return if last accrual was in the same block
         if (elapsed == 0) return $.twJTYieldShareAccruedWAD;
 
-        // Get the instantaneous JT yield share, scaled by WAD
+        // Get the instantaneous JT yield share, scaled to WAD precision
         uint256 jtYieldShareWAD = IRDM($.rdm).jtYieldShare($.lastSTRawNAV, $.lastJTRawNAV, $.betaWAD, $.coverageWAD, $.lastJTEffectiveNAV);
+        // TODO: Should we revert instead?
+        if (jtYieldShareWAD > WAD) jtYieldShareWAD = WAD;
         // Accrue the time-weighted yield share accrued to JT since the last tranche interaction
         $.lastAccrualTimestamp = uint32(block.timestamp);
         return ($.twJTYieldShareAccruedWAD += uint192(jtYieldShareWAD * elapsed));
@@ -424,19 +475,24 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         // Preemptively return if last accrual was in the same block
         if (elapsed == 0) return $.twJTYieldShareAccruedWAD;
 
-        // Get the instantaneous JT yield share, scaled by WAD
+        // Get the instantaneous JT yield share, scaled to WAD precision
         uint256 jtYieldShareWAD = IRDM($.rdm).previewJTYieldShare($.lastSTRawNAV, $.lastJTRawNAV, $.betaWAD, $.coverageWAD, $.lastJTEffectiveNAV);
+        // TODO: Should we revert instead?
+        if (jtYieldShareWAD > WAD) jtYieldShareWAD = WAD;
         // Apply the accural of JT yield share to the accumulator, weighted by the time elapsed
         return ($.twJTYieldShareAccruedWAD + uint192(jtYieldShareWAD * elapsed));
     }
 
-    /**
-     * @notice Computes raw NAV deltas for a tranche
-     * @param _currentRawNAV The current raw NAV
-     * @param _lastRawNAV The last recorded raw NAV
-     * @return deltaNAV The delta between the last recorded and current raw NAV
-     */
-    function _computeRawNAVDelta(NAV_UNIT _currentRawNAV, NAV_UNIT _lastRawNAV) internal pure returns (int256 deltaNAV) {
-        deltaNAV = int256(_currentRawNAV) - int256(_lastRawNAV);
+    /// @notice Validates the coverage requirement parameters of the market
+    /// @param _coverageWAD The coverage ratio that the senior tranche is expected to be protected by, scaled to WAD precision
+    /// @param _betaWAD The JT's sensitivity to the same downside stress that affects ST, scaled to WAD precision
+    /// @dev Ensures coverage is within bounds and prevents JT withdrawal lockup
+    /// @dev Coverage must be >= MIN_COVERAGE_WAD and < WAD to maintain valid range
+    /// @dev The product of coverage and beta must be < WAD to prevent permanent withdrawal blocking
+    function _validateCoverageRequirement(uint64 _coverageWAD, uint96 _betaWAD) internal pure {
+        // Ensure that the coverage requirement is valid
+        require((_coverageWAD >= MIN_COVERAGE_WAD) && (_coverageWAD < WAD), INVALID_COVERAGE_CONFIG());
+        // Ensure that JT withdrawals are not permanently bricked
+        require(uint256(_coverageWAD).mulDiv(_betaWAD, WAD, Math.Rounding.Ceil) < WAD, INVALID_COVERAGE_CONFIG());
     }
 }

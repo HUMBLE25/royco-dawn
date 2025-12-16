@@ -5,7 +5,7 @@ import { Math } from "../../../../lib/openzeppelin-contracts/contracts/utils/mat
 import { RoycoAuth } from "../../../auth/RoycoAuth.sol";
 import { IAsyncJTWithdrawalKernel } from "../../../interfaces/kernel/IAsyncJTWithdrawalKernel.sol";
 import { IRoycoKernel } from "../../../interfaces/kernel/IRoycoKernel.sol";
-import { ConstantsLib } from "../../../libraries/ConstantsLib.sol";
+import { ConstantsLib } from "../../../libraries/Constants.sol";
 import { RequestRedeemSharesBehavior } from "../../../libraries/Types.sol";
 import { RoycoKernel } from "../RoycoKernel.sol";
 
@@ -83,7 +83,7 @@ abstract contract BaseAsyncJTRedemptionDelayKernel is IAsyncJTWithdrawalKernel, 
         require(!redemption.isCanceled, WITHDRAWAL_CANCELLED__CLAIM_BEFORE_REQUESTING_AGAIN());
 
         // Redeem Requests are purely controller-discriminated, so the request ID is 0
-        requestId = ConstantsLib.ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID;
+        requestId = ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID;
 
         // Compute the redemption value at request
         uint256 redemptionValueAtRequest = _redemptionValue(jtEffectiveNAV, _shares, _totalShares);
@@ -97,7 +97,7 @@ abstract contract BaseAsyncJTRedemptionDelayKernel is IAsyncJTWithdrawalKernel, 
 
     /// @inheritdoc IAsyncJTWithdrawalKernel
     function jtPendingRedeemRequest(uint256 _requestId, address _controller) external view onlyJuniorTranche returns (uint256 pendingShares) {
-        require(_requestId == ConstantsLib.ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, INVALID_REQUEST_ID(_requestId));
+        require(_requestId == ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, INVALID_REQUEST_ID(_requestId));
         BaseAsyncJTRedemptionDelayKernelState storage $ = _getBaseAsyncJTRedemptionDelayKernelState();
         Redemption storage redemption = $.redemptions[_controller];
 
@@ -116,7 +116,7 @@ abstract contract BaseAsyncJTRedemptionDelayKernel is IAsyncJTWithdrawalKernel, 
 
     /// @inheritdoc IAsyncJTWithdrawalKernel
     function jtClaimableRedeemRequest(uint256 _requestId, address _controller) external view onlyJuniorTranche returns (uint256 claimableShares) {
-        require(_requestId == ConstantsLib.ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, INVALID_REQUEST_ID(_requestId));
+        require(_requestId == ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, INVALID_REQUEST_ID(_requestId));
 
         claimableShares = _jtClaimableRedeemRequest(_controller);
     }
@@ -144,7 +144,7 @@ abstract contract BaseAsyncJTRedemptionDelayKernel is IAsyncJTWithdrawalKernel, 
 
     /// @inheritdoc IAsyncJTWithdrawalKernel
     function jtCancelRedeemRequest(uint256 _requestId, address _controller) external onlyJuniorTranche whenNotPaused {
-        require(_requestId == ConstantsLib.ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, INVALID_REQUEST_ID(_requestId));
+        require(_requestId == ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, INVALID_REQUEST_ID(_requestId));
         BaseAsyncJTRedemptionDelayKernelState storage $ = _getBaseAsyncJTRedemptionDelayKernelState();
         Redemption storage redemption = $.redemptions[_controller];
 
@@ -154,7 +154,7 @@ abstract contract BaseAsyncJTRedemptionDelayKernel is IAsyncJTWithdrawalKernel, 
 
     /// @inheritdoc IAsyncJTWithdrawalKernel
     function jtClaimCancelRedeemRequest(uint256 _requestId, address, address _controller) external onlyJuniorTranche whenNotPaused returns (uint256 shares) {
-        require(_requestId == ConstantsLib.ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, INVALID_REQUEST_ID(_requestId));
+        require(_requestId == ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, INVALID_REQUEST_ID(_requestId));
         BaseAsyncJTRedemptionDelayKernelState storage $ = _getBaseAsyncJTRedemptionDelayKernelState();
         Redemption memory redemption = $.redemptions[_controller];
 
@@ -167,7 +167,7 @@ abstract contract BaseAsyncJTRedemptionDelayKernel is IAsyncJTWithdrawalKernel, 
 
     /// @inheritdoc IAsyncJTWithdrawalKernel
     function jtClaimableCancelRedeemRequest(uint256 _requestId, address _controller) external view onlyJuniorTranche returns (uint256 shares) {
-        require(_requestId == ConstantsLib.ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, INVALID_REQUEST_ID(_requestId));
+        require(_requestId == ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, INVALID_REQUEST_ID(_requestId));
         BaseAsyncJTRedemptionDelayKernelState storage $ = _getBaseAsyncJTRedemptionDelayKernelState();
 
         // If the redemption is not canceled, return 0

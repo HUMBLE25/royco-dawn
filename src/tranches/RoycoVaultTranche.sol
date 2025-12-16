@@ -12,10 +12,11 @@ import { IAsyncSTDepositKernel } from "../interfaces/kernel/IAsyncSTDepositKerne
 import { IAsyncSTWithdrawalKernel } from "../interfaces/kernel/IAsyncSTWithdrawalKernel.sol";
 import { ExecutionModel, IRoycoKernel, RequestRedeemSharesBehavior } from "../interfaces/kernel/IRoycoKernel.sol";
 import { IERC165, IRoycoAsyncCancellableVault, IRoycoAsyncVault, IRoycoVaultTranche } from "../interfaces/tranche/IRoycoVaultTranche.sol";
+import { ZERO_NAV_UNITS } from "../libraries/Constants.sol";
 import { RoycoTrancheStorageLib } from "../libraries/RoycoTrancheStorageLib.sol";
 import { AssetClaims } from "../libraries/Types.sol";
 import { TrancheType } from "../libraries/Types.sol";
-import { AccountingState, Action, AssetClaims, TrancheDeploymentParams } from "../libraries/Types.sol";
+import { Action, SyncedAccountingState, TrancheDeploymentParams } from "../libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, toNAVUnits, toTrancheUnits, toUint256 } from "../libraries/Units.sol";
 
 /// @title RoycoVaultTranche
@@ -34,7 +35,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Upgra
     error MUST_REQUEST_NON_ZERO_SHARES();
 
     /// @notice Thrown when the deposit amount is zero
-    error MUST_DEPOSIT_NON_ZERO_ASSETS();
+    error MUST_INCREASE_NAV_NON_ZERO_ASSETS();
 
     /// @notice Thrown when the redeem amount is zero
     error MUST_CLAIM_NON_ZERO_SHARES();
@@ -122,6 +123,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Upgra
         return RoycoTrancheStorageLib._getRoycoTrancheStorage().marketId;
     }
 
+    /// @inheritdoc IRoycoVaultTranche
     function totalAssets() external view virtual override(IRoycoVaultTranche) returns (AssetClaims memory claims) {
         return (TRANCHE_TYPE() == TrancheType.SENIOR ? IRoycoKernel(kernel()).getSTTotalEffectiveAssets() : IRoycoKernel(kernel()).getJTTotalEffectiveAssets());
     }
@@ -140,7 +142,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Upgra
     function maxRedeem(address _owner) external view virtual override(IRoycoVaultTranche) returns (uint256 shares) {
         NAV_UNIT maxWithdrawableNAV =
         (TRANCHE_TYPE() == TrancheType.SENIOR ? IRoycoKernel(kernel()).stMaxWithdrawableAssets(_owner) : IRoycoKernel(kernel()).jtMaxWithdrawableAssets(_owner));
-        if (maxWithdrawableNAV == toNAVUnits(0)) return 0;
+        if (maxWithdrawableNAV == ZERO_NAV_UNITS) return 0;
 
         // Get the post-sync tranche state: applying NAV reconciliation and fee share minting
         (AssetClaims memory trancheClaims, uint256 trancheTotalShares) = _previewPostSyncTrancheState();
@@ -202,7 +204,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Upgra
         onlyCallerOrOperator(_controller)
         returns (uint256 shares)
     {
-        require(_assets != toTrancheUnits(0), MUST_DEPOSIT_NON_ZERO_ASSETS());
+        require(_assets != toTrancheUnits(0), MUST_INCREASE_NAV_NON_ZERO_ASSETS());
 
         IRoycoKernel kernel_ = IRoycoKernel(kernel());
 
@@ -671,7 +673,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Upgra
     function _previewPostSyncTrancheState() internal view returns (AssetClaims memory trancheClaims, uint256 trancheTotalShares) {
         // Get the post-sync state of the kernel for the tranche
         IRoycoKernel kernel_ = IRoycoKernel(kernel());
-        AccountingState memory state;
+        SyncedAccountingState memory state;
         (state, trancheClaims) = kernel_.previewSyncTrancheNAVs(TRANCHE_TYPE());
         NAV_UNIT protocolFeeAssetsAccrued;
         if (TRANCHE_TYPE() == TrancheType.SENIOR) {
@@ -683,7 +685,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Upgra
         // Convert the fee assets accrued to shares
         trancheTotalShares = totalSupply();
         // If fees were accrued, fee shares will be minted
-        if (protocolFeeAssetsAccrued != toNAVUnits(0)) {
+        if (protocolFeeAssetsAccrued != ZERO_NAV_UNITS) {
             // Simulate minting the fee shares and add them to the tranche's total shares
             // Deduct protocol fee assets accrued from the total assets since fees are included in total assets
             trancheTotalShares += _convertToShares(
@@ -749,6 +751,6 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Upgra
     }
 
     function _withVirtualAssets(NAV_UNIT _assets) internal pure returns (NAV_UNIT) {
-        return _assets + toNAVUnits(1);
+        return _assets + toNAVUnits(uint256(1));
     }
 }

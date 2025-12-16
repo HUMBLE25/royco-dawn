@@ -29,7 +29,7 @@ struct AssetClaims {
 }
 
 /**
- * @title AccountingState
+ * @title SyncedAccountingState
  * @dev Contains all current mark to market NAV accounting data for the market's tranches
  * @custom:field stRawNAV - The senior tranche's current raw NAV: the pure value of its invested assets
  * @custom:field jtRawNAV - The junior tranche's current raw NAV: the pure value of its invested assets
@@ -40,7 +40,7 @@ struct AssetClaims {
  * @custom:field stProtocolFeeAccrued - Protocol fee taken on ST yield on this sync
  * @custom:field jtProtocolFeeAccrued - Protocol fee taken on JT yield on this sync
  */
-struct AccountingState {
+struct SyncedAccountingState {
     NAV_UNIT stRawNAV;
     NAV_UNIT jtRawNAV;
     NAV_UNIT stEffectiveNAV;
@@ -54,23 +54,23 @@ struct AccountingState {
 /**
  * @title Operation
  * @dev Defines the operation being executed by the user
- * @custom:type ST_DEPOSIT Depositing assets into the senior tranche
- * @custom:type ST_WITHDRAW Withdrawing assets from the senior tranche
- * @custom:type JT_DEPOSIT Depositing assets into the junior tranche
- * @custom:type JT_WITHDRAW Withdrawing assets from the junior tranche
- * @custom:type ST_REQUEST_DEPOSIT Requesting a deposit for the senior tranche
+ * @custom:type ST_INCREASE_NAV Depositing assets into the senior tranche
+ * @custom:type ST_DECREASE_NAV Withdrawing assets from the senior tranche
+ * @custom:type JT_INCREASE_NAV Depositing assets into the junior tranche
+ * @custom:type JT_DECREASE_NAV Withdrawing assets from the junior tranche
+ * @custom:type ST_REQUEST_INCREASE_NAV Requesting a deposit for the senior tranche
  * @custom:type ST_REQUEST_REDEEM Requesting a redemption for the senior tranche
- * @custom:type JT_REQUEST_DEPOSIT Requesting a deposit for the junior tranche
+ * @custom:type JT_REQUEST_INCREASE_NAV Requesting a deposit for the junior tranche
  * @custom:type JT_REQUEST_REDEEM Requesting a redemption for the junior tranche
  */
 enum Operation {
-    ST_DEPOSIT,
-    ST_WITHDRAW,
-    ST_REQUEST_DEPOSIT,
+    ST_INCREASE_NAV,
+    ST_DECREASE_NAV,
+    ST_REQUEST_INCREASE_NAV,
     ST_REQUEST_REDEEM,
-    JT_DEPOSIT,
-    JT_WITHDRAW,
-    JT_REQUEST_DEPOSIT,
+    JT_INCREASE_NAV,
+    JT_DECREASE_NAV,
+    JT_REQUEST_INCREASE_NAV,
     JT_REQUEST_REDEEM
 }
 

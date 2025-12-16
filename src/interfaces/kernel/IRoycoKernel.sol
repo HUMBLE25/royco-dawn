@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import { RoycoKernelState } from "../../libraries/RoycoKernelStorageLib.sol";
-import { AccountingState, AssetClaims, ExecutionModel, RequestRedeemSharesBehavior } from "../../libraries/Types.sol";
+import { AssetClaims, ExecutionModel, RequestRedeemSharesBehavior, SyncedAccountingState } from "../../libraries/Types.sol";
 import { TrancheType } from "../../libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT } from "../../libraries/Units.sol";
 
@@ -23,11 +23,11 @@ interface IRoycoKernel {
     function ST_REQUEST_REDEEM_SHARES_BEHAVIOR() external pure returns (RequestRedeemSharesBehavior);
     function JT_REQUEST_REDEEM_SHARES_BEHAVIOR() external pure returns (RequestRedeemSharesBehavior);
 
-    function ST_DEPOSIT_EXECUTION_MODEL() external pure returns (ExecutionModel);
-    function ST_WITHDRAWAL_EXECUTION_MODEL() external pure returns (ExecutionModel);
+    function ST_INCREASE_NAV_EXECUTION_MODEL() external pure returns (ExecutionModel);
+    function ST_DECREASE_NAVAL_EXECUTION_MODEL() external pure returns (ExecutionModel);
 
-    function JT_DEPOSIT_EXECUTION_MODEL() external pure returns (ExecutionModel);
-    function JT_WITHDRAWAL_EXECUTION_MODEL() external pure returns (ExecutionModel);
+    function JT_INCREASE_NAV_EXECUTION_MODEL() external pure returns (ExecutionModel);
+    function JT_DECREASE_NAVAL_EXECUTION_MODEL() external pure returns (ExecutionModel);
 
     function getSTRawNAV() external view returns (NAV_UNIT nav);
     function getJTRawNAV() external view returns (NAV_UNIT nav);
@@ -35,9 +35,9 @@ interface IRoycoKernel {
     function getSTTotalEffectiveAssets() external view returns (AssetClaims memory claims);
     function getJTTotalEffectiveAssets() external view returns (AssetClaims memory claims);
 
-    function syncTrancheNAVs() external returns (AccountingState memory state, AssetClaims memory claims);
+    function syncTrancheNAVs(TrancheType _trancheType) external returns (SyncedAccountingState memory state, AssetClaims memory claims);
 
-    function previewSyncTrancheNAVs(TrancheType _trancheType) external view returns (AccountingState memory state, AssetClaims memory claims);
+    function previewSyncTrancheNAVs(TrancheType _trancheType) external view returns (SyncedAccountingState memory state, AssetClaims memory claims);
 
     function stMaxDeposit(address _receiver) external view returns (TRANCHE_UNIT assets);
 
