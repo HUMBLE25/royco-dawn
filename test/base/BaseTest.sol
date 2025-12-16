@@ -9,9 +9,11 @@ import { ERC4626ST_AaveV3JT_Kernel } from "../../src/KERNELs/ERC4626ST_AaveV3JT_
 import { RoycoKernel } from "../../src/KERNELs/base/RoycoKernel.sol";
 import { StaticCurveRDM } from "../../src/RDM/StaticCurveRDM.sol";
 import { RoycoTrancheFactory } from "../../src/RoycoTrancheFactory.sol";
+import { RoycoAccountant } from "../../src/accountant/RoycoAccountant.sol";
 import { RoycoAuth, RoycoRoles } from "../../src/auth/RoycoAuth.sol";
 import { IRoycoKernel } from "../../src/interfaces/KERNEL/IRoycoKernel.sol";
 import { ConstantsLib } from "../../src/libraries/ConstantsLib.sol";
+import { RoycoAccountantInitParams } from "../../src/libraries/RoycoAccountantStorageLib.sol";
 import { RoycoKernelInitParams } from "../../src/libraries/RoycoKernelStorageLib.sol";
 import { RoycoJT } from "../../src/tranches/RoycoJT.sol";
 import { RoycoST } from "../../src/tranches/RoycoST.sol";
@@ -75,6 +77,7 @@ contract BaseTest is Test {
     RoycoST public ST_IMPL;
     RoycoJT public JT_IMPL;
     ERC4626ST_AaveV3JT_Kernel public ERC4626ST_AAVEV3JT_KERNEL_IMPL;
+    RoycoAccountant public ACCOUNTANT_IMPL;
 
     // Deployed Later in the concrete tests
     RoycoVaultTranche internal ST;
@@ -127,6 +130,10 @@ contract BaseTest is Test {
         JT_IMPL = new RoycoJT();
         vm.label(address(ST_IMPL), "STImpl");
         vm.label(address(JT_IMPL), "JTImpl");
+
+        // Deploy accountant implementation
+        ACCOUNTANT_IMPL = new RoycoAccountant();
+        vm.label(address(ACCOUNTANT_IMPL), "AccountantImpl");
 
         // Deploy KERNEL implementation
         ERC4626ST_AAVEV3JT_KERNEL_IMPL = new ERC4626ST_AaveV3JT_Kernel();
@@ -292,6 +299,14 @@ contract BaseTest is Test {
 
         ST = RoycoVaultTranche(_st);
         JT = RoycoVaultTranche(_jt);
+    }
+
+    /// @notice Deploys a accountant using ERC1967 proxy
+    /// @param _params The initialization parameters
+    function _deployAccountant(RoycoAccountantInitParams memory _params) internal returns (RoycoAccountant accountant) {
+        accountant = RoycoAccountant(
+            address(new ERC1967Proxy(address(ACCOUNTANT_IMPL), abi.encodeCall(RoycoAccountant.initialize, (_params, OWNER_ADDRESS, PAUSER_ADDRESS))))
+        );
     }
 
     /// @notice Verifies the preview NAVs of the senior and junior tranches

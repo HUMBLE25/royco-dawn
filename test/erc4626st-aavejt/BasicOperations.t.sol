@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import { Vm } from "../../lib/forge-std/src/Vm.sol";
 import { IERC20 } from "../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-import { RoycoKernel } from "../../src/kernels/base/RoycoKernel.sol";
+import { IRoycoAccountant } from "../../src/interfaces/IRoycoAccountant.sol";
 import { MainnetForkWithAaveTestBase } from "./base/MainnetForkWithAaveBaseTest.sol";
 
 contract BasicOperationsTest is MainnetForkWithAaveTestBase {
@@ -131,7 +131,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
 
         vm.startPrank(stDepositor);
         USDC.approve(address(ST), stDepositAmount);
-        vm.expectRevert(abi.encodeWithSelector(RoycoKernel.INSUFFICIENT_COVERAGE.selector));
+        vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.COVERAGE_REQUIREMENT_UNSATISFIED.selector));
         ST.deposit(stDepositAmount, stDepositor, stDepositor);
         vm.stopPrank();
 

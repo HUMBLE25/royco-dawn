@@ -51,7 +51,7 @@ contract RoycoTrancheFactory {
     /// @param _seniorTrancheSymbol The symbol of the senior tranche
     /// @param _juniorTrancheName The name of the junior tranche
     /// @param _juniorTrancheSymbol The symbol of the junior tranche
-    /// @param _kernelImplementation The kernel implementation address
+    /// @param _kernel The kernel address
     /// @param _seniorAsset The underlying asset for the senior tranche
     /// @param _juniorAsset The underlying asset for the junior tranche
     /// @param _owner The initial owner of both tranches
@@ -66,7 +66,7 @@ contract RoycoTrancheFactory {
         string memory _juniorTrancheSymbol,
         address _seniorAsset,
         address _juniorAsset,
-        address _kernelImplementation,
+        address _kernel,
         address _owner,
         address _pauser,
         bytes32 _marketId
@@ -77,20 +77,14 @@ contract RoycoTrancheFactory {
         require(_seniorAsset != address(0), InvalidAsset());
         require(_juniorAsset != address(0), InvalidAsset());
         require(_owner != address(0), InvalidOwner());
-        require(_kernelImplementation != address(0), KernelRequired());
+        require(_kernel != address(0), KernelRequired());
 
         // Deploy senior tranche proxy first
         seniorTranche = _deployTranche(
             ROYCO_ST_IMPLEMENTATION,
             abi.encodeCall(
                 RoycoST.initialize,
-                (
-                    TrancheDeploymentParams({ name: _seniorTrancheName, symbol: _seniorTrancheSymbol, kernel: _kernelImplementation }),
-                    _seniorAsset,
-                    _owner,
-                    _pauser,
-                    _marketId
-                )
+                (TrancheDeploymentParams({ name: _seniorTrancheName, symbol: _seniorTrancheSymbol, kernel: _kernel }), _seniorAsset, _owner, _pauser, _marketId)
             )
         );
 
@@ -99,17 +93,11 @@ contract RoycoTrancheFactory {
             ROYCO_JT_IMPLEMENTATION,
             abi.encodeCall(
                 RoycoJT.initialize,
-                (
-                    TrancheDeploymentParams({ name: _juniorTrancheName, symbol: _juniorTrancheSymbol, kernel: _kernelImplementation }),
-                    _juniorAsset,
-                    _owner,
-                    _pauser,
-                    _marketId
-                )
+                (TrancheDeploymentParams({ name: _juniorTrancheName, symbol: _juniorTrancheSymbol, kernel: _kernel }), _juniorAsset, _owner, _pauser, _marketId)
             )
         );
 
-        emit MarketDeployed(seniorTranche, juniorTranche, _kernelImplementation, _marketId, _seniorAsset, _juniorAsset, _owner);
+        emit MarketDeployed(seniorTranche, juniorTranche, _kernel, _marketId, _seniorAsset, _juniorAsset, _owner);
 
         return (seniorTranche, juniorTranche);
     }

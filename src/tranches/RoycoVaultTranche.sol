@@ -19,7 +19,7 @@ import { ExecutionModel, IRoycoKernel, RequestRedeemSharesBehavior } from "../in
 import { IERC165, IERC7540, IERC7575, IERC7887, IRoycoVaultTranche } from "../interfaces/tranche/IRoycoVaultTranche.sol";
 import { RoycoTrancheStorageLib } from "../libraries/RoycoTrancheStorageLib.sol";
 import { TrancheType } from "../libraries/Types.sol";
-import { Action, TrancheDeploymentParams } from "../libraries/Types.sol";
+import { Action, SyncedNAVsPacket, TrancheDeploymentParams } from "../libraries/Types.sol";
 
 /// @title RoycoVaultTranche
 /// @notice Abstract base contract implementing core functionality for Royco tranches
@@ -144,7 +144,8 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoAuth, UUPSUpgrad
 
     /// @inheritdoc IRoycoVaultTranche
     function getEffectiveNAV() public view override(IRoycoVaultTranche) returns (uint256) {
-        return (TRANCHE_TYPE() == TrancheType.SENIOR ? IRoycoKernel(kernel()).getSTEffectiveNAV() : IRoycoKernel(kernel()).getJTEffectiveNAV());
+        SyncedNAVsPacket memory packet = IRoycoKernel(kernel()).previewSyncTrancheNAVs();
+        return (TRANCHE_TYPE() == TrancheType.SENIOR ? packet.stEffectiveNAV : packet.jtEffectiveNAV);
     }
 
     /// @inheritdoc ERC4626Upgradeable
@@ -727,11 +728,14 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoAuth, UUPSUpgrad
     function _previewPostSyncTrancheState() internal view returns (uint256 trancheTotalAssets, uint256 trancheTotalShares) {
         // Get the post-sync state of the kernel for the tranche
         IRoycoKernel kernel = IRoycoKernel(kernel());
+        SyncedNAVsPacket memory packet = kernel.previewSyncTrancheNAVs();
         uint256 protocolFeeAssetsAccrued;
         if (TRANCHE_TYPE() == TrancheType.SENIOR) {
-            (,, trancheTotalAssets,, protocolFeeAssetsAccrued,) = kernel.previewSyncTrancheNAVs();
+            trancheTotalAssets = packet.stEffectiveNAV;
+            protocolFeeAssetsAccrued = packet.stProtocolFeeAccrued;
         } else {
-            (,,, trancheTotalAssets,, protocolFeeAssetsAccrued) = kernel.previewSyncTrancheNAVs();
+            trancheTotalAssets = packet.jtEffectiveNAV;
+            protocolFeeAssetsAccrued = packet.jtProtocolFeeAccrued;
         }
 
         // Convert the fee assets accrued to shares
@@ -739,6 +743,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoAuth, UUPSUpgrad
         // If fees were accrued, fee shares will be minted
         if (protocolFeeAssetsAccrued != 0) {
             // Simulate minting the fee shares and add them to the tranche's total shares
+            // Deduct protocol fee assets accrued from the total assets since fees are included in total assets
             trancheTotalShares += _convertToShares(
                 protocolFeeAssetsAccrued, trancheTotalShares, (trancheTotalAssets - protocolFeeAssetsAccrued), Math.Rounding.Floor
             );

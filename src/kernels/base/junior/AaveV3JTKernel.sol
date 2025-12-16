@@ -7,10 +7,8 @@ import { IPool } from "../../../interfaces/aave/IPool.sol";
 import { IPoolAddressesProvider } from "../../../interfaces/aave/IPoolAddressesProvider.sol";
 import { IPoolDataProvider } from "../../../interfaces/aave/IPoolDataProvider.sol";
 import { ExecutionModel, IRoycoKernel } from "../../../interfaces/kernel/IRoycoKernel.sol";
-import { Operation } from "../../../libraries/RoycoKernelStorageLib.sol";
-import { RoycoKernelState, RoycoKernelStorageLib } from "../../../libraries/RoycoKernelStorageLib.sol";
 import { AaveV3KernelState, AaveV3KernelStorageLib } from "../../../libraries/kernels/AaveV3KernelStorageLib.sol";
-import { RoycoKernel } from "../RoycoKernel.sol";
+import { Operation, RoycoKernel, SyncedNAVsPacket } from "../RoycoKernel.sol";
 import { BaseAsyncJTRedemptionDelayKernel } from "./BaseAsyncJTRedemptionDelayKernel.sol";
 
 abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKernel {
@@ -47,13 +45,13 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
     }
 
     /// @inheritdoc IRoycoKernel
-    function getJTTotalEffectiveAssets() public view override(IRoycoKernel) returns (uint256) {
-        return _getJuniorTrancheEffectiveNAV();
+    function getJTTotalEffectiveAssets() external view override(IRoycoKernel) returns (uint256) {
+        return previewSyncTrancheNAVs().jtEffectiveNAV;
     }
 
     /// @inheritdoc IRoycoKernel
     function jtDeposit(
-        address,
+        address _asset,
         uint256 _assets,
         address,
         address
@@ -61,17 +59,18 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
         external
         override(IRoycoKernel)
         onlyJuniorTranche
-        syncNAVs(Operation.JT_DEPOSIT)
         whenNotPaused
         returns (uint256 valueAllocated, uint256 effectiveNAVToMintAt)
     {
-        // The effective NAV to mint at is the effective NAV of the tranche before the deposit is made, ie. the NAV at which the shares will be minted
-        // Assumes that _preOpSyncTrancheNAVs has already been called and the NAVs have been updated to reflect the deposit
-        effectiveNAVToMintAt = RoycoKernelStorageLib._getRoycoKernelStorage().lastJTEffectiveNAV;
-
-        AaveV3KernelState storage $ = AaveV3KernelStorageLib._getAaveV3KernelStorage();
-        IPool($.pool).supply($.asset, _assets, address(this), 0);
+        // Execute a pre-op sync on NAV accounting
         valueAllocated = _assets;
+        effectiveNAVToMintAt = (_preOpSyncTrancheNAVs()).jtEffectiveNAV;
+
+        // Max approval already given to the pool on initialization
+        IPool(AaveV3KernelStorageLib._getAaveV3KernelStorage().pool).supply(_asset, _assets, address(this), 0);
+
+        // Execute a post-op sync on NAV accounting
+        _postOpSyncTrancheNAVs(Operation.JT_DEPOSIT);
     }
 
     /// @inheritdoc IRoycoKernel
@@ -85,19 +84,24 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
         external
         override(IRoycoKernel)
         onlyJuniorTranche
-        syncNAVsAndEnforceCoverage(Operation.JT_WITHDRAW)
         returns (uint256 assetsWithdrawn)
     {
+        SyncedNAVsPacket memory packet = _preOpSyncTrancheNAVs();
         require(_shares <= _jtClaimableRedeemRequest(_controller), INSUFFICIENT_CLAIMABLE_SHARES(_shares, _jtClaimableRedeemRequest(_controller)));
         // Calculate the value of the shares to claim and update the controller's redemption request
-        assetsWithdrawn = _processClaimableRedeemRequest(_controller, _shares, _totalShares);
+        assetsWithdrawn = _processClaimableRedeemRequest(_controller, packet.jtEffectiveNAV, _shares, _totalShares);
 
-        // Compute and claim the assets that need to be pulled from ST for this withdrawal
-        uint256 stAssetsToWithdraw = _shares.mulDiv(_getJuniorClaimOnSeniorNAV(), _totalShares, Math.Rounding.Floor);
+        // The difference between the JT effective NAV and raw NAV is the amount of assets it is owed from ST raw NAV
+        uint256 totalJTClaimOnSTAssets = Math.saturatingSub(packet.jtEffectiveNAV, packet.jtRawNAV);
+        // Compute and claim the assets that need to be pulled from ST for this withdrawal, rounding in favor of the senior tranche
+        uint256 stAssetsToWithdraw = _shares.mulDiv(totalJTClaimOnSTAssets, _totalShares, Math.Rounding.Floor);
         if (stAssetsToWithdraw != 0) _claimJuniorAssetsFromSenior(_asset, stAssetsToWithdraw, _receiver);
 
         // Facilitate the remainder of the withdrawal from JT exposure
         IPool(AaveV3KernelStorageLib._getAaveV3KernelStorage().pool).withdraw(_asset, (assetsWithdrawn - stAssetsToWithdraw), _receiver);
+
+        // Execute a post-op sync on NAV accounting and enforce the market's coverage requirement
+        _postOpSyncTrancheNAVsAndEnforceCoverage(Operation.JT_WITHDRAW);
     }
 
     /// @inheritdoc RoycoKernel

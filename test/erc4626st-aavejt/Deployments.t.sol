@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import { IERC20Metadata } from "../../lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { IRoycoKernel } from "../../src/interfaces/KERNEL/IRoycoKernel.sol";
 import { IPool } from "../../src/interfaces/aave/IPool.sol";
+import { RoycoAccountantState } from "../../src/libraries/RoycoAccountantStorageLib.sol";
 import { RoycoKernelState } from "../../src/libraries/RoycoKernelStorageLib.sol";
 import { MainnetForkWithAaveTestBase } from "./base/MainnetForkWithAaveBaseTest.sol";
 
@@ -57,26 +58,26 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
     }
 
     /// @notice Verifies KERNEL deployment parameters and wiring
-    function test_KernelDeployment() public {
+    function test_KernelAndAccountantDeployment() public {
         // Basic wiring
         assertTrue(address(KERNEL) != address(0), "Kernel not deployed");
 
-        // Verify KERNEL configuration via getKernelState
-        RoycoKernelState memory state = KERNEL.getKernelState();
+        RoycoKernelState memory kernelState = KERNEL.getState();
+        RoycoAccountantState memory accountantState = ACCOUNTANT.getState();
 
         // Tranche wiring
-        assertEq(state.seniorTranche, address(ST), "Kernel ST mismatch");
-        assertEq(state.juniorTranche, address(JT), "Kernel JT mismatch");
+        assertEq(kernelState.seniorTranche, address(ST), "Kernel ST mismatch");
+        assertEq(kernelState.juniorTranche, address(JT), "Kernel JT mismatch");
+        assertEq(kernelState.accountant, address(ACCOUNTANT), "Kernel accountant mismatch");
+        assertEq(kernelState.protocolFeeRecipient, PROTOCOL_FEE_RECIPIENT_ADDRESS, "Kernel protocolFeeRecipient mismatch");
 
         // Coverage, beta, protocol fee configuration
-        assertEq(state.coverageWAD, COVERAGE_WAD, "Kernel coverageWAD mismatch");
-        assertEq(BETA_WAD, 1e18, "BETA_WAD mismatch");
-        assertEq(state.betaWAD, BETA_WAD, "Kernel betaWAD mismatch");
-        assertEq(state.protocolFeeRecipient, PROTOCOL_FEE_RECIPIENT_ADDRESS, "Kernel protocolFeeRecipient mismatch");
-        assertEq(state.protocolFeeWAD, PROTOCOL_FEE_WAD, "Kernel protocolFeeWAD mismatch");
+        assertEq(accountantState.coverageWAD, COVERAGE_WAD, "Kernel coverageWAD mismatch");
+        assertEq(accountantState.betaWAD, BETA_WAD, "BETA_WAD mismatch");
+        assertEq(accountantState.protocolFeeWAD, PROTOCOL_FEE_WAD, "Kernel protocolFeeWAD mismatch");
 
         // RDM wiring
-        assertEq(state.rdm, address(RDM), "Kernel RDM mismatch");
+        assertEq(accountantState.rdm, address(RDM), "Kernel RDM mismatch");
 
         // Initial NAV / ASSETS via KERNEL view functions
         assertEq(KERNEL.getSTTotalEffectiveAssets(), 0, "Kernel ST total effective ASSETS should be 0");

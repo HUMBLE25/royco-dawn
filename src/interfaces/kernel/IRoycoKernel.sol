@@ -2,13 +2,22 @@
 pragma solidity ^0.8.28;
 
 import { RoycoKernelState } from "../../libraries/RoycoKernelStorageLib.sol";
-import { ExecutionModel, RequestRedeemSharesBehavior } from "../../libraries/Types.sol";
+import { ExecutionModel, RequestRedeemSharesBehavior, SyncedNAVsPacket } from "../../libraries/Types.sol";
 
 /**
  * @title IRoycoKernel
  *
  */
 interface IRoycoKernel {
+    /// @notice Thrown when any of the required initialization params are null
+    error NULL_ADDRESS();
+
+    /// @notice Thrown when the caller of a permissioned function isn't the market's senior tranche
+    error ONLY_SENIOR_TRANCHE();
+
+    /// @notice Thrown when the caller of a permissioned function isn't the market's junior tranche
+    error ONLY_JUNIOR_TRANCHE();
+
     function ST_REQUEST_REDEEM_SHARES_BEHAVIOR() external pure returns (RequestRedeemSharesBehavior);
     function JT_REQUEST_REDEEM_SHARES_BEHAVIOR() external pure returns (RequestRedeemSharesBehavior);
 
@@ -21,22 +30,12 @@ interface IRoycoKernel {
     function getSTRawNAV() external view returns (uint256);
     function getJTRawNAV() external view returns (uint256);
 
-    function getSTEffectiveNAV() external view returns (uint256);
-    function getJTEffectiveNAV() external view returns (uint256);
-
     function getSTTotalEffectiveAssets() external view returns (uint256);
     function getJTTotalEffectiveAssets() external view returns (uint256);
 
-    function getKernelState() external view returns (RoycoKernelState memory);
+    function syncTrancheNAVs() external returns (SyncedNAVsPacket memory packet);
 
-    function syncTrancheNAVs()
-        external
-        returns (uint256 stRawNAV, uint256 jtRawNAV, uint256 stEffectiveNAV, uint256 jtEffectiveNAV, uint256 stProtocolFeeTaken, uint256 jtProtocolFeeTaken);
-
-    function previewSyncTrancheNAVs()
-        external
-        view
-        returns (uint256 stRawNAV, uint256 jtRawNAV, uint256 stEffectiveNAV, uint256 jtEffectiveNAV, uint256 stProtocolFeeTaken, uint256 jtProtocolFeeTaken);
+    function previewSyncTrancheNAVs() external view returns (SyncedNAVsPacket memory packet);
 
     function stMaxDeposit(address _asset, address _receiver) external view returns (uint256);
 
@@ -51,6 +50,7 @@ interface IRoycoKernel {
     )
         external
         returns (uint256 valueAllocated, uint256 effectiveNAVToMintAt);
+
     function stRedeem(address _asset, uint256 _shares, uint256 _totalShares, address _controller, address _receiver) external returns (uint256 assetsWithdrawn);
 
     function jtMaxDeposit(address _asset, address _receiver) external view returns (uint256);
@@ -65,5 +65,8 @@ interface IRoycoKernel {
     )
         external
         returns (uint256 valueAllocated, uint256 effectiveNAVToMintAt);
+
     function jtRedeem(address _asset, uint256 _shares, uint256 _totalShares, address _controller, address _receiver) external returns (uint256 assetsWithdrawn);
+
+    function getState() external view returns (RoycoKernelState memory);
 }

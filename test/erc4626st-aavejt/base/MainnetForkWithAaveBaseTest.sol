@@ -4,7 +4,9 @@ pragma solidity ^0.8.28;
 import { Vm } from "../../../lib/forge-std/src/Vm.sol";
 import { IERC20 } from "../../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { ERC4626ST_AaveV3JT_Kernel } from "../../../src/KERNELs/ERC4626ST_AaveV3JT_Kernel.sol";
+import { RoycoAccountant } from "../../../src/accountant/RoycoAccountant.sol";
 import { ConstantsLib } from "../../../src/libraries/ConstantsLib.sol";
+import { RoycoAccountantInitParams } from "../../../src/libraries/RoycoAccountantStorageLib.sol";
 import { RoycoKernelInitParams } from "../../../src/libraries/RoycoKernelStorageLib.sol";
 import { RoycoVaultTranche } from "../../../src/tranches/RoycoVaultTranche.sol";
 import { BaseTest } from "../../base/BaseTest.sol";
@@ -22,6 +24,7 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
     // Deployed contracts
     ERC4626Mock internal MOCK_UNDERLYING_ST_VAULT;
     ERC4626ST_AaveV3JT_Kernel internal ERC4626ST_AAVEV3JT_KERNEL;
+    RoycoAccountant internal ACCOUNTANT;
 
     // External Contracts
     IERC20 internal USDC = IERC20(ETHEREUM_MAINNET_USDC_ADDRESS);
@@ -91,6 +94,13 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
         // Deploy KERNEL
         kernel = ERC4626ST_AaveV3JT_Kernel(_deployKernel(address(ERC4626ST_AAVEV3JT_KERNEL_IMPL), bytes("")));
 
+        // Deploy and initialize the accountant
+        ACCOUNTANT = _deployAccountant(
+            RoycoAccountantInitParams({
+                kernel: address(kernel), protocolFeeWAD: PROTOCOL_FEE_WAD, coverageWAD: COVERAGE_WAD, betaWAD: BETA_WAD, rdm: address(RDM)
+            })
+        );
+
         // Deploy market with KERNEL
         (seniorTranche, juniorTranche, marketID) = _deployMarket(
             SENIOR_TRANCH_NAME,
@@ -106,11 +116,8 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
         RoycoKernelInitParams memory params = RoycoKernelInitParams({
             seniorTranche: address(seniorTranche),
             juniorTranche: address(juniorTranche),
-            coverageWAD: COVERAGE_WAD,
-            betaWAD: BETA_WAD,
-            rdm: address(RDM),
-            protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS,
-            protocolFeeWAD: PROTOCOL_FEE_WAD
+            accountant: address(ACCOUNTANT),
+            protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS
         });
 
         // Initialize the KERNEL
