@@ -13,10 +13,9 @@ interface IAsyncSTWithdrawalKernel {
      * @param _caller The address of the user requesting the withdrawal for the senior tranche
      * @param _shares The amount of shares of the senior tranche being requested to be redeemed
      * @param _controller The controller that is allowed to operate the lifecycle of the request.
-     * @param _totalShares The total number of shares in the senior tranche
      * @return requestId The request ID of this withdrawal request
      */
-    function stRequestRedeem(address _caller, uint256 _shares, uint256 _totalShares, address _controller) external returns (uint256 requestId);
+    function stRequestRedeem(address _caller, uint256 _shares, address _controller) external returns (uint256 requestId);
 
     /**
      * @notice Returns the amount of assets pending redemption for a specific controller

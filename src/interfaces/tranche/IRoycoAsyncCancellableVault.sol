@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-/// @title ERC-7887: Cancelation for ERC-7540 Tokenized Vaults (Draft)
+import { TRANCHE_UNIT } from "../../libraries/Units.sol";
+
+/// @title IRoycoAsyncCancellableVault: based on ERC-7887: Cancelation for ERC-7540 Tokenized Vaults
 /// @notice Interface extending ERC-7540 asynchronous vaults with cancelation flows.
 /// @dev Contracts implementing this interface MUST also implement ERC-165.
-interface IERC7887 {
+interface IRoycoAsyncCancellableVault {
     // =============================
     // Events
     // =============================
@@ -21,7 +23,7 @@ interface IERC7887 {
     /// @param requestId The identifier of the canceled Request.
     /// @param sender The caller of the claimCancelDepositRequest.
     /// @param assets The amount of assets claimed.
-    event CancelDepositClaim(address indexed controller, address indexed receiver, uint256 indexed requestId, address sender, uint256 assets);
+    event CancelDepositClaim(address indexed controller, address indexed receiver, uint256 indexed requestId, address sender, TRANCHE_UNIT assets);
 
     /// @notice Emitted when a controller requests cancelation of a redeem Request.
     /// @param controller The controller of the Request (may equal msg.sender or its approved operator).
@@ -59,7 +61,7 @@ interface IERC7887 {
     /// @param _requestId The identifier of the original deposit Request.
     /// @param _controller The controller address.
     /// @return assets The amount of assets claimable.
-    function claimableCancelDepositRequest(uint256 _requestId, address _controller) external view returns (uint256 assets);
+    function claimableCancelDepositRequest(uint256 _requestId, address _controller) external view returns (TRANCHE_UNIT assets);
 
     /// @notice Claim a deposit cancelation Request, transferring assets to the receiver.
     /// @dev MUST emit {CancelDepositClaim}.

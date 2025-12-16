@@ -201,7 +201,7 @@ contract RoycoTrancheFactory is AccessManager, RoycoRoles {
         _setTargetFunctionRole(address(_deployedContracts.kernel), UUPSUpgradeable.upgradeToAndCall.selector, UPGRADER_ROLE);
         _setTargetFunctionRole(address(_deployedContracts.kernel), IRoycoAuth.pause.selector, PAUSER_ROLE);
         _setTargetFunctionRole(address(_deployedContracts.kernel), IRoycoAuth.unpause.selector, PAUSER_ROLE);
-        _setTargetFunctionRole(address(_deployedContracts.kernel), IRoycoKernel.syncTrancheNAVs.selector, SYNC_ROLE);
+        _setTargetFunctionRole(address(_deployedContracts.kernel), IRoycoKernel.syncTrancheAccounting.selector, SYNC_ROLE);
 
         // Configure the roles for the senior tranche
         _configureRolesForTranche(_deployedContracts.seniorTranche);
@@ -235,4 +235,3 @@ contract RoycoTrancheFactory is AccessManager, RoycoRoles {
         proxy = Create2.deploy(0, _salt, abi.encodePacked(type(ERC1967Proxy).creationCode, abi.encode(_implementation, "")));
     }
 }
-

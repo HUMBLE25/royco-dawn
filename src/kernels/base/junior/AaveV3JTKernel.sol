@@ -46,7 +46,7 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
 
     /// @inheritdoc IRoycoKernel
     function getJTTotalEffectiveAssets() external view override(IRoycoKernel) returns (uint256) {
-        return previewSyncTrancheNAVs().jtEffectiveNAV;
+        return previewSyncTrancheAccounting().jtEffectiveNAV;
     }
 
     /// @inheritdoc IRoycoKernel
@@ -64,13 +64,13 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
     {
         // Execute a pre-op sync on NAV accounting
         valueAllocated = _assets;
-        effectiveNAVToMintAt = (_preOpSyncTrancheNAVs()).jtEffectiveNAV;
+        effectiveNAVToMintAt = (_preOpSyncTrancheAccounting()).jtEffectiveNAV;
 
         // Max approval already given to the pool on initialization
         IPool(AaveV3KernelStorageLib._getAaveV3KernelStorage().pool).supply(_asset, _assets, address(this), 0);
 
         // Execute a post-op sync on NAV accounting
-        _postOpSyncTrancheNAVs(Operation.JT_INCREASE_NAV);
+        _postOpSyncTrancheAccounting(Operation.JT_INCREASE_NAV);
     }
 
     /// @inheritdoc IRoycoKernel
@@ -86,7 +86,7 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
         onlyJuniorTranche
         returns (uint256 assetsWithdrawn)
     {
-        SyncedAccountingState memory state = _preOpSyncTrancheNAVs();
+        SyncedAccountingState memory state = _preOpSyncTrancheAccounting();
         require(_shares <= _jtClaimableRedeemRequest(_controller), INSUFFICIENT_CLAIMABLE_SHARES(_shares, _jtClaimableRedeemRequest(_controller)));
         // Calculate the value of the shares to claim and update the controller's redemption request
         assetsWithdrawn = _processClaimableRedeemRequest(_controller, state.jtEffectiveNAV, _shares, _totalShares);
@@ -101,7 +101,7 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
         IPool(AaveV3KernelStorageLib._getAaveV3KernelStorage().pool).withdraw(_asset, (assetsWithdrawn - stAssetsToWithdraw), _receiver);
 
         // Execute a post-op sync on NAV accounting and enforce the market's coverage requirement
-        _postOpSyncTrancheNAVsAndEnforceCoverage(Operation.JT_DECREASE_NAV);
+        _postOpSyncTrancheAccountingAndEnforceCoverage(Operation.JT_DECREASE_NAV);
     }
 
     /// @inheritdoc RoycoKernel

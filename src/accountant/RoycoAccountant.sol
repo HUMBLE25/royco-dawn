@@ -39,7 +39,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
     }
 
     /// @inheritdoc IRoycoAccountant
-    function preOpSyncTrancheNAVs(
+    function preOpSyncTrancheAccounting(
         NAV_UNIT _stRawNAV,
         NAV_UNIT _jtRawNAV
     )
@@ -53,7 +53,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
 
         // Accrue the JT yield share since the last accrual and preview the tranche NAVs and debts synchronization
         bool yieldDistributed;
-        (state, yieldDistributed) = _previewSyncTrancheNAVs(_stRawNAV, _jtRawNAV, _accrueJTYieldShare());
+        (state, yieldDistributed) = _previewSyncTrancheAccounting(_stRawNAV, _jtRawNAV, _accrueJTYieldShare());
 
         // ST yield was split between ST and JT
         if (yieldDistributed) {
@@ -72,7 +72,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
     }
 
     /// @inheritdoc IRoycoAccountant
-    function previewSyncTrancheNAVs(
+    function previewSyncTrancheAccounting(
         NAV_UNIT _stRawNAV,
         NAV_UNIT _jtRawNAV
     )
@@ -81,11 +81,11 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         override(IRoycoAccountant)
         returns (SyncedAccountingState memory state)
     {
-        (state,) = _previewSyncTrancheNAVs(_stRawNAV, _jtRawNAV, _previewJTYieldShareAccrual());
+        (state,) = _previewSyncTrancheAccounting(_stRawNAV, _jtRawNAV, _previewJTYieldShareAccrual());
     }
 
     /// @inheritdoc IRoycoAccountant
-    function postOpSyncTrancheNAVs(NAV_UNIT _stRawNAV, NAV_UNIT _jtRawNAV, Operation _op) public override(IRoycoAccountant) onlyRoycoKernel {
+    function postOpSyncTrancheAccounting(NAV_UNIT _stRawNAV, NAV_UNIT _jtRawNAV, Operation _op) public override(IRoycoAccountant) onlyRoycoKernel {
         // Get the storage pointer to the base kernel state
         RoycoAccountantState storage $ = RoycoAccountantStorageLib._getRoycoAccountantStorage();
         if (_op == Operation.ST_INCREASE_NAV) {
@@ -147,7 +147,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
     }
 
     /// @inheritdoc IRoycoAccountant
-    function postOpSyncTrancheNAVsAndEnforceCoverage(
+    function postOpSyncTrancheAccountingAndEnforceCoverage(
         NAV_UNIT _stRawNAV,
         NAV_UNIT _jtRawNAV,
         Operation _op
@@ -157,7 +157,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         onlyRoycoKernel
     {
         // Execute a post-op NAV synchronization
-        postOpSyncTrancheNAVs(_stRawNAV, _jtRawNAV, _op);
+        postOpSyncTrancheAccounting(_stRawNAV, _jtRawNAV, _op);
         // Enforce the market's coverage requirement
         require(isCoverageRequirementSatisfied(), COVERAGE_REQUIREMENT_UNSATISFIED());
     }
@@ -193,7 +193,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         // Get the storage pointer to the base kernel state
         RoycoAccountantState storage $ = RoycoAccountantStorageLib._getRoycoAccountantStorage();
         // Preview a NAV sync to get the market's current state
-        (SyncedAccountingState memory state,) = _previewSyncTrancheNAVs(_stRawNAV, _jtRawNAV, _previewJTYieldShareAccrual());
+        (SyncedAccountingState memory state,) = _previewSyncTrancheAccounting(_stRawNAV, _jtRawNAV, _previewJTYieldShareAccrual());
         // Solve for x, rounding in favor of senior protection
         // Compute the total covered assets by the junior tranche loss absorption buffer
         NAV_UNIT totalCoveredAssets = state.jtEffectiveNAV.mulDiv(WAD, $.coverageWAD, Math.Rounding.Floor);
@@ -217,7 +217,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         uint256 betaWAD = $.betaWAD;
         uint256 coverageWAD = $.coverageWAD;
         // Preview a NAV sync to get the market's current state
-        (SyncedAccountingState memory state,) = _previewSyncTrancheNAVs(_stRawNAV, _jtRawNAV, _previewJTYieldShareAccrual());
+        (SyncedAccountingState memory state,) = _previewSyncTrancheAccounting(_stRawNAV, _jtRawNAV, _previewJTYieldShareAccrual());
         // Solve for y, rounding in favor of senior protection
         // Compute the total covered exposure of the underlying investment
         NAV_UNIT totalCoveredExposure = _stRawNAV + _jtRawNAV.mulDiv(betaWAD, WAD, Math.Rounding.Ceil);
@@ -239,7 +239,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
      * @return state A struct containing all synced NAV, debt, and fee data after executing the sync
      * @return yieldDistributed A boolean indicating whether ST yield was split between ST and JT
      */
-    function _previewSyncTrancheNAVs(
+    function _previewSyncTrancheAccounting(
         NAV_UNIT _stRawNAV,
         NAV_UNIT _jtRawNAV,
         uint192 _twJTYieldShareAccruedWAD

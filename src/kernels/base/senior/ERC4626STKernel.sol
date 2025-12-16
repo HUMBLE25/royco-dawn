@@ -43,7 +43,7 @@ abstract contract ERC4626STKernel is RoycoKernel {
 
     /// @inheritdoc IRoycoKernel
     function getSTTotalEffectiveAssets() external view override(IRoycoKernel) returns (uint256) {
-        return previewSyncTrancheNAVs().stEffectiveNAV;
+        return previewSyncTrancheAccounting().stEffectiveNAV;
     }
 
     /// @inheritdoc IRoycoKernel
@@ -61,7 +61,7 @@ abstract contract ERC4626STKernel is RoycoKernel {
     {
         // The effective NAV to mint at is the effective NAV of the tranche before the deposit is made, ie. the NAV at which the shares will be minted
         // This is the NAV returned by the pre-op sync
-        effectiveNAVToMintAt = (_preOpSyncTrancheNAVs()).stEffectiveNAV;
+        effectiveNAVToMintAt = (_preOpSyncTrancheAccounting()).stEffectiveNAV;
 
         // Deposit the assets into the underlying investment vault
         IERC4626(ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault).deposit(_assets, address(this));
@@ -70,7 +70,7 @@ abstract contract ERC4626STKernel is RoycoKernel {
         valueAllocated = _convertAssetsToValue(_assets);
 
         // Execute a post-op sync on NAV accounting and enforce the market's coverage requirement
-        _postOpSyncTrancheNAVsAndEnforceCoverage(Operation.ST_INCREASE_NAV);
+        _postOpSyncTrancheAccountingAndEnforceCoverage(Operation.ST_INCREASE_NAV);
     }
 
     /// @inheritdoc IRoycoKernel
@@ -88,7 +88,7 @@ abstract contract ERC4626STKernel is RoycoKernel {
         returns (uint256 assetsWithdrawn)
     {
         // Execute a pre-op sync on NAV accounting
-        SyncedAccountingState memory state = _preOpSyncTrancheNAVs();
+        SyncedAccountingState memory state = _preOpSyncTrancheAccounting();
 
         // Compute the assets expected to be received on withdrawal based on the ST's effective NAV
         assetsWithdrawn = _shares.mulDiv(state.stEffectiveNAV, _totalShares, Math.Rounding.Floor);
@@ -104,7 +104,7 @@ abstract contract ERC4626STKernel is RoycoKernel {
         IERC4626(ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault).withdraw((assetsWithdrawn - jtAssetsToWithdraw), _receiver, address(this));
 
         // Execute a post-op sync on NAV accounting
-        _postOpSyncTrancheNAVs(Operation.ST_DECREASE_NAV);
+        _postOpSyncTrancheAccounting(Operation.ST_DECREASE_NAV);
     }
 
     /**

@@ -40,7 +40,7 @@ interface IRoycoAccountant {
      * @param _jtRawNAV The junior tranche's current raw NAV: the pure value of its invested assets
      * @return state The synced NAV, debt, and fee accounting containing all mark to market accounting data
      */
-    function preOpSyncTrancheNAVs(NAV_UNIT _stRawNAV, NAV_UNIT _jtRawNAV) external returns (SyncedAccountingState memory state);
+    function preOpSyncTrancheAccounting(NAV_UNIT _stRawNAV, NAV_UNIT _jtRawNAV) external returns (SyncedAccountingState memory state);
 
     /**
      * @notice Previews a synchronization of tranche NAVs based on the underlying PNL(s) and their effects on the current state of the loss waterfall
@@ -48,7 +48,7 @@ interface IRoycoAccountant {
      * @param _jtRawNAV The junior tranche's current raw NAV: the pure value of its invested assets
      * @return state The synced NAV, debt, and fee accounting containing all mark to market accounting data
      */
-    function previewSyncTrancheNAVs(NAV_UNIT _stRawNAV, NAV_UNIT _jtRawNAV) external view returns (SyncedAccountingState memory state);
+    function previewSyncTrancheAccounting(NAV_UNIT _stRawNAV, NAV_UNIT _jtRawNAV) external view returns (SyncedAccountingState memory state);
 
     /**
      * @notice Applies post-operation (deposit and withdrawal) raw NAV deltas to effective NAV checkpoints
@@ -57,7 +57,7 @@ interface IRoycoAccountant {
      * @param _jtRawNAV The junior tranche's current raw NAV: the pure value of its invested assets
      * @param _op The operation being executed in between the pre and post synchronizations
      */
-    function postOpSyncTrancheNAVs(NAV_UNIT _stRawNAV, NAV_UNIT _jtRawNAV, Operation _op) external;
+    function postOpSyncTrancheAccounting(NAV_UNIT _stRawNAV, NAV_UNIT _jtRawNAV, Operation _op) external;
 
     /**
      * @notice Applies post-operation (deposit and withdrawal) raw NAV deltas to effective NAV checkpoints and enforces the coverage condition of the market
@@ -67,7 +67,7 @@ interface IRoycoAccountant {
      * @param _jtRawNAV The junior tranche's current raw NAV: the pure value of its invested assets
      * @param _op The operation being executed in between the pre and post synchronizations
      */
-    function postOpSyncTrancheNAVsAndEnforceCoverage(NAV_UNIT _stRawNAV, NAV_UNIT _jtRawNAV, Operation _op) external;
+    function postOpSyncTrancheAccountingAndEnforceCoverage(NAV_UNIT _stRawNAV, NAV_UNIT _jtRawNAV, Operation _op) external;
 
     /**
      * @notice Returns if the market’s coverage requirement is satisfied

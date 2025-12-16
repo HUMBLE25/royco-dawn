@@ -24,6 +24,16 @@ library UnitsMathLib {
     }
 
     /**
+     * @notice Computes the minimum of two tranche unit denominated quantities
+     * @param _a A tranche unit denominated quantity
+     * @param _b A tranche unit denominated quantity
+     * @return The minimum of _a and _b in tranche units
+     */
+    function min(TRANCHE_UNIT _a, TRANCHE_UNIT _b) internal pure returns (TRANCHE_UNIT) {
+        return toTrancheUnits(Math.min(toUint256(_a), toUint256(_b)));
+    }
+
+    /**
      * @notice Computes the signed delta between two NAV unit denominated quantities
      * @param _a The NAV unit denominated minuend of the subtraction
      * @param _b The NAV unit denominated subtrahend of the subtraction

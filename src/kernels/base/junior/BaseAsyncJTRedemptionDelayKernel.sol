@@ -76,7 +76,7 @@ abstract contract BaseAsyncJTRedemptionDelayKernel is IAsyncJTWithdrawalKernel, 
         whenNotPaused
         returns (uint256 requestId)
     {
-        uint256 jtEffectiveNAV = _preOpSyncTrancheNAVs().jtEffectiveNAV;
+        uint256 jtEffectiveNAV = _preOpSyncTrancheAccounting().jtEffectiveNAV;
         BaseAsyncJTRedemptionDelayKernelState storage $ = _getBaseAsyncJTRedemptionDelayKernelState();
 
         Redemption storage redemption = $.redemptions[_controller];
