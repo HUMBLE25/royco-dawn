@@ -46,16 +46,8 @@ interface IRoycoAccountant {
      * @param _stRawNAV The senior tranche's current raw NAV: the pure value of its invested assets
      * @param _jtRawNAV The junior tranche's current raw NAV: the pure value of its invested assets
      * @return packet The NAV sync packet containing all mark to market accounting data
-     * @return twJTYieldShareAccruedWAD The accumulated time-weighted JT yield share since the last yield distribution
-     * @return yieldDistributed A boolean indicating whether ST yield was split between ST and JT
      */
-    function previewSyncTrancheNAVs(
-        uint256 _stRawNAV,
-        uint256 _jtRawNAV
-    )
-        external
-        view
-        returns (SyncedNAVsPacket memory packet, uint192 twJTYieldShareAccruedWAD, bool yieldDistributed);
+    function previewSyncTrancheNAVs(uint256 _stRawNAV, uint256 _jtRawNAV) external view returns (SyncedNAVsPacket memory packet);
 
     /**
      * @notice Applies post-operation (deposit and withdrawal) raw NAV deltas to effective NAV checkpoints

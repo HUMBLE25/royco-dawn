@@ -5,12 +5,11 @@ library ConstantsLib {
     /// @dev Constant for the WAD scaling factor
     uint256 public constant WAD = 1e18;
 
-    /// @dev The minimum coverage expressed in WAD
-    /// Minimum coverage = 1%
+    /// @dev The minimum configurable coverage percentage, scaled by WAD
     uint256 public constant MIN_COVERAGE_WAD = 0.01e18;
 
-    /// @dev The max protocol fee on yield
-    uint256 public constant MAX_PROTOCOL_FEE_WAD = 0.33e18;
+    /// @dev The max protocol fee percentage on tranche yields, scaled by WAD
+    uint256 public constant MAX_PROTOCOL_FEE_WAD = 1e18;
 
     /// @dev The request ID for a purely controller-discriminated request in ERC-7540
     uint256 public constant ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID = 0;

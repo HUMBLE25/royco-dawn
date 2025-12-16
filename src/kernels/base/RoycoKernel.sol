@@ -7,7 +7,6 @@ import { IRDM } from "../../interfaces/IRDM.sol";
 import { IRoycoKernel } from "../../interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoVaultTranche } from "../../interfaces/tranche/IRoycoVaultTranche.sol";
 import { RoycoKernelInitParams, RoycoKernelState, RoycoKernelStorageLib } from "../../libraries/RoycoKernelStorageLib.sol";
-
 import { SyncedNAVsPacket } from "../../libraries/Types.sol";
 import { ConstantsLib, Math, UtilsLib } from "../../libraries/UtilsLib.sol";
 import { IRoycoAccountant, Operation } from "./../../interfaces/IRoycoAccountant.sol";
@@ -110,7 +109,7 @@ abstract contract RoycoKernel is IRoycoKernel, UUPSUpgradeable, RoycoAuth {
      * @return packet The NAV sync packet containing all mark to market accounting data
      */
     function previewSyncTrancheNAVs() public view override(IRoycoKernel) returns (SyncedNAVsPacket memory packet) {
-        (packet,,) = _accountant().previewSyncTrancheNAVs(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV());
+        return _accountant().previewSyncTrancheNAVs(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV());
     }
 
     /**

@@ -49,14 +49,9 @@ contract RoycoAccountant is Initializable, IRoycoAccountant {
         // Get the storage pointer to the base kernel state
         RoycoAccountantState storage $ = RoycoAccountantStorageLib._getRoycoAccountantStorage();
 
-        // Preview the new NAVs and protocol fees accrued for each tranche based on PNL(s) of the underlying investment(s)
-        uint192 twJTYieldShareAccruedWAD;
+        // Accrue the JT yield share since the last accrual and preview the tranche NAVs and debts synchronization
         bool yieldDistributed;
-        (packet, twJTYieldShareAccruedWAD, yieldDistributed) = previewSyncTrancheNAVs(_stRawNAV, _jtRawNAV);
-
-        // Accrue the time-weighted yield share accrued to JT since the last tranche interaction
-        $.twJTYieldShareAccruedWAD = twJTYieldShareAccruedWAD;
-        $.lastAccrualTimestamp = uint32(block.timestamp);
+        (packet, yieldDistributed) = _previewSyncTrancheNAVs(_stRawNAV, _jtRawNAV, _accrueJTYieldShare());
 
         // ST yield was split between ST and JT
         if (yieldDistributed) {
@@ -75,149 +70,8 @@ contract RoycoAccountant is Initializable, IRoycoAccountant {
     }
 
     /// @inheritdoc IRoycoAccountant
-    function previewSyncTrancheNAVs(
-        uint256 _stRawNAV,
-        uint256 _jtRawNAV
-    )
-        public
-        view
-        override(IRoycoAccountant)
-        returns (SyncedNAVsPacket memory packet, uint192 twJTYieldShareAccruedWAD, bool yieldDistributed)
-    {
-        // Get the storage pointer to the base kernel state
-        RoycoAccountantState storage $ = RoycoAccountantStorageLib._getRoycoAccountantStorage();
-
-        // Preview the time-weighted yield share accrued to JT since the last tranche interaction
-        twJTYieldShareAccruedWAD = _previewJTYieldShareAccrual();
-
-        // Compute the deltas in the raw NAVs of each tranche
-        // The deltas represent the unrealized PNL of the underlying investment since the last NAV checkpoints
-        int256 deltaST = _computeRawNAVDelta(_stRawNAV, $.lastSTRawNAV);
-        int256 deltaJT = _computeRawNAVDelta(_jtRawNAV, $.lastJTRawNAV);
-
-        // Cache the last checkpointed effective NAV and coverage debt for each tranche
-        uint256 stEffectiveNAV = $.lastSTEffectiveNAV;
-        uint256 jtEffectiveNAV = $.lastJTEffectiveNAV;
-        uint256 stCoverageDebt = $.lastSTCoverageDebt;
-        uint256 jtCoverageDebt = $.lastJTCoverageDebt;
-        uint256 stProtocolFeeAccrued;
-        uint256 jtProtocolFeeAccrued;
-
-        /// @dev STEP_APPLY_JT_LOSS: The JT assets depreciated in value
-        if (deltaJT < 0) {
-            /// @dev STEP_JT_ABSORB_LOSS: JT's remaning loss-absorption buffer incurs as much of the loss as possible
-            uint256 jtLoss = uint256(-deltaJT);
-            uint256 jtAbsorbableLoss = Math.min(jtLoss, jtEffectiveNAV);
-            if (jtAbsorbableLoss != 0) {
-                // Incur the maximum absorbable losses to remaining JT loss capital
-                jtEffectiveNAV -= jtAbsorbableLoss;
-                // Reduce the residual JT loss by the loss absorbed
-                jtLoss -= jtAbsorbableLoss;
-            }
-            /// @dev STEP_ST_INCURS_RESIDUAL_LOSSES: Residual loss after emptying JT's remaning loss-absorption buffer are incurred by ST
-            if (jtLoss != 0) {
-                // The excess loss is absorbed by ST
-                stEffectiveNAV -= jtLoss;
-                // Repay ST debt to JT
-                // This is equivalent to retroactively reducing previously applied coverage
-                // Thus, the liability is flipped to JT debt to ST
-                stCoverageDebt -= jtLoss;
-                jtCoverageDebt += jtLoss;
-            }
-            /// @dev STEP_APPLY_JT_GAIN: The JT assets appreciated in value
-        } else if (deltaJT > 0) {
-            uint256 jtGain = uint256(deltaJT);
-            /// @dev STEP_REPAY_JT_COVERAGE_DEBT: Pay off any JT debt to ST (previously uncovered losses)
-            uint256 jtDebtRepayment = Math.min(jtGain, jtCoverageDebt);
-            if (jtDebtRepayment != 0) {
-                // Repay JT debt to ST
-                // This is equivalent to retroactively applying coverage for previously uncovered losses
-                // Thus, the liability is flipped to ST debt to JT
-                jtCoverageDebt -= jtDebtRepayment;
-                stCoverageDebt += jtDebtRepayment;
-                // Apply the repayment (retroactive coverage) to the ST
-                stEffectiveNAV += jtDebtRepayment;
-                jtGain -= jtDebtRepayment;
-            }
-            /// @dev STEP_JT_ACCRUES_RESIDUAL_GAINS: JT accrues any remaining appreciation after repaying liabilities
-            if (jtGain != 0) {
-                // Compute the protocol fee taken on this JT yield accrual - will be used to mint JT shares to the protocol fee recipient at the updated JT effective NAV
-                jtProtocolFeeAccrued = jtGain.mulDiv($.protocolFeeWAD, ConstantsLib.WAD, Math.Rounding.Floor);
-                // Book the residual gains to the JT
-                jtEffectiveNAV += jtGain;
-            }
-        }
-
-        /// @dev STEP_APPLY_ST_LOSS: The ST assets depreciated in value
-        if (deltaST < 0) {
-            uint256 stLoss = uint256(-deltaST);
-            /// @dev STEP_APPLY_JT_COVERAGE_TO_ST: Apply any possible coverage to ST provided by JT's loss-absorption buffer
-            uint256 coverageApplied = Math.min(stLoss, jtEffectiveNAV);
-            if (coverageApplied != 0) {
-                jtEffectiveNAV -= coverageApplied;
-                // Any coverage provided is a ST liability to JT
-                stCoverageDebt += coverageApplied;
-            }
-            /// @dev STEP_ST_INCURS_RESIDUAL_LOSSES: Apply any uncovered losses by JT to ST
-            uint256 netStLoss = stLoss - coverageApplied;
-            if (netStLoss != 0) {
-                // Apply residual losses to ST
-                stEffectiveNAV -= netStLoss;
-                // The uncovered portion of the ST loss is a JT liability to ST
-                jtCoverageDebt += netStLoss;
-            }
-            /// @dev STEP_APPLY_ST_GAIN: The ST assets appreciated in value
-        } else if (deltaST > 0) {
-            uint256 stGain = uint256(deltaST);
-            /// @dev STEP_REPAY_JT_COVERAGE_DEBT: The first priority of repayment to reverse the loss-waterfall is making ST whole again
-            // Repay JT debt to ST: previously uncovered ST losses
-            uint256 debtRepayment = Math.min(stGain, jtCoverageDebt);
-            if (debtRepayment != 0) {
-                // Pay back JT debt to ST: making ST whole again
-                stEffectiveNAV += debtRepayment;
-                jtCoverageDebt -= debtRepayment;
-                // Deduct the repayment from the ST gains and return if no gains are left
-                stGain -= debtRepayment;
-            }
-            /// @dev STEP_REPAY_ST_COVERAGE_DEBT: The second priority of repayment to reverse the loss-waterfall is making JT whole again
-            // Repay ST debt to JT: previously applied coverage from JT to ST
-            debtRepayment = Math.min(stGain, stCoverageDebt);
-            if (debtRepayment != 0) {
-                // Pay back ST debt to JT: making JT whole again
-                jtEffectiveNAV += debtRepayment;
-                stCoverageDebt -= debtRepayment;
-                // Deduct the repayment from the remaining ST gains and return if no gains are left
-                stGain -= debtRepayment;
-            }
-            /// @dev STEP_DISTRIBUTE_YIELD: There are no remaining debts in the system, the residual gains will be used to distribute yield to both tranches
-            if (stGain != 0) {
-                // Compute the time weighted average JT share of yield
-                uint256 elapsed = block.timestamp - $.lastDistributionTimestamp;
-                uint256 protocolFeeWAD = $.protocolFeeWAD;
-                // If the last yield distribution wasn't in this block, split the yield between ST and JT
-                if (elapsed != 0) {
-                    // Compute the ST gain allocated to JT based on its time weighted yield share since the last distribution, rounding in favor of the senior tranche
-                    uint256 jtGain = stGain.mulDiv((twJTYieldShareAccruedWAD / elapsed), ConstantsLib.WAD, Math.Rounding.Floor);
-                    // Apply the yield split to JT's effective NAV
-                    if (jtGain != 0) {
-                        // Compute the protocol fee taken on this JT yield accrual (will be used to mint shares to the protocol fee recipient) at the updated JT effective NAV
-                        jtProtocolFeeAccrued += jtGain.mulDiv(protocolFeeWAD, ConstantsLib.WAD, Math.Rounding.Floor);
-                        jtEffectiveNAV += jtGain;
-                        stGain -= jtGain;
-                    }
-                    yieldDistributed = true;
-                }
-                // Compute the protocol fee taken on this ST yield accrual (will be used to mint shares to the protocol fee recipient) at the updated JT effective NAV
-                stProtocolFeeAccrued = stGain.mulDiv(protocolFeeWAD, ConstantsLib.WAD, Math.Rounding.Floor);
-                // Book the residual gain to the ST
-                stEffectiveNAV += stGain;
-            }
-        }
-        // Enforce the NAV conservation invariant
-        require((_stRawNAV + _jtRawNAV) == (stEffectiveNAV + jtEffectiveNAV), NAV_CONSERVATION_VIOLATION());
-        // Construct the synced NAVs packet to return to the caller
-        packet =
-            SyncedNAVsPacket(_stRawNAV, _jtRawNAV, stEffectiveNAV, jtEffectiveNAV, stCoverageDebt, jtCoverageDebt, stProtocolFeeAccrued, jtProtocolFeeAccrued);
+    function previewSyncTrancheNAVs(uint256 _stRawNAV, uint256 _jtRawNAV) public view override(IRoycoAccountant) returns (SyncedNAVsPacket memory packet) {
+        (packet,) = _previewSyncTrancheNAVs(_stRawNAV, _jtRawNAV, _previewJTYieldShareAccrual());
     }
 
     /// @inheritdoc IRoycoAccountant
@@ -330,7 +184,7 @@ contract RoycoAccountant is Initializable, IRoycoAccountant {
         // Get the storage pointer to the base kernel state
         RoycoAccountantState storage $ = RoycoAccountantStorageLib._getRoycoAccountantStorage();
         // Preview a NAV sync to get the market's current state
-        (SyncedNAVsPacket memory packet,,) = previewSyncTrancheNAVs(_stRawNAV, _jtRawNAV);
+        (SyncedNAVsPacket memory packet,) = _previewSyncTrancheNAVs(_stRawNAV, _jtRawNAV, _previewJTYieldShareAccrual());
         // Solve for x, rounding in favor of senior protection
         // Compute the total covered assets by the junior tranche loss absorption buffer
         uint256 totalCoveredAssets = packet.jtEffectiveNAV.mulDiv(ConstantsLib.WAD, $.coverageWAD, Math.Rounding.Floor);
@@ -354,7 +208,7 @@ contract RoycoAccountant is Initializable, IRoycoAccountant {
         uint256 betaWAD = $.betaWAD;
         uint256 coverageWAD = $.coverageWAD;
         // Preview a NAV sync to get the market's current state
-        (SyncedNAVsPacket memory packet,,) = previewSyncTrancheNAVs(_stRawNAV, _jtRawNAV);
+        (SyncedNAVsPacket memory packet,) = _previewSyncTrancheNAVs(_stRawNAV, _jtRawNAV, _previewJTYieldShareAccrual());
         // Solve for y, rounding in favor of senior protection
         // Compute the total covered exposure of the underlying investment
         uint256 totalCoveredExposure = _stRawNAV + _jtRawNAV.mulDiv(betaWAD, ConstantsLib.WAD, Math.Rounding.Ceil);
@@ -369,7 +223,182 @@ contract RoycoAccountant is Initializable, IRoycoAccountant {
     }
 
     /**
-     * @notice Computes the currently accrued JT yield share since the last yield distribution
+     * @notice Syncs all tranche NAVs and debts based on unrealized PNLs of the underlying investment(s)
+     * @return packet A struct containing all synced NAV, debt, and fee data after executing the sync
+     * @return yieldDistributed A boolean indicating whether ST yield was split between ST and JT
+     */
+    function _previewSyncTrancheNAVs(
+        uint256 _stRawNAV,
+        uint256 _jtRawNAV,
+        uint192 _twJTYieldShareAccruedWAD
+    )
+        internal
+        view
+        returns (SyncedNAVsPacket memory packet, bool yieldDistributed)
+    {
+        // Get the storage pointer to the base kernel state
+        RoycoAccountantState storage $ = RoycoAccountantStorageLib._getRoycoAccountantStorage();
+
+        // Compute the deltas in the raw NAVs of each tranche
+        // The deltas represent the unrealized PNL of the underlying investment since the last NAV checkpoints
+        int256 deltaST = _computeRawNAVDelta(_stRawNAV, $.lastSTRawNAV);
+        int256 deltaJT = _computeRawNAVDelta(_jtRawNAV, $.lastJTRawNAV);
+
+        // Cache the last checkpointed effective NAV and coverage debt for each tranche
+        uint256 stEffectiveNAV = $.lastSTEffectiveNAV;
+        uint256 jtEffectiveNAV = $.lastJTEffectiveNAV;
+        uint256 stCoverageDebt = $.lastSTCoverageDebt;
+        uint256 jtCoverageDebt = $.lastJTCoverageDebt;
+        uint256 stProtocolFeeAccrued;
+        uint256 jtProtocolFeeAccrued;
+
+        /// @dev STEP_APPLY_JT_LOSS: The JT assets depreciated in value
+        if (deltaJT < 0) {
+            /// @dev STEP_JT_ABSORB_LOSS: JT's remaning loss-absorption buffer incurs as much of the loss as possible
+            uint256 jtLoss = uint256(-deltaJT);
+            uint256 jtAbsorbableLoss = Math.min(jtLoss, jtEffectiveNAV);
+            if (jtAbsorbableLoss != 0) {
+                // Incur the maximum absorbable losses to remaining JT loss capital
+                jtEffectiveNAV -= jtAbsorbableLoss;
+                // Reduce the residual JT loss by the loss absorbed
+                jtLoss -= jtAbsorbableLoss;
+            }
+            /// @dev STEP_ST_INCURS_RESIDUAL_LOSSES: Residual loss after emptying JT's remaning loss-absorption buffer are incurred by ST
+            if (jtLoss != 0) {
+                // The excess loss is absorbed by ST
+                stEffectiveNAV -= jtLoss;
+                // Repay ST debt to JT
+                // This is equivalent to retroactively reducing previously applied coverage
+                // Thus, the liability is flipped to JT debt to ST
+                stCoverageDebt -= jtLoss;
+                jtCoverageDebt += jtLoss;
+            }
+            /// @dev STEP_APPLY_JT_GAIN: The JT assets appreciated in value
+        } else if (deltaJT > 0) {
+            uint256 jtGain = uint256(deltaJT);
+            /// @dev STEP_REPAY_JT_COVERAGE_DEBT: Pay off any JT debt to ST (previously uncovered losses)
+            uint256 jtDebtRepayment = Math.min(jtGain, jtCoverageDebt);
+            if (jtDebtRepayment != 0) {
+                // Repay JT debt to ST
+                // This is equivalent to retroactively applying coverage for previously uncovered losses
+                // Thus, the liability is flipped to ST debt to JT
+                jtCoverageDebt -= jtDebtRepayment;
+                stCoverageDebt += jtDebtRepayment;
+                // Apply the repayment (retroactive coverage) to the ST
+                stEffectiveNAV += jtDebtRepayment;
+                jtGain -= jtDebtRepayment;
+            }
+            /// @dev STEP_JT_ACCRUES_RESIDUAL_GAINS: JT accrues any remaining appreciation after repaying liabilities
+            if (jtGain != 0) {
+                // Compute the protocol fee taken on this JT yield accrual - will be used to mint JT shares to the protocol fee recipient at the updated JT effective NAV
+                jtProtocolFeeAccrued = jtGain.mulDiv($.protocolFeeWAD, ConstantsLib.WAD, Math.Rounding.Floor);
+                // Book the residual gains to the JT
+                jtEffectiveNAV += jtGain;
+            }
+        }
+
+        /// @dev STEP_APPLY_ST_LOSS: The ST assets depreciated in value
+        if (deltaST < 0) {
+            uint256 stLoss = uint256(-deltaST);
+            /// @dev STEP_APPLY_JT_COVERAGE_TO_ST: Apply any possible coverage to ST provided by JT's loss-absorption buffer
+            uint256 coverageApplied = Math.min(stLoss, jtEffectiveNAV);
+            if (coverageApplied != 0) {
+                jtEffectiveNAV -= coverageApplied;
+                // Any coverage provided is a ST liability to JT
+                stCoverageDebt += coverageApplied;
+            }
+            /// @dev STEP_ST_INCURS_RESIDUAL_LOSSES: Apply any uncovered losses by JT to ST
+            uint256 netStLoss = stLoss - coverageApplied;
+            if (netStLoss != 0) {
+                // Apply residual losses to ST
+                stEffectiveNAV -= netStLoss;
+                // The uncovered portion of the ST loss is a JT liability to ST
+                jtCoverageDebt += netStLoss;
+            }
+            /// @dev STEP_APPLY_ST_GAIN: The ST assets appreciated in value
+        } else if (deltaST > 0) {
+            uint256 stGain = uint256(deltaST);
+            /// @dev STEP_REPAY_JT_COVERAGE_DEBT: The first priority of repayment to reverse the loss-waterfall is making ST whole again
+            // Repay JT debt to ST: previously uncovered ST losses
+            uint256 debtRepayment = Math.min(stGain, jtCoverageDebt);
+            if (debtRepayment != 0) {
+                // Pay back JT debt to ST: making ST whole again
+                stEffectiveNAV += debtRepayment;
+                jtCoverageDebt -= debtRepayment;
+                // Deduct the repayment from the ST gains and return if no gains are left
+                stGain -= debtRepayment;
+            }
+            /// @dev STEP_REPAY_ST_COVERAGE_DEBT: The second priority of repayment to reverse the loss-waterfall is making JT whole again
+            // Repay ST debt to JT: previously applied coverage from JT to ST
+            debtRepayment = Math.min(stGain, stCoverageDebt);
+            if (debtRepayment != 0) {
+                // Pay back ST debt to JT: making JT whole again
+                jtEffectiveNAV += debtRepayment;
+                stCoverageDebt -= debtRepayment;
+                // Deduct the repayment from the remaining ST gains and return if no gains are left
+                stGain -= debtRepayment;
+            }
+            /// @dev STEP_DISTRIBUTE_YIELD: There are no remaining debts in the system, the residual gains will be used to distribute yield to both tranches
+            if (stGain != 0) {
+                // Compute the time weighted average JT share of yield
+                uint256 elapsed = block.timestamp - $.lastDistributionTimestamp;
+                uint256 protocolFeeWAD = $.protocolFeeWAD;
+                // If the last yield distribution wasn't in this block, split the yield between ST and JT
+                if (elapsed != 0) {
+                    // Compute the ST gain allocated to JT based on its time weighted yield share since the last distribution, rounding in favor of the senior tranche
+                    uint256 jtGain = stGain.mulDiv((_twJTYieldShareAccruedWAD / elapsed), ConstantsLib.WAD, Math.Rounding.Floor);
+                    // Apply the yield split to JT's effective NAV
+                    if (jtGain != 0) {
+                        // Compute the protocol fee taken on this JT yield accrual (will be used to mint shares to the protocol fee recipient) at the updated JT effective NAV
+                        jtProtocolFeeAccrued += jtGain.mulDiv(protocolFeeWAD, ConstantsLib.WAD, Math.Rounding.Floor);
+                        jtEffectiveNAV += jtGain;
+                        stGain -= jtGain;
+                        yieldDistributed = true;
+                    }
+                }
+                // Compute the protocol fee taken on this ST yield accrual (will be used to mint shares to the protocol fee recipient) at the updated JT effective NAV
+                stProtocolFeeAccrued = stGain.mulDiv(protocolFeeWAD, ConstantsLib.WAD, Math.Rounding.Floor);
+                // Book the residual gain to the ST
+                stEffectiveNAV += stGain;
+            }
+        }
+        // Enforce the NAV conservation invariant
+        require((_stRawNAV + _jtRawNAV) == (stEffectiveNAV + jtEffectiveNAV), NAV_CONSERVATION_VIOLATION());
+        // Construct the synced NAVs packet to return to the caller
+        packet =
+            SyncedNAVsPacket(_stRawNAV, _jtRawNAV, stEffectiveNAV, jtEffectiveNAV, stCoverageDebt, jtCoverageDebt, stProtocolFeeAccrued, jtProtocolFeeAccrued);
+    }
+
+    /**
+     * @notice Accrues the JT yield share since the last yield distribution
+     * @dev Gets the instantaneous JT yield share and accumulates it over the time elapsed since the last accrual
+     * @return The updated time-weighted JT yield share since the last yield distribution
+     */
+    function _accrueJTYieldShare() internal returns (uint192) {
+        // Get the storage pointer to the base kernel state
+        RoycoAccountantState storage $ = RoycoAccountantStorageLib._getRoycoAccountantStorage();
+
+        // Get the last update timestamp
+        uint256 lastUpdate = $.lastAccrualTimestamp;
+        if (lastUpdate == 0) {
+            $.lastAccrualTimestamp = uint32(block.timestamp);
+            return 0;
+        }
+
+        // Compute the elapsed time since the last update
+        uint256 elapsed = block.timestamp - lastUpdate;
+        // Preemptively return if last accrual was in the same block
+        if (elapsed == 0) return $.twJTYieldShareAccruedWAD;
+
+        // Get the instantaneous JT yield share, scaled by WAD
+        uint256 jtYieldShareWAD = IRDM($.rdm).jtYieldShare($.lastSTRawNAV, $.lastJTRawNAV, $.betaWAD, $.coverageWAD, $.lastJTEffectiveNAV);
+        // Accrue the time-weighted yield share accrued to JT since the last tranche interaction
+        $.lastAccrualTimestamp = uint32(block.timestamp);
+        return ($.twJTYieldShareAccruedWAD += uint192(jtYieldShareWAD * elapsed));
+    }
+
+    /**
+     * @notice Computes and returns the currently accrued JT yield share since the last yield distribution
      * @dev Gets the instantaneous JT yield share and accumulates it over the time elapsed since the last accrual
      * @return The updated time-weighted JT yield share since the last yield distribution
      */
@@ -387,8 +416,7 @@ contract RoycoAccountant is Initializable, IRoycoAccountant {
         if (elapsed == 0) return $.twJTYieldShareAccruedWAD;
 
         // Get the instantaneous JT yield share, scaled by WAD
-        // TODO: add a non-view funcs for stateful RDMs
-        uint256 jtYieldShareWAD = IRDM($.rdm).getJTYieldShare($.lastSTRawNAV, $.lastJTRawNAV, $.betaWAD, $.coverageWAD, $.lastJTEffectiveNAV);
+        uint256 jtYieldShareWAD = IRDM($.rdm).previewJTYieldShare($.lastSTRawNAV, $.lastJTRawNAV, $.betaWAD, $.coverageWAD, $.lastJTEffectiveNAV);
         // Apply the accural of JT yield share to the accumulator, weighted by the time elapsed
         return ($.twJTYieldShareAccruedWAD + uint192(jtYieldShareWAD * elapsed));
     }
