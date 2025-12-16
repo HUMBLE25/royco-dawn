@@ -11,9 +11,8 @@ import { RoycoRoles } from "./auth/RoycoRoles.sol";
 import { IRoycoAccountant } from "./interfaces/IRoycoAccountant.sol";
 import { IRoycoAuth } from "./interfaces/IRoycoAuth.sol";
 import { IRoycoKernel } from "./interfaces/kernel/IRoycoKernel.sol";
-import { IERC7540 } from "./interfaces/tranche/IERC7540.sol";
-import { IERC7540 } from "./interfaces/tranche/IERC7540.sol";
-import { IERC7887 } from "./interfaces/tranche/IERC7887.sol";
+import { IRoycoAsyncCancellableVault } from "./interfaces/tranche/IRoycoAsyncCancellableVault.sol";
+import { IRoycoAsyncVault } from "./interfaces/tranche/IRoycoAsyncVault.sol";
 import { IRoycoVaultTranche } from "./interfaces/tranche/IRoycoVaultTranche.sol";
 import { TrancheDeploymentParams } from "./libraries/Types.sol";
 import { DeployedContracts, MarketDeploymentParams } from "./libraries/Types.sol";
@@ -217,15 +216,14 @@ contract RoycoFactory is AccessManager, RoycoRoles {
         _setTargetFunctionRole(address(_tranche), UUPSUpgradeable.upgradeToAndCall.selector, UPGRADER_ROLE);
         _setTargetFunctionRole(address(_tranche), IRoycoAuth.pause.selector, PAUSER_ROLE);
         _setTargetFunctionRole(address(_tranche), IRoycoAuth.unpause.selector, PAUSER_ROLE);
-        _setTargetFunctionRole(address(_tranche), IERC4626.deposit.selector, DEPOSIT_ROLE);
-        _setTargetFunctionRole(address(_tranche), IERC7540.deposit.selector, DEPOSIT_ROLE);
-        _setTargetFunctionRole(address(_tranche), IERC7540.withdraw.selector, REDEEM_ROLE);
-        _setTargetFunctionRole(address(_tranche), IERC7540.requestDeposit.selector, DEPOSIT_ROLE);
-        _setTargetFunctionRole(address(_tranche), IERC7540.requestRedeem.selector, REDEEM_ROLE);
-        _setTargetFunctionRole(address(_tranche), IERC7887.cancelDepositRequest.selector, CANCEL_DEPOSIT_ROLE);
-        _setTargetFunctionRole(address(_tranche), IERC7887.cancelRedeemRequest.selector, CANCEL_REDEEM_ROLE);
-        _setTargetFunctionRole(address(_tranche), IERC7887.claimCancelDepositRequest.selector, CANCEL_DEPOSIT_ROLE);
-        _setTargetFunctionRole(address(_tranche), IERC7887.claimCancelRedeemRequest.selector, CANCEL_REDEEM_ROLE);
+        _setTargetFunctionRole(address(_tranche), IRoycoVaultTranche.deposit.selector, DEPOSIT_ROLE);
+        _setTargetFunctionRole(address(_tranche), IRoycoVaultTranche.redeem.selector, REDEEM_ROLE);
+        _setTargetFunctionRole(address(_tranche), IRoycoAsyncVault.requestDeposit.selector, DEPOSIT_ROLE);
+        _setTargetFunctionRole(address(_tranche), IRoycoAsyncVault.requestRedeem.selector, REDEEM_ROLE);
+        _setTargetFunctionRole(address(_tranche), IRoycoAsyncCancellableVault.cancelDepositRequest.selector, CANCEL_DEPOSIT_ROLE);
+        _setTargetFunctionRole(address(_tranche), IRoycoAsyncCancellableVault.cancelRedeemRequest.selector, CANCEL_REDEEM_ROLE);
+        _setTargetFunctionRole(address(_tranche), IRoycoAsyncCancellableVault.claimCancelDepositRequest.selector, CANCEL_DEPOSIT_ROLE);
+        _setTargetFunctionRole(address(_tranche), IRoycoAsyncCancellableVault.claimCancelRedeemRequest.selector, CANCEL_REDEEM_ROLE);
     }
 
     /// @notice Deploys a tranche using ERC1967 proxy deterministically

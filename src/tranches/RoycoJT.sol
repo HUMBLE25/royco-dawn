@@ -5,7 +5,6 @@ import { TrancheDeploymentParams } from "../libraries/Types.sol";
 import { TrancheType } from "../libraries/Types.sol";
 import { RoycoVaultTranche } from "./RoycoVaultTranche.sol";
 
-// TODO: ST and JT base asset can have different decimals
 contract RoycoJT is RoycoVaultTranche {
     /// @notice Initializes the Royco junior tranche
     /// @param _jtParams Deployment parameters including name, symbol, kernel, and kernel initialization data for the junior tranche

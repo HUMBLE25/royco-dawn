@@ -7,6 +7,8 @@ import { TrancheType } from "./Types.sol";
 /// @notice Storage state for Royco Tranche contracts
 /// @custom:storage-location erc7201:Royco.storage.RoycoTrancheState
 /// @custom:field kernel - The address of the kernel contract handling strategy logic
+/// @custom:field underlyingAssetDecimals - The decimals of the tranche's underlying asset
+/// @custom:field asset - The address of the tranche's deposit asset
 /// @custom:field marketId - The identifier of the Royco market this tranche is linked to
 /// @custom:field decimalsOffset - Decimals offset for share token precision
 /// @custom:field DEPOSIT_EXECUTION_MODEL - The kernel execution model for deposit operations
@@ -16,8 +18,10 @@ import { TrancheType } from "./Types.sol";
 /// @custom:field isOperator - Nested mapping tracking operator approvals for owners
 struct RoycoTrancheState {
     address kernel;
-    bytes32 marketId;
+    uint8 underlyingAssetDecimals;
+    address asset;
     uint8 decimalsOffset;
+    bytes32 marketId;
     ExecutionModel DEPOSIT_EXECUTION_MODEL;
     ExecutionModel WITHDRAW_EXECUTION_MODEL;
     RequestRedeemSharesBehavior REQUEST_REDEEM_SHARES_ST_BEHAVIOR;
@@ -45,23 +49,37 @@ library RoycoTrancheStorageLib {
     /// @notice Initializes the tranche storage state
     /// @dev Sets up all initial parameters and validates fee constraints
     /// @param _kernel The address of the kernel contract handling strategy logic
+    /// @param _asset The address of the tranche's deposit asset
     /// @param _marketId The identifier of the Royco market this tranche is linked to
+    /// @param _underlyingAssetDecimals The decimals of the tranche's underlying asset
     /// @param _decimalsOffset Decimals offset for share token precision
+
     /// @param _trancheType The type of the tranche
-    function __RoycoTranche_init(address _kernel, bytes32 _marketId, uint8 _decimalsOffset, TrancheType _trancheType) internal {
+    function __RoycoTranche_init(
+        address _kernel,
+        address _asset,
+        bytes32 _marketId,
+        uint8 _underlyingAssetDecimals,
+        uint8 _decimalsOffset,
+        TrancheType _trancheType
+    )
+        internal
+    {
         // Set the initial state of the tranche
         RoycoTrancheState storage $ = _getRoycoTrancheStorage();
         $.kernel = _kernel;
+        $.asset = _asset;
         $.marketId = _marketId;
+        $.underlyingAssetDecimals = _underlyingAssetDecimals;
         $.decimalsOffset = _decimalsOffset;
         $.REQUEST_REDEEM_SHARES_ST_BEHAVIOR = IRoycoKernel(_kernel).ST_REQUEST_REDEEM_SHARES_BEHAVIOR();
         $.REQUEST_REDEEM_SHARES_JT_BEHAVIOR = IRoycoKernel(_kernel).JT_REQUEST_REDEEM_SHARES_BEHAVIOR();
         if (_trancheType == TrancheType.SENIOR) {
-            $.DEPOSIT_EXECUTION_MODEL = IRoycoKernel(_kernel).ST_DEPOSIT_EXECUTION_MODEL();
-            $.WITHDRAW_EXECUTION_MODEL = IRoycoKernel(_kernel).ST_WITHDRAWAL_EXECUTION_MODEL();
+            $.DEPOSIT_EXECUTION_MODEL = IRoycoKernel(_kernel).ST_INCREASE_NAV_EXECUTION_MODEL();
+            $.WITHDRAW_EXECUTION_MODEL = IRoycoKernel(_kernel).ST_DECREASE_NAVAL_EXECUTION_MODEL();
         } else {
-            $.DEPOSIT_EXECUTION_MODEL = IRoycoKernel(_kernel).JT_DEPOSIT_EXECUTION_MODEL();
-            $.WITHDRAW_EXECUTION_MODEL = IRoycoKernel(_kernel).JT_WITHDRAWAL_EXECUTION_MODEL();
+            $.DEPOSIT_EXECUTION_MODEL = IRoycoKernel(_kernel).JT_INCREASE_NAV_EXECUTION_MODEL();
+            $.WITHDRAW_EXECUTION_MODEL = IRoycoKernel(_kernel).JT_DECREASE_NAVAL_EXECUTION_MODEL();
         }
     }
 }

@@ -5,7 +5,7 @@ import { RoycoBase } from "../../base/RoycoBase.sol";
 import { IRoycoKernel } from "../../interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoVaultTranche } from "../../interfaces/tranche/IRoycoVaultTranche.sol";
 import { RoycoKernelInitParams, RoycoKernelState, RoycoKernelStorageLib } from "../../libraries/RoycoKernelStorageLib.sol";
-import { AccountingState } from "../../libraries/Types.sol";
+import { SyncedAccountingState } from "../../libraries/Types.sol";
 import { Math } from "../../libraries/UtilsLib.sol";
 import { IRoycoAccountant, Operation } from "./../../interfaces/IRoycoAccountant.sol";
 
@@ -99,7 +99,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
      * @dev Only executes a pre-op sync because there is no operation being executed in the same call as this sync
      * @return state The NAV sync state containing all mark to market accounting data
      */
-    function syncTrancheNAVs() external override(IRoycoKernel) restricted returns (AccountingState memory state) {
+    function syncTrancheNAVs() external override(IRoycoKernel) restricted returns (SyncedAccountingState memory state) {
         return _preOpSyncTrancheNAVs();
     }
 
@@ -108,7 +108,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
      * @dev Does not mutate any state
      * @return state The NAV sync state containing all mark to market accounting data
      */
-    function previewSyncTrancheNAVs() public view override(IRoycoKernel) returns (AccountingState memory state) {
+    function previewSyncTrancheNAVs() public view override(IRoycoKernel) returns (SyncedAccountingState memory state) {
         return _accountant().previewSyncTrancheNAVs(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV());
     }
 
@@ -117,7 +117,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
      * @dev Should be called on every NAV mutating user operation
      * @return state The NAV sync state containing all mark to market accounting data
      */
-    function _preOpSyncTrancheNAVs() internal returns (AccountingState memory state) {
+    function _preOpSyncTrancheNAVs() internal returns (SyncedAccountingState memory state) {
         // Execute the pre-op sync via the accountant
         state = _accountant().preOpSyncTrancheNAVs(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV());
 

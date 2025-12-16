@@ -2,7 +2,9 @@
 pragma solidity ^0.8.28;
 
 import { RoycoKernelState } from "../../libraries/RoycoKernelStorageLib.sol";
-import { AccountingState, AssetClaims, ExecutionModel, NAV_UNIT, RequestRedeemSharesBehavior, TRANCHE_UNIT } from "../../libraries/Types.sol";
+import { AssetClaims, ExecutionModel, RequestRedeemSharesBehavior, SyncedAccountingState } from "../../libraries/Types.sol";
+import { TrancheType } from "../../libraries/Types.sol";
+import { NAV_UNIT, TRANCHE_UNIT } from "../../libraries/Units.sol";
 
 /**
  * @title IRoycoKernel
@@ -21,11 +23,11 @@ interface IRoycoKernel {
     function ST_REQUEST_REDEEM_SHARES_BEHAVIOR() external pure returns (RequestRedeemSharesBehavior);
     function JT_REQUEST_REDEEM_SHARES_BEHAVIOR() external pure returns (RequestRedeemSharesBehavior);
 
-    function ST_DEPOSIT_EXECUTION_MODEL() external pure returns (ExecutionModel);
-    function ST_WITHDRAWAL_EXECUTION_MODEL() external pure returns (ExecutionModel);
+    function ST_INCREASE_NAV_EXECUTION_MODEL() external pure returns (ExecutionModel);
+    function ST_DECREASE_NAVAL_EXECUTION_MODEL() external pure returns (ExecutionModel);
 
-    function JT_DEPOSIT_EXECUTION_MODEL() external pure returns (ExecutionModel);
-    function JT_WITHDRAWAL_EXECUTION_MODEL() external pure returns (ExecutionModel);
+    function JT_INCREASE_NAV_EXECUTION_MODEL() external pure returns (ExecutionModel);
+    function JT_DECREASE_NAVAL_EXECUTION_MODEL() external pure returns (ExecutionModel);
 
     function getSTRawNAV() external view returns (NAV_UNIT nav);
     function getJTRawNAV() external view returns (NAV_UNIT nav);
@@ -33,42 +35,47 @@ interface IRoycoKernel {
     function getSTTotalEffectiveAssets() external view returns (AssetClaims memory claims);
     function getJTTotalEffectiveAssets() external view returns (AssetClaims memory claims);
 
-    function syncTrancheNAVs() external returns (AccountingState memory state);
+    function syncTrancheNAVs(TrancheType _trancheType) external returns (SyncedAccountingState memory state, AssetClaims memory claims);
 
-    function previewSyncTrancheNAVs() external view returns (AccountingState memory state);
+    function previewSyncTrancheNAVs(TrancheType _trancheType) external view returns (SyncedAccountingState memory state, AssetClaims memory claims);
 
-    function stMaxDeposit(address _asset, address _receiver) external view returns (TRANCHE_UNIT assets);
+    function stMaxDeposit(address _receiver) external view returns (TRANCHE_UNIT assets);
 
-    function stMaxWithdrawableAssets(address _asset, address _owner) external view returns (AssetClaims memory claims);
-
-    // Assumes that the funds are transferred to the kernel before the deposit call is made
-    function stDeposit(address _asset, uint256 _assets, address _caller, address _receiver) external returns (NAV_UNIT valueAllocated, NAV_UNIT navToMintAt);
-
-    function stRedeem(
-        address _asset,
-        uint256 _shares,
-        uint256 _totalShares,
-        address _controller,
-        address _receiver
-    )
-        external
-        returns (AssetClaims memory claims);
-
-    function jtMaxDeposit(address _asset, address _receiver) external view returns (TRANCHE_UNIT assets);
-    function jtMaxWithdrawableAssets(address _asset, address _owner) external view returns (AssetClaims memory claims);
+    function stMaxWithdrawableAssets(address _owner) external view returns (NAV_UNIT maxWithdrawableNAV);
 
     // Assumes that the funds are transferred to the kernel before the deposit call is made
-    function jtDeposit(address _asset, uint256 _assets, address _caller, address _receiver) external returns (NAV_UNIT valueAllocated, NAV_UNIT navToMintAt);
+    function stDeposit(TRANCHE_UNIT _assets, address _caller, address _receiver) external returns (NAV_UNIT valueAllocated, NAV_UNIT navToMintAt);
 
-    function jtRedeem(
-        address _asset,
-        uint256 _shares,
-        uint256 _totalShares,
-        address _controller,
-        address _receiver
-    )
-        external
-        returns (AssetClaims memory claims);
+    function stRedeem(uint256 _shares, address _controller, address _receiver) external returns (AssetClaims memory claims);
+
+    function jtMaxDeposit(address _receiver) external view returns (TRANCHE_UNIT assets);
+
+    function jtMaxWithdrawableAssets(address _owner) external view returns (NAV_UNIT maxWithdrawableNAV);
+
+    /// @notice Converts the specified ST assets denominated in its tranche units to the kernel's NAV units
+    /// @param _stAssets The ST assets denominated in tranche units to convert to the kernel's NAV units
+    /// @return The specified ST assets denominated in its tranche units converted to the kernel's NAV units
+    function stConvertTrancheUnitsToNAVUnits(TRANCHE_UNIT _stAssets) external view returns (NAV_UNIT);
+
+    /// @notice Converts the specified JT assets denominated in its tranche units to the kernel's NAV units
+    /// @param _jtAssets The JT assets denominated in tranche units to convert to the kernel's NAV units
+    /// @return The specified JT assets denominated in its tranche units converted to the kernel's NAV units
+    function jtConvertTrancheUnitsToNAVUnits(TRANCHE_UNIT _jtAssets) external view returns (NAV_UNIT);
+
+    /// @notice Converts the specified assets denominated in the kernel's NAV units to assets denominated in ST's tranche units
+    /// @param _navAssets The NAV of the assets denominated in the kernel's NAV units to convert to assets denominated in ST's tranche units
+    /// @return The specified NAV of the assets denominated in the kernel's NAV units converted to assets denominated in ST's tranche units
+    function stConvertNAVUnitsToTrancheUnits(NAV_UNIT _navAssets) external view returns (TRANCHE_UNIT);
+
+    /// @notice Converts the specified assets denominated in the kernel's NAV units to assets denominated in JT's tranche units
+    /// @param _navAssets The NAV of the assets denominated in the kernel's NAV units to convert to assets denominated in JT's tranche units
+    /// @return The specified NAV of the assets denominated in the kernel's NAV units converted to assets denominated in JT's tranche units
+    function jtConvertNAVUnitsToTrancheUnits(NAV_UNIT _navAssets) external view returns (TRANCHE_UNIT);
+
+    // Assumes that the funds are transferred to the kernel before the deposit call is made
+    function jtDeposit(TRANCHE_UNIT _assets, address _caller, address _receiver) external returns (NAV_UNIT valueAllocated, NAV_UNIT navToMintAt);
+
+    function jtRedeem(uint256 _shares, address _controller, address _receiver) external returns (AssetClaims memory claims);
 
     function getState() external view returns (RoycoKernelState memory);
 }

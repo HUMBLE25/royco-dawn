@@ -13,7 +13,6 @@ import { RoycoRoles } from "../../src/auth/RoycoRoles.sol";
 import { IRoycoKernel } from "../../src/interfaces/KERNEL/IRoycoKernel.sol";
 import { ERC4626ST_AaveV3JT_Kernel } from "../../src/kernels/ERC4626ST_AaveV3JT_Kernel.sol";
 import { RoycoKernel } from "../../src/kernels/base/RoycoKernel.sol";
-import { ConstantsLib } from "../../src/libraries/ConstantsLib.sol";
 import { RoycoAccountantInitParams } from "../../src/libraries/RoycoAccountantStorageLib.sol";
 import { RoycoKernelInitParams } from "../../src/libraries/RoycoKernelStorageLib.sol";
 import { RoycoJT } from "../../src/tranches/RoycoJT.sol";

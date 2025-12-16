@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import { Math } from "../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 import { StaticCurveRDM } from "../../src/RDM/StaticCurveRDM.sol";
-import { ConstantsLib } from "../../src/libraries/ConstantsLib.sol";
+import { WAD } from "../../src/libraries/Constants.sol";
 import { UtilsLib } from "../../src/libraries/UtilsLib.sol";
 import { BaseTest } from "../base/BaseTest.sol";
 
@@ -17,7 +17,6 @@ contract StaticCurveRDMTest is BaseTest {
     uint256 public constant BASE_RATE_GTE_TARGET_UTIL = 0.225e18;
 
     // Test parameters
-    uint256 public constant WAD = ConstantsLib.WAD;
     uint256 public constant BETA_100_PCT = WAD; // 100% beta
     uint256 public constant COVERAGE_100_PCT = WAD; // 100% coverage
 
