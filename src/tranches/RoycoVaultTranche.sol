@@ -131,6 +131,9 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC4626Upg
 
     /// @inheritdoc ERC4626Upgradeable
     function totalAssets() public view virtual override(ERC4626Upgradeable) returns (uint256) {
+        revert DISABLED();
+        // TODO: Overload this function to return the total effective assets in the tranche's NAV units
+
         return (TRANCHE_TYPE() == TrancheType.SENIOR ? IRoycoKernel(kernel()).getSTTotalEffectiveAssets() : IRoycoKernel(kernel()).getJTTotalEffectiveAssets());
     }
 
@@ -714,7 +717,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC4626Upg
             _burn(address(this), _shares);
         }
 
-        emit Withdraw(_caller, _receiver, _owner, _assets, _shares);
+        // TODO: Describe why we don't emit Withdraw here
     }
 
     /**
