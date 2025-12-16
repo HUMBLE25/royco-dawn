@@ -4,7 +4,8 @@ pragma solidity ^0.8.28;
 import { IRDM } from "../interfaces/IRDM.sol";
 
 import { Math } from "../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
-import { ConstantsLib } from "../libraries/Constants.sol";
+import { WAD } from "../libraries/Constants.sol";
+import { NAV_UNIT } from "../libraries/Units.sol";
 import { UtilsLib } from "../libraries/UtilsLib.sol";
 
 /**
@@ -35,11 +36,11 @@ contract StaticCurveRDM is IRDM {
 
     /// @inheritdoc IRDM
     function previewJTYieldShare(
-        uint256 _stRawNAV,
-        uint256 _jtRawNAV,
+        NAV_UNIT _stRawNAV,
+        NAV_UNIT _jtRawNAV,
         uint256 _betaWAD,
         uint256 _coverageWAD,
-        uint256 _jtEffectiveNAV
+        NAV_UNIT _jtEffectiveNAV
     )
         external
         pure
@@ -50,11 +51,11 @@ contract StaticCurveRDM is IRDM {
 
     /// @inheritdoc IRDM
     function jtYieldShare(
-        uint256 _stRawNAV,
-        uint256 _jtRawNAV,
+        NAV_UNIT _stRawNAV,
+        NAV_UNIT _jtRawNAV,
         uint256 _betaWAD,
         uint256 _coverageWAD,
-        uint256 _jtEffectiveNAV
+        NAV_UNIT _jtEffectiveNAV
     )
         external
         pure
@@ -65,11 +66,11 @@ contract StaticCurveRDM is IRDM {
 
     /// @dev Pure helper to compute the instantaneous JT yield share based on the static curve's output
     function _computeJTYieldShare(
-        uint256 _stRawNAV,
-        uint256 _jtRawNAV,
+        NAV_UNIT _stRawNAV,
+        NAV_UNIT _jtRawNAV,
         uint256 _betaWAD,
         uint256 _coverageWAD,
-        uint256 _jtEffectiveNAV
+        NAV_UNIT _jtEffectiveNAV
     )
         internal
         pure
