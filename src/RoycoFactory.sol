@@ -20,11 +20,11 @@ import { DeployedContracts, MarketDeploymentParams } from "./libraries/Types.sol
 import { RoycoJT } from "./tranches/RoycoJT.sol";
 import { RoycoST } from "./tranches/RoycoST.sol";
 
-/// @title RoycoTrancheFactory
+/// @title RoycoFactory
 /// @notice Factory contract for deploying Royco tranches (ST and JT) and their associated kernel using ERC1967 proxies
 /// @notice The factory also acts as the shared access manager for all the Royco market
 /// @dev This factory deploys upgradeable tranche contracts using the UUPS proxy pattern
-contract RoycoTrancheFactory is AccessManager, RoycoRoles {
+contract RoycoFactory is AccessManager, RoycoRoles {
     /// @notice Thrown when an invalid name is provided
     error InvalidName();
     /// @notice Thrown when an invalid symbol is provided
@@ -108,7 +108,8 @@ contract RoycoTrancheFactory is AccessManager, RoycoRoles {
 
     /// @notice Deploys the contracts for a new market
     /// @param _params The parameters for deploying a new market
-    function _deployContracts(MarketDeploymentParams calldata _params) internal returns (DeployedContracts memory deployedContracts) {
+    /// @return deployedContracts The deployed contracts
+    function _deployContracts(MarketDeploymentParams calldata _params) internal virtual returns (DeployedContracts memory deployedContracts) {
         // Deploy the kernel, accountant and tranches with empty initialization data
         // It is expected that the kernel initialization data contains the address of the accountant and vice versa
         // Therefore, it is expected that the proxy address is precomputed based on an uninitialized erc1967 proxy initcode

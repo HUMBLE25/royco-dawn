@@ -12,7 +12,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
 
     function setUp() public {
         _setUpRoyco();
-        _setUpTrancheRoles(address(JT), providers, PAUSER_ADDRESS, UPGRADER_ADDRESS, SCHEDULER_MANAGER_ADDRESS);
+        _setUpTrancheRoles(providers, PAUSER_ADDRESS, UPGRADER_ADDRESS);
     }
 
     function testFuzz_depositIntoJT(uint256 _assets) external {

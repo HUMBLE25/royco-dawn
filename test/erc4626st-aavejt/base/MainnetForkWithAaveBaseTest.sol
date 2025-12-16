@@ -75,7 +75,6 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
         // Deal to admin/role addresses
         deal(ETHEREUM_MAINNET_USDC_ADDRESS, OWNER_ADDRESS, usdcAmount);
         deal(ETHEREUM_MAINNET_USDC_ADDRESS, PAUSER_ADDRESS, usdcAmount);
-        deal(ETHEREUM_MAINNET_USDC_ADDRESS, SCHEDULER_MANAGER_ADDRESS, usdcAmount);
         deal(ETHEREUM_MAINNET_USDC_ADDRESS, UPGRADER_ADDRESS, usdcAmount);
         deal(ETHEREUM_MAINNET_USDC_ADDRESS, PROTOCOL_FEE_RECIPIENT_ADDRESS, usdcAmount);
 

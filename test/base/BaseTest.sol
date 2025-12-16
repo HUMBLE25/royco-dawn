@@ -6,7 +6,7 @@ import { Vm } from "../../lib/forge-std/src/Vm.sol";
 import { ERC20Mock } from "../../lib/openzeppelin-contracts/contracts/mocks/token/ERC20Mock.sol";
 import { ERC1967Proxy } from "../../lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import { StaticCurveRDM } from "../../src/RDM/StaticCurveRDM.sol";
-import { RoycoTrancheFactory } from "../../src/RoycoTrancheFactory.sol";
+import { RoycoFactory } from "../../src/RoycoFactory.sol";
 import { RoycoAccountant } from "../../src/accountant/RoycoAccountant.sol";
 import { RoycoAuth } from "../../src/auth/RoycoAuth.sol";
 import { RoycoRoles } from "../../src/auth/RoycoRoles.sol";
@@ -37,9 +37,6 @@ contract BaseTest is Test, RoycoRoles {
 
     Vm.Wallet internal PAUSER;
     address internal PAUSER_ADDRESS;
-
-    Vm.Wallet internal SCHEDULER_MANAGER;
-    address internal SCHEDULER_MANAGER_ADDRESS;
 
     Vm.Wallet internal UPGRADER;
     address internal UPGRADER_ADDRESS;
@@ -73,7 +70,7 @@ contract BaseTest is Test, RoycoRoles {
     // -----------------------------------------
 
     // Initial Deployments
-    RoycoTrancheFactory public FACTORY;
+    RoycoFactory public FACTORY;
     StaticCurveRDM public RDM;
     RoycoST public ST_IMPL;
     RoycoJT public JT_IMPL;
@@ -142,7 +139,7 @@ contract BaseTest is Test, RoycoRoles {
         vm.label(address(ERC4626ST_AAVEV3JT_KERNEL_IMPL), "KernelImpl");
 
         // Deploy FACTORY
-        FACTORY = new RoycoTrancheFactory(OWNER_ADDRESS);
+        FACTORY = new RoycoFactory(OWNER_ADDRESS);
         vm.label(address(FACTORY), "Factory");
 
         _setupFactoryAuth();
@@ -180,7 +177,6 @@ contract BaseTest is Test, RoycoRoles {
         // Init wallets with 1000 ETH each
         OWNER = _initWallet("OWNER", 1000 ether);
         PAUSER = _initWallet("PAUSER", 1000 ether);
-        SCHEDULER_MANAGER = _initWallet("SCHEDULER_MANAGER", 1000 ether);
         UPGRADER = _initWallet("UPGRADER", 1000 ether);
         ALICE = _initWallet("ALICE", 1000 ether);
         BOB = _initWallet("BOB", 1000 ether);
@@ -191,7 +187,6 @@ contract BaseTest is Test, RoycoRoles {
         // Set addresses
         OWNER_ADDRESS = OWNER.addr;
         PAUSER_ADDRESS = PAUSER.addr;
-        SCHEDULER_MANAGER_ADDRESS = SCHEDULER_MANAGER.addr;
         UPGRADER_ADDRESS = UPGRADER.addr;
         ALICE_ADDRESS = ALICE.addr;
         BOB_ADDRESS = BOB.addr;
@@ -215,6 +210,7 @@ contract BaseTest is Test, RoycoRoles {
         vm.label(address(ST), "ST");
         vm.label(address(JT), "JT");
         vm.label(address(KERNEL), "Kernel");
+        vm.label(address(ACCOUNTANT), "Accountant");
     }
 
     function _initWallet(string memory _name, uint256 _amount) internal returns (Vm.Wallet memory) {
@@ -225,24 +221,12 @@ contract BaseTest is Test, RoycoRoles {
     }
 
     /// @notice Sets up roles for a tranche
-    /// @param _tranche The tranche address
     /// @param _providers The providers addresses
     /// @param _pauser The pauser address
     /// @param _upgrader The upgrader address
-    /// @param _schedulerManager The scheduler manager address
-    function _setUpTrancheRoles(
-        address _tranche,
-        address[] memory _providers,
-        address _pauser,
-        address _upgrader,
-        address _schedulerManager
-    )
-        internal
-        prankModifier(OWNER_ADDRESS)
-    {
+    function _setUpTrancheRoles(address[] memory _providers, address _pauser, address _upgrader) internal prankModifier(OWNER_ADDRESS) {
         FACTORY.grantRole(RoycoRoles.PAUSER_ROLE, _pauser, 0);
         FACTORY.grantRole(RoycoRoles.UPGRADER_ROLE, _upgrader, 0);
-        FACTORY.grantRole(RoycoRoles.SCHEDULER_MANAGER_ROLE, _schedulerManager, 0);
         for (uint256 i = 0; i < _providers.length; i++) {
             FACTORY.grantRole(RoycoRoles.DEPOSIT_ROLE, _providers[i], 0);
             FACTORY.grantRole(RoycoRoles.REDEEM_ROLE, _providers[i], 0);
@@ -251,17 +235,15 @@ contract BaseTest is Test, RoycoRoles {
 
     /// @notice Sets up roles for a kernel
     /// @param _kernel The kernel address
-    /// @param _schedulerManager The scheduler manager address
     /// @param _kernelAdmin The kernel admin address
-    function _setUpKernelRoles(address _kernel, address _schedulerManager, address _kernelAdmin) internal prankModifier(OWNER_ADDRESS) {
-        FACTORY.grantRole(RoycoRoles.SCHEDULER_MANAGER_ROLE, _schedulerManager, 0);
+    function _setUpKernelRoles(address _kernel, address _kernelAdmin) internal prankModifier(OWNER_ADDRESS) {
         FACTORY.grantRole(RoycoRoles.KERNEL_ADMIN_ROLE, _kernelAdmin, 0);
     }
 
     /// @notice Sets up roles for the factory
     function _setupFactoryAuth() internal prankModifier(OWNER_ADDRESS) {
         bytes4[] memory selectors = new bytes4[](1);
-        selectors[0] = RoycoTrancheFactory.deployMarket.selector;
+        selectors[0] = RoycoFactory.deployMarket.selector;
         FACTORY.setTargetFunctionRole(address(FACTORY), selectors, type(uint64).max);
     }
 

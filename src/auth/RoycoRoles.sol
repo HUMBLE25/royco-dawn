@@ -7,7 +7,6 @@ abstract contract RoycoRoles {
     /// Common roles
     uint64 public constant PAUSER_ROLE = uint64(uint256(keccak256(abi.encode("ROYCO_PAUSER_ROLE"))));
     uint64 public constant UPGRADER_ROLE = uint64(uint256(keccak256(abi.encode("ROYCO_UPGRADER_ROLE"))));
-    uint64 public constant SCHEDULER_MANAGER_ROLE = uint64(uint256(keccak256(abi.encode("ROYCO_SCHEDULER_MANAGER_ROLE"))));
 
     /// Tranche roles
     uint64 public constant DEPOSIT_ROLE = uint64(uint256(keccak256(abi.encode("ROYCO_DEPOSIT_ROLE"))));
