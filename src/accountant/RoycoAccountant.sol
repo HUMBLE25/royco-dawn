@@ -4,7 +4,6 @@ pragma solidity ^0.8.28;
 import { RoycoBase } from "../base/RoycoBase.sol";
 import { IRDM } from "../interfaces/IRDM.sol";
 import { IRoycoAccountant, Operation } from "../interfaces/IRoycoAccountant.sol";
-import { IRoycoVaultTranche } from "../interfaces/tranche/IRoycoVaultTranche.sol";
 import { RoycoAccountantInitParams, RoycoAccountantState, RoycoAccountantStorageLib } from "../libraries/RoycoAccountantStorageLib.sol";
 import { SyncedNAVsPacket } from "../libraries/Types.sol";
 import { ConstantsLib, Math, UtilsLib } from "../libraries/UtilsLib.sol";

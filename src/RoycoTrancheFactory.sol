@@ -168,7 +168,7 @@ contract RoycoTrancheFactory is AccessManager, RoycoRoles {
 
     /// @notice Validates the deployment parameters
     /// @param _params The parameters to validate
-    function _validateDeploymentParams(MarketDeploymentParams calldata _params) internal view {
+    function _validateDeploymentParams(MarketDeploymentParams calldata _params) internal pure {
         require(bytes(_params.seniorTrancheName).length > 0, InvalidName());
         require(bytes(_params.seniorTrancheSymbol).length > 0, InvalidSymbol());
         require(bytes(_params.juniorTrancheName).length > 0, InvalidName());

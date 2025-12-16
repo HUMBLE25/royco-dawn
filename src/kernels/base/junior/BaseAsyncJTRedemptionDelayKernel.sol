@@ -3,12 +3,11 @@ pragma solidity ^0.8.28;
 
 import { Math } from "../../../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 import { RoycoAuth } from "../../../auth/RoycoAuth.sol";
-import { RoycoRoles } from "../../../auth/RoycoRoles.sol";
 import { IAsyncJTWithdrawalKernel } from "../../../interfaces/kernel/IAsyncJTWithdrawalKernel.sol";
 import { IRoycoKernel } from "../../../interfaces/kernel/IRoycoKernel.sol";
 import { ConstantsLib } from "../../../libraries/ConstantsLib.sol";
 import { RequestRedeemSharesBehavior } from "../../../libraries/Types.sol";
-import { Operation, RoycoKernel, SyncedNAVsPacket } from "../RoycoKernel.sol";
+import { RoycoKernel } from "../RoycoKernel.sol";
 
 /// @title BaseAsyncJTRedemptionDelayKernel
 /// @notice Abstract base contract for the junior tranche redemption delay kernel
