@@ -6,8 +6,6 @@ import { TRANCHE_UNIT } from "../../libraries/Types.sol";
 /**
  * @title IAsyncJTDepositKernel
  * @notice Interface for Royco kernels that employ an asynchronous deposit flow for the junior tranche
- * @dev We mandate that kernels implement the cancellation functions because of the market's utilization changing between request and claim
- *      if the underlying investment opportunity supports it
  */
 interface IAsyncJTDepositKernel {
     /**
@@ -23,7 +21,7 @@ interface IAsyncJTDepositKernel {
      * @notice Returns the amount of assets pending deposit for a specified controller
      * @param _requestId The request ID of this deposit request
      * @param _controller The controller corresponding to this request
-     * @return pendingAssets The amount of assets pending deposit for the controller
+     * @return pendingAssets The amount of assets pending deposit for the controller denominated in the tranche's base asset
      */
     function jtPendingDepositRequest(uint256 _requestId, address _controller) external view returns (TRANCHE_UNIT pendingAssets);
 
@@ -31,7 +29,7 @@ interface IAsyncJTDepositKernel {
      * @notice Returns the amount of assets claimable from a processed deposit request for a specified controller
      * @param _requestId The request ID of this deposit request
      * @param _controller The controller corresponding to this request
-     * @return claimableAssets The amount of assets claimable from processed deposit request
+     * @return claimableAssets The amount of assets claimable from processed deposit request denominated in the tranche's base asset
      */
     function jtClaimableDepositRequest(uint256 _requestId, address _controller) external view returns (TRANCHE_UNIT claimableAssets);
 
@@ -41,7 +39,7 @@ interface IAsyncJTDepositKernel {
      * @param _requestId The request ID of this deposit request
      * @param _receiver The receiver of the cancelled deposit assets
      * @param _controller The controller corresponding to this request
-     * @return assets The amount of assets claimed from the cancelled deposit request
+     * @return assets The amount of assets claimed from the cancelled deposit request denominated in the tranche's base asset
      */
     function jtClaimCancelDepositRequest(uint256 _requestId, address _receiver, address _controller) external returns (TRANCHE_UNIT assets);
 

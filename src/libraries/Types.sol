@@ -16,16 +16,16 @@ struct TrancheDeploymentParams {
 }
 
 /**
- * @title AssetClaims
- * @dev The breakdown of assets that represent the value of a tranche's shares
- * @custom:field nav - The net asset value in NAV units of this particular claim
- * @custom:field stAssets - The discrete amount of senior tranche assets in this particular claim
- * @custom:field stAssets - The discrete amount of junior tranche assets in this particular claim
+ * @title TrancheAssetClaims
+ * @dev The claims on ST and JT assets that this tranche has
+ * @custom:field stAssets - The claim on senior tranche assets denominated in JT's tranche units that this particular tranche has
+ * @custom:field jtAssets - The claim on junior tranche assets denominated in ST's tranche units that this particular tranche has
+ * @custom:field effectiveNAV - The effective net asset value of this tranche denominated in the kernel's NAV units
  */
-struct AssetClaims {
-    NAV_UNIT nav;
+struct TrancheAssetClaims {
     TRANCHE_UNIT stAssets;
     TRANCHE_UNIT jtAssets;
+    NAV_UNIT effectiveNAV;
 }
 
 /**

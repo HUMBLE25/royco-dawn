@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import { AssetClaims } from "../../libraries/Types.sol";
+import { TrancheAssetClaims } from "../../libraries/Types.sol";
 import { TRANCHE_UNIT } from "../../libraries/Units.sol";
 
 /**
@@ -98,7 +98,7 @@ interface IRoycoAsyncVault {
     /// @param _receiver Recipient of assets.
     /// @param _controller Controller discriminating the claim when sender is operator.
     /// @return claims Assets returned.
-    function redeem(uint256 _shares, address _receiver, address _controller) external returns (AssetClaims memory claims);
+    function redeem(uint256 _shares, address _receiver, address _controller) external returns (TrancheAssetClaims memory claims);
 
     /// @notice Returns true if operator is approved for controller.
     /// @param _controller Controller address.

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import { IERC165 } from "../../../lib/openzeppelin-contracts/contracts/utils/introspection/IERC165.sol";
-import { AssetClaims } from "../../libraries/Types.sol";
+import { TrancheAssetClaims } from "../../libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT } from "../../libraries/Units.sol";
 import { IRoycoAsyncCancellableVault } from "./IRoycoAsyncCancellableVault.sol";
 import { IRoycoAsyncVault } from "./IRoycoAsyncVault.sol";
@@ -31,7 +31,7 @@ interface IRoycoVaultTranche is IERC165, IRoycoAsyncVault, IRoycoAsyncCancellabl
     /// @dev Includes yield splits, coverage applications, etc.
     /// @dev The NAV is expressed in the tranche's base asset
     /// @return claims The breakdown of assets that represent the value of the tranche's shares
-    function totalAssets() external view returns (AssetClaims memory claims);
+    function totalAssets() external view returns (TrancheAssetClaims memory claims);
 
     /// @notice Returns the maximum amount of assets that can be deposited into the tranche
     /// @dev The assets are expressed in the tranche's base asset
@@ -61,13 +61,13 @@ interface IRoycoVaultTranche is IERC165, IRoycoAsyncVault, IRoycoAsyncCancellabl
     /// @dev The shares are expressed in the tranche's base asset
     /// @param _shares The number of shares to convert to claims
     /// @return claims The breakdown of assets that the shares have a claim on
-    function previewRedeem(uint256 _shares) external view returns (AssetClaims memory claims);
+    function previewRedeem(uint256 _shares) external view returns (TrancheAssetClaims memory claims);
 
     /// @notice Returns the breakdown of assets that the shares have a claim on
     /// @dev The shares are expressed in the tranche's base asset
     /// @param _shares The number of shares to convert to assets
     /// @return claims The breakdown of assets that the shares have a claim on
-    function convertToAssets(uint256 _shares) external view returns (AssetClaims memory claims);
+    function convertToAssets(uint256 _shares) external view returns (TrancheAssetClaims memory claims);
 
     /// @notice Mints tranche shares to the receiver
     /// @dev The assets are expressed in the tranche's base asset
@@ -83,7 +83,7 @@ interface IRoycoVaultTranche is IERC165, IRoycoAsyncVault, IRoycoAsyncCancellabl
     /// @param _receiver The address to redeem the shares to
     /// @param _controller The controller of the request
     /// @return claims The breakdown of assets that the redeemed shares have a claim on
-    function redeem(uint256 _shares, address _receiver, address _controller) external returns (AssetClaims memory claims);
+    function redeem(uint256 _shares, address _receiver, address _controller) external returns (TrancheAssetClaims memory claims);
 
     /**
      * @notice Mints tranche shares to the protocol fee recipient, representing ownership over the fee assets of the tranche
@@ -91,7 +91,7 @@ interface IRoycoVaultTranche is IERC165, IRoycoAsyncVault, IRoycoAsyncCancellabl
      * @param _protocolFeeAssets The fee accrued for this tranche as a result of the pre-op sync
      * @param _protocolFeeRecipient The address to receive the freshly minted protocol fee shares
      * @param _trancheTotalAssets The total effective assets controlled by this tranche as a result of the pre-op sync
-     * @return totalSharesIncludingVirtualShares The total number of shares that will be minted to the protocol fee recipient, including virtual shares
+     * @return totalTrancheShares The total number of shares that exist in the tranche after minting any protocol fee shares post-sync
      */
     function mintProtocolFeeShares(
         NAV_UNIT _protocolFeeAssets,
@@ -99,7 +99,7 @@ interface IRoycoVaultTranche is IERC165, IRoycoAsyncVault, IRoycoAsyncCancellabl
         address _protocolFeeRecipient
     )
         external
-        returns (uint256 totalSharesIncludingVirtualShares);
+        returns (uint256 totalTrancheShares);
 
     /// @notice Returns the address of the tranche's deposit asset
     /// @return asset The address of the tranche's deposit asset

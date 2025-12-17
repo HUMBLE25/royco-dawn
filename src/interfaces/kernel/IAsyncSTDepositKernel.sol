@@ -34,7 +34,7 @@ interface IAsyncSTDepositKernel {
      * @param _requestId The request ID of this deposit request
      * @param _receiver The receiver of the cancelled deposit assets
      * @param _controller The controller corresponding to this request
-     * @return assets The amount of assets claimed from the cancelled deposit request
+     * @return assets The amount of assets claimed from the cancelled deposit request denominated in the tranche's base asset
      */
     function stClaimCancelDepositRequest(uint256 _requestId, address _receiver, address _controller) external returns (TRANCHE_UNIT assets);
 
@@ -42,7 +42,7 @@ interface IAsyncSTDepositKernel {
      * @notice Returns the amount of assets claimable from a processed deposit request for a specified controller
      * @param _requestId The request ID of this deposit request
      * @param _controller The controller corresponding to this request
-     * @return claimableAssets The amount of assets claimable from processed deposit request
+     * @return claimableAssets The amount of assets claimable from processed deposit request denominated in the tranche's base asset
      */
     function stClaimableDepositRequest(uint256 _requestId, address _controller) external view returns (TRANCHE_UNIT claimableAssets);
 
@@ -69,7 +69,7 @@ interface IAsyncSTDepositKernel {
      * @dev This function is only relevant if the kernel supports deposit cancellation for the senior tranche
      * @param _requestId The request ID of this deposit request
      * @param _controller The controller to query for claimable cancellation assets
-     * @return assets The amount of assets claimable from deposit cancellation
+     * @return assets The amount of assets claimable from deposit cancellation denominated in the tranche's base asset
      */
     function stClaimableCancelDepositRequest(uint256 _requestId, address _controller) external view returns (TRANCHE_UNIT assets);
 }

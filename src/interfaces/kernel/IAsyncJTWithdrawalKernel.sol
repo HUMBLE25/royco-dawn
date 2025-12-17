@@ -36,8 +36,6 @@ interface IAsyncJTWithdrawalKernel {
     /**
      * @notice Cancels a pending redeem request for the specified controller
      * @dev This function is only relevant if the kernel supports redeem cancellation
-     * @dev Must be called via a delegatecall (reliant on address(this))
-     * @dev The contract delegatecalling this function must have a pending redeem request with this requestId and/or controller
      * @param _requestId The request ID of this deposit request
      * @param _controller The controller that is allowed to operate the cancellation
      */
