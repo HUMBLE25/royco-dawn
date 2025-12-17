@@ -15,21 +15,23 @@ import { RoycoKernel } from "../RoycoKernel.sol";
  *        For example, USDC and USDS (USD pegged assets with 6 and 18 decimals of precision respectively)
  */
 abstract contract InKindAssetsQuoter is Initializable, RoycoKernel {
-    /// @notice Thrown when the senior or junior tranche asset has over WAD decimals of precision
-    error UNSUPPORTED_DECIMALS();
-
     /// @dev Storage slot for InKindAssetsQuoterState using ERC-7201 pattern
     // keccak256(abi.encode(uint256(keccak256("Royco.storage.InKindAssetsQuoterState")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant INKIND_ASSETS_QUOTER_STORAGE_SLOT = 0x772ab8662186eb1a607ea316dd8b37fa0391c8f9f780762129706cf58c146e00;
 
-    /// @notice Storage state for the Royco in kind assets quoter
-    /// @custom:storage-location erc7201:Royco.storage.InKindAssetsQuoterState
-    /// @custom:field stScaleFactorToWAD - Multiplier to scale ST asset units up to WAD precision
-    /// @custom:field jtScaleFactorToWAD - Multiplier to scale JT asset units up to WAD precision
+    /**
+     * @notice Storage state for the Royco in kind assets quoter
+     * @custom:storage-location erc7201:Royco.storage.InKindAssetsQuoterState
+     * @custom:field stScaleFactorToWAD - Multiplier to scale ST asset units up to WAD precision
+     * @custom:field jtScaleFactorToWAD - Multiplier to scale JT asset units up to WAD precision
+     */
     struct InKindAssetsQuoterState {
         uint64 stScaleFactorToWAD;
         uint64 jtScaleFactorToWAD;
     }
+
+    /// @notice Thrown when the senior or junior tranche asset has over WAD decimals of precision
+    error UNSUPPORTED_DECIMALS();
 
     /**
      * @notice Initializes the quoter for inkind tranche assets
@@ -78,9 +80,11 @@ abstract contract InKindAssetsQuoter is Initializable, RoycoKernel {
         return toTrancheUnits(toUint256(_nav) / _getInKindAssetsQuoterStorage().jtScaleFactorToWAD);
     }
 
-    /// @notice Returns a storage pointer to the InKindAssetsQuoterState storage
-    /// @dev Uses ERC-7201 storage slot pattern for collision-resistant storage
-    /// @return $ Storage pointer to the in-kind assets quoter state
+    /**
+     * @notice Returns a storage pointer to the InKindAssetsQuoterState storage
+     * @dev Uses ERC-7201 storage slot pattern for collision-resistant storage
+     * @return $ Storage pointer to the in-kind assets quoter state
+     */
     function _getInKindAssetsQuoterStorage() internal pure returns (InKindAssetsQuoterState storage $) {
         assembly ("memory-safe") {
             $.slot := INKIND_ASSETS_QUOTER_STORAGE_SLOT

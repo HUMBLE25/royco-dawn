@@ -39,7 +39,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
     error MUST_REQUEST_NON_ZERO_SHARES();
 
     /// @notice Thrown when the deposit amount is zero
-    error MUST_INCREASE_NAV_NON_ZERO_ASSETS();
+    error MUST_DEPOSIT_NON_ZERO_ASSETS();
 
     /// @notice Thrown when the redeem amount is zero
     error MUST_CLAIM_NON_ZERO_SHARES();
@@ -218,7 +218,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         onlyCallerOrOperator(_controller)
         returns (uint256 shares)
     {
-        require(_assets != toTrancheUnits(0), MUST_INCREASE_NAV_NON_ZERO_ASSETS());
+        require(_assets != toTrancheUnits(0), MUST_DEPOSIT_NON_ZERO_ASSETS());
 
         IRoycoKernel kernel_ = IRoycoKernel(kernel());
 
