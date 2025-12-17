@@ -6,13 +6,15 @@ import { TRANCHE_UNIT } from "../../libraries/Types.sol";
 /**
  * @title IAsyncSTDepositKernel
  * @notice Interface for Royco kernels that employ an asynchronous deposit flow for the senior tranche
+ * @dev We mandate that kernels implement the cancellation functions because of the market's utilization changing between request and claim
+ *      if the underlying investment opportunity supports it
  */
 interface IAsyncSTDepositKernel {
     /**
      * @notice Requests a deposit of a specified amount of an asset into the underlying investment opportunity
      * @dev Assumes that the funds are transferred to the kernel before the deposit call is made
      * @param _caller The address of the user requesting the deposit for the senior tranche
-     * @param _assets The amount of the asset in the tranche's base asset to deposit into the underlying investment opportunity
+     * @param _assets The amount of the asset to deposit into the underlying investment opportunity
      * @param _controller The controller that is allowed to operate the lifecycle of this deposit request
      * @return requestId The request ID of this deposit request
      */
@@ -22,7 +24,7 @@ interface IAsyncSTDepositKernel {
      * @notice Returns the amount of assets pending deposit for a specified controller
      * @param _requestId The request ID of this deposit request
      * @param _controller The controller corresponding to this request
-     * @return pendingAssets The amount of assets in the tranche's base asset pending deposit for the controller
+     * @return pendingAssets The amount of assets pending deposit for the controller
      */
     function stPendingDepositRequest(uint256 _requestId, address _controller) external view returns (TRANCHE_UNIT pendingAssets);
 
@@ -32,7 +34,7 @@ interface IAsyncSTDepositKernel {
      * @param _requestId The request ID of this deposit request
      * @param _receiver The receiver of the cancelled deposit assets
      * @param _controller The controller corresponding to this request
-     * @return assets The amount of assets in the tranche's base asset claimed from the cancelled deposit request
+     * @return assets The amount of assets claimed from the cancelled deposit request
      */
     function stClaimCancelDepositRequest(uint256 _requestId, address _receiver, address _controller) external returns (TRANCHE_UNIT assets);
 
@@ -40,7 +42,7 @@ interface IAsyncSTDepositKernel {
      * @notice Returns the amount of assets claimable from a processed deposit request for a specified controller
      * @param _requestId The request ID of this deposit request
      * @param _controller The controller corresponding to this request
-     * @return claimableAssets The amount of assets in the tranche's base asset claimable from processed deposit request
+     * @return claimableAssets The amount of assets claimable from processed deposit request
      */
     function stClaimableDepositRequest(uint256 _requestId, address _controller) external view returns (TRANCHE_UNIT claimableAssets);
 
@@ -63,11 +65,11 @@ interface IAsyncSTDepositKernel {
     function stPendingCancelDepositRequest(uint256 _requestId, address _controller) external view returns (bool isPending);
 
     /**
-     * @notice Returns the amount of assets in the tranche's base asset claimable from a deposit cancellation for the specified controller
+     * @notice Returns the amount of assets claimable from a deposit cancellation for the specified controller
      * @dev This function is only relevant if the kernel supports deposit cancellation for the senior tranche
      * @param _requestId The request ID of this deposit request
      * @param _controller The controller to query for claimable cancellation assets
-     * @return assets The amount of assets in the tranche's base asset claimable from deposit cancellation
+     * @return assets The amount of assets claimable from deposit cancellation
      */
     function stClaimableCancelDepositRequest(uint256 _requestId, address _controller) external view returns (TRANCHE_UNIT assets);
 }

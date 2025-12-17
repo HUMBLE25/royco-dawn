@@ -15,26 +15,17 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
     using SafeERC20 for IERC20;
     using Math for uint256;
 
-    /**
-     * @inheritdoc IRoycoKernel
-     */
+    /// @inheritdoc IRoycoKernel
     ExecutionModel public constant JT_INCREASE_NAV_EXECUTION_MODEL = ExecutionModel.SYNC;
-    /**
-     * @inheritdoc IRoycoKernel
-     */
+
+    /// @inheritdoc IRoycoKernel
     ExecutionModel public constant JT_DECREASE_NAVAL_EXECUTION_MODEL = ExecutionModel.ASYNC;
 
-    /**
-     * @notice Thrown when the JT base asset is not a supported reserve token in the Aave V3 Pool
-     */
+    /// @notice Thrown when the JT base asset is not a supported reserve token in the Aave V3 Pool
     error UNSUPPORTED_RESERVE_TOKEN();
-    /**
-     * @notice Thrown when the shares to redeem are greater than the claimable shares
-     */
+    /// @notice Thrown when the shares to redeem are greater than the claimable shares
     error INSUFFICIENT_CLAIMABLE_SHARES(uint256 sharesToRedeem, uint256 claimableShares);
-    /**
-     * @notice Thrown when a low-level call fails
-     */
+    /// @notice Thrown when a low-level call fails
     error FAILED_CALL();
 
     /**
@@ -55,16 +46,12 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
         AaveV3KernelStorageLib.__AaveV3Kernel_init(_aaveV3Pool, address(IPool(_aaveV3Pool).ADDRESSES_PROVIDER()), _jtAsset, jtAssetAToken);
     }
 
-    /**
-     * @inheritdoc IRoycoKernel
-     */
+    /// @inheritdoc IRoycoKernel
     function getJTTotalEffectiveAssets() external view override(IRoycoKernel) returns (uint256) {
         return previewSyncTrancheNAVs().jtEffectiveNAV;
     }
 
-    /**
-     * @inheritdoc IRoycoKernel
-     */
+    /// @inheritdoc IRoycoKernel
     function jtDeposit(
         address _asset,
         uint256 _assets,
@@ -88,9 +75,7 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
         _postOpSyncTrancheNAVs(Operation.JT_INCREASE_NAV);
     }
 
-    /**
-     * @inheritdoc IRoycoKernel
-     */
+    /// @inheritdoc IRoycoKernel
     function jtRedeem(
         address _asset,
         uint256 _shares,
@@ -121,28 +106,20 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
         _postOpSyncTrancheNAVsAndEnforceCoverage(Operation.JT_DECREASE_NAV);
     }
 
-    /**
-     * @inheritdoc RoycoKernel
-     */
+    /// @inheritdoc RoycoKernel
     function _claimSeniorAssetsFromJunior(address _asset, uint256 _assets, address _receiver) internal override(RoycoKernel) {
         IPool(AaveV3KernelStorageLib._getAaveV3KernelStorage().pool).withdraw(_asset, _assets, _receiver);
     }
 
-    /**
-     * @inheritdoc RoycoKernel
-     */
+    /// @inheritdoc RoycoKernel
     function _getJuniorTrancheRawNAV() internal view override(RoycoKernel) returns (uint256) {
         // The tranche's balance of the AToken is the total assets it is owed from the Aave pool
-        /**
-         * @dev This does not treat illiquidity in the Aave pool as a loss: we assume that total lent will be withdrawable at some point
-         */
+        /// @dev This does not treat illiquidity in the Aave pool as a loss: we assume that total lent will be withdrawable at some point
         AaveV3KernelState storage $ = AaveV3KernelStorageLib._getAaveV3KernelStorage();
         return IERC20($.aToken).balanceOf(address(this));
     }
 
-    /**
-     * @inheritdoc RoycoKernel
-     */
+    /// @inheritdoc RoycoKernel
     function _maxJTDepositGlobally(address) internal view override(RoycoKernel) returns (uint256) {
         // Retrieve the Pool's data provider and asset
         AaveV3KernelState storage $ = AaveV3KernelStorageLib._getAaveV3KernelStorage();
@@ -167,11 +144,9 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
         return (currentlySupplied >= supplyCap) ? 0 : (supplyCap - currentlySupplied);
     }
 
-    /**
-     * @notice Helper function to get the total accrued to treasury and total lent from the pool data provider
-     * @dev IPoolDataProvider.getReserveData returns a tuple of 11 words which saturates the stack
-     * @dev Uses a low-level static call to the pool data provider to avoid stack too deep errors
-     */
+    /// @notice Helper function to get the total accrued to treasury and total lent from the pool data provider
+    /// @dev IPoolDataProvider.getReserveData returns a tuple of 11 words which saturates the stack
+    /// @dev Uses a low-level static call to the pool data provider to avoid stack too deep errors
     function _getTotalAccruedToTreasuryAndLent(
         IPoolDataProvider _poolDataProvider,
         address _asset
@@ -198,9 +173,7 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
         require(success, FAILED_CALL());
     }
 
-    /**
-     * @inheritdoc RoycoKernel
-     */
+    /// @inheritdoc RoycoKernel
     function _maxJTWithdrawalGlobally(address) internal view override(RoycoKernel) returns (uint256) {
         // Retrieve the Pool's data provider and asset
         AaveV3KernelState storage $ = AaveV3KernelStorageLib._getAaveV3KernelStorage();

@@ -19,124 +19,68 @@ import { DeployedContracts, MarketDeploymentParams } from "./libraries/Types.sol
 import { RoycoJT } from "./tranches/RoycoJT.sol";
 import { RoycoST } from "./tranches/RoycoST.sol";
 
-/**
- * @title RoycoFactory
- * @notice Factory contract for deploying Royco tranches (ST and JT) and their associated kernel using ERC1967 proxies
- * @notice The factory also acts as the shared access manager for all the Royco market
- * @dev This factory deploys upgradeable tranche contracts using the UUPS proxy pattern
- */
+/// @title RoycoFactory
+/// @notice Factory contract for deploying Royco tranches (ST and JT) and their associated kernel using ERC1967 proxies
+/// @notice The factory also acts as the shared access manager for all the Royco market
+/// @dev This factory deploys upgradeable tranche contracts using the UUPS proxy pattern
 contract RoycoFactory is AccessManager, RoycoRoles {
-    /**
-     * @notice Thrown when an invalid name is provided
-     */
+    /// @notice Thrown when an invalid name is provided
     error InvalidName();
-    /**
-     * @notice Thrown when an invalid symbol is provided
-     */
+    /// @notice Thrown when an invalid symbol is provided
     error InvalidSymbol();
-    /**
-     * @notice Thrown when an invalid asset is provided
-     */
+    /// @notice Thrown when an invalid asset is provided
     error InvalidAsset();
-    /**
-     * @notice Thrown when an invalid market id is provided
-     */
+    /// @notice Thrown when an invalid market id is provided
     error InvalidMarketId();
-    /**
-     * @notice Thrown when an invalid kernel implementation is provided
-     */
+    /// @notice Thrown when an invalid kernel implementation is provided
     error InvalidKernelImplementation();
-    /**
-     * @notice Thrown when an invalid accountant implementation is provided
-     */
+    /// @notice Thrown when an invalid accountant implementation is provided
     error InvalidAccountantImplementation();
-    /**
-     * @notice Thrown when an invalid senior tranche proxy deployment salt is provided
-     */
+    /// @notice Thrown when an invalid senior tranche proxy deployment salt is provided
     error InvalidSeniorTrancheProxyDeploymentSalt();
-    /**
-     * @notice Thrown when an invalid junior tranche proxy deployment salt is provided
-     */
+    /// @notice Thrown when an invalid junior tranche proxy deployment salt is provided
     error InvalidJuniorTrancheProxyDeploymentSalt();
-    /**
-     * @notice Thrown when an invalid kernel proxy deployment salt is provided
-     */
+    /// @notice Thrown when an invalid kernel proxy deployment salt is provided
     error InvalidKernelProxyDeploymentSalt();
-    /**
-     * @notice Thrown when an invalid accountant proxy deployment salt is provided
-     */
+    /// @notice Thrown when an invalid accountant proxy deployment salt is provided
     error InvalidAccountantProxyDeploymentSalt();
-    /**
-     * @notice Thrown when an invalid senior tranche implementation is provided
-     */
+    /// @notice Thrown when an invalid senior tranche implementation is provided
     error InvalidSeniorTrancheImplementation();
-    /**
-     * @notice Thrown when an invalid junior tranche implementation is provided
-     */
+    /// @notice Thrown when an invalid junior tranche implementation is provided
     error InvalidJuniorTrancheImplementation();
-    /**
-     * @notice Thrown when an invalid access manager is configured on a deployed contract
-     */
+    /// @notice Thrown when an invalid access manager is configured on a deployed contract
     error InvalidAccessManager();
-    /**
-     * @notice Thrown when the kernel address configured on the senior tranche is invalid
-     */
+    /// @notice Thrown when the kernel address configured on the senior tranche is invalid
     error InvalidKernelOnSeniorTranche();
-    /**
-     * @notice Thrown when the kernel address configured on the junior tranche is invalid
-     */
+    /// @notice Thrown when the kernel address configured on the junior tranche is invalid
     error InvalidKernelOnJuniorTranche();
-    /**
-     * @notice Thrown when the accountant address configured on the kernel is invalid
-     */
+    /// @notice Thrown when the accountant address configured on the kernel is invalid
     error InvalidAccountantOnKernel();
-    /**
-     * @notice Thrown when the kernel address configured on the accountant is invalid
-     */
+    /// @notice Thrown when the kernel address configured on the accountant is invalid
     error InvalidKernelOnAccountant();
-    /**
-     * @notice Thrown when kernel initialization data is invalid
-     */
+    /// @notice Thrown when kernel initialization data is invalid
     error InvalidKernelInitializationData();
-    /**
-     * @notice Thrown when accountant initialization data is invalid
-     */
+    /// @notice Thrown when accountant initialization data is invalid
     error InvalidAccountantInitializationData();
-    /**
-     * @notice Thrown when the kernel failed to initialize
-     */
+    /// @notice Thrown when the kernel failed to initialize
     error FailedToInitializeKernel(bytes data);
-    /**
-     * @notice Thrown when the accountant failed to initialize
-     */
+    /// @notice Thrown when the accountant failed to initialize
     error FailedToInitializeAccountant(bytes data);
-    /**
-     * @notice Thrown when the senior tranche failed to initialize
-     */
+    /// @notice Thrown when the senior tranche failed to initialize
     error FailedToInitializeSeniorTranche(bytes data);
-    /**
-     * @notice Thrown when the junior tranche failed to initialize
-     */
+    /// @notice Thrown when the junior tranche failed to initialize
     error FailedToInitializeJuniorTranche(bytes data);
 
-    /**
-     * @notice Emitted when a new market is deployed
-     */
+    /// @notice Emitted when a new market is deployed
     event MarketDeployed(DeployedContracts deployedContracts, MarketDeploymentParams params);
-    /**
-     * @notice Emitted when a role delay is set
-     */
+    /// @notice Emitted when a role delay is set
     event RoleDelaySet(uint64 role, uint256 delay);
 
-    /**
-     * @notice Initializes the factory with tranche implementation addresses
-     */
+    /// @notice Initializes the factory with tranche implementation addresses
     constructor(address _initialAdmin) AccessManager(_initialAdmin) { }
 
-    /**
-     * @notice Deploys a new market with senior tranche, junior tranche, and kernel
-     * @param _params The parameters for deploying a new market
-     */
+    /// @notice Deploys a new market with senior tranche, junior tranche, and kernel
+    /// @param _params The parameters for deploying a new market
     function deployMarket(MarketDeploymentParams calldata _params) external onlyAuthorized returns (DeployedContracts memory deployedContracts) {
         // Validate the deployment parameters
         _validateDeploymentParams(_params);
@@ -153,21 +97,17 @@ contract RoycoFactory is AccessManager, RoycoRoles {
         emit MarketDeployed(deployedContracts, _params);
     }
 
-    /**
-     * @notice Predicts the address of a tranche proxy
-     * @param _implementation The implementation address
-     * @param _salt The salt for the deployment
-     * @return proxy The predicted proxy address
-     */
+    /// @notice Predicts the address of a tranche proxy
+    /// @param _implementation The implementation address
+    /// @param _salt The salt for the deployment
+    /// @return proxy The predicted proxy address
     function predictERC1967ProxyAddress(address _implementation, bytes32 _salt) external view returns (address proxy) {
         proxy = Create2.computeAddress(_salt, keccak256(abi.encodePacked(type(ERC1967Proxy).creationCode, abi.encode(_implementation, ""))));
     }
 
-    /**
-     * @notice Deploys the contracts for a new market
-     * @param _params The parameters for deploying a new market
-     * @return deployedContracts The deployed contracts
-     */
+    /// @notice Deploys the contracts for a new market
+    /// @param _params The parameters for deploying a new market
+    /// @return deployedContracts The deployed contracts
     function _deployContracts(MarketDeploymentParams calldata _params) internal virtual returns (DeployedContracts memory deployedContracts) {
         // Deploy the kernel, accountant and tranches with empty initialization data
         // It is expected that the kernel initialization data contains the address of the accountant and vice versa
@@ -206,10 +146,8 @@ contract RoycoFactory is AccessManager, RoycoRoles {
         require(success, FailedToInitializeKernel(data));
     }
 
-    /**
-     * @notice Validates the deployment
-     * @param _deployedContracts The deployed contracts to validate
-     */
+    /// @notice Validates the deployment
+    /// @param _deployedContracts The deployed contracts to validate
     function _validateDeployment(DeployedContracts memory _deployedContracts) internal view {
         // Check that the access manager is set on the contracts
         require(AccessManagedUpgradeable(address(_deployedContracts.accountant)).authority() == address(this), InvalidAccessManager());
@@ -228,10 +166,8 @@ contract RoycoFactory is AccessManager, RoycoRoles {
         require(address(_deployedContracts.accountant.getState().kernel) == address(_deployedContracts.kernel), InvalidKernelOnAccountant());
     }
 
-    /**
-     * @notice Validates the deployment parameters
-     * @param _params The parameters to validate
-     */
+    /// @notice Validates the deployment parameters
+    /// @param _params The parameters to validate
     function _validateDeploymentParams(MarketDeploymentParams calldata _params) internal pure {
         require(bytes(_params.seniorTrancheName).length > 0, InvalidName());
         require(bytes(_params.seniorTrancheSymbol).length > 0, InvalidSymbol());
@@ -253,10 +189,8 @@ contract RoycoFactory is AccessManager, RoycoRoles {
         require(_params.accountantProxyDeploymentSalt != bytes32(0), InvalidAccountantProxyDeploymentSalt());
     }
 
-    /**
-     * @notice Configures the roles for the deployed contracts
-     * @param _deployedContracts The deployed contracts to configure
-     */
+    /// @notice Configures the roles for the deployed contracts
+    /// @param _deployedContracts The deployed contracts to configure
     function _configureRoles(DeployedContracts memory _deployedContracts) internal {
         // Configure the roles for the accountant
         _setTargetFunctionRole(address(_deployedContracts.accountant), UUPSUpgradeable.upgradeToAndCall.selector, UPGRADER_ROLE);
@@ -276,10 +210,8 @@ contract RoycoFactory is AccessManager, RoycoRoles {
         _configureRolesForTranche(_deployedContracts.juniorTranche);
     }
 
-    /**
-     * @notice Configures the roles for a tranche
-     * @param _tranche The tranche to configure the roles for
-     */
+    /// @notice Configures the roles for a tranche
+    /// @param _tranche The tranche to configure the roles for
     function _configureRolesForTranche(IRoycoVaultTranche _tranche) internal {
         _setTargetFunctionRole(address(_tranche), UUPSUpgradeable.upgradeToAndCall.selector, UPGRADER_ROLE);
         _setTargetFunctionRole(address(_tranche), IRoycoAuth.pause.selector, PAUSER_ROLE);
@@ -294,12 +226,10 @@ contract RoycoFactory is AccessManager, RoycoRoles {
         _setTargetFunctionRole(address(_tranche), IRoycoAsyncCancellableVault.claimCancelRedeemRequest.selector, CANCEL_REDEEM_ROLE);
     }
 
-    /**
-     * @notice Deploys a tranche using ERC1967 proxy deterministically
-     * @param _implementation The implementation address
-     * @param _salt The salt for the deployment
-     * @return proxy The deployed proxy address
-     */
+    /// @notice Deploys a tranche using ERC1967 proxy deterministically
+    /// @param _implementation The implementation address
+    /// @param _salt The salt for the deployment
+    /// @return proxy The deployed proxy address
     function _deployERC1967ProxyDeterministic(address _implementation, bytes32 _salt) internal returns (address proxy) {
         proxy = Create2.deploy(0, _salt, abi.encodePacked(type(ERC1967Proxy).creationCode, abi.encode(_implementation, "")));
     }

@@ -10,39 +10,25 @@ import { NAV_UNIT } from "../libraries/Units.sol";
  * @notice Interface for the RoycoAccountant contract that manages tranche NAVs and coverage requirements
  */
 interface IRoycoAccountant {
-    /**
-     * @notice Thrown when the caller of the function is not the accountant's configured Royco Kernel
-     */
+    /// @notice Thrown when the caller of the function is not the accountant's configured Royco Kernel
     error ONLY_ROYCO_KERNEL();
 
-    /**
-     * @notice Thrown when the accountant's coverage config is invalid
-     */
+    /// @notice Thrown when the accountant's coverage config is invalid
     error INVALID_COVERAGE_CONFIG();
 
-    /**
-     * @notice Thrown when the RDM address is null on initialization
-     */
+    /// @notice Thrown when the RDM address is null on initialization
     error NULL_RDM_ADDRESS();
 
-    /**
-     * @notice Thrown when the configured protocol fee exceeds the maximum
-     */
+    /// @notice Thrown when the configured protocol fee exceeds the maximum
     error MAX_PROTOCOL_FEE_EXCEEDED();
 
-    /**
-     * @notice Thrown when the sum of the raw NAVs don't equal the sum of the effective NAVs of both tranches
-     */
+    /// @notice Thrown when the sum of the raw NAVs don't equal the sum of the effective NAVs of both tranches
     error NAV_CONSERVATION_VIOLATION();
 
-    /**
-     * @notice Thrown when an operation results in an invalid NAV state in the post-operation synchronization
-     */
+    /// @notice Thrown when an operation results in an invalid NAV state in the post-operation synchronization
     error INVALID_POST_OP_STATE(Operation _op);
 
-    /**
-     * @notice Thrown when the market's coverage requirement is unsatisfied
-     */
+    /// @notice Thrown when the market's coverage requirement is unsatisfied
     error COVERAGE_REQUIREMENT_UNSATISFIED();
 
     /**

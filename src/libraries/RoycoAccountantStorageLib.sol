@@ -57,32 +57,24 @@ struct RoycoAccountantState {
     uint32 lastDistributionTimestamp;
 }
 
-/**
- * @title RoycoAccountantStorageLib
- * @notice Library for managing Royco Accountant storage using the ERC7201 pattern
- */
+/// @title RoycoAccountantStorageLib
+/// @notice Library for managing Royco Accountant storage using the ERC7201 pattern
 library RoycoAccountantStorageLib {
-    /**
-     * @dev Storage slot for RoycoAccountantState using ERC-7201 pattern
-     */
+    /// @dev Storage slot for RoycoAccountantState using ERC-7201 pattern
     // keccak256(abi.encode(uint256(keccak256("Royco.storage.RoycoAccountantState")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant ROYCO_ACCOUNTANT_STORAGE_SLOT = 0x0e1123d8194dcf603de811512b2b6334f106b53313663d6b2df1a2b814038e00;
 
-    /**
-     * @notice Returns a storage pointer to the RoycoAccountantState storage
-     * @dev Uses ERC-7201 storage slot pattern for collision-resistant storage
-     * @return $ Storage pointer to the accountant's state
-     */
+    /// @notice Returns a storage pointer to the RoycoAccountantState storage
+    /// @dev Uses ERC-7201 storage slot pattern for collision-resistant storage
+    /// @return $ Storage pointer to the accountant's state
     function _getRoycoAccountantStorage() internal pure returns (RoycoAccountantState storage $) {
         assembly ("memory-safe") {
             $.slot := ROYCO_ACCOUNTANT_STORAGE_SLOT
         }
     }
 
-    /**
-     * @notice Initializes the Royco Accountant state
-     * @param _params The initialization parameters for the royco accountant
-     */
+    /// @notice Initializes the Royco Accountant state
+    /// @param _params The initialization parameters for the royco accountant
     function __RoycoAccountant_init(RoycoAccountantInitParams memory _params) internal {
         // Set the initial state of the accountant
         RoycoAccountantState storage $ = _getRoycoAccountantStorage();

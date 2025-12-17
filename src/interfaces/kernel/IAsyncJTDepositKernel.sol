@@ -6,13 +6,14 @@ import { TRANCHE_UNIT } from "../../libraries/Types.sol";
 /**
  * @title IAsyncJTDepositKernel
  * @notice Interface for Royco kernels that employ an asynchronous deposit flow for the junior tranche
+ * @dev We mandate that kernels implement the cancellation functions because of the market's utilization changing between request and claim
+ *      if the underlying investment opportunity supports it
  */
 interface IAsyncJTDepositKernel {
     /**
      * @notice Requests a deposit of a specified amount of an asset into the underlying investment opportunity
-     * @dev Assumes that the funds are transferred to the kernel before the deposit call is made
      * @param _caller The address of the user requesting the deposit for the junior tranche
-     * @param _assets The amount of the asset in the tranche's base asset to deposit into the underlying investment opportunity
+     * @param _assets The amount of the asset to deposit into the underlying investment opportunity
      * @param _controller The controller that is allowed to operate the lifecycle of this deposit request
      * @return requestId The request ID of this deposit request
      */
@@ -22,7 +23,7 @@ interface IAsyncJTDepositKernel {
      * @notice Returns the amount of assets pending deposit for a specified controller
      * @param _requestId The request ID of this deposit request
      * @param _controller The controller corresponding to this request
-     * @return pendingAssets The amount of assets in the tranche's base asset pending deposit for the controller
+     * @return pendingAssets The amount of assets pending deposit for the controller
      */
     function jtPendingDepositRequest(uint256 _requestId, address _controller) external view returns (TRANCHE_UNIT pendingAssets);
 
