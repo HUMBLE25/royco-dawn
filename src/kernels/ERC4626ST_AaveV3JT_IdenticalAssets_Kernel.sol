@@ -23,6 +23,6 @@ contract ERC4626ST_AaveV3JT_IdenticalAssets_Kernel is ERC4626STKernel, AaveV3JTK
         // Initialize the Aave V3 junior tranche state
         __AaveV3JTKernel_init_unchained(_aaveV3Pool, jtAsset);
         // Initialize the identical assets quoter
-        __IdenticalAssetQuoter_init_unchained(stAsset, jtAsset);
+        __IdenticalAssetsQuoter_init_unchained(stAsset, jtAsset);
     }
 }
