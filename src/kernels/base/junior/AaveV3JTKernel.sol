@@ -62,8 +62,11 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
         // Extend a one time max approval to the Aave V3 pool for the JT's base asset
         IERC20(_jtAsset).forceApprove(_aaveV3Pool, type(uint256).max);
 
-        // Initialize the Aave V3 kernel storage
-        __AaveV3Kernel_init(_aaveV3Pool, address(IPool(_aaveV3Pool).ADDRESSES_PROVIDER()), jtAssetAToken);
+        // Set the initial state of the Aave V3 kernel
+        AaveV3KernelState storage $ = _getAaveV3KernelStorage();
+        $.pool = _pool;
+        $.poolAddressesProvider = _poolAddressesProvider;
+        $.aToken = _aToken;
     }
 
     /// @inheritdoc IRoycoKernel
@@ -224,19 +227,5 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
         assembly ("memory-safe") {
             $.slot := AAVE_V3_KERNEL_STORAGE_SLOT
         }
-    }
-
-    /**
-     * @notice Initializes the Aave V3 kernel state
-     * @param _pool The address of the Aave V3 pool
-     * @param _poolAddressesProvider The address of the Aave V3 pool addresses provider
-     * @param _aToken - The address of the tranche's base asset's A Token
-     */
-    function __AaveV3Kernel_init(address _pool, address _poolAddressesProvider, address _aToken) internal {
-        // Set the initial state of the Aave V3 kernel
-        AaveV3KernelState storage $ = _getAaveV3KernelStorage();
-        $.pool = _pool;
-        $.poolAddressesProvider = _poolAddressesProvider;
-        $.aToken = _aToken;
     }
 }
