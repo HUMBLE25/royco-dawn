@@ -5,9 +5,11 @@ import { RoycoFactory } from "../../src/RoycoFactory.sol";
 import { RoycoAccountant } from "../../src/accountant/RoycoAccountant.sol";
 import { IPool } from "../../src/interfaces/aave/IPool.sol";
 import { ERC4626ST_AaveV3JT_Kernel } from "../../src/kernels/ERC4626ST_AaveV3JT_Kernel.sol";
+import { ZERO_NAV_UNITS, ZERO_TRANCHE_UNITS } from "../../src/libraries/Constants.sol";
 import { RoycoAccountantInitParams, RoycoAccountantState } from "../../src/libraries/RoycoAccountantStorageLib.sol";
 import { RoycoKernelInitParams, RoycoKernelState } from "../../src/libraries/RoycoKernelStorageLib.sol";
 import { IRoycoAccountant, IRoycoKernel, MarketDeploymentParams, TrancheDeploymentParams } from "../../src/libraries/Types.sol";
+import { toNAVUnits, toTrancheUnits } from "../../src/libraries/Units.sol";
 import { MainnetForkWithAaveTestBase } from "./base/MainnetForkWithAaveBaseTest.sol";
 
 contract DeploymentsTest is MainnetForkWithAaveTestBase {
@@ -34,9 +36,10 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
 
         // Initial NAV and totals
         assertEq(ST.totalSupply(), 0, "ST initial totalSupply should be 0");
-        assertEq(ST.getRawNAV(), 0, "ST initial raw NAV should be 0");
-        assertEq(ST.getEffectiveNAV(), 0, "ST initial effective NAV should be 0");
-        assertEq(ST.totalAssets(), 0, "ST initial total ASSETS should be 0");
+        assertEq(ST.getRawNAV(), ZERO_NAV_UNITS, "ST initial raw NAV should be 0");
+        assertEq(ST.totalAssets().effectiveNAV, ZERO_NAV_UNITS, "ST initial effective NAV should be 0");
+        assertEq(ST.totalAssets().stAssets, ZERO_TRANCHE_UNITS, "ST initial total st assets should be 0");
+        assertEq(ST.totalAssets().jtAssets, ZERO_TRANCHE_UNITS, "ST initial total jt assets should be 0");
     }
 
     /// @notice Verifies junior tranche deployment parameters
@@ -54,9 +57,10 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
 
         // Initial NAV and totals
         assertEq(JT.totalSupply(), 0, "JT initial totalSupply should be 0");
-        assertEq(JT.getRawNAV(), 0, "JT initial raw NAV should be 0");
-        assertEq(JT.getEffectiveNAV(), 0, "JT initial effective NAV should be 0");
-        assertEq(JT.totalAssets(), 0, "JT initial total ASSETS should be 0");
+        assertEq(JT.getRawNAV(), ZERO_NAV_UNITS, "JT initial raw NAV should be 0");
+        assertEq(JT.totalAssets().effectiveNAV, ZERO_NAV_UNITS, "JT initial effective NAV should be 0");
+        assertEq(JT.totalAssets().stAssets, ZERO_TRANCHE_UNITS, "JT initial total st assets should be 0");
+        assertEq(JT.totalAssets().jtAssets, ZERO_TRANCHE_UNITS, "JT initial total jt assets should be 0");
     }
 
     /// @notice Verifies kernel and accountant deployment parameters and wiring
@@ -82,10 +86,10 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         assertEq(accountantState.rdm, address(RDM), "Kernel RDM mismatch");
 
         // Initial NAV / ASSETS via KERNEL view functions
-        assertEq(KERNEL.getSTTotalEffectiveAssets(), 0, "Kernel ST total effective ASSETS should be 0");
-        assertEq(KERNEL.getJTTotalEffectiveAssets(), 0, "Kernel JT total effective ASSETS should be 0");
-        assertEq(KERNEL.getSTRawNAV(), 0, "Kernel ST raw NAV should be 0");
-        assertEq(KERNEL.getJTRawNAV(), 0, "Kernel JT raw NAV should be 0");
+        assertEq(KERNEL.getSTAssetClaims().effectiveNAV, ZERO_NAV_UNITS, "Kernel ST total effective ASSETS should be 0");
+        assertEq(KERNEL.getJTAssetClaims().effectiveNAV, ZERO_NAV_UNITS, "Kernel JT total effective ASSETS should be 0");
+        assertEq(KERNEL.getSTRawNAV(), ZERO_NAV_UNITS, "Kernel ST raw NAV should be 0");
+        assertEq(KERNEL.getJTRawNAV(), ZERO_NAV_UNITS, "Kernel JT raw NAV should be 0");
 
         // Aave wiring: pool and AUSDC mapping must be consistent
         address expectedAToken = IPool(ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS).getReserveAToken(ETHEREUM_MAINNET_USDC_ADDRESS);

@@ -283,7 +283,6 @@ contract BaseTest is Test, RoycoRoles, Assertions {
         assertApproxEqAbs(jtClaims.effectiveNAV, _jtState.effectiveNAV, _maxAbsDelta, "JT effective NAV mismatch");
         assertApproxEqAbs(jtClaims.stAssets, _jtState.stAssetsClaim, _maxAbsDelta, "JT st assets claim mismatch");
         assertApproxEqAbs(jtClaims.jtAssets, _jtState.jtAssetsClaim, _maxAbsDelta, "JT jt assets claim mismatch");
-        assertApproxEqAbs(JT.totalAssets(), _jtState.totalEffectiveAssets, _maxAbsDelta, "JT total effective ASSETS mismatch");
     }
 
     /// @notice Verifies the fee taken by the senior and junior tranches
@@ -292,11 +291,11 @@ contract BaseTest is Test, RoycoRoles, Assertions {
     /// @param _feeRecipient The address of the fee recipient
     function _verifyFeeTaken(TrancheState storage _stState, TrancheState storage _jtState, address _feeRecipient) internal {
         uint256 seniorFeeShares = ST.balanceOf(_feeRecipient);
-        uint256 seniorFeeSharesValue = ST.convertToAssets(seniorFeeShares);
+        NAV_UNIT seniorFeeSharesValue = ST.convertToAssets(seniorFeeShares).effectiveNAV;
         assertEq(seniorFeeSharesValue, _stState.protocolFeeValue, "ST protocol fee value mismatch");
 
         uint256 juniorFeeShares = JT.balanceOf(_feeRecipient);
-        uint256 juniorFeeSharesValue = JT.convertToAssets(juniorFeeShares);
+        NAV_UNIT juniorFeeSharesValue = JT.convertToAssets(juniorFeeShares).effectiveNAV;
         assertEq(juniorFeeSharesValue, _jtState.protocolFeeValue, "JT protocol fee value mismatch");
     }
 
@@ -340,11 +339,11 @@ contract BaseTest is Test, RoycoRoles, Assertions {
     )
         internal
     {
-        _trancheState.rawNAV -= _totalAssetsValueWithdrawn;
-        _trancheState.effectiveNAV -= _totalAssetsValueWithdrawn;
-        _trancheState.stAssetsClaim -= _stAssetsWithdrawn;
-        _trancheState.jtAssetsClaim -= _jtAssetsWithdrawn;
-        _trancheState.totalShares -= _shares;
+        _trancheState.rawNAV = _trancheState.rawNAV - _totalAssetsValueWithdrawn;
+        _trancheState.effectiveNAV = _trancheState.effectiveNAV - _totalAssetsValueWithdrawn;
+        _trancheState.stAssetsClaim = _trancheState.stAssetsClaim - _stAssetsWithdrawn;
+        _trancheState.jtAssetsClaim = _trancheState.jtAssetsClaim - _jtAssetsWithdrawn;
+        _trancheState.totalShares = _trancheState.totalShares - _shares;
     }
 
     /// @notice Converts the specified assets denominated in JT's tranche units to the kernel's NAV units

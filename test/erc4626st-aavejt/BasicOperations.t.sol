@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import { Vm } from "../../lib/forge-std/src/Vm.sol";
 import { IRoycoAccountant } from "../../src/interfaces/IRoycoAccountant.sol";
 import { TrancheType } from "../../src/libraries/Types.sol";
-import { TRANCHE_UNIT, toTrancheUnits } from "../../src/libraries/Units.sol";
+import { TRANCHE_UNIT, toTrancheUnits, toUint256 } from "../../src/libraries/Units.sol";
 import { MainnetForkWithAaveTestBase } from "./base/MainnetForkWithAaveBaseTest.sol";
 
 contract BasicOperationsTest is MainnetForkWithAaveTestBase {
@@ -51,8 +51,8 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         assertTrue(maxRedeemableShares <= shares, "Max redeemable shares should be less than or equal to shares");
 
         // Verify that previewRedeem returns the correct amount
-        uint256 convertedAssets = JT.convertToAssets(shares);
-        assertApproxEqRel(convertedAssets, _assets, MAX_CONVERT_TO_ASSETS_RELATIVE_DELTA, "Convert to assets should return the correct amount");
+        TRANCHE_UNIT convertedAssets = JT.convertToAssets(shares).jtAssets;
+        assertApproxEqRel(convertedAssets, assets, MAX_CONVERT_TO_ASSETS_RELATIVE_DELTA, "Convert to assets should return the correct amount");
 
         // Verify assets were transferred
         assertEq(USDC.balanceOf(depositor), initialDepositorBalance - _assets, "Depositor balance should decrease by assets amount");
@@ -92,7 +92,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
 
             // Deposit into the tranche
             vm.prank(provider.addr);
-            uint256 shares = JT.deposit(amount, provider.addr, provider.addr);
+            uint256 shares = JT.deposit(assets, provider.addr, provider.addr);
 
             // Verify that an equivalent amount of AUSDCs were minted
             assertApproxEqAbs(
@@ -111,7 +111,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
             assertTrue(maxRedeemableShares <= shares, "Max redeemable shares should be less than or equal to shares");
 
             // Verify that previewRedeem returns the correct amount
-            uint256 convertedAssets = JT.convertToAssets(shares);
+            TRANCHE_UNIT convertedAssets = JT.convertToAssets(shares).jtAssets;
             assertApproxEqRel(convertedAssets, assets, MAX_CONVERT_TO_ASSETS_RELATIVE_DELTA, "Convert to assets should return the correct amount");
             assertTrue(convertedAssets <= assets, "Convert to assets should be less than or equal to amount");
 
@@ -131,10 +131,10 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
 
         // There are no assets in JT initally, therefore depositing into ST should fail
         address stDepositor = BOB_ADDRESS;
-        uint256 stDepositAmount = 1;
+        TRANCHE_UNIT stDepositAmount = toTrancheUnits(1);
 
         vm.startPrank(stDepositor);
-        USDC.approve(address(ST), stDepositAmount);
+        USDC.approve(address(ST), toUint256(stDepositAmount));
         vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.COVERAGE_REQUIREMENT_UNSATISFIED.selector));
         ST.deposit(stDepositAmount, stDepositor, stDepositor);
         vm.stopPrank();

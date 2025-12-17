@@ -20,7 +20,7 @@ struct AaveV3KernelState {
 library AaveV3KernelStorageLib {
     /// @dev Storage slot for AaveV3KernelState using ERC-7201 pattern
     // keccak256(abi.encode(uint256(keccak256("Royco.storage.AaveV3KernelState")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant AAVE_V3_KERNEL_STORAGE_SLOT = 0x20a998929d5f52fd2ab88c68a53f71f586f1008b18ca7e45b22d0acddbf3e00;
+    bytes32 private constant AAVE_V3_KERNEL_STORAGE_SLOT = 0x020a998929d5f52fd2ab88c68a53f71f586f1008b18ca7e45b22d0acddbf3e00;
 
     /// @notice Returns a storage pointer to the AaveV3KernelState storage
     /// @dev Uses ERC-7201 storage slot pattern for collision-resistant storage
