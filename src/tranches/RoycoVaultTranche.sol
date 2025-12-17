@@ -42,6 +42,9 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Upgra
     /// @notice Thrown when the caller isn't the kernel
     error ONLY_KERNEL();
 
+    /// @notice Thrown when the value allocated is zero
+    error INVALID_VALUE_ALLOCATED();
+
     /// @notice Modifier to ensure the specified action uses a synchronous execution model
     /// @param _action The action to check (DEPOSIT or WITHDRAW)
     /// @dev Reverts if the execution model for the action is asynchronous
@@ -217,6 +220,9 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Upgra
         // Deposit the assets into the underlying investment opportunity and get the fraction of total assets allocated
         (NAV_UNIT valueAllocated, NAV_UNIT effectiveNAVToMintAt) =
             (TRANCHE_TYPE() == TrancheType.SENIOR ? kernel_.stDeposit(_assets, _controller, _receiver) : kernel_.jtDeposit(_assets, _controller, _receiver));
+
+        // effectiveNAVToMint at can be zero initially when the tranche is deployed
+        require(valueAllocated != ZERO_NAV_UNITS, INVALID_VALUE_ALLOCATED());
 
         // valueAllocated represents the value of the assets deposited in the asset that the tranche's NAV is denominated in
         // shares are minted to the user at the effective NAV of the tranche
@@ -721,12 +727,10 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Upgra
         returns (TrancheAssetClaims memory claims)
     {
         IRoycoKernel kernel_ = IRoycoKernel(kernel());
-        NAV_UNIT stAssetsValue = kernel_.stConvertTrancheUnitsToNAVUnits(_totalAssets.stAssets);
-        NAV_UNIT jtAssetsValue = kernel_.jtConvertTrancheUnitsToNAVUnits(_totalAssets.jtAssets);
 
         claims.effectiveNAV = toNAVUnits(_shares.mulDiv(toUint256(_withVirtualAssets(_totalAssets.effectiveNAV)), _withVirtualShares(_totalSupply), _rounding));
-        claims.stAssets = toTrancheUnits(_shares.mulDiv(toUint256(stAssetsValue), _withVirtualShares(_totalSupply), _rounding));
-        claims.jtAssets = toTrancheUnits(_shares.mulDiv(toUint256(jtAssetsValue), _withVirtualShares(_totalSupply), _rounding));
+        claims.stAssets = toTrancheUnits(_shares.mulDiv(toUint256(_totalAssets.stAssets), _withVirtualShares(_totalSupply), _rounding));
+        claims.jtAssets = toTrancheUnits(_shares.mulDiv(toUint256(_totalAssets.jtAssets), _withVirtualShares(_totalSupply), _rounding));
     }
 
     /// @dev Returns if the specified action employs a synchronous execution model
