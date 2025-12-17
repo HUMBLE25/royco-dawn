@@ -29,7 +29,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         uint256 initialTrancheShares = JT.balanceOf(depositor);
 
         // Assert that initially all tranche parameters are 0
-        _verifyPreviewNAVs(sTState, jTState, AAVE_MAX_ABS_NAV_DELTA);
+        _verifyPreviewNAVs(sTState, jTState, AAVE_MAX_ABS_TRANCH_UNIT_DELTA, AAVE_MAX_ABS_NAV_DELTA);
         _verifyFeeTaken(sTState, jTState, PROTOCOL_FEE_RECIPIENT_ADDRESS);
 
         // Approve the junior tranche to spend assets
@@ -58,10 +58,12 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         assertEq(USDC.balanceOf(depositor), initialDepositorBalance - _assets, "Depositor balance should decrease by assets amount");
 
         // Verify that an equivalent amount of AUSDCs were minted
-        assertApproxEqAbs(AUSDC.balanceOf(address(KERNEL)), _assets, AAVE_MAX_ABS_NAV_DELTA, "An equivalent amount of AUSDCs should be minted");
+        assertApproxEqAbs(
+            AUSDC.balanceOf(address(KERNEL)), _assets, toUint256(AAVE_MAX_ABS_TRANCH_UNIT_DELTA), "An equivalent amount of AUSDCs should be minted"
+        );
 
         // Verify that the tranche state has been updated
-        _verifyPreviewNAVs(sTState, jTState, AAVE_MAX_ABS_NAV_DELTA);
+        _verifyPreviewNAVs(sTState, jTState, AAVE_MAX_ABS_TRANCH_UNIT_DELTA, AAVE_MAX_ABS_NAV_DELTA);
         _verifyFeeTaken(sTState, jTState, PROTOCOL_FEE_RECIPIENT_ADDRESS);
     }
 
@@ -70,7 +72,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         _numDepositors = bound(_numDepositors, 1, 10);
 
         // Assert that initially all tranche parameters are 0
-        _verifyPreviewNAVs(sTState, jTState, AAVE_MAX_ABS_NAV_DELTA);
+        _verifyPreviewNAVs(sTState, jTState, AAVE_MAX_ABS_TRANCH_UNIT_DELTA, AAVE_MAX_ABS_NAV_DELTA);
         _verifyFeeTaken(sTState, jTState, PROTOCOL_FEE_RECIPIENT_ADDRESS);
 
         for (uint256 i = 0; i < _numDepositors; i++) {
@@ -96,7 +98,10 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
 
             // Verify that an equivalent amount of AUSDCs were minted
             assertApproxEqAbs(
-                AUSDC.balanceOf(address(KERNEL)), amount + initialATokenBalance, AAVE_MAX_ABS_NAV_DELTA, "An equivalent amount of AUSDCs should be minted"
+                AUSDC.balanceOf(address(KERNEL)),
+                amount + initialATokenBalance,
+                toUint256(AAVE_MAX_ABS_TRANCH_UNIT_DELTA),
+                "An equivalent amount of AUSDCs should be minted"
             );
 
             uint256 aTokensMinted = AUSDC.balanceOf(address(KERNEL)) - initialATokenBalance;
@@ -119,7 +124,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
             assertEq(USDC.balanceOf(provider.addr), initialDepositorBalance - amount, "Provider balance should decrease by amount");
 
             // Verify that the tranche state has been updated
-            _verifyPreviewNAVs(sTState, jTState, AAVE_MAX_ABS_NAV_DELTA);
+            _verifyPreviewNAVs(sTState, jTState, AAVE_MAX_ABS_TRANCH_UNIT_DELTA, AAVE_MAX_ABS_NAV_DELTA);
             _verifyFeeTaken(sTState, jTState, PROTOCOL_FEE_RECIPIENT_ADDRESS);
         }
     }
@@ -141,11 +146,12 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
 
         // Deposit assets into the junior tranche to allow deposits into the ST
         address jtDepositor = ALICE_ADDRESS;
-        vm.prank(jtDepositor);
-        USDC.approve(address(ST), _jtAssets);
+        vm.startPrank(jtDepositor);
+        USDC.approve(address(JT), _jtAssets);
         uint256 shares = JT.deposit(jtAssets, jtDepositor, jtDepositor);
-        _updateOnDeposit(jTState, jtAssets, _toJTValue(jtAssets), shares, TrancheType.JUNIOR);
+        vm.stopPrank();
 
-        //
+        _updateOnDeposit(jTState, jtAssets, _toJTValue(jtAssets), shares, TrancheType.JUNIOR);
+        // todo
     }
 }

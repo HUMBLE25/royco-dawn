@@ -77,10 +77,7 @@ interface IRoycoKernel {
      * @return state The synced NAV, debt, and fee accounting containing all mark to market accounting data
      * @return claims The claims on ST and JT assets that the specified tranche has denominated in tranche-native units
      */
-    function previewSyncTrancheAccounting(TrancheType _trancheType)
-        external
-        view
-        returns (SyncedAccountingState memory state, TrancheAssetClaims memory claims);
+    function previewSyncTrancheAccounting(TrancheType _trancheType) external view returns (SyncedAccountingState memory state, TrancheAssetClaims memory claims);
 
     function stMaxAssetsDeposit(address _receiver) external view returns (TRANCHE_UNIT assets);
 

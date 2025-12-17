@@ -5,21 +5,21 @@ import { Test } from "../../lib/forge-std/src/Test.sol";
 import { Vm } from "../../lib/forge-std/src/Vm.sol";
 import { ERC20Mock } from "../../lib/openzeppelin-contracts/contracts/mocks/token/ERC20Mock.sol";
 import { ERC1967Proxy } from "../../lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import { StaticCurveRDM } from "../../src/RDM/StaticCurveRDM.sol";
 import { RoycoFactory } from "../../src/RoycoFactory.sol";
 import { RoycoAccountant } from "../../src/accountant/RoycoAccountant.sol";
 import { RoycoAuth } from "../../src/auth/RoycoAuth.sol";
 import { RoycoRoles } from "../../src/auth/RoycoRoles.sol";
-import { IRoycoKernel } from "../../src/interfaces/KERNEL/IRoycoKernel.sol";
-import { ERC4626ST_AaveV3JT_Kernel } from "../../src/kernels/ERC4626ST_AaveV3JT_Kernel.sol";
+import { IRoycoKernel } from "../../src/interfaces/kernel/IRoycoKernel.sol";
 import { RoycoKernel } from "../../src/kernels/base/RoycoKernel.sol";
 import { RoycoAccountantInitParams } from "../../src/libraries/RoycoAccountantStorageLib.sol";
 import { RoycoKernelInitParams } from "../../src/libraries/RoycoKernelStorageLib.sol";
 import { TrancheAssetClaims, TrancheType } from "../../src/libraries/Types.sol";
-import { NAV_UNIT, TRANCHE_UNIT } from "../../src/libraries/Units.sol";
+import { NAV_UNIT, TRANCHE_UNIT, toUint256 } from "../../src/libraries/Units.sol";
+import { StaticCurveRDM } from "../../src/rdm/StaticCurveRDM.sol";
 import { RoycoJT } from "../../src/tranches/RoycoJT.sol";
 import { RoycoST } from "../../src/tranches/RoycoST.sol";
 import { RoycoVaultTranche } from "../../src/tranches/RoycoVaultTranche.sol";
+import { USDC_ERC4626_AaveV3JT_Kernel } from "../mock/USDC_ERC4626_AaveV3JT_Kernel.sol";
 import { Assertions } from "./Assertions.sol";
 
 contract BaseTest is Test, RoycoRoles, Assertions {
@@ -77,7 +77,7 @@ contract BaseTest is Test, RoycoRoles, Assertions {
     StaticCurveRDM public RDM;
     RoycoST public ST_IMPL;
     RoycoJT public JT_IMPL;
-    ERC4626ST_AaveV3JT_Kernel public ERC4626ST_AAVEV3JT_KERNEL_IMPL;
+    USDC_ERC4626_AaveV3JT_Kernel public USDC_ERC4626_AaveV3JT_KERNEL_IMPL;
     RoycoAccountant public ACCOUNTANT_IMPL;
 
     // Deployed Later in the concrete tests
@@ -138,8 +138,8 @@ contract BaseTest is Test, RoycoRoles, Assertions {
         vm.label(address(ACCOUNTANT_IMPL), "AccountantImpl");
 
         // Deploy KERNEL implementation
-        ERC4626ST_AAVEV3JT_KERNEL_IMPL = new ERC4626ST_AaveV3JT_Kernel();
-        vm.label(address(ERC4626ST_AAVEV3JT_KERNEL_IMPL), "KernelImpl");
+        USDC_ERC4626_AaveV3JT_KERNEL_IMPL = new USDC_ERC4626_AaveV3JT_Kernel();
+        vm.label(address(USDC_ERC4626_AaveV3JT_KERNEL_IMPL), "KernelImpl");
 
         // Deploy FACTORY
         FACTORY = new RoycoFactory(OWNER_ADDRESS);
@@ -268,21 +268,28 @@ contract BaseTest is Test, RoycoRoles, Assertions {
     /// @notice Verifies the preview NAVs of the senior and junior tranches
     /// @param _stState The state of the senior tranche
     /// @param _jtState The state of the junior tranche
-    function _verifyPreviewNAVs(TrancheState memory _stState, TrancheState memory _jtState, uint256 _maxAbsDelta) internal {
+    function _verifyPreviewNAVs(
+        TrancheState memory _stState,
+        TrancheState memory _jtState,
+        TRANCHE_UNIT _maxAbsDeltaTrancheUnits,
+        NAV_UNIT _maxAbsDeltaNAV
+    )
+        internal
+    {
         assertTrue(address(ST) != address(0), "Senior tranche is not deployed");
         assertTrue(address(JT) != address(0), "Junior tranche is not deployed");
 
-        assertApproxEqAbs(ST.getRawNAV(), _stState.rawNAV, _maxAbsDelta, "ST raw NAV mismatch");
+        assertApproxEqAbs(ST.getRawNAV(), _stState.rawNAV, toUint256(_maxAbsDeltaNAV), "ST raw NAV mismatch");
         TrancheAssetClaims memory stClaims = ST.totalAssets();
-        assertApproxEqAbs(stClaims.effectiveNAV, _stState.effectiveNAV, _maxAbsDelta, "ST effective NAV mismatch");
-        assertApproxEqAbs(stClaims.stAssets, _stState.stAssetsClaim, _maxAbsDelta, "ST st assets claim mismatch");
-        assertApproxEqAbs(stClaims.jtAssets, _stState.jtAssetsClaim, _maxAbsDelta, "ST jt assets claim mismatch");
+        assertApproxEqAbs(stClaims.effectiveNAV, _stState.effectiveNAV, toUint256(_maxAbsDeltaNAV), "ST effective NAV mismatch");
+        assertApproxEqAbs(stClaims.stAssets, _stState.stAssetsClaim, toUint256(_maxAbsDeltaTrancheUnits), "ST st assets claim mismatch");
+        assertApproxEqAbs(stClaims.jtAssets, _stState.jtAssetsClaim, toUint256(_maxAbsDeltaTrancheUnits), "ST jt assets claim mismatch");
 
-        assertApproxEqAbs(JT.getRawNAV(), _jtState.rawNAV, _maxAbsDelta, "JT raw NAV mismatch");
+        assertApproxEqAbs(JT.getRawNAV(), _jtState.rawNAV, toUint256(_maxAbsDeltaNAV), "JT raw NAV mismatch");
         TrancheAssetClaims memory jtClaims = JT.totalAssets();
-        assertApproxEqAbs(jtClaims.effectiveNAV, _jtState.effectiveNAV, _maxAbsDelta, "JT effective NAV mismatch");
-        assertApproxEqAbs(jtClaims.stAssets, _jtState.stAssetsClaim, _maxAbsDelta, "JT st assets claim mismatch");
-        assertApproxEqAbs(jtClaims.jtAssets, _jtState.jtAssetsClaim, _maxAbsDelta, "JT jt assets claim mismatch");
+        assertApproxEqAbs(jtClaims.effectiveNAV, _jtState.effectiveNAV, toUint256(_maxAbsDeltaNAV), "JT effective NAV mismatch");
+        assertApproxEqAbs(jtClaims.stAssets, _jtState.stAssetsClaim, toUint256(_maxAbsDeltaTrancheUnits), "JT st assets claim mismatch");
+        assertApproxEqAbs(jtClaims.jtAssets, _jtState.jtAssetsClaim, toUint256(_maxAbsDeltaTrancheUnits), "JT jt assets claim mismatch");
     }
 
     /// @notice Verifies the fee taken by the senior and junior tranches

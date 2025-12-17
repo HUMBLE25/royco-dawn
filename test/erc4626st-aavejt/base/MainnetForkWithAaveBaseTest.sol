@@ -4,19 +4,21 @@ pragma solidity ^0.8.28;
 import { Vm } from "../../../lib/forge-std/src/Vm.sol";
 import { IERC20 } from "../../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { RoycoAccountant } from "../../../src/accountant/RoycoAccountant.sol";
-import { ERC4626ST_AaveV3JT_Kernel } from "../../../src/kernels/ERC4626ST_AaveV3JT_Kernel.sol";
 import { RoycoKernel } from "../../../src/kernels/base/RoycoKernel.sol";
 import { RoycoAccountantInitParams } from "../../../src/libraries/RoycoAccountantStorageLib.sol";
 import { RoycoKernelInitParams } from "../../../src/libraries/RoycoKernelStorageLib.sol";
 import { DeployedContracts, IRoycoAccountant, IRoycoKernel, MarketDeploymentParams } from "../../../src/libraries/Types.sol";
 import { TrancheDeploymentParams } from "../../../src/libraries/Types.sol";
+import { NAV_UNIT, TRANCHE_UNIT, toNAVUnits, toTrancheUnits, toUint256 } from "../../../src/libraries/Units.sol";
 import { RoycoVaultTranche } from "../../../src/tranches/RoycoVaultTranche.sol";
 import { BaseTest } from "../../base/BaseTest.sol";
 import { ERC4626Mock } from "../../mock/ERC4626Mock.sol";
+import { USDC_ERC4626_AaveV3JT_Kernel } from "../../mock/USDC_ERC4626_AaveV3JT_Kernel.sol";
 
 abstract contract MainnetForkWithAaveTestBase is BaseTest {
     // TODO: Review All
-    uint256 internal constant AAVE_MAX_ABS_NAV_DELTA = 3;
+    TRANCHE_UNIT internal AAVE_MAX_ABS_TRANCH_UNIT_DELTA = toTrancheUnits(3);
+    NAV_UNIT internal AAVE_MAX_ABS_NAV_DELTA = toNAVUnits(toUint256(AAVE_MAX_ABS_TRANCH_UNIT_DELTA) * 10 ** 21);
     uint256 internal constant MAX_REDEEM_RELATIVE_DELTA = 0.0001e18; // 0.01%
     uint256 internal constant MAX_CONVERT_TO_ASSETS_RELATIVE_DELTA = 0.0001e18; // 0.01%
 
@@ -25,7 +27,7 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
 
     // Deployed contracts
     ERC4626Mock internal MOCK_UNDERLYING_ST_VAULT;
-    ERC4626ST_AaveV3JT_Kernel internal ERC4626ST_AAVEV3JT_KERNEL;
+    USDC_ERC4626_AaveV3JT_Kernel internal USDC_ERC4626_AaveV3JT_KERNEL;
 
     // External Contracts
     IERC20 internal USDC;
@@ -97,12 +99,12 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
         bytes32 salt = keccak256(abi.encodePacked("SALT"));
         address expectedSeniorTrancheAddress = FACTORY.predictERC1967ProxyAddress(address(ST_IMPL), salt);
         address expectedJuniorTrancheAddress = FACTORY.predictERC1967ProxyAddress(address(JT_IMPL), salt);
-        address expectedKernelAddress = FACTORY.predictERC1967ProxyAddress(address(ERC4626ST_AAVEV3JT_KERNEL_IMPL), salt);
+        address expectedKernelAddress = FACTORY.predictERC1967ProxyAddress(address(USDC_ERC4626_AaveV3JT_KERNEL_IMPL), salt);
         address expectedAccountantAddress = FACTORY.predictERC1967ProxyAddress(address(ACCOUNTANT_IMPL), salt);
 
         // Create the initialization data
         bytes memory kernelInitializationData = abi.encodeCall(
-            ERC4626ST_AaveV3JT_Kernel.initialize,
+            USDC_ERC4626_AaveV3JT_KERNEL_IMPL.initialize,
             (
                 RoycoKernelInitParams({
                     seniorTranche: expectedSeniorTrancheAddress,
@@ -154,7 +156,7 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
                 marketId: marketID,
                 seniorTrancheImplementation: ST_IMPL,
                 juniorTrancheImplementation: JT_IMPL,
-                kernelImplementation: IRoycoKernel(address(ERC4626ST_AAVEV3JT_KERNEL_IMPL)),
+                kernelImplementation: IRoycoKernel(address(USDC_ERC4626_AaveV3JT_KERNEL_IMPL)),
                 seniorTrancheInitializationData: seniorTrancheInitializationData,
                 juniorTrancheInitializationData: juniorTrancheInitializationData,
                 accountantImplementation: IRoycoAccountant(address(ACCOUNTANT_IMPL)),

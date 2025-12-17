@@ -67,9 +67,8 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
         navToMintAt = (_preOpSyncTrancheAccounting()).jtEffectiveNAV;
 
         // Max approval already given to the pool on initialization
-        IPool(AaveV3KernelStorageLib._getAaveV3KernelStorage().pool).supply(
-            AaveV3KernelStorageLib._getAaveV3KernelStorage().asset, toUint256(_assets), address(this), 0
-        );
+        IPool(AaveV3KernelStorageLib._getAaveV3KernelStorage().pool)
+            .supply(AaveV3KernelStorageLib._getAaveV3KernelStorage().asset, toUint256(_assets), address(this), 0);
 
         // Execute a post-op sync on accounting
         _postOpSyncTrancheAccounting(Operation.JT_INCREASE_NAV);
@@ -111,9 +110,8 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
 
     /// @inheritdoc RoycoKernel
     function _withdrawJTAssets(TRANCHE_UNIT _jtAssets, address _receiver) internal override(RoycoKernel) {
-        IPool(AaveV3KernelStorageLib._getAaveV3KernelStorage().pool).withdraw(
-            AaveV3KernelStorageLib._getAaveV3KernelStorage().asset, toUint256(_jtAssets), _receiver
-        );
+        IPool(AaveV3KernelStorageLib._getAaveV3KernelStorage().pool)
+            .withdraw(AaveV3KernelStorageLib._getAaveV3KernelStorage().asset, toUint256(_jtAssets), _receiver);
     }
 
     /// @inheritdoc RoycoKernel
