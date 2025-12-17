@@ -2,6 +2,8 @@
 pragma solidity ^0.8.28;
 
 import { ERC20Upgradeable, IERC20, IERC20Metadata } from "../../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/ERC20Upgradeable.sol";
+import { ERC20PausableUpgradeable } from "../../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/ERC20PausableUpgradeable.sol";
+import { ERC20PermitUpgradeable } from "../../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
 import { IAccessControlEnumerable } from "../../lib/openzeppelin-contracts/contracts/access/extensions/IAccessControlEnumerable.sol";
 import { SafeERC20 } from "../../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import { Math } from "../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
@@ -17,10 +19,13 @@ import { RoycoTrancheStorageLib } from "../libraries/RoycoTrancheStorageLib.sol"
 import { TrancheAssetClaims, TrancheType } from "../libraries/Types.sol";
 import { Action, SyncedAccountingState, TrancheDeploymentParams } from "../libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, toNAVUnits, toTrancheUnits, toUint256 } from "../libraries/Units.sol";
+import { UtilsLib } from "../libraries/UtilsLib.sol";
 
-/// @title RoycoVaultTranche
-/// @notice Abstract base contract implementing core functionality for Royco tranches
-abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Upgradeable {
+/**
+ * @title RoycoVaultTranche
+ * @notice Abstract base contract implementing core functionality for Royco tranches
+ */
+abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20PausableUpgradeable, ERC20PermitUpgradeable {
     using Math for uint256;
     using SafeERC20 for IERC20;
 
@@ -45,45 +50,55 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Upgra
     /// @notice Thrown when the value allocated is zero
     error INVALID_VALUE_ALLOCATED();
 
-    /// @notice Modifier to ensure the specified action uses a synchronous execution model
-    /// @param _action The action to check (DEPOSIT or WITHDRAW)
-    /// @dev Reverts if the execution model for the action is asynchronous
+    /**
+     * @notice Modifier to ensure the specified action uses a synchronous execution model
+     * @param _action The action to check (DEPOSIT or WITHDRAW)
+     * @dev Reverts if the execution model for the action is asynchronous
+     */
     /// forge-lint: disable-next-item(unwrapped-modifier-logic)
     modifier executionIsSync(Action _action) {
         require(_isSync(_action), DISABLED());
         _;
     }
 
-    /// @notice Modifier to ensure the specified action uses an asynchronous execution model
-    /// @param _action The action to check (DEPOSIT or WITHDRAW)
-    /// @dev Reverts if the execution model for the action is synchronous
+    /**
+     * @notice Modifier to ensure the specified action uses an asynchronous execution model
+     * @param _action The action to check (DEPOSIT or WITHDRAW)
+     * @dev Reverts if the execution model for the action is synchronous
+     */
     /// forge-lint: disable-next-item(unwrapped-modifier-logic)
     modifier executionIsAsync(Action _action) {
         require(!_isSync(_action), DISABLED());
         _;
     }
 
-    /// @notice Modifier to ensure caller is either the specified address or an approved operator
-    /// @param _account The address that the caller should match or have operator approval for
-    /// @dev Reverts if caller is neither the address nor an approved operator
+    /**
+     * @notice Modifier to ensure caller is either the specified address or an approved operator
+     * @param _account The address that the caller should match or have operator approval for
+     * @dev Reverts if caller is neither the address nor an approved operator
+     */
     modifier onlyCallerOrOperator(address _account) {
         _onlyCallerOrOperator(_account);
         _;
     }
 
-    /// @notice Checks if the caller is either the specified address or an approved operator
-    /// @param _account The address to check
-    /// @dev Reverts if the caller is neither the address nor an approved operator
+    /**
+     * @notice Checks if the caller is either the specified address or an approved operator
+     * @param _account The address to check
+     * @dev Reverts if the caller is neither the address nor an approved operator
+     */
     function _onlyCallerOrOperator(address _account) internal view {
         require(msg.sender == _account || RoycoTrancheStorageLib._getRoycoTrancheStorage().isOperator[_account][msg.sender], ONLY_CALLER_OR_OPERATOR());
     }
 
-    /// @notice Initializes the Royco tranche
-    /// @dev This function initializes parent contracts and the tranche-specific state
-    /// @param _trancheParams Deployment parameters including name, symbol, kernel, and kernel initialization data
-    /// @param _asset The underlying asset for the tranche
-    /// @param _initialAuthority The initial authority for the tranche
-    /// @param _marketId The identifier of the Royco market this tranche is linked to
+    /**
+     * @notice Initializes the Royco tranche
+     * @dev This function initializes parent contracts and the tranche-specific state
+     * @param _trancheParams Deployment parameters including name, symbol, kernel, and kernel initialization data
+     * @param _asset The underlying asset for the tranche
+     * @param _initialAuthority The initial authority for the tranche
+     * @param _marketId The identifier of the Royco market this tranche is linked to
+     */
     function __RoycoTranche_init(
         TrancheDeploymentParams calldata _trancheParams,
         address _asset,
@@ -95,17 +110,21 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Upgra
     {
         // Initialize the parent contracts
         __ERC20_init_unchained(_trancheParams.name, _trancheParams.symbol);
+        __ERC20Pausable_init();
+        __ERC20Permit_init(_trancheParams.name);
         __RoycoBase_init(_initialAuthority);
 
         // Initialize the Royco Tranche state
         __RoycoTranche_init_unchained(_asset, _trancheParams.kernel, _marketId);
     }
 
-    /// @notice Internal initialization function for Royco tranche-specific state
-    /// @dev This function sets up the tranche storage and initializes the kernel
-    /// @param _asset The underlying asset for the tranche
-    /// @param _kernelAddress The address of the kernel that handles strategy logic
-    /// @param _marketId The identifier of the Royco market this tranche is linked to
+    /**
+     * @notice Internal initialization function for Royco tranche-specific state
+     * @dev This function sets up the tranche storage and initializes the kernel
+     * @param _asset The underlying asset for the tranche
+     * @param _kernelAddress The address of the kernel that handles strategy logic
+     * @param _marketId The identifier of the Royco market this tranche is linked to
+     */
     function __RoycoTranche_init_unchained(address _asset, address _kernelAddress, bytes32 _marketId) internal onlyInitializing {
         // Calculate the vault's decimal offset (curb inflation attacks)
         uint8 underlyingAssetDecimals = IERC20Metadata(_asset).decimals();
@@ -158,9 +177,10 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Upgra
     }
 
     /// @inheritdoc IRoycoVaultTranche
-    /// @dev Disabled if deposit execution is asynchronous as per ERC7540
     function previewDeposit(TRANCHE_UNIT _assets) external view virtual override(IRoycoVaultTranche) executionIsSync(Action.DEPOSIT) returns (uint256 shares) {
-        shares = convertToShares(_assets);
+        (NAV_UNIT navAssets, NAV_UNIT effectiveNAVToMintAt) =
+            (TRANCHE_TYPE() == TrancheType.SENIOR ? IRoycoKernel(kernel()).stPreviewDeposit(_assets) : IRoycoKernel(kernel()).jtPreviewDeposit(_assets));
+        shares = _convertToShares(navAssets, totalSupply(), effectiveNAVToMintAt, Math.Rounding.Floor);
     }
 
     /// @inheritdoc IRoycoVaultTranche
@@ -183,14 +203,14 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Upgra
         executionIsSync(Action.WITHDRAW)
         returns (TrancheAssetClaims memory claims)
     {
-        claims = convertToAssets(_shares);
+        claims = (TRANCHE_TYPE() == TrancheType.SENIOR ? IRoycoKernel(kernel()).stPreviewRedeem(_shares) : IRoycoKernel(kernel()).jtPreviewRedeem(_shares));
     }
 
     /// @inheritdoc IRoycoVaultTranche
     function convertToAssets(uint256 _shares) public view virtual override(IRoycoVaultTranche) returns (TrancheAssetClaims memory claims) {
         // Get the post-sync tranche state: applying NAV reconciliation.
         (TrancheAssetClaims memory trancheClaims, uint256 trancheTotalShares) = _previewPostSyncTrancheState();
-        return _convertToClaim(_shares, trancheTotalShares, trancheClaims, Math.Rounding.Floor);
+        return UtilsLib.scaleTrancheAssetsClaim(trancheClaims, _shares, trancheTotalShares);
     }
 
     /// @inheritdoc IRoycoAsyncVault
@@ -281,8 +301,10 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Upgra
         return true;
     }
 
-    /// @inheritdoc IRoycoAsyncVault
-    /// @dev Will revert if this tranche does not employ an asynchronous deposit flow
+    /**
+     * @inheritdoc IRoycoAsyncVault
+     * @dev Will revert if this tranche does not employ an asynchronous deposit flow
+     */
     function requestDeposit(
         TRANCHE_UNIT _assets,
         address _controller,
@@ -311,8 +333,10 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Upgra
         emit DepositRequest(_controller, _owner, requestId, msg.sender, _assets);
     }
 
-    /// @inheritdoc IRoycoAsyncVault
-    /// @dev Will revert if this tranche does not employ an asynchronous deposit flow
+    /**
+     * @inheritdoc IRoycoAsyncVault
+     * @dev Will revert if this tranche does not employ an asynchronous deposit flow
+     */
     function pendingDepositRequest(
         uint256 _requestId,
         address _controller
@@ -330,8 +354,10 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Upgra
                 : IAsyncJTDepositKernel(kernel()).jtPendingDepositRequest(_requestId, _controller));
     }
 
-    /// @inheritdoc IRoycoAsyncVault
-    /// @dev Will revert if this tranche does not employ an asynchronous deposit flow
+    /**
+     * @inheritdoc IRoycoAsyncVault
+     * @dev Will revert if this tranche does not employ an asynchronous deposit flow
+     */
     function claimableDepositRequest(
         uint256 _requestId,
         address _controller
@@ -349,8 +375,10 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Upgra
                 : IAsyncJTDepositKernel(kernel()).jtClaimableDepositRequest(_requestId, _controller));
     }
 
-    /// @inheritdoc IRoycoAsyncVault
-    /// @dev Will revert if this tranche does not employ an asynchronous withdrawal flow
+    /**
+     * @inheritdoc IRoycoAsyncVault
+     * @dev Will revert if this tranche does not employ an asynchronous withdrawal flow
+     */
     function requestRedeem(
         uint256 _shares,
         address _controller,
@@ -389,8 +417,10 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Upgra
         emit RedeemRequest(_controller, _owner, requestId, msg.sender, _shares);
     }
 
-    /// @inheritdoc IRoycoAsyncVault
-    /// @dev Will revert if this tranche does not employ an asynchronous withdrawal flow
+    /**
+     * @inheritdoc IRoycoAsyncVault
+     * @dev Will revert if this tranche does not employ an asynchronous withdrawal flow
+     */
     function pendingRedeemRequest(
         uint256 _requestId,
         address _controller
@@ -408,8 +438,10 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Upgra
                 : IAsyncJTWithdrawalKernel(kernel()).jtPendingRedeemRequest(_requestId, _controller));
     }
 
-    /// @inheritdoc IRoycoAsyncVault
-    /// @dev Will revert if this tranche does not employ an asynchronous withdrawal flow
+    /**
+     * @inheritdoc IRoycoAsyncVault
+     * @dev Will revert if this tranche does not employ an asynchronous withdrawal flow
+     */
     function claimableRedeemRequest(
         uint256 _requestId,
         address _controller
@@ -431,8 +463,10 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Upgra
     // ERC-7887 Cancelation Functions
     // =============================
 
-    /// @inheritdoc IRoycoAsyncCancellableVault
-    /// @dev Will revert if this tranche does not employ an asynchronous deposit flow
+    /**
+     * @inheritdoc IRoycoAsyncCancellableVault
+     * @dev Will revert if this tranche does not employ an asynchronous deposit flow
+     */
     function cancelDepositRequest(
         uint256 _requestId,
         address _controller
@@ -454,8 +488,10 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Upgra
         emit CancelDepositRequest(_controller, _requestId, msg.sender);
     }
 
-    /// @inheritdoc IRoycoAsyncCancellableVault
-    /// @dev Will revert if this tranche does not employ an asynchronous deposit flow
+    /**
+     * @inheritdoc IRoycoAsyncCancellableVault
+     * @dev Will revert if this tranche does not employ an asynchronous deposit flow
+     */
     function pendingCancelDepositRequest(
         uint256 _requestId,
         address _controller
@@ -472,8 +508,10 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Upgra
                 : IAsyncJTDepositKernel(kernel()).jtPendingCancelDepositRequest(_requestId, _controller));
     }
 
-    /// @inheritdoc IRoycoAsyncCancellableVault
-    /// @dev Will revert if this tranche does not employ an asynchronous deposit flow
+    /**
+     * @inheritdoc IRoycoAsyncCancellableVault
+     * @dev Will revert if this tranche does not employ an asynchronous deposit flow
+     */
     function claimableCancelDepositRequest(
         uint256 _requestId,
         address _controller
@@ -491,8 +529,10 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Upgra
                 : IAsyncJTDepositKernel(kernel()).jtClaimableCancelDepositRequest(_requestId, _controller));
     }
 
-    /// @inheritdoc IRoycoAsyncCancellableVault
-    /// @dev Will revert if this tranche does not employ an asynchronous deposit flow
+    /**
+     * @inheritdoc IRoycoAsyncCancellableVault
+     * @dev Will revert if this tranche does not employ an asynchronous deposit flow
+     */
     function claimCancelDepositRequest(
         uint256 _requestId,
         address _receiver,
@@ -514,8 +554,10 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Upgra
         emit CancelDepositClaim(_controller, _receiver, _requestId, msg.sender, claimedAssets);
     }
 
-    /// @inheritdoc IRoycoAsyncCancellableVault
-    /// @dev Will revert if this tranche does not employ an asynchronous withdrawal flow
+    /**
+     * @inheritdoc IRoycoAsyncCancellableVault
+     * @dev Will revert if this tranche does not employ an asynchronous withdrawal flow
+     */
     function cancelRedeemRequest(
         uint256 _requestId,
         address _controller
@@ -537,8 +579,10 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Upgra
         emit CancelRedeemRequest(_controller, _requestId, msg.sender);
     }
 
-    /// @inheritdoc IRoycoAsyncCancellableVault
-    /// @dev Will revert if this tranche does not employ an asynchronous withdrawal flow
+    /**
+     * @inheritdoc IRoycoAsyncCancellableVault
+     * @dev Will revert if this tranche does not employ an asynchronous withdrawal flow
+     */
     function pendingCancelRedeemRequest(
         uint256 _requestId,
         address _controller
@@ -556,8 +600,10 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Upgra
                 : IAsyncJTWithdrawalKernel(kernel()).jtPendingCancelRedeemRequest(_requestId, _controller));
     }
 
-    /// @inheritdoc IRoycoAsyncCancellableVault
-    /// @dev Will revert if this tranche does not employ an asynchronous withdrawal flow
+    /**
+     * @inheritdoc IRoycoAsyncCancellableVault
+     * @dev Will revert if this tranche does not employ an asynchronous withdrawal flow
+     */
     function claimableCancelRedeemRequest(
         uint256 _requestId,
         address _controller
@@ -575,8 +621,10 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Upgra
                 : IAsyncJTWithdrawalKernel(kernel()).jtClaimableCancelRedeemRequest(_requestId, _controller));
     }
 
-    /// @inheritdoc IRoycoAsyncCancellableVault
-    /// @dev Will revert if this tranche does not employ an asynchronous withdrawal flow
+    /**
+     * @inheritdoc IRoycoAsyncCancellableVault
+     * @dev Will revert if this tranche does not employ an asynchronous withdrawal flow
+     */
     function claimCancelRedeemRequest(
         uint256 _requestId,
         address _receiver,
@@ -610,6 +658,27 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Upgra
     }
 
     /// @inheritdoc IRoycoVaultTranche
+    function previewMintProtocolFeeShares(
+        NAV_UNIT _protocolFeeAssets,
+        NAV_UNIT _trancheTotalAssets
+    )
+        public
+        view
+        virtual
+        override(IRoycoVaultTranche)
+        returns (uint256 mintedProtocolFeeShares, uint256 totalTrancheShares)
+    {
+        // Compute the shares to be minted to the protocol fee recipient to satisfy the ratio of total assets that the fee represents
+        // Subtract fee assets from total tranche assets because fees are included in total tranche assets
+        // Round in favor of the tranche
+        uint256 totalShares = totalSupply();
+        mintedProtocolFeeShares = _convertToShares(_protocolFeeAssets, totalShares, (_trancheTotalAssets - _protocolFeeAssets), Math.Rounding.Floor);
+
+        // The total tranche shares include the protocol fee shares and virtual shares
+        totalTrancheShares = _withVirtualShares(totalShares + mintedProtocolFeeShares);
+    }
+
+    /// @inheritdoc IRoycoVaultTranche
     function mintProtocolFeeShares(
         NAV_UNIT _protocolFeeAssets,
         NAV_UNIT _trancheTotalAssets,
@@ -618,23 +687,14 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Upgra
         external
         virtual
         override(IRoycoVaultTranche)
-        returns (uint256 totalTrancheShares)
+        returns (uint256 mintedProtocolFeeShares, uint256 totalTrancheShares)
     {
         require(msg.sender == kernel(), ONLY_KERNEL());
 
-        // Compute the shares to be minted to the protocol fee recipient to satisfy the ratio of total assets that the fee represents
-        // Subtract fee assets from total tranche assets because fees are included in total tranche assets
-        // Round in favor of the tranche
-        uint256 totalShares = totalSupply();
-
-        uint256 protocolFeeSharesToMint = _convertToShares(_protocolFeeAssets, totalShares, (_trancheTotalAssets - _protocolFeeAssets), Math.Rounding.Floor);
-
-        if (protocolFeeSharesToMint != 0) {
-            _mint(_protocolFeeRecipient, protocolFeeSharesToMint);
-            totalShares += protocolFeeSharesToMint;
+        (mintedProtocolFeeShares, totalTrancheShares) = previewMintProtocolFeeShares(_protocolFeeAssets, _trancheTotalAssets);
+        if (mintedProtocolFeeShares != 0) {
+            _mint(_protocolFeeRecipient, mintedProtocolFeeShares);
         }
-
-        totalTrancheShares = _withVirtualShares(totalShares);
     }
 
     /// @inheritdoc IERC20Metadata
@@ -680,57 +740,19 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Upgra
         // Get the post-sync state of the kernel for the tranche
         IRoycoKernel kernel_ = IRoycoKernel(kernel());
         SyncedAccountingState memory state;
-        (state, trancheClaims) = kernel_.previewSyncTrancheAccounting(TRANCHE_TYPE());
-        NAV_UNIT protocolFeeAssetsAccrued;
-        if (TRANCHE_TYPE() == TrancheType.SENIOR) {
-            protocolFeeAssetsAccrued = state.stProtocolFeeAccrued;
-        } else {
-            protocolFeeAssetsAccrued = state.jtProtocolFeeAccrued;
-        }
-
-        // Convert the fee assets accrued to shares
-        trancheTotalShares = totalSupply();
-        // If fees were accrued, fee shares will be minted
-        if (protocolFeeAssetsAccrued != ZERO_NAV_UNITS) {
-            // Simulate minting the fee shares and add them to the tranche's total shares
-            // Deduct protocol fee assets accrued from the total assets since fees are included in total assets
-            trancheTotalShares += _convertToShares(
-                protocolFeeAssetsAccrued, trancheTotalShares, (trancheClaims.effectiveNAV - protocolFeeAssetsAccrued), Math.Rounding.Floor
-            );
-        }
+        (state, trancheClaims, trancheTotalShares) = kernel_.previewSyncTrancheAccounting(TRANCHE_TYPE());
     }
 
-    /// @dev Returns the amount of shares that have a claim on the specified amount of tranche controlled assets
-    /// @param _assets The amount of assets to convert
-    /// @param _totalSupply The total supply of tranche shares (including marginally minted fee shares)
-    /// @param _totalAssets The total tranche controlled assets
-    /// @param _rounding The rounding mode to use
-    /// @return shares The number of shares that have a claim on the specified amount of tranche controlled assets
+    /**
+     * @dev Returns the amount of shares that have a claim on the specified amount of tranche controlled assets
+     * @param _assets The amount of assets to convert
+     * @param _totalSupply The total supply of tranche shares (including marginally minted fee shares)
+     * @param _totalAssets The total tranche controlled assets
+     * @param _rounding The rounding mode to use
+     * @return shares The number of shares that have a claim on the specified amount of tranche controlled assets
+     */
     function _convertToShares(NAV_UNIT _assets, uint256 _totalSupply, NAV_UNIT _totalAssets, Math.Rounding _rounding) internal view returns (uint256 shares) {
         return toUint256(_assets).mulDiv(_withVirtualShares(_totalSupply), toUint256(_withVirtualAssets(_totalAssets)), _rounding);
-    }
-
-    /// @dev Returns the amount of tranche controlled assets that the specified shares have a claim on
-    /// @param _shares The number of shares to convert
-    /// @param _totalSupply The total supply of tranche shares (including marginally minted fee shares)
-    /// @param _totalAssets The breakdown of total tranche controlled assets
-    /// @param _rounding The rounding mode to use
-    /// @return claims The breakdown of assets that the shares have a claim on
-    function _convertToClaim(
-        uint256 _shares,
-        uint256 _totalSupply,
-        TrancheAssetClaims memory _totalAssets,
-        Math.Rounding _rounding
-    )
-        internal
-        view
-        returns (TrancheAssetClaims memory claims)
-    {
-        IRoycoKernel kernel_ = IRoycoKernel(kernel());
-
-        claims.effectiveNAV = toNAVUnits(_shares.mulDiv(toUint256(_withVirtualAssets(_totalAssets.effectiveNAV)), _withVirtualShares(_totalSupply), _rounding));
-        claims.stAssets = toTrancheUnits(_shares.mulDiv(toUint256(_totalAssets.stAssets), _withVirtualShares(_totalSupply), _rounding));
-        claims.jtAssets = toTrancheUnits(_shares.mulDiv(toUint256(_totalAssets.jtAssets), _withVirtualShares(_totalSupply), _rounding));
     }
 
     /// @dev Returns if the specified action employs a synchronous execution model
@@ -756,5 +778,10 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Upgra
 
     function _withVirtualAssets(NAV_UNIT _assets) internal pure returns (NAV_UNIT) {
         return _assets + toNAVUnits(uint256(1));
+    }
+
+    /// @inheritdoc ERC20PausableUpgradeable
+    function _update(address _from, address _to, uint256 _value) internal override(ERC20PausableUpgradeable, ERC20Upgradeable) whenNotPaused {
+        super._update(_from, _to, _value);
     }
 }
