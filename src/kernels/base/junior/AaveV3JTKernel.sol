@@ -8,7 +8,9 @@ import { IPoolAddressesProvider } from "../../../interfaces/aave/IPoolAddressesP
 import { IPoolDataProvider } from "../../../interfaces/aave/IPoolDataProvider.sol";
 import { ExecutionModel, IRoycoKernel } from "../../../interfaces/kernel/IRoycoKernel.sol";
 import { ZERO_TRANCHE_UNITS } from "../../../libraries/Constants.sol";
+
 import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib, toTrancheUnits, toUint256 } from "../../../libraries/Units.sol";
+import { UtilsLib } from "../../../libraries/UtilsLib.sol";
 import { AaveV3KernelState, AaveV3KernelStorageLib } from "../../../libraries/kernels/AaveV3KernelStorageLib.sol";
 import { Operation, RoycoKernel, RoycoKernelStorageLib, SyncedAccountingState, TrancheAssetClaims, TrancheType } from "../RoycoKernel.sol";
 import { BaseAsyncJTRedemptionDelayKernel } from "./BaseAsyncJTRedemptionDelayKernel.sol";
@@ -48,6 +50,13 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
 
         // Initialize the Aave V3 kernel storage
         AaveV3KernelStorageLib.__AaveV3Kernel_init(_aaveV3Pool, address(IPool(_aaveV3Pool).ADDRESSES_PROVIDER()), jtAssetAToken);
+    }
+
+    /// @inheritdoc IRoycoKernel
+    function jtPreviewDeposit(TRANCHE_UNIT _assets) external view override onlyJuniorTranche returns (NAV_UNIT valueAllocated, NAV_UNIT navToMintAt) {
+        // Preview the deposit by converting the assets to NAV units and returning the NAV at which the shares will be minted
+        valueAllocated = _jtConvertTrancheUnitsToNAVUnits(_assets);
+        navToMintAt = (_accountant().previewSyncTrancheAccounting(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV())).jtEffectiveNAV;
     }
 
     /// @inheritdoc IRoycoKernel
@@ -97,13 +106,12 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
         // Get the total NAV to withdraw on this redemption
         NAV_UNIT navToWithdraw = _processClaimableRedeemRequest(_controller, state.jtEffectiveNAV, _shares, totalTrancheShares);
 
-        // Compute the ST assets to claim and withdraw them
-        claims.stAssets = claims.stAssets.mulDiv(navToWithdraw, state.jtEffectiveNAV, Math.Rounding.Floor);
-        if (claims.stAssets != ZERO_TRANCHE_UNITS) _stWithdrawAssets(claims.stAssets, _receiver);
+        // Scale the claims based on the NAV to withdraw for the user
+        claims = UtilsLib.scaleTrancheAssetsClaim(claims, navToWithdraw, state.jtEffectiveNAV);
 
-        // Compute the JT assets to claim and withdraw them
-        claims.jtAssets = claims.jtAssets.mulDiv(navToWithdraw, state.jtEffectiveNAV, Math.Rounding.Floor);
+        // Withdraw the JT and ST assets if non-zero
         if (claims.jtAssets != ZERO_TRANCHE_UNITS) _jtWithdrawAssets(claims.jtAssets, _receiver);
+        if (claims.stAssets != ZERO_TRANCHE_UNITS) _stWithdrawAssets(claims.stAssets, _receiver);
 
         // Execute a post-op sync on accounting and enforce the market's coverage requirement
         _postOpSyncTrancheAccountingAndEnforceCoverage(Operation.JT_DECREASE_NAV);
@@ -190,5 +198,10 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
         IPool(AaveV3KernelStorageLib._getAaveV3KernelStorage().pool).withdraw(
             RoycoKernelStorageLib._getRoycoKernelStorage().jtAsset, toUint256(_jtAssets), _receiver
         );
+    }
+
+    /// @inheritdoc RoycoKernel
+    function _previewWithdrawJTAssets(TRANCHE_UNIT _jtAssets) internal view override(RoycoKernel) returns (TRANCHE_UNIT redeemedJTAssets) {
+        return _jtAssets;
     }
 }

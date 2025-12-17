@@ -17,15 +17,15 @@ struct TrancheDeploymentParams {
 
 /**
  * @title TrancheAssetClaims
- * @dev The claims on ST and JT assets that this tranche has
- * @custom:field stAssets - The claim on senior tranche assets denominated in JT's tranche units that this particular tranche has
- * @custom:field jtAssets - The claim on junior tranche assets denominated in ST's tranche units that this particular tranche has
- * @custom:field effectiveNAV - The effective net asset value of this tranche denominated in the kernel's NAV units
+ * @dev A struct representing claims on ST assets, JT assets, and NAV
+ * @custom:field stAssets - The claim on senior tranche assets denominated in ST's tranche units
+ * @custom:field jtAssets - The claim on junior tranche assets denominated in JT's tranche units
+ * @custom:field nav - The net asset value of these claims in NAV units
  */
 struct TrancheAssetClaims {
     TRANCHE_UNIT stAssets;
     TRANCHE_UNIT jtAssets;
-    NAV_UNIT effectiveNAV;
+    NAV_UNIT nav;
 }
 
 /**
@@ -53,25 +53,17 @@ struct SyncedAccountingState {
 
 /**
  * @title Operation
- * @dev Defines the operation being executed by the user
- * @custom:type ST_INCREASE_NAV Depositing assets into the senior tranche
- * @custom:type ST_DECREASE_NAV Withdrawing assets from the senior tranche
- * @custom:type JT_INCREASE_NAV Depositing assets into the junior tranche
- * @custom:type JT_DECREASE_NAV Withdrawing assets from the junior tranche
- * @custom:type ST_REQUEST_INCREASE_NAV Requesting a deposit for the senior tranche
- * @custom:type ST_REQUEST_REDEEM Requesting a redemption for the senior tranche
- * @custom:type JT_REQUEST_INCREASE_NAV Requesting a deposit for the junior tranche
- * @custom:type JT_REQUEST_REDEEM Requesting a redemption for the junior tranche
+ * @dev Defines the type of operation being executed by the user
+ * @custom:type ST_INCREASE_NAV - An operation that will potentially increase the NAV of ST
+ * @custom:type ST_DECREASE_NAV - An operation that will potentially decrease the NAV of ST
+ * @custom:type JT_INCREASE_NAV - An operation that will potentially increase the NAV of JT
+ * @custom:type JT_DECREASE_NAV - An operation that will potentially decrease the NAV of JT
  */
 enum Operation {
     ST_INCREASE_NAV,
     ST_DECREASE_NAV,
-    ST_REQUEST_INCREASE_NAV,
-    ST_REQUEST_REDEEM,
     JT_INCREASE_NAV,
-    JT_DECREASE_NAV,
-    JT_REQUEST_INCREASE_NAV,
-    JT_REQUEST_REDEEM
+    JT_DECREASE_NAV
 }
 
 /// @title Action

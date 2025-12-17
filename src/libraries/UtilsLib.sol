@@ -3,10 +3,12 @@ pragma solidity ^0.8.28;
 
 import { Math } from "../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 import { WAD, ZERO_NAV_UNITS } from "./Constants.sol";
-import { NAV_UNIT, UnitsMathLib, toUint256 } from "./Units.sol";
+import { TrancheAssetClaims } from "./Types.sol";
+import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib, toUint256 } from "./Units.sol";
 
 library UtilsLib {
     using UnitsMathLib for NAV_UNIT;
+    using UnitsMathLib for TRANCHE_UNIT;
     using Math for uint256;
 
     /// @notice Computes the utilization of the Royco market given the market's state
@@ -34,5 +36,43 @@ library UtilsLib {
         if (_jtEffectiveNAV == ZERO_NAV_UNITS) return type(uint256).max;
         // Round in favor of ensuring senior tranche protection
         utilization = toUint256((_stRawNAV + _jtRawNAV.mulDiv(_betaWAD, WAD, Math.Rounding.Ceil)).mulDiv(_coverageWAD, _jtEffectiveNAV, Math.Rounding.Ceil));
+    }
+
+    /// @notice Scales the claims on ST and JT assets of a tranche by a given shares assuming total shares in a vault
+    /// @param _claims The claims on ST and JT assets of the tranche
+    /// @param _shares The number of shares to scale the claims by
+    /// @param _totalTrancheShares The total number of shares that exist in the tranche
+    /// @return scaledClaims The scaled claims on ST and JT assets of the tranche
+    function scaleTrancheAssetsClaim(
+        TrancheAssetClaims memory _claims,
+        uint256 _shares,
+        uint256 _totalTrancheShares
+    )
+        internal
+        pure
+        returns (TrancheAssetClaims memory scaledClaims)
+    {
+        scaledClaims.nav = _claims.nav.mulDiv(_shares, _totalTrancheShares, Math.Rounding.Floor);
+        scaledClaims.stAssets = _claims.stAssets.mulDiv(_shares, _totalTrancheShares, Math.Rounding.Floor);
+        scaledClaims.jtAssets = _claims.jtAssets.mulDiv(_shares, _totalTrancheShares, Math.Rounding.Floor);
+    }
+
+    /// @notice Scales the claims on ST and JT assets of a tranche by a given shares assuming total shares in a vault
+    /// @param _claims The claims on ST and JT assets of the tranche
+    /// @param _navNumerator The NAV to use for the numerator
+    /// @param _navDenominator The NAV to use for the denominator
+    /// @return scaledClaims The scaled claims on ST and JT assets of the tranche
+    function scaleTrancheAssetsClaim(
+        TrancheAssetClaims memory _claims,
+        NAV_UNIT _navNumerator,
+        NAV_UNIT _navDenominator
+    )
+        internal
+        pure
+        returns (TrancheAssetClaims memory scaledClaims)
+    {
+        scaledClaims.nav = _claims.nav.mulDiv(_navNumerator, _navDenominator, Math.Rounding.Floor);
+        scaledClaims.stAssets = _claims.stAssets.mulDiv(_navNumerator, _navDenominator, Math.Rounding.Floor);
+        scaledClaims.jtAssets = _claims.jtAssets.mulDiv(_navNumerator, _navDenominator, Math.Rounding.Floor);
     }
 }

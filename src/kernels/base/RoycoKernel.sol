@@ -8,7 +8,6 @@ import { ZERO_NAV_UNITS } from "../../libraries/Constants.sol";
 import { RoycoKernelInitParams, RoycoKernelState, RoycoKernelStorageLib } from "../../libraries/RoycoKernelStorageLib.sol";
 import { SyncedAccountingState, TrancheAssetClaims, TrancheType } from "../../libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib } from "../../libraries/Units.sol";
-import { Math } from "../../libraries/UtilsLib.sol";
 import { IRoycoAccountant, Operation } from "./../../interfaces/IRoycoAccountant.sol";
 
 /**
@@ -76,7 +75,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
 
     /// @inheritdoc IRoycoKernel
     function stMaxDeposit(address _receiver) external view override(IRoycoKernel) returns (TRANCHE_UNIT) {
-        NAV_UNIT stMaxDepositableNAV = previewSyncTrancheAccounting(_trancheType);
+        NAV_UNIT stMaxDepositableNAV = _accountant().maxSTDepositGivenCoverage(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV());
         return UnitsMathLib.min(_stMaxDepositGlobally(_receiver), _stConvertNAVUnitsToTrancheUnits(stMaxDepositableNAV));
     }
 
@@ -88,12 +87,12 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         returns (SyncedAccountingState memory state, TrancheAssetClaims memory stNotionalClaims, TrancheAssetClaims memory stMaxClaims)
     {
         // Get the total claims the senior tranche has on each tranche's assets
-        (state, stNotionalClaims) = previewSyncTrancheAccounting(TrancheType.SENIOR);
+        (state, stNotionalClaims,) = previewSyncTrancheAccounting(TrancheType.SENIOR);
 
         // Bound the claims by the max withdrawable assets globally for each tranche and compute the cumulative NAV
         stMaxClaims.stAssets = _stMaxWithdrawableGlobally(_owner);
         stMaxClaims.jtAssets = _jtMaxWithdrawableGlobally(_owner);
-        stMaxClaims.effectiveNAV = stConvertTrancheUnitsToNAVUnits(stMaxClaims.stAssets) + stConvertTrancheUnitsToNAVUnits(stMaxClaims.jtAssets);
+        stMaxClaims.nav = _stConvertTrancheUnitsToNAVUnits(stMaxClaims.stAssets) + _stConvertTrancheUnitsToNAVUnits(stMaxClaims.jtAssets);
     }
 
     /// @inheritdoc IRoycoKernel
@@ -119,12 +118,12 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
 
     /// @inheritdoc IRoycoKernel
     function getJTAssetClaims() external view override(IRoycoKernel) returns (TrancheAssetClaims memory claims) {
-        (, claims) = previewSyncTrancheAccounting(TrancheType.JUNIOR);
+        (, claims,) = previewSyncTrancheAccounting(TrancheType.JUNIOR);
     }
 
     /// @inheritdoc IRoycoKernel
     function getSTAssetClaims() external view override(IRoycoKernel) returns (TrancheAssetClaims memory claims) {
-        (, claims) = previewSyncTrancheAccounting(TrancheType.SENIOR);
+        (, claims,) = previewSyncTrancheAccounting(TrancheType.SENIOR);
     }
 
     /// @inheritdoc IRoycoKernel
@@ -143,7 +142,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         public
         view
         override(IRoycoKernel)
-        returns (SyncedAccountingState memory state, TrancheAssetClaims memory claims)
+        returns (SyncedAccountingState memory state, TrancheAssetClaims memory claims, uint256 totalTrancheShares)
     {
         // Preview an accounting sync via the accountant
         state = _accountant().previewSyncTrancheAccounting(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV());
@@ -155,6 +154,14 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         claims = _marshalTrancheAssetClaims(
             _trancheType, state.stEffectiveNAV, state.jtEffectiveNAV, stNAVClaimOnSelf, stNAVClaimOnJT, jtNAVClaimOnSelf, jtNAVClaimOnST
         );
+
+        // Preview the total tranche shares after minting any protocol fee shares post-sync
+        RoycoKernelState storage $ = RoycoKernelStorageLib._getRoycoKernelStorage();
+        if (_trancheType == TrancheType.SENIOR) {
+            (, totalTrancheShares) = IRoycoVaultTranche($.seniorTranche).previewMintProtocolFeeShares(state.stProtocolFeeAccrued, state.stEffectiveNAV);
+        } else {
+            (, totalTrancheShares) = IRoycoVaultTranche($.juniorTranche).previewMintProtocolFeeShares(state.jtProtocolFeeAccrued, state.jtEffectiveNAV);
+        }
     }
 
     /**
@@ -179,12 +186,12 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         uint256 jtTotalTrancheSharesAfterMintingFees;
         // If ST fees were accrued or we need to get total shares for ST, mint ST protocol fee shares to the protocol fee recipient
         if (state.stProtocolFeeAccrued != ZERO_NAV_UNITS || _trancheType == TrancheType.SENIOR) {
-            stTotalTrancheSharesAfterMintingFees =
+            (, stTotalTrancheSharesAfterMintingFees) =
                 IRoycoVaultTranche($.seniorTranche).mintProtocolFeeShares(state.stProtocolFeeAccrued, state.stEffectiveNAV, protocolFeeRecipient);
         }
         // If JT fees were accrued or we need to get total shares for JT, mint JT protocol fee shares to the protocol fee recipient
         if (state.jtProtocolFeeAccrued != ZERO_NAV_UNITS || _trancheType == TrancheType.JUNIOR) {
-            jtTotalTrancheSharesAfterMintingFees =
+            (, jtTotalTrancheSharesAfterMintingFees) =
                 IRoycoVaultTranche($.juniorTranche).mintProtocolFeeShares(state.jtProtocolFeeAccrued, state.jtEffectiveNAV, protocolFeeRecipient);
         }
 
@@ -308,11 +315,11 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         if (_trancheType == TrancheType.SENIOR) {
             if (_stNAVClaimOnSelf != ZERO_NAV_UNITS) claims.stAssets = _stConvertNAVUnitsToTrancheUnits(_stNAVClaimOnSelf);
             if (_stNAVClaimOnJT != ZERO_NAV_UNITS) claims.jtAssets = _jtConvertNAVUnitsToTrancheUnits(_stNAVClaimOnJT);
-            claims.effectiveNAV = _stEffectiveNAV;
+            claims.nav = _stEffectiveNAV;
         } else {
             if (_jtNAVClaimOnST != ZERO_NAV_UNITS) claims.stAssets = _stConvertNAVUnitsToTrancheUnits(_jtNAVClaimOnST);
             if (_jtNAVClaimOnSelf != ZERO_NAV_UNITS) claims.jtAssets = _jtConvertNAVUnitsToTrancheUnits(_jtNAVClaimOnSelf);
-            claims.effectiveNAV = _jtEffectiveNAV;
+            claims.nav = _jtEffectiveNAV;
         }
     }
 
@@ -391,11 +398,25 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     function _jtMaxWithdrawableGlobally(address _owner) internal view virtual returns (TRANCHE_UNIT);
 
     /**
+     * @notice Previews the amount of ST assets that would be redeemed for a given amount of ST assets
+     * @param _stAssets The ST assets denominated in its tranche units to redeem
+     * @return redeemedSTAssets The amount of ST assets that would be redeemed for the given amount of ST assets
+     */
+    function _previewWithdrawSTAssets(TRANCHE_UNIT _stAssets) internal view virtual returns (TRANCHE_UNIT redeemedSTAssets);
+
+    /**
      * @notice Withdraws ST assets to the specified receiver
      * @param _stAssets The ST assets denominated in its tranche units to withdraw to the receiver
      * @param _receiver The receiver of the ST assets
      */
     function _stWithdrawAssets(TRANCHE_UNIT _stAssets, address _receiver) internal virtual;
+
+    /**
+     * @notice Previews the amount of JT assets that would be redeemed for a given amount of JT assets
+     * @param _jtAssets The JT assets denominated in its tranche units to redeem
+     * @return redeemedJTAssets The amount of JT assets that would be redeemed for the given amount of JT assets
+     */
+    function _previewWithdrawJTAssets(TRANCHE_UNIT _jtAssets) internal view virtual returns (TRANCHE_UNIT redeemedJTAssets);
 
     /**
      * @notice Withdraws JT assets to the specified receiver

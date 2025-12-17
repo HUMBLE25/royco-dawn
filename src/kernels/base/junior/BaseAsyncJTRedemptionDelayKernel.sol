@@ -6,6 +6,7 @@ import { RoycoAuth } from "../../../auth/RoycoAuth.sol";
 import { IAsyncJTWithdrawalKernel } from "../../../interfaces/kernel/IAsyncJTWithdrawalKernel.sol";
 import { IRoycoKernel } from "../../../interfaces/kernel/IRoycoKernel.sol";
 import { ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID } from "../../../libraries/Constants.sol";
+import { TrancheAssetClaims } from "../../../libraries/Types.sol";
 import { Operation, RequestRedeemSharesBehavior, SyncedAccountingState, TrancheType } from "../../../libraries/Types.sol";
 import { NAV_UNIT, UnitsMathLib, toNAVUnits, toUint256 } from "../../../libraries/Units.sol";
 import { RoycoKernel } from "../RoycoKernel.sol";
@@ -38,6 +39,8 @@ abstract contract BaseAsyncJTRedemptionDelayKernel is IAsyncJTWithdrawalKernel, 
     error WITHDRAWAL_ALREADY_CANCELED();
     /// @notice Thrown when the shares to claim are zero
     error MUST_CLAIM_NON_ZERO_SHARES();
+    /// @notice Thrown when the function is not implemented
+    error PREVIEW_REDEEM_DISABLED_FOR_ASYNC_REDEMPTION();
 
     /// @custom:storage-location erc7201:Royco.storage.BaseAsyncJTRedemptionDelayKernelState
     /// forge-lint: disable-next-item(pascal-case-struct)
@@ -67,6 +70,11 @@ abstract contract BaseAsyncJTRedemptionDelayKernel is IAsyncJTWithdrawalKernel, 
         __BaseAsyncJTRedemptionDelayKernel_init(_redemptionDelaySeconds);
     }
 
+    /// @inheritdoc IRoycoKernel
+    function jtPreviewRedeem(uint256) external view virtual override onlyJuniorTranche returns (TrancheAssetClaims memory) {
+        revert PREVIEW_REDEEM_DISABLED_FOR_ASYNC_REDEMPTION();
+    }
+
     // =============================
     // ERC7540 Asynchronous flow functions
     // =============================
@@ -94,7 +102,7 @@ abstract contract BaseAsyncJTRedemptionDelayKernel is IAsyncJTWithdrawalKernel, 
         redemption.redemptionAllowedAtTimestamp = block.timestamp + $.redemptionDelaySeconds;
 
         // Execute a post-op sync on accounting
-        _postOpSyncTrancheAccounting(Operation.JT_REQUEST_REDEEM);
+        _postOpSyncTrancheAccounting(Operation.JT_DECREASE_NAV);
     }
 
     /// @inheritdoc IAsyncJTWithdrawalKernel
