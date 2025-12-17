@@ -4,11 +4,9 @@ pragma solidity ^0.8.28;
 /// @notice Storage state for the Royco ERC4626 Senior Tranche Kernel
 /// @custom:storage-location erc7201:Royco.storage.ERC4626STKernelState
 /// @custom:field vault - The address of the ERC4626 vault
-/// @custom:field asset - The address of the senior tranche's base asset
 /// forge-lint: disable-next-item(pascal-case-struct)
 struct ERC4626STKernelState {
     address vault;
-    address asset;
 }
 
 /// @title ERC4626STKernelStorageLib
@@ -31,10 +29,8 @@ library ERC4626STKernelStorageLib {
 
     /// @notice Initializes the ERC4626 ST kernel state
     /// @param _vault The address of the ERC4626 vault
-    /// @param _asset The address of the senior tranche's base asset
-    function __ERC4626STKernel_init(address _vault, address _asset) internal {
+    function __ERC4626STKernel_init(address _vault) internal {
         ERC4626STKernelState storage $ = _getERC4626STKernelStorage();
         $.vault = _vault;
-        $.asset = _asset;
     }
 }

@@ -151,12 +151,13 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
                 require($.lastJTEffectiveNAV + $.lastSTCoverageDebt >= _jtRawNAV, INVALID_POST_OP_STATE(_op));
             }
         }
-        // Enforce the NAV conservation invariant
-        require(($.lastSTRawNAV + $.lastJTRawNAV) == ($.lastSTEffectiveNAV + $.lastJTEffectiveNAV), NAV_CONSERVATION_VIOLATION());
         // Construct the synced NAVs state to return to the caller
+        // No fees are ever taken on post-op sync
         state = SyncedAccountingState(
             _stRawNAV, _jtRawNAV, $.lastSTEffectiveNAV, $.lastJTEffectiveNAV, $.lastSTCoverageDebt, $.lastJTCoverageDebt, ZERO_NAV_UNITS, ZERO_NAV_UNITS
         );
+        // Enforce the NAV conservation invariant
+        require((_stRawNAV + _jtRawNAV) == (state.stEffectiveNAV + state.jtEffectiveNAV), NAV_CONSERVATION_VIOLATION());
     }
 
     /// @inheritdoc IRoycoAccountant
@@ -285,19 +286,19 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
             NAV_UNIT jtAbsorbableLoss = UnitsMathLib.min(jtLoss, jtEffectiveNAV);
             if (jtAbsorbableLoss != ZERO_NAV_UNITS) {
                 // Incur the maximum absorbable losses to remaining JT loss capital
-                jtEffectiveNAV = jtEffectiveNAV - jtAbsorbableLoss;
+                jtEffectiveNAV = (jtEffectiveNAV - jtAbsorbableLoss);
                 // Reduce the residual JT loss by the loss absorbed
-                jtLoss = jtLoss - jtAbsorbableLoss;
+                jtLoss = (jtLoss - jtAbsorbableLoss);
             }
             /// @dev STEP_ST_INCURS_RESIDUAL_LOSSES: Residual loss after emptying JT's remaning loss-absorption buffer are incurred by ST
             if (jtLoss != ZERO_NAV_UNITS) {
                 // The excess loss is absorbed by ST
-                stEffectiveNAV = stEffectiveNAV - jtLoss;
+                stEffectiveNAV = (stEffectiveNAV - jtLoss);
                 // Repay ST debt to JT
                 // This is equivalent to retroactively reducing previously applied coverage
                 // Thus, the liability is flipped to JT debt to ST
-                stCoverageDebt = stCoverageDebt - jtLoss;
-                jtCoverageDebt = jtCoverageDebt + jtLoss;
+                stCoverageDebt = (stCoverageDebt - jtLoss);
+                jtCoverageDebt = (jtCoverageDebt + jtLoss);
             }
             /// @dev STEP_APPLY_JT_GAIN: The JT assets appreciated in value
         } else if (deltaJT > 0) {
@@ -308,18 +309,18 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
                 // Repay JT debt to ST
                 // This is equivalent to retroactively applying coverage for previously uncovered losses
                 // Thus, the liability is flipped to ST debt to JT
-                jtCoverageDebt = jtCoverageDebt - jtDebtRepayment;
-                stCoverageDebt = stCoverageDebt + jtDebtRepayment;
+                jtCoverageDebt = (jtCoverageDebt - jtDebtRepayment);
+                stCoverageDebt = (stCoverageDebt + jtDebtRepayment);
                 // Apply the repayment (retroactive coverage) to the ST
-                stEffectiveNAV = stEffectiveNAV + jtDebtRepayment;
-                jtGain = jtGain - jtDebtRepayment;
+                stEffectiveNAV = (stEffectiveNAV + jtDebtRepayment);
+                jtGain = (jtGain - jtDebtRepayment);
             }
             /// @dev STEP_JT_ACCRUES_RESIDUAL_GAINS: JT accrues any remaining appreciation after repaying liabilities
             if (jtGain != ZERO_NAV_UNITS) {
                 // Compute the protocol fee taken on this JT yield accrual - will be used to mint JT shares to the protocol fee recipient at the updated JT effective NAV
                 jtProtocolFeeAccrued = jtGain.mulDiv($.protocolFeeWAD, WAD, Math.Rounding.Floor);
                 // Book the residual gains to the JT
-                jtEffectiveNAV = jtEffectiveNAV + jtGain;
+                jtEffectiveNAV = (jtEffectiveNAV + jtGain);
             }
         }
 
@@ -329,17 +330,17 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
             /// @dev STEP_APPLY_JT_COVERAGE_TO_ST: Apply any possible coverage to ST provided by JT's loss-absorption buffer
             NAV_UNIT coverageApplied = UnitsMathLib.min(stLoss, jtEffectiveNAV);
             if (coverageApplied != ZERO_NAV_UNITS) {
-                jtEffectiveNAV = jtEffectiveNAV - coverageApplied;
+                jtEffectiveNAV = (jtEffectiveNAV - coverageApplied);
                 // Any coverage provided is a ST liability to JT
-                stCoverageDebt = stCoverageDebt + coverageApplied;
+                stCoverageDebt = (stCoverageDebt + coverageApplied);
             }
             /// @dev STEP_ST_INCURS_RESIDUAL_LOSSES: Apply any uncovered losses by JT to ST
             NAV_UNIT netStLoss = stLoss - coverageApplied;
             if (netStLoss != ZERO_NAV_UNITS) {
                 // Apply residual losses to ST
-                stEffectiveNAV = stEffectiveNAV - netStLoss;
+                stEffectiveNAV = (stEffectiveNAV - netStLoss);
                 // The uncovered portion of the ST loss is a JT liability to ST
-                jtCoverageDebt = jtCoverageDebt + netStLoss;
+                jtCoverageDebt = (jtCoverageDebt + netStLoss);
             }
             /// @dev STEP_APPLY_ST_GAIN: The ST assets appreciated in value
         } else if (deltaST > 0) {
@@ -349,10 +350,10 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
             NAV_UNIT debtRepayment = UnitsMathLib.min(stGain, jtCoverageDebt);
             if (debtRepayment != ZERO_NAV_UNITS) {
                 // Pay back JT debt to ST: making ST whole again
-                stEffectiveNAV = stEffectiveNAV + debtRepayment;
-                jtCoverageDebt = jtCoverageDebt - debtRepayment;
+                stEffectiveNAV = (stEffectiveNAV + debtRepayment);
+                jtCoverageDebt = (jtCoverageDebt - debtRepayment);
                 // Deduct the repayment from the ST gains and return if no gains are left
-                stGain = stGain - debtRepayment;
+                stGain = (stGain - debtRepayment);
             }
             /// @dev STEP_REPAY_ST_COVERAGE_DEBT: The second priority of repayment to reverse the loss-waterfall is making JT whole again
             // Repay ST debt to JT: previously applied coverage from JT to ST
@@ -422,7 +423,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
 
         // Get the instantaneous JT yield share, scaled to WAD precision
         uint256 jtYieldShareWAD = IRDM($.rdm).jtYieldShare($.lastSTRawNAV, $.lastJTRawNAV, $.betaWAD, $.coverageWAD, $.lastJTEffectiveNAV);
-        // TODO: Should we revert instead?
+        // TODO: Should we revert instead? Don't want to DOS system on faulty RDM, so this seems like the best possible way to handle
         if (jtYieldShareWAD > WAD) jtYieldShareWAD = WAD;
         // Accrue the time-weighted yield share accrued to JT since the last tranche interaction
         $.lastAccrualTimestamp = uint32(block.timestamp);
@@ -449,7 +450,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
 
         // Get the instantaneous JT yield share, scaled to WAD precision
         uint256 jtYieldShareWAD = IRDM($.rdm).previewJTYieldShare($.lastSTRawNAV, $.lastJTRawNAV, $.betaWAD, $.coverageWAD, $.lastJTEffectiveNAV);
-        // TODO: Should we revert instead?
+        // TODO: Should we revert instead? Don't want to DOS system on faulty RDM, so this seems like the best possible way to handle
         if (jtYieldShareWAD > WAD) jtYieldShareWAD = WAD;
         // Apply the accural of JT yield share to the accumulator, weighted by the time elapsed
         return ($.twJTYieldShareAccruedWAD + uint192(jtYieldShareWAD * elapsed));

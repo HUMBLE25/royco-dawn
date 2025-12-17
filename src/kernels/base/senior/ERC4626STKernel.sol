@@ -40,7 +40,7 @@ abstract contract ERC4626STKernel is RoycoKernel {
         IERC20(_stAsset).forceApprove(address(_vault), type(uint256).max);
 
         // Initialize the ERC4626 ST kernel storage
-        ERC4626STKernelStorageLib.__ERC4626STKernel_init(_vault, _stAsset);
+        ERC4626STKernelStorageLib.__ERC4626STKernel_init(_vault);
     }
 
     /// @inheritdoc IRoycoKernel

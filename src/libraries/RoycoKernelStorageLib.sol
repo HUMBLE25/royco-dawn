@@ -19,13 +19,17 @@ struct RoycoKernelInitParams {
  * @notice Storage state for the Royco Kernel
  * @custom:storage-location erc7201:Royco.storage.RoycoKernelState
  * @custom:field seniorTranche - The address of the Royco senior tranche associated with this kernel
+ * @custom:field stAsset - The address of the asset that ST is denominated in: constitutes the ST's tranche units (type and precision)
  * @custom:field juniorTranche - The address of the Royco junior tranche associated with this kernel
+ * @custom:field jtAsset - The address of the asset that JT is denominated in: constitutes the ST's tranche units (type and precision)
  * @custom:field accountant - The address of the Royco accountant used to perform per operation accounting for this kernel
  * @custom:field protocolFeeRecipient - The market's configured protocol fee recipient
  */
 struct RoycoKernelState {
     address seniorTranche;
+    address stAsset;
     address juniorTranche;
+    address jtAsset;
     address accountant;
     address protocolFeeRecipient;
 }
@@ -48,11 +52,13 @@ library RoycoKernelStorageLib {
 
     /// @notice Initializes the kernel state
     /// @param _params The initialization parameters for the kernel
-    function __RoycoKernel_init(RoycoKernelInitParams memory _params) internal {
+    function __RoycoKernel_init(RoycoKernelInitParams memory _params, address _stAsset, address _jtAsset) internal {
         // Set the initial state of the kernel
         RoycoKernelState storage $ = _getRoycoKernelStorage();
         $.seniorTranche = _params.seniorTranche;
+        $.stAsset = _stAsset;
         $.juniorTranche = _params.juniorTranche;
+        $.jtAsset = _jtAsset;
         $.accountant = _params.accountant;
         $.protocolFeeRecipient = _params.protocolFeeRecipient;
     }

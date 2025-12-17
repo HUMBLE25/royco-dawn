@@ -39,19 +39,31 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
      * @notice Initializes the base kernel state
      * @dev Initializes any parent contracts and the base kernel state
      * @param _params The initialization parameters for the Royco kernel
+     * @param _stAsset The address of the asset that ST is denominated in: constitutes the ST's tranche units (type and precision)
+     * @param _jtAsset The address of the asset that JT is denominated in: constitutes the JT's tranche units (type and precision)
      * @param _initialAuthority The initial authority for the base kernel
      */
-    function __RoycoKernel_init(RoycoKernelInitParams memory _params, address _initialAuthority) internal onlyInitializing {
+    function __RoycoKernel_init(
+        RoycoKernelInitParams memory _params,
+        address _stAsset,
+        address _jtAsset,
+        address _initialAuthority
+    )
+        internal
+        onlyInitializing
+    {
         __RoycoBase_init(_initialAuthority);
-        __RoycoKernel_init_unchained(_params);
+        __RoycoKernel_init_unchained(_params, _stAsset, _jtAsset);
     }
 
     /**
      * @notice Initializes the base kernel state
      * @dev Checks the initial market's configuration and initializes the base kernel state
      * @param _params The initialization parameters for the base kernel
+     * @param _stAsset The address of the asset that ST is denominated in: constitutes the ST's tranche units (type and precision)
+     * @param _jtAsset The address of the asset that JT is denominated in: constitutes the JT's tranche units (type and precision)
      */
-    function __RoycoKernel_init_unchained(RoycoKernelInitParams memory _params) internal onlyInitializing {
+    function __RoycoKernel_init_unchained(RoycoKernelInitParams memory _params, address _stAsset, address _jtAsset) internal onlyInitializing {
         // Ensure that the tranche addresses, accountant, and protocol fee recipient are not null
         require(
             _params.seniorTranche != address(0) && _params.juniorTranche != address(0) && _params.accountant != address(0)
@@ -59,7 +71,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
             NULL_ADDRESS()
         );
         // Initialize the base kernel state
-        RoycoKernelStorageLib.__RoycoKernel_init(_params);
+        RoycoKernelStorageLib.__RoycoKernel_init(_params, _stAsset, _jtAsset);
     }
 
     /// @inheritdoc IRoycoKernel

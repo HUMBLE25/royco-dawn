@@ -16,7 +16,7 @@ contract ERC4626ST_AaveV3JT_Kernel is ERC4626STKernel, AaveV3JTKernel {
         address jtAsset = IRoycoVaultTranche(_params.juniorTranche).asset();
 
         // Initialize the base kernel state
-        __RoycoKernel_init(_params, _initialAuthority);
+        __RoycoKernel_init(_params, stAsset, jtAsset, _initialAuthority);
         // Initialize the ERC4626 senior tranche state
         __ERC4626STKernel_init_unchained(_stVault, stAsset);
         // Initialize the Aave V3 junior tranche state

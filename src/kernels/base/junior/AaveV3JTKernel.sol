@@ -10,7 +10,7 @@ import { ExecutionModel, IRoycoKernel } from "../../../interfaces/kernel/IRoycoK
 import { ZERO_TRANCHE_UNITS } from "../../../libraries/Constants.sol";
 import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib, toTrancheUnits, toUint256 } from "../../../libraries/Units.sol";
 import { AaveV3KernelState, AaveV3KernelStorageLib } from "../../../libraries/kernels/AaveV3KernelStorageLib.sol";
-import { Operation, RoycoKernel, SyncedAccountingState, TrancheAssetClaims, TrancheType } from "../RoycoKernel.sol";
+import { Operation, RoycoKernel, RoycoKernelStorageLib, SyncedAccountingState, TrancheAssetClaims, TrancheType } from "../RoycoKernel.sol";
 import { BaseAsyncJTRedemptionDelayKernel } from "./BaseAsyncJTRedemptionDelayKernel.sol";
 
 abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKernel {
@@ -47,7 +47,7 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
         IERC20(_jtAsset).forceApprove(_aaveV3Pool, type(uint256).max);
 
         // Initialize the Aave V3 kernel storage
-        AaveV3KernelStorageLib.__AaveV3Kernel_init(_aaveV3Pool, address(IPool(_aaveV3Pool).ADDRESSES_PROVIDER()), _jtAsset, jtAssetAToken);
+        AaveV3KernelStorageLib.__AaveV3Kernel_init(_aaveV3Pool, address(IPool(_aaveV3Pool).ADDRESSES_PROVIDER()), jtAssetAToken);
     }
 
     /// @inheritdoc IRoycoKernel
@@ -67,8 +67,9 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
         navToMintAt = (_preOpSyncTrancheAccounting()).jtEffectiveNAV;
 
         // Max approval already given to the pool on initialization
-        IPool(AaveV3KernelStorageLib._getAaveV3KernelStorage().pool)
-            .supply(AaveV3KernelStorageLib._getAaveV3KernelStorage().asset, toUint256(_assets), address(this), 0);
+        IPool(AaveV3KernelStorageLib._getAaveV3KernelStorage().pool).supply(
+            RoycoKernelStorageLib._getRoycoKernelStorage().jtAsset, toUint256(_assets), address(this), 0
+        );
 
         // Execute a post-op sync on accounting
         _postOpSyncTrancheAccounting(Operation.JT_INCREASE_NAV);
@@ -110,16 +111,17 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
 
     /// @inheritdoc RoycoKernel
     function _withdrawJTAssets(TRANCHE_UNIT _jtAssets, address _receiver) internal override(RoycoKernel) {
-        IPool(AaveV3KernelStorageLib._getAaveV3KernelStorage().pool)
-            .withdraw(AaveV3KernelStorageLib._getAaveV3KernelStorage().asset, toUint256(_jtAssets), _receiver);
+        IPool(AaveV3KernelStorageLib._getAaveV3KernelStorage().pool).withdraw(
+            RoycoKernelStorageLib._getRoycoKernelStorage().jtAsset, toUint256(_jtAssets), _receiver
+        );
     }
 
     /// @inheritdoc RoycoKernel
     function _jtMaxAssetDepositGlobally(address) internal view override(RoycoKernel) returns (TRANCHE_UNIT) {
         // Retrieve the Pool's data provider and asset
-        AaveV3KernelState storage $ = AaveV3KernelStorageLib._getAaveV3KernelStorage();
-        IPoolDataProvider poolDataProvider = IPoolDataProvider(IPoolAddressesProvider($.poolAddressesProvider).getPoolDataProvider());
-        address asset = $.asset;
+        IPoolDataProvider poolDataProvider =
+            IPoolDataProvider(IPoolAddressesProvider(AaveV3KernelStorageLib._getAaveV3KernelStorage().poolAddressesProvider).getPoolDataProvider());
+        address asset = RoycoKernelStorageLib._getRoycoKernelStorage().jtAsset;
 
         // If the reserve asset is inactive, frozen, or paused, supplies are forbidden
         (uint256 decimals,,,,,,,, bool isActive, bool isFrozen) = poolDataProvider.getReserveConfigurationData(asset);
@@ -173,7 +175,7 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
         // Retrieve the Pool's data provider and asset
         AaveV3KernelState storage $ = AaveV3KernelStorageLib._getAaveV3KernelStorage();
         IPoolDataProvider poolDataProvider = IPoolDataProvider(IPoolAddressesProvider($.poolAddressesProvider).getPoolDataProvider());
-        address asset = $.asset;
+        address asset = RoycoKernelStorageLib._getRoycoKernelStorage().jtAsset;
 
         // If the reserve asset is inactive or paused, withdrawals are forbidden
         (,,,,,,,, bool isActive,) = poolDataProvider.getReserveConfigurationData(asset);
