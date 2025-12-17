@@ -680,16 +680,16 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         view
         virtual
         override(IRoycoVaultTranche)
-        returns (uint256 mintedProtocolFeeShares, uint256 totalTrancheShares)
+        returns (uint256 protocolFeeSharesMinted, uint256 totalTrancheShares)
     {
         // Compute the shares to be minted to the protocol fee recipient to satisfy the ratio of total assets that the fee represents
         // Subtract fee assets from total tranche assets because fees are included in total tranche assets
         // Round in favor of the tranche
         uint256 totalShares = totalSupply();
-        mintedProtocolFeeShares = _convertToShares(_protocolFeeAssets, totalShares, (_trancheTotalAssets - _protocolFeeAssets), Math.Rounding.Floor);
+        protocolFeeSharesMinted = _convertToShares(_protocolFeeAssets, totalShares, (_trancheTotalAssets - _protocolFeeAssets), Math.Rounding.Floor);
 
         // The total tranche shares include the protocol fee shares and virtual shares
-        totalTrancheShares = _withVirtualShares(totalShares + mintedProtocolFeeShares);
+        totalTrancheShares = _withVirtualShares(totalShares + protocolFeeSharesMinted);
     }
 
     /// @inheritdoc IRoycoVaultTranche
@@ -701,14 +701,15 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         external
         virtual
         override(IRoycoVaultTranche)
-        returns (uint256 mintedProtocolFeeShares, uint256 totalTrancheShares)
+        returns (uint256 protocolFeeSharesMinted, uint256 totalTrancheShares)
     {
         require(msg.sender == kernel(), ONLY_KERNEL());
 
-        (mintedProtocolFeeShares, totalTrancheShares) = previewMintProtocolFeeShares(_protocolFeeAssets, _trancheTotalAssets);
-        if (mintedProtocolFeeShares != 0) {
-            _mint(_protocolFeeRecipient, mintedProtocolFeeShares);
-        }
+        // Mint any protocol fee shares accrued to the specified recipient
+        (protocolFeeSharesMinted, totalTrancheShares) = previewMintProtocolFeeShares(_protocolFeeAssets, _trancheTotalAssets);
+        if (protocolFeeSharesMinted != 0) _mint(_protocolFeeRecipient, protocolFeeSharesMinted);
+
+        emit ProtocolFeeSharesMinted(_protocolFeeRecipient, protocolFeeSharesMinted, totalTrancheShares);
     }
 
     /// @inheritdoc IERC20Metadata

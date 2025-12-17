@@ -18,12 +18,12 @@ interface IRoycoVaultTranche is IERC165, IRoycoAsyncVault, IRoycoAsyncCancellabl
     event Deposit(address indexed sender, address indexed owner, TRANCHE_UNIT assets, uint256 shares);
 
     /**
-     * @notice Emitted when a protocol fee is minted to the protocol fee recipient
+     * @notice Emitted when protocol fee shares are minted to the protocol fee recipient
      * @param protocolFeeRecipient The address that received the protocol fee shares
      * @param mintedProtocolFeeShares The number of protocol fee shares that were minted
      * @param totalTrancheShares The total number of shares that exist in the tranche after minting any protocol fee shares post-sync
      */
-    event MintProtocolFeeShares(address indexed protocolFeeRecipient, uint256 mintedProtocolFeeShares, uint256 totalTrancheShares);
+    event ProtocolFeeSharesMinted(address indexed protocolFeeRecipient, uint256 mintedProtocolFeeShares, uint256 totalTrancheShares);
 
     /**
      * @notice Returns the raw net asset value of the tranche's invested assets
