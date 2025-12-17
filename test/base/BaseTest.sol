@@ -20,8 +20,9 @@ import { NAV_UNIT, TRANCHE_UNIT } from "../../src/libraries/Units.sol";
 import { RoycoJT } from "../../src/tranches/RoycoJT.sol";
 import { RoycoST } from "../../src/tranches/RoycoST.sol";
 import { RoycoVaultTranche } from "../../src/tranches/RoycoVaultTranche.sol";
+import { Assertions } from "./Assertions.sol";
 
-contract BaseTest is Test, RoycoRoles {
+contract BaseTest is Test, RoycoRoles, Assertions {
     struct TrancheState {
         NAV_UNIT rawNAV;
         NAV_UNIT effectiveNAV;
@@ -344,6 +345,20 @@ contract BaseTest is Test, RoycoRoles {
         _trancheState.stAssetsClaim -= _stAssetsWithdrawn;
         _trancheState.jtAssetsClaim -= _jtAssetsWithdrawn;
         _trancheState.totalShares -= _shares;
+    }
+
+    /// @notice Converts the specified assets denominated in JT's tranche units to the kernel's NAV units
+    /// @param _assets The assets denominated in JT's tranche units to convert to the kernel's NAV units
+    /// @return value The specified assets denominated in JT's tranche units converted to the kernel's NAV units
+    function _toJTValue(TRANCHE_UNIT _assets) internal view returns (NAV_UNIT) {
+        return KERNEL.jtConvertTrancheUnitsToNAVUnits(_assets);
+    }
+
+    /// @notice Converts the specified assets denominated in ST's tranche units to the kernel's NAV units
+    /// @param _assets The assets denominated in ST's tranche units to convert to the kernel's NAV units
+    /// @return value The specified assets denominated in ST's tranche units converted to the kernel's NAV units
+    function _toSTValue(TRANCHE_UNIT _assets) internal view returns (NAV_UNIT) {
+        return KERNEL.stConvertTrancheUnitsToNAVUnits(_assets);
     }
 
     /// @notice Deploys a KERNEL using ERC1967 proxy

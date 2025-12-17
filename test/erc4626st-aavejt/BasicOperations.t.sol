@@ -18,6 +18,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
     function testFuzz_depositIntoJT(uint256 _assets) external {
         // Bound assets to reasonable range (avoid zero and very large amounts)
         _assets = bound(_assets, 1e6, 1_000_000e6); // Between 1 USDC and 1M USDC (6 decimals)
+        TRANCHE_UNIT assets = toTrancheUnits(_assets);
 
         address depositor = ALICE_ADDRESS;
 
@@ -35,8 +36,8 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
 
         // Deposit into junior tranche
         vm.prank(depositor);
-        uint256 shares = JT.deposit(_assets, depositor, depositor);
-        _updateOnDeposit(jTState, _assets, _assets, shares);
+        uint256 shares = JT.deposit(assets, depositor, depositor);
+        _updateOnDeposit(jTState, assets, _toJTValue(assets), shares, TrancheType.JUNIOR);
 
         // Verify shares were minted
         assertGt(shares, 0, "Shares should be greater than 0");
@@ -76,6 +77,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
 
             // Generate a random amount
             uint256 amount = bound(uint256(keccak256(abi.encodePacked(_amountSeed, i))), 1e6, 1_000_000e6);
+            TRANCHE_UNIT assets = toTrancheUnits(amount);
 
             // Get initial balances
             uint256 initialDepositorBalance = USDC.balanceOf(provider.addr);
@@ -96,7 +98,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
             );
 
             uint256 aTokensMinted = AUSDC.balanceOf(address(KERNEL)) - initialATokenBalance;
-            _updateOnDeposit(jTState, aTokensMinted, aTokensMinted, shares);
+            _updateOnDeposit(jTState, toTrancheUnits(aTokensMinted), _toJTValue(toTrancheUnits(aTokensMinted)), shares, TrancheType.JUNIOR);
 
             // Verify that shares were minted
             assertEq(JT.balanceOf(provider.addr), initialTrancheShares + shares, "Provider should receive shares");
@@ -108,8 +110,8 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
 
             // Verify that previewRedeem returns the correct amount
             uint256 convertedAssets = JT.convertToAssets(shares);
-            assertApproxEqRel(convertedAssets, amount, MAX_CONVERT_TO_ASSETS_RELATIVE_DELTA, "Convert to assets should return the correct amount");
-            assertTrue(convertedAssets <= amount, "Convert to assets should be less than or equal to amount");
+            assertApproxEqRel(convertedAssets, assets, MAX_CONVERT_TO_ASSETS_RELATIVE_DELTA, "Convert to assets should return the correct amount");
+            assertTrue(convertedAssets <= assets, "Convert to assets should be less than or equal to amount");
 
             // Verify that assets were transferred
             assertEq(USDC.balanceOf(provider.addr), initialDepositorBalance - amount, "Provider balance should decrease by amount");
@@ -120,7 +122,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         }
     }
 
-    function testFuzz_depositIntoST(uint256 _jtAssets) external {
+    function testFuzz_depositIntoST_verifyCoverageRequirementEnforcement(uint256 _jtAssets) external {
         // Bound assets to reasonable range (avoid zero and very large amounts)
         _jtAssets = bound(_jtAssets, 1e6, 1_000_000e6); // Between 1 USDC and 1M USDC (6 decimals)
 
