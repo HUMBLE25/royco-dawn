@@ -115,14 +115,6 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
         );
     }
 
-    // /// @inheritdoc RoycoKernel
-    // function _getJuniorTrancheRawNAV() internal view override(RoycoKernel) returns (NAV_UNIT) {
-    //     // The tranche's balance of the AToken is the total assets it is owed from the Aave pool
-    //     /// @dev This does not treat illiquidity in the Aave pool as a loss: we assume that total lent will be withdrawable at some point
-    //     AaveV3KernelState storage $ = AaveV3KernelStorageLib._getAaveV3KernelStorage();
-    //     return IERC20($.aToken).balanceOf(address(this));
-    // }
-
     /// @inheritdoc RoycoKernel
     function _jtMaxAssetDepositGlobally(address) internal view override(RoycoKernel) returns (TRANCHE_UNIT) {
         // Retrieve the Pool's data provider and asset

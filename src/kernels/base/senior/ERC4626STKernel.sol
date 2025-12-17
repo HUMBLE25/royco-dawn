@@ -99,15 +99,6 @@ abstract contract ERC4626STKernel is RoycoKernel {
         IERC4626(ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault).withdraw(toUint256(_stAssets), _receiver, address(this));
     }
 
-    // /// @inheritdoc RoycoKernel
-    // function _getSeniorTrancheRawNAV() internal view override(RoycoKernel) returns (uint256) {
-    //     // Must use preview redeem for the tranche owned shares
-    //     // Max withdraw will mistake illiquidity for NAV losses
-    //     address vault = ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault;
-    //     uint256 trancheSharesBalance = IERC4626(vault).balanceOf(address(this));
-    //     return IERC4626(vault).previewRedeem(trancheSharesBalance);
-    // }
-
     /// @inheritdoc RoycoKernel
     function _maxSTDepositGlobally(address) internal view override(RoycoKernel) returns (TRANCHE_UNIT) {
         // Max deposit takes global withdrawal limits into account
