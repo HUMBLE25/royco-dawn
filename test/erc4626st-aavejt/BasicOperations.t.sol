@@ -3,6 +3,8 @@ pragma solidity ^0.8.28;
 
 import { Vm } from "../../lib/forge-std/src/Vm.sol";
 import { IRoycoAccountant } from "../../src/interfaces/IRoycoAccountant.sol";
+import { TrancheType } from "../../src/libraries/Types.sol";
+import { TRANCHE_UNIT, toTrancheUnits } from "../../src/libraries/Units.sol";
 import { MainnetForkWithAaveTestBase } from "./base/MainnetForkWithAaveBaseTest.sol";
 
 contract BasicOperationsTest is MainnetForkWithAaveTestBase {
@@ -125,6 +127,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
     function testFuzz_depositIntoST_verifyCoverageRequirementEnforcement(uint256 _jtAssets) external {
         // Bound assets to reasonable range (avoid zero and very large amounts)
         _jtAssets = bound(_jtAssets, 1e6, 1_000_000e6); // Between 1 USDC and 1M USDC (6 decimals)
+        TRANCHE_UNIT jtAssets = toTrancheUnits(_jtAssets);
 
         // There are no assets in JT initally, therefore depositing into ST should fail
         address stDepositor = BOB_ADDRESS;
@@ -140,5 +143,9 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         address jtDepositor = ALICE_ADDRESS;
         vm.prank(jtDepositor);
         USDC.approve(address(ST), _jtAssets);
+        uint256 shares = JT.deposit(jtAssets, jtDepositor, jtDepositor);
+        _updateOnDeposit(jTState, jtAssets, _toJTValue(jtAssets), shares, TrancheType.JUNIOR);
+
+        //
     }
 }

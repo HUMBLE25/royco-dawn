@@ -15,7 +15,7 @@ import { ERC4626ST_AaveV3JT_Kernel } from "../../src/kernels/ERC4626ST_AaveV3JT_
 import { RoycoKernel } from "../../src/kernels/base/RoycoKernel.sol";
 import { RoycoAccountantInitParams } from "../../src/libraries/RoycoAccountantStorageLib.sol";
 import { RoycoKernelInitParams } from "../../src/libraries/RoycoKernelStorageLib.sol";
-import { TrancheAssetClaims } from "../../src/libraries/Types.sol";
+import { TrancheAssetClaims, TrancheType } from "../../src/libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT } from "../../src/libraries/Units.sol";
 import { RoycoJT } from "../../src/tranches/RoycoJT.sol";
 import { RoycoST } from "../../src/tranches/RoycoST.sol";
