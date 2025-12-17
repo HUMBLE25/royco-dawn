@@ -85,7 +85,16 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
     }
 
     /// @inheritdoc IRoycoAccountant
-    function postOpSyncTrancheAccounting(NAV_UNIT _stRawNAV, NAV_UNIT _jtRawNAV, Operation _op) public override(IRoycoAccountant) onlyRoycoKernel {
+    function postOpSyncTrancheAccounting(
+        NAV_UNIT _stRawNAV,
+        NAV_UNIT _jtRawNAV,
+        Operation _op
+    )
+        public
+        override(IRoycoAccountant)
+        onlyRoycoKernel
+        returns (SyncedAccountingState memory state)
+    {
         // Get the storage pointer to the base kernel state
         RoycoAccountantState storage $ = RoycoAccountantStorageLib._getRoycoAccountantStorage();
         if (_op == Operation.ST_INCREASE_NAV) {
@@ -144,6 +153,10 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         }
         // Enforce the NAV conservation invariant
         require(($.lastSTRawNAV + $.lastJTRawNAV) == ($.lastSTEffectiveNAV + $.lastJTEffectiveNAV), NAV_CONSERVATION_VIOLATION());
+        // Construct the synced NAVs state to return to the caller
+        state = SyncedAccountingState(
+            _stRawNAV, _jtRawNAV, $.lastSTEffectiveNAV, $.lastJTEffectiveNAV, $.lastSTCoverageDebt, $.lastJTCoverageDebt, ZERO_NAV_UNITS, ZERO_NAV_UNITS
+        );
     }
 
     /// @inheritdoc IRoycoAccountant
@@ -155,9 +168,10 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         external
         override(IRoycoAccountant)
         onlyRoycoKernel
+        returns (SyncedAccountingState memory state)
     {
         // Execute a post-op NAV synchronization
-        postOpSyncTrancheAccounting(_stRawNAV, _jtRawNAV, _op);
+        state = postOpSyncTrancheAccounting(_stRawNAV, _jtRawNAV, _op);
         // Enforce the market's coverage requirement
         require(isCoverageRequirementSatisfied(), COVERAGE_REQUIREMENT_UNSATISFIED());
     }

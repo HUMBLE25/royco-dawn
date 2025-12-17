@@ -16,7 +16,7 @@ abstract contract ERC4626STKernel is RoycoKernel {
     ExecutionModel public constant ST_INCREASE_NAV_EXECUTION_MODEL = ExecutionModel.SYNC;
 
     /// @inheritdoc IRoycoKernel
-    ExecutionModel public constant ST_DECREASE_NAVAL_EXECUTION_MODEL = ExecutionModel.SYNC;
+    ExecutionModel public constant ST_DECREASE_NAV_EXECUTION_MODEL = ExecutionModel.SYNC;
 
     /// @inheritdoc IRoycoKernel
     RequestRedeemSharesBehavior public constant ST_REQUEST_REDEEM_SHARES_BEHAVIOR = RequestRedeemSharesBehavior.BURN_ON_REDEEM;
@@ -42,7 +42,7 @@ abstract contract ERC4626STKernel is RoycoKernel {
     }
 
     /// @inheritdoc IRoycoKernel
-    function getSTTotalEffectiveAssets() external view override(IRoycoKernel) returns (uint256) {
+    function getSTAssetClaims() external view override(IRoycoKernel) returns (uint256) {
         return previewSyncTrancheAccounting().stEffectiveNAV;
     }
 

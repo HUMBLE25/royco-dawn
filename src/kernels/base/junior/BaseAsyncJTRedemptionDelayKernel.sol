@@ -7,6 +7,7 @@ import { IAsyncJTWithdrawalKernel } from "../../../interfaces/kernel/IAsyncJTWit
 import { IRoycoKernel } from "../../../interfaces/kernel/IRoycoKernel.sol";
 import { ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID } from "../../../libraries/Constants.sol";
 import { RequestRedeemSharesBehavior } from "../../../libraries/Types.sol";
+import { NAV_UNIT } from "../../../libraries/Units.sol";
 import { RoycoKernel } from "../RoycoKernel.sol";
 
 /// @title BaseAsyncJTRedemptionDelayKernel
@@ -21,8 +22,8 @@ abstract contract BaseAsyncJTRedemptionDelayKernel is IAsyncJTWithdrawalKernel, 
 
     /// @dev Emitted when the redemption delay is updated
     event RedemptionDelayUpdated(uint256 redemptionDelaySeconds);
-
     /// @notice Thrown when the redemption delay is zero
+
     error INVALID_WITHDRAWAL_DELAY_SECONDS(uint256 redemptionDelaySeconds);
     /// @notice Thrown when the total shares to withdraw is less than the shares to redeem
     error INSUFFICIENT_SHARES(uint256 sharesToRedeem, uint256 totalSharesToRedeem);
@@ -76,7 +77,7 @@ abstract contract BaseAsyncJTRedemptionDelayKernel is IAsyncJTWithdrawalKernel, 
         whenNotPaused
         returns (uint256 requestId)
     {
-        uint256 jtEffectiveNAV = _preOpSyncTrancheAccounting().jtEffectiveNAV;
+        NAV_UNIT jtEffectiveNAV = _preOpSyncTrancheAccounting().jtEffectiveNAV;
         BaseAsyncJTRedemptionDelayKernelState storage $ = _getBaseAsyncJTRedemptionDelayKernelState();
 
         Redemption storage redemption = $.redemptions[_controller];

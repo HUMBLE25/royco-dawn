@@ -97,6 +97,16 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     }
 
     /// @inheritdoc IRoycoKernel
+    function getJTAssetClaims() external view override(IRoycoKernel) returns (TrancheAssetClaims memory claims) {
+        (, claims) = previewSyncTrancheAccounting(TrancheType.JUNIOR);
+    }
+
+    /// @inheritdoc IRoycoKernel
+    function getSTAssetClaims() external view override(IRoycoKernel) returns (TrancheAssetClaims memory claims) {
+        (, claims) = previewSyncTrancheAccounting(TrancheType.SENIOR);
+    }
+
+    /// @inheritdoc IRoycoKernel
     function getState() external view override(IRoycoKernel) returns (RoycoKernelState memory) {
         return RoycoKernelStorageLib._getRoycoKernelStorage();
     }
@@ -147,7 +157,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
      * @return claims The claims on ST and JT assets that the specified tranche has denominated in tranche-native units
      */
     function previewSyncTrancheAccounting(TrancheType _trancheType)
-        external
+        public
         view
         override(IRoycoKernel)
         returns (SyncedAccountingState memory state, TrancheAssetClaims memory claims)
@@ -168,6 +178,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
      * @param _trancheType An enum indicating which tranche to return claims and total tranche shares for
      * @return state The synced NAV, debt, and fee accounting containing all mark to market accounting data
      * @return claims The claims on ST and JT assets that the specified tranche has denominated in tranche-native units
+     * @return totalTrancheShares The total shares outstanding in the specified tranche after minting any protocol fee shares
      */
     function _preOpSyncTrancheAccounting(TrancheType _trancheType)
         internal
@@ -203,6 +214,31 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     }
 
     /**
+     * @notice Invokes the accountant to do a post-operation (deposit and withdrawal) NAV sync
+     * @dev Should be called on every NAV mutating user operation
+     * @param _trancheType An enum indicating which tranche to return claims and total tranche shares for
+     * @param _op The operation being executed in between the pre and post synchronizations
+     * @return state The synced NAV, debt, and fee accounting containing all mark to market accounting data
+     * @return claims The claims on ST and JT assets that the specified tranche has denominated in tranche-native units
+     */
+    function _postOpSyncTrancheAccounting(
+        TrancheType _trancheType,
+        Operation _op
+    )
+        internal
+        returns (SyncedAccountingState memory state, TrancheAssetClaims memory claims)
+    {
+        // Execute the pre-op sync via the accountant
+        state = _postOpSyncTrancheAccounting(_op);
+
+        // Decompose effective NAVs into self-backed NAV claims and cross-tranche NAV claims
+        (NAV_UNIT stNAVClaimOnSelf, NAV_UNIT stNAVClaimOnJT, NAV_UNIT jtNAVClaimOnSelf, NAV_UNIT jtNAVClaimOnST) = _decomposeNAVClaims(state);
+
+        // Marshal the tranche claims for this tranche given the decomposed claims
+        claims = _marshalTrancheAssetClaims(_trancheType, stNAVClaimOnSelf, stNAVClaimOnJT, jtNAVClaimOnSelf, jtNAVClaimOnST);
+    }
+
+    /**
      * @notice Invokes the accountant to do a pre-operation (deposit and withdrawal) NAV sync
      * @dev Should be called on every NAV mutating user operation
      * @return state The synced NAV, debt, and fee accounting containing all mark to market accounting data
@@ -216,10 +252,11 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
      * @notice Invokes the accountant to do a post-operation (deposit and withdrawal) NAV sync
      * @dev Should be called on every NAV mutating user operation that doesn't require a coverage check
      * @param _op The operation being executed in between the pre and post synchronizations
+     * @return state The synced NAV, debt, and fee accounting containing all mark to market accounting data
      */
-    function _postOpSyncTrancheAccounting(Operation _op) internal {
+    function _postOpSyncTrancheAccounting(Operation _op) internal returns (SyncedAccountingState memory state) {
         // Execute the post-op sync on the accountant
-        _accountant().postOpSyncTrancheAccounting(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV(), _op);
+        state = _accountant().postOpSyncTrancheAccounting(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV(), _op);
     }
 
     /**
