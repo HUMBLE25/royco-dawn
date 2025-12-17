@@ -40,7 +40,7 @@ library UnitsMathLib {
      * @return The signed difference between _a and _b
      */
     function computeNAVDelta(NAV_UNIT _a, NAV_UNIT _b) internal pure returns (int256) {
-        return (int256(toUint256(_a)) - int256(toUint256(_b)));
+        return (toInt256(_a) - toInt256(_b));
     }
 
     /**
@@ -140,6 +140,10 @@ function toNAVUnits(int256 _assets) pure returns (NAV_UNIT) {
 
 function toUint256(NAV_UNIT _units) pure returns (uint256) {
     return NAV_UNIT.unwrap(_units);
+}
+
+function toInt256(NAV_UNIT _units) pure returns (int256) {
+    return int256(NAV_UNIT.unwrap(_units));
 }
 
 function addNAVUnits(NAV_UNIT _a, NAV_UNIT _b) pure returns (NAV_UNIT) {
