@@ -18,6 +18,15 @@ interface IRoycoVaultTranche is IERC165, IRoycoAsyncVault, IRoycoAsyncCancellabl
     event Deposit(address indexed sender, address indexed owner, TRANCHE_UNIT assets, uint256 shares);
 
     /**
+     * @notice Emitted when a redemption is made
+     * @param sender The address that made the redemption
+     * @param receiver The address of the receiver of the redeemed assets
+     * @param claims A struct representing the assets received on redemption and their value at the time of redemption in NAV units
+     * @param shares The amount of shares redeemed
+     */
+    event Redeem(address indexed sender, address indexed receiver, TrancheAssetClaims claims, uint256 shares);
+
+    /**
      * @notice Emitted when protocol fee shares are minted to the protocol fee recipient
      * @param protocolFeeRecipient The address that received the protocol fee shares
      * @param mintedProtocolFeeShares The number of protocol fee shares that were minted
