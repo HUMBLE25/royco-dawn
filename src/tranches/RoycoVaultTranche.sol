@@ -270,7 +270,8 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
                 : IRoycoKernel(kernel()).jtRedeem(_shares, _controller, _receiver)
         );
 
-        // Account for the withdrawal
+        // Account for the redemption
+        // Shares must be burned after the kernel processes the redemption since the kernel has a causal dependency on the pre-burn and post-sync total share supply
         _redeem(msg.sender, _controller, _shares);
 
         emit Redeem(msg.sender, _receiver, claims, _shares);

@@ -9,7 +9,7 @@ import { ZERO_TRANCHE_UNITS } from "../../../libraries/Constants.sol";
 import { TrancheAssetClaims } from "../../../libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib, toTrancheUnits, toUint256 } from "../../../libraries/Units.sol";
 import { UtilsLib } from "../../../libraries/UtilsLib.sol";
-import { ERC4626STKernelStorageLib } from "../../../libraries/kernels/ERC4626STKernelStorageLib.sol";
+import { ERC4626KernelStorageLib } from "../../../libraries/kernels/ERC4626KernelStorageLib.sol";
 import { Operation, RoycoKernel, TrancheType } from "../RoycoKernel.sol";
 
 abstract contract ERC4626STKernel is RoycoKernel {
@@ -42,12 +42,12 @@ abstract contract ERC4626STKernel is RoycoKernel {
         IERC20(_stAsset).forceApprove(address(_vault), type(uint256).max);
 
         // Initialize the ERC4626 ST kernel storage
-        ERC4626STKernelStorageLib.__ERC4626STKernel_init(_vault);
+        ERC4626KernelStorageLib.__ERC4626Kernel_init(_vault);
     }
 
     /// @inheritdoc IRoycoKernel
     function stPreviewDeposit(TRANCHE_UNIT _assets) external view override onlySeniorTranche returns (NAV_UNIT valueAllocated, NAV_UNIT navToMintAt) {
-        IERC4626 vault = IERC4626(ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault);
+        IERC4626 vault = IERC4626(ERC4626KernelStorageLib._getERC4626KernelStorage().vault);
 
         // Simulate the deposit of the assets into the underlying investment vault
         uint256 underlyingVaultSharesAllocated = vault.previewDeposit(toUint256(_assets));
@@ -75,7 +75,7 @@ abstract contract ERC4626STKernel is RoycoKernel {
         navToMintAt = (_preOpSyncTrancheAccounting()).stEffectiveNAV;
 
         // Deposit the assets into the underlying investment vault
-        IERC4626(ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault).deposit(toUint256(_assets), address(this));
+        IERC4626(ERC4626KernelStorageLib._getERC4626KernelStorage().vault).deposit(toUint256(_assets), address(this));
 
         // Execute a post-op sync on accounting and enforce the market's coverage requirement
         NAV_UNIT postDepositNAV = (_postOpSyncTrancheAccountingAndEnforceCoverage(Operation.ST_INCREASE_NAV)).stEffectiveNAV;
@@ -123,7 +123,7 @@ abstract contract ERC4626STKernel is RoycoKernel {
     function _getSeniorTrancheRawNAV() internal view override(RoycoKernel) returns (NAV_UNIT) {
         // Must use convert to assets for the tranche owned shares in order to be exlusive of any fixed fees on withdrawal
         // Cannot use max withdraw since it will mistake illiquidity for NAV losses
-        address vault = ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault;
+        address vault = ERC4626KernelStorageLib._getERC4626KernelStorage().vault;
         uint256 trancheSharesBalance = IERC4626(vault).balanceOf(address(this));
         return _stConvertTrancheUnitsToNAVUnits(toTrancheUnits(IERC4626(vault).convertToAssets(trancheSharesBalance)));
     }
@@ -131,23 +131,23 @@ abstract contract ERC4626STKernel is RoycoKernel {
     /// @inheritdoc RoycoKernel
     function _stMaxDepositGlobally(address) internal view override(RoycoKernel) returns (TRANCHE_UNIT) {
         // Max deposit takes global withdrawal limits into account
-        return toTrancheUnits(IERC4626(ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault).maxDeposit(address(this)));
+        return toTrancheUnits(IERC4626(ERC4626KernelStorageLib._getERC4626KernelStorage().vault).maxDeposit(address(this)));
     }
 
     /// @inheritdoc RoycoKernel
     function _stMaxWithdrawableGlobally(address) internal view override(RoycoKernel) returns (TRANCHE_UNIT) {
         // Max withdraw takes global withdrawal limits into account
-        return toTrancheUnits(IERC4626(ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault).maxWithdraw(address(this)));
+        return toTrancheUnits(IERC4626(ERC4626KernelStorageLib._getERC4626KernelStorage().vault).maxWithdraw(address(this)));
     }
 
     /// @inheritdoc RoycoKernel
     function _stWithdrawAssets(TRANCHE_UNIT _stAssets, address _receiver) internal override(RoycoKernel) {
-        IERC4626(ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault).withdraw(toUint256(_stAssets), _receiver, address(this));
+        IERC4626(ERC4626KernelStorageLib._getERC4626KernelStorage().vault).withdraw(toUint256(_stAssets), _receiver, address(this));
     }
 
     /// @inheritdoc RoycoKernel
     function _previewWithdrawSTAssets(TRANCHE_UNIT _stAssets) internal view override(RoycoKernel) returns (TRANCHE_UNIT redeemedSTAssets) {
-        IERC4626 vault = IERC4626(ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault);
+        IERC4626 vault = IERC4626(ERC4626KernelStorageLib._getERC4626KernelStorage().vault);
 
         // Convert the ST assets to underlying shares
         uint256 underlyingShares = vault.convertToShares(toUint256(_stAssets));
