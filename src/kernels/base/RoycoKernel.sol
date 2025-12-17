@@ -111,18 +111,6 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     }
 
     /// @inheritdoc IRoycoKernel
-    function stConvertTrancheUnitsToNAVUnits(TRANCHE_UNIT _stAssets) public view virtual override(IRoycoKernel) returns (NAV_UNIT);
-
-    /// @inheritdoc IRoycoKernel
-    function jtConvertTrancheUnitsToNAVUnits(TRANCHE_UNIT _jtAssets) public view virtual override(IRoycoKernel) returns (NAV_UNIT);
-
-    /// @inheritdoc IRoycoKernel
-    function stConvertNAVUnitsToTrancheUnits(NAV_UNIT _navAssets) public view virtual override(IRoycoKernel) returns (TRANCHE_UNIT);
-
-    /// @inheritdoc IRoycoKernel
-    function jtConvertNAVUnitsToTrancheUnits(NAV_UNIT _navAssets) public view virtual override(IRoycoKernel) returns (TRANCHE_UNIT);
-
-    /// @inheritdoc IRoycoKernel
     function syncTrancheAccounting() external override(IRoycoKernel) restricted returns (SyncedAccountingState memory state) {
         // Execute a pre-op accounting sync via the accountant
         return _preOpSyncTrancheAccounting();
@@ -299,6 +287,18 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     function _accountant() internal view returns (IRoycoAccountant) {
         return IRoycoAccountant(RoycoKernelStorageLib._getRoycoKernelStorage().accountant);
     }
+
+    /// @inheritdoc IRoycoKernel
+    function stConvertTrancheUnitsToNAVUnits(TRANCHE_UNIT _stAssets) public view virtual override(IRoycoKernel) returns (NAV_UNIT);
+
+    /// @inheritdoc IRoycoKernel
+    function jtConvertTrancheUnitsToNAVUnits(TRANCHE_UNIT _jtAssets) public view virtual override(IRoycoKernel) returns (NAV_UNIT);
+
+    /// @inheritdoc IRoycoKernel
+    function stConvertNAVUnitsToTrancheUnits(NAV_UNIT _navAssets) public view virtual override(IRoycoKernel) returns (TRANCHE_UNIT);
+
+    /// @inheritdoc IRoycoKernel
+    function jtConvertNAVUnitsToTrancheUnits(NAV_UNIT _navAssets) public view virtual override(IRoycoKernel) returns (TRANCHE_UNIT);
 
     /// @notice Returns the raw net asset value of the senior tranche denominated in the NAV units (USD, BTC, etc.) for this kernel
     /// @return The pure net asset value of the senior tranche invested assets
