@@ -153,12 +153,12 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         address protocolFeeRecipient = $.protocolFeeRecipient;
         uint256 stTotalTrancheSharesAfterMintingFees;
         uint256 jtTotalTrancheSharesAfterMintingFees;
-        // If ST yield was distributed, Mint ST protocol fee shares to the protocol fee recipient
+        // If ST fees were accrued or we need to get total shares for ST, mint ST protocol fee shares to the protocol fee recipient
         if (state.stProtocolFeeAccrued != ZERO_NAV_UNITS || _trancheType == TrancheType.SENIOR) {
             stTotalTrancheSharesAfterMintingFees =
                 IRoycoVaultTranche($.seniorTranche).mintProtocolFeeShares(state.stProtocolFeeAccrued, state.stEffectiveNAV, protocolFeeRecipient);
         }
-        // If JT yield was distributed, Mint JT protocol fee shares to the protocol fee recipient
+        // If JT fees were accrued or we need to get total shares for JT, mint JT protocol fee shares to the protocol fee recipient
         if (state.jtProtocolFeeAccrued != ZERO_NAV_UNITS || _trancheType == TrancheType.JUNIOR) {
             jtTotalTrancheSharesAfterMintingFees =
                 IRoycoVaultTranche($.juniorTranche).mintProtocolFeeShares(state.jtProtocolFeeAccrued, state.jtEffectiveNAV, protocolFeeRecipient);

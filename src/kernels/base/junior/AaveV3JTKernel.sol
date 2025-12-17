@@ -29,6 +29,7 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
 
     /// @notice Thrown when the shares to redeem are greater than the claimable shares
     error INSUFFICIENT_CLAIMABLE_SHARES(uint256 sharesToRedeem, uint256 claimableShares);
+
     /// @notice Thrown when a low-level call fails
     error FAILED_CALL();
 
