@@ -5,12 +5,14 @@ import { IERC4626 } from "../../../../lib/openzeppelin-contracts/contracts/inter
 import { IERC20, SafeERC20 } from "../../../../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import { Math } from "../../../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 import { ExecutionModel, IRoycoKernel, RequestRedeemSharesBehavior } from "../../../interfaces/kernel/IRoycoKernel.sol";
+import { ZERO_TRANCHE_UNITS } from "../../../libraries/Constants.sol";
+import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib, toTrancheUnits, toUint256 } from "../../../libraries/Units.sol";
 import { ERC4626STKernelStorageLib } from "../../../libraries/kernels/ERC4626STKernelStorageLib.sol";
-import { Operation, RoycoKernel, SyncedAccountingState } from "../RoycoKernel.sol";
+import { Operation, RoycoKernel, SyncedAccountingState, TrancheAssetClaims, TrancheType } from "../RoycoKernel.sol";
 
 abstract contract ERC4626STKernel is RoycoKernel {
     using SafeERC20 for IERC20;
-    using Math for uint256;
+    using UnitsMathLib for TRANCHE_UNIT;
 
     /// @inheritdoc IRoycoKernel
     ExecutionModel public constant ST_INCREASE_NAV_EXECUTION_MODEL = ExecutionModel.SYNC;
@@ -42,14 +44,8 @@ abstract contract ERC4626STKernel is RoycoKernel {
     }
 
     /// @inheritdoc IRoycoKernel
-    function getSTAssetClaims() external view override(IRoycoKernel) returns (uint256) {
-        return previewSyncTrancheAccounting().stEffectiveNAV;
-    }
-
-    /// @inheritdoc IRoycoKernel
     function stDeposit(
-        address,
-        uint256 _assets,
+        TRANCHE_UNIT _assets,
         address,
         address
     )
@@ -57,27 +53,22 @@ abstract contract ERC4626STKernel is RoycoKernel {
         override(IRoycoKernel)
         onlySeniorTranche
         whenNotPaused
-        returns (uint256 valueAllocated, uint256 effectiveNAVToMintAt)
+        returns (NAV_UNIT valueAllocated, NAV_UNIT navToMintAt)
     {
-        // The effective NAV to mint at is the effective NAV of the tranche before the deposit is made, ie. the NAV at which the shares will be minted
-        // This is the NAV returned by the pre-op sync
-        effectiveNAVToMintAt = (_preOpSyncTrancheAccounting()).stEffectiveNAV;
+        // Execute a pre-op sync on accounting
+        navToMintAt = (_preOpSyncTrancheAccounting()).stEffectiveNAV;
 
         // Deposit the assets into the underlying investment vault
-        IERC4626(ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault).deposit(_assets, address(this));
+        IERC4626(ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault).deposit(toUint256(_assets), address(this));
 
-        // The value of the assets deposited is the value of the assets in the asset that the tranche's NAV is denominated in
-        valueAllocated = _convertAssetsToValue(_assets);
-
-        // Execute a post-op sync on NAV accounting and enforce the market's coverage requirement
-        _postOpSyncTrancheAccountingAndEnforceCoverage(Operation.ST_INCREASE_NAV);
+        // Execute a post-op sync on accounting and enforce the market's coverage requirement
+        NAV_UNIT postDepositNAV = (_postOpSyncTrancheAccountingAndEnforceCoverage(Operation.ST_INCREASE_NAV)).stEffectiveNAV;
+        valueAllocated = postDepositNAV - navToMintAt;
     }
 
     /// @inheritdoc IRoycoKernel
     function stRedeem(
-        address _asset,
         uint256 _shares,
-        uint256 _totalShares,
         address,
         address _receiver
     )
@@ -85,61 +76,47 @@ abstract contract ERC4626STKernel is RoycoKernel {
         override(IRoycoKernel)
         onlySeniorTranche
         whenNotPaused
-        returns (uint256 assetsWithdrawn)
+        returns (TrancheAssetClaims memory claims)
     {
-        // Execute a pre-op sync on NAV accounting
-        SyncedAccountingState memory state = _preOpSyncTrancheAccounting();
+        // Execute a pre-op sync on accounting
+        uint256 totalTrancheShares;
+        (, claims, totalTrancheShares) = _preOpSyncTrancheAccounting(TrancheType.SENIOR);
 
-        // Compute the assets expected to be received on withdrawal based on the ST's effective NAV
-        assetsWithdrawn = _shares.mulDiv(state.stEffectiveNAV, _totalShares, Math.Rounding.Floor);
+        // Compute the JT assets to claim and withdraw them
+        claims.jtAssets = claims.jtAssets.mulDiv(_shares, totalTrancheShares, Math.Rounding.Floor);
+        if (claims.jtAssets != ZERO_TRANCHE_UNITS) _withdrawJTAssets(claims.jtAssets, _receiver);
 
-        // ST's coverage debt post-sync is the total applied coverage by JT to ST
-        uint256 totalAppliedCoverage = state.stCoverageDebt;
-        // Compute and claim the assets that need to pulled from JT for this withdrawal, rounding in favor of ST
-        uint256 jtAssetsToWithdraw = Math.min(_shares.mulDiv(totalAppliedCoverage, _totalShares, Math.Rounding.Ceil), totalAppliedCoverage);
-        if (jtAssetsToWithdraw != 0) _claimSeniorAssetsFromJunior(_asset, jtAssetsToWithdraw, _receiver);
+        // Compute the ST assets to claim and withdraw them
+        claims.stAssets = claims.stAssets.mulDiv(_shares, totalTrancheShares, Math.Rounding.Floor);
+        if (claims.stAssets != ZERO_TRANCHE_UNITS) _withdrawSTAssets(claims.stAssets, _receiver);
 
-        // Facilitate the remainder of the withdrawal from ST exposure
-        // TODO: Should we use redeem flow instead since some vaults disable withdrawal flows?
-        IERC4626(ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault).withdraw((assetsWithdrawn - jtAssetsToWithdraw), _receiver, address(this));
-
-        // Execute a post-op sync on NAV accounting
+        // Execute a post-op sync on accounting
         _postOpSyncTrancheAccounting(Operation.ST_DECREASE_NAV);
     }
 
-    /**
-     * @notice Converts the amount of assets to the value of the assets in the asset that the tranche's NAV is denominated in
-     * @dev This implementation assumes that the NAV is denominated in the same asset as the assets being deposited
-     * @param _assets The amount of assets to convert
-     * @return value The value of the assets in the asset that the tranche's NAV is denominated in
-     */
-    function _convertAssetsToValue(uint256 _assets) internal view virtual returns (uint256 value) {
-        return _assets;
+    /// @inheritdoc RoycoKernel
+    function _withdrawSTAssets(TRANCHE_UNIT _stAssets, address _receiver) internal override(RoycoKernel) {
+        IERC4626(ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault).withdraw(toUint256(_stAssets), _receiver, address(this));
     }
 
-    /// @inheritdoc RoycoKernel
-    function _claimJuniorAssetsFromSenior(address, uint256 _assets, address _receiver) internal override(RoycoKernel) {
-        IERC4626(ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault).withdraw(_assets, _receiver, address(this));
-    }
+    // /// @inheritdoc RoycoKernel
+    // function _getSeniorTrancheRawNAV() internal view override(RoycoKernel) returns (uint256) {
+    //     // Must use preview redeem for the tranche owned shares
+    //     // Max withdraw will mistake illiquidity for NAV losses
+    //     address vault = ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault;
+    //     uint256 trancheSharesBalance = IERC4626(vault).balanceOf(address(this));
+    //     return IERC4626(vault).previewRedeem(trancheSharesBalance);
+    // }
 
     /// @inheritdoc RoycoKernel
-    function _getSeniorTrancheRawNAV() internal view override(RoycoKernel) returns (uint256) {
-        // Must use preview redeem for the tranche owned shares
-        // Max withdraw will mistake illiquidity for NAV losses
-        address vault = ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault;
-        uint256 trancheSharesBalance = IERC4626(vault).balanceOf(address(this));
-        return IERC4626(vault).previewRedeem(trancheSharesBalance);
-    }
-
-    /// @inheritdoc RoycoKernel
-    function _maxSTDepositGlobally(address) internal view override(RoycoKernel) returns (uint256) {
+    function _maxSTDepositGlobally(address) internal view override(RoycoKernel) returns (TRANCHE_UNIT) {
         // Max deposit takes global withdrawal limits into account
-        return IERC4626(ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault).maxDeposit(address(this));
+        return toTrancheUnits(IERC4626(ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault).maxDeposit(address(this)));
     }
 
     /// @inheritdoc RoycoKernel
-    function _maxSTWithdrawalGlobally(address) internal view override(RoycoKernel) returns (uint256) {
+    function _maxSTWithdrawalGlobally(address) internal view override(RoycoKernel) returns (TRANCHE_UNIT) {
         // Max withdraw takes global withdrawal limits into account
-        return IERC4626(ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault).maxWithdraw(address(this));
+        return toTrancheUnits(IERC4626(ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault).maxWithdraw(address(this)));
     }
 }

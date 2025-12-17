@@ -112,6 +112,18 @@ library UnitsMathLib {
     function mulDiv(TRANCHE_UNIT _a, NAV_UNIT _b, NAV_UNIT _c, Math.Rounding _rounding) internal pure returns (TRANCHE_UNIT) {
         return toTrancheUnits(Math.mulDiv(toUint256(_a), toUint256(_b), toUint256(_c), _rounding));
     }
+
+    /**
+     * @notice Multiplies a NAV unit denominated quantity by a uint256 and divides by another uint256, rounding according to the specified rounding mode
+     * @param _a The tranche unit denominated multiplicand of the multiplication
+     * @param _b The uint256 multiplier of the multiplication
+     * @param _c The uint256 divisor of the division
+     * @param _rounding The rounding mode to use
+     * @return The result of the multiplication followed by division
+     */
+    function mulDiv(TRANCHE_UNIT _a, uint256 _b, uint256 _c, Math.Rounding _rounding) internal pure returns (TRANCHE_UNIT) {
+        return toTrancheUnits(Math.mulDiv(toUint256(_a), _b, _c, _rounding));
+    }
 }
 
 /// ----------------------

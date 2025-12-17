@@ -6,7 +6,7 @@ import { NAV_UNIT, TRANCHE_UNIT } from "./Units.sol";
 /// @dev Constant for 0 NAV units
 NAV_UNIT constant ZERO_NAV_UNITS = NAV_UNIT.wrap(0);
 
-/// @dev Constant for 0 NAV units
+/// @dev Constant for 0 tranche units
 TRANCHE_UNIT constant ZERO_TRANCHE_UNITS = TRANCHE_UNIT.wrap(0);
 
 /// @dev Constant for the WAD scaling factor

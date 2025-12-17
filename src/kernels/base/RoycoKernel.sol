@@ -20,7 +20,6 @@ import { IRoycoAccountant, Operation } from "./../../interfaces/IRoycoAccountant
 abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     using UnitsMathLib for NAV_UNIT;
     using UnitsMathLib for TRANCHE_UNIT;
-    using Math for uint256;
 
     /// @dev Permissions the function to only the market's senior tranche
     /// @dev Should be placed on all ST deposit and withdraw functions
@@ -111,51 +110,25 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         return RoycoKernelStorageLib._getRoycoKernelStorage();
     }
 
-    /**
-     * @notice Converts the specified ST assets denominated in its tranche units to the kernel's NAV units
-     * @param _stAssets The ST assets denominated in tranche units to convert to the kernel's NAV units
-     * @return The specified ST assets denominated in its tranche units converted to the kernel's NAV units
-     */
-    function stConvertTrancheUnitsToNAVUnits(TRANCHE_UNIT _stAssets) public view virtual returns (NAV_UNIT);
+    /// @inheritdoc IRoycoKernel
+    function stConvertTrancheUnitsToNAVUnits(TRANCHE_UNIT _stAssets) public view virtual override(IRoycoKernel) returns (NAV_UNIT);
 
-    /**
-     * @notice Converts the specified JT assets denominated in its tranche units to the kernel's NAV units
-     * @param _jtAssets The JT assets denominated in tranche units to convert to the kernel's NAV units
-     * @return The specified JT assets denominated in its tranche units converted to the kernel's NAV units
-     */
-    function jtConvertTrancheUnitsToNAVUnits(TRANCHE_UNIT _jtAssets) public view virtual returns (NAV_UNIT);
+    /// @inheritdoc IRoycoKernel
+    function jtConvertTrancheUnitsToNAVUnits(TRANCHE_UNIT _jtAssets) public view virtual override(IRoycoKernel) returns (NAV_UNIT);
 
-    /**
-     * @notice Converts the specified assets denominated in the kernel's NAV units to assets denominated in ST's tranche units
-     * @param _navAssets The NAV of the assets denominated in the kernel's NAV units to convert to assets denominated in ST's tranche units
-     * @return The specified NAV of the assets denominated in the kernel's NAV units converted to assets denominated in ST's tranche units
-     */
-    function stConvertNAVUnitsToTrancheUnits(NAV_UNIT _navAssets) public view virtual returns (TRANCHE_UNIT);
+    /// @inheritdoc IRoycoKernel
+    function stConvertNAVUnitsToTrancheUnits(NAV_UNIT _navAssets) public view virtual override(IRoycoKernel) returns (TRANCHE_UNIT);
 
-    /**
-     * @notice Converts the specified assets denominated in the kernel's NAV units to assets denominated in JT's tranche units
-     * @param _navAssets The NAV of the assets denominated in the kernel's NAV units to convert to assets denominated in JT's tranche units
-     * @return The specified NAV of the assets denominated in the kernel's NAV units converted to assets denominated in JT's tranche units
-     */
-    function jtConvertNAVUnitsToTrancheUnits(NAV_UNIT _navAssets) public view virtual returns (TRANCHE_UNIT);
+    /// @inheritdoc IRoycoKernel
+    function jtConvertNAVUnitsToTrancheUnits(NAV_UNIT _navAssets) public view virtual override(IRoycoKernel) returns (TRANCHE_UNIT);
 
-    /**
-     * @notice Synchronizes and persists the raw and effective NAVs of both tranches
-     * @dev Only executes a pre-op sync because there is no operation being executed in the same call as this sync
-     * @return state The synced NAV, debt, and fee accounting containing all mark to market accounting data
-     */
+    /// @inheritdoc IRoycoKernel
     function syncTrancheAccounting() external override(IRoycoKernel) restricted returns (SyncedAccountingState memory state) {
         // Execute a pre-op accounting sync via the accountant
         return _preOpSyncTrancheAccounting();
     }
 
-    /**
-     * @notice Previews a synchronization of the raw and effective NAVs of both tranches
-     * @dev Does not mutate any state
-     * @param _trancheType An enum indicating which tranche to execute this preview for
-     * @return state The synced NAV, debt, and fee accounting containing all mark to market accounting data
-     * @return claims The claims on ST and JT assets that the specified tranche has denominated in tranche-native units
-     */
+    /// @inheritdoc IRoycoKernel
     function previewSyncTrancheAccounting(TrancheType _trancheType)
         public
         view
@@ -263,10 +236,11 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
      * @notice Invokes the accountant to do a post-operation (deposit and withdrawal) NAV sync and checks the market's coverage requirement is satisfied
      * @dev Should be called on every NAV mutating user operation that requires a coverage check: ST deposit and JT withdrawal
      * @param _op The operation being executed in between the pre and post synchronizations
+     * @return state The synced NAV, debt, and fee accounting containing all mark to market accounting data
      */
-    function _postOpSyncTrancheAccountingAndEnforceCoverage(Operation _op) internal {
+    function _postOpSyncTrancheAccountingAndEnforceCoverage(Operation _op) internal returns (SyncedAccountingState memory state) {
         // Execute the post-op sync on the accountant
-        _accountant().postOpSyncTrancheAccountingAndEnforceCoverage(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV(), _op);
+        return _accountant().postOpSyncTrancheAccountingAndEnforceCoverage(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV(), _op);
     }
 
     /**
