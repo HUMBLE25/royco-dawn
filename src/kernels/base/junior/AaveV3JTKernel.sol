@@ -7,13 +7,15 @@ import { IPool } from "../../../interfaces/aave/IPool.sol";
 import { IPoolAddressesProvider } from "../../../interfaces/aave/IPoolAddressesProvider.sol";
 import { IPoolDataProvider } from "../../../interfaces/aave/IPoolDataProvider.sol";
 import { ExecutionModel, IRoycoKernel } from "../../../interfaces/kernel/IRoycoKernel.sol";
-import { NAV_UNIT, TRANCHE_UNIT } from "../../../libraries/Units.sol";
+import { ZERO_TRANCHE_UNITS } from "../../../libraries/Constants.sol";
+import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib, toTrancheUnits, toUint256 } from "../../../libraries/Units.sol";
 import { AaveV3KernelState, AaveV3KernelStorageLib } from "../../../libraries/kernels/AaveV3KernelStorageLib.sol";
-import { Operation, RoycoKernel, SyncedAccountingState, TrancheAssetClaims } from "../RoycoKernel.sol";
+import { Operation, RoycoKernel, SyncedAccountingState, TrancheAssetClaims, TrancheType } from "../RoycoKernel.sol";
 import { BaseAsyncJTRedemptionDelayKernel } from "./BaseAsyncJTRedemptionDelayKernel.sol";
 
 abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKernel {
     using SafeERC20 for IERC20;
+    using UnitsMathLib for TRANCHE_UNIT;
     using Math for uint256;
 
     /// @inheritdoc IRoycoKernel
@@ -58,11 +60,13 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
         returns (NAV_UNIT valueAllocated, NAV_UNIT navToMintAt)
     {
         // Execute a pre-op sync on accounting
-        valueAllocated = _assets;
+        valueAllocated = jtConvertTrancheUnitsToNAVUnits(_assets);
         navToMintAt = (_preOpSyncTrancheAccounting()).jtEffectiveNAV;
 
         // Max approval already given to the pool on initialization
-        IPool(AaveV3KernelStorageLib._getAaveV3KernelStorage().pool).supply(_asset, _assets, address(this), 0);
+        IPool(AaveV3KernelStorageLib._getAaveV3KernelStorage().pool).supply(
+            AaveV3KernelStorageLib._getAaveV3KernelStorage().asset, toUint256(_assets), address(this), 0
+        );
 
         // Execute a post-op sync on accounting
         _postOpSyncTrancheAccounting(Operation.JT_INCREASE_NAV);
@@ -80,39 +84,45 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
         returns (TrancheAssetClaims memory claims)
     {
         // Execute a pre-op sync on accounting
-        (SyncedAccountingState memory state, TrancheAssetClaims memory claims, uint256 totalTrancheShares) = _preOpSyncTrancheAccounting(TrancheType.JUNIOR);
+        SyncedAccountingState memory state;
+        uint256 totalTrancheShares;
+        (state, claims, totalTrancheShares) = _preOpSyncTrancheAccounting(TrancheType.JUNIOR);
 
         // Ensure that the shares to redeem are actually claimable right now
         require(_shares <= _jtClaimableRedeemRequest(_controller), INSUFFICIENT_CLAIMABLE_SHARES(_shares, _jtClaimableRedeemRequest(_controller)));
-        // Calculate the value of the shares to claim and update the controller's redemption request
-        assetsWithdrawn = _processClaimableRedeemRequest(_controller, state.jtEffectiveNAV, _shares, totalTrancheShares);
 
-        // Compute and claim the assets that need to be pulled from ST for this withdrawal, rounding in favor of the senior tranche
-        uint256 stAssetsToWithdraw = _shares.mulDiv(totalJTClaimOnSTAssets, _totalShares, Math.Rounding.Floor);
-        if (stAssetsToWithdraw != 0) _claimJuniorAssetsFromSenior(_asset, stAssetsToWithdraw, _receiver);
+        // Get the total NAV to withdraw on this redemption
+        NAV_UNIT navToWithdraw = _processClaimableRedeemRequest(_controller, state.jtEffectiveNAV, _shares, totalTrancheShares);
 
-        // // Facilitate the remainder of the withdrawal from JT exposure
-        // IPool(AaveV3KernelStorageLib._getAaveV3KernelStorage().pool).withdraw(_asset, (assetsWithdrawn - stAssetsToWithdraw), _receiver);
+        // Compute the ST assets to withdraw and claim them
+        claims.stAssets = claims.stAssets.mulDiv(navToWithdraw, state.jtEffectiveNAV, Math.Rounding.Floor);
+        if (claims.stAssets != ZERO_TRANCHE_UNITS) _withdrawSTAssets(claims.stAssets, _receiver);
 
-        // // Execute a post-op sync on NAV accounting and enforce the market's coverage requirement
-        // _postOpSyncTrancheAccountingAndEnforceCoverage(Operation.JT_DECREASE_NAV);
+        // Facilitate the remainder of the withdrawal from JT exposure
+        claims.jtAssets = claims.jtAssets.mulDiv(navToWithdraw, state.jtEffectiveNAV, Math.Rounding.Floor);
+        if (claims.jtAssets != ZERO_TRANCHE_UNITS) _withdrawJTAssets(claims.jtAssets, _receiver);
+
+        // Execute a post-op sync on NAV accounting and enforce the market's coverage requirement
+        _postOpSyncTrancheAccountingAndEnforceCoverage(Operation.JT_DECREASE_NAV);
     }
 
     /// @inheritdoc RoycoKernel
-    function _claimSeniorAssetsFromJunior(address _asset, uint256 _assets, address _receiver) internal override(RoycoKernel) {
-        IPool(AaveV3KernelStorageLib._getAaveV3KernelStorage().pool).withdraw(_asset, _assets, _receiver);
+    function _withdrawJTAssets(TRANCHE_UNIT _jtAssets, address _receiver) internal override(RoycoKernel) {
+        IPool(AaveV3KernelStorageLib._getAaveV3KernelStorage().pool).withdraw(
+            AaveV3KernelStorageLib._getAaveV3KernelStorage().asset, toUint256(_jtAssets), _receiver
+        );
     }
 
-    /// @inheritdoc RoycoKernel
-    function _getJuniorTrancheRawNAV() internal view override(RoycoKernel) returns (uint256) {
-        // The tranche's balance of the AToken is the total assets it is owed from the Aave pool
-        /// @dev This does not treat illiquidity in the Aave pool as a loss: we assume that total lent will be withdrawable at some point
-        AaveV3KernelState storage $ = AaveV3KernelStorageLib._getAaveV3KernelStorage();
-        return IERC20($.aToken).balanceOf(address(this));
-    }
+    // /// @inheritdoc RoycoKernel
+    // function _getJuniorTrancheRawNAV() internal view override(RoycoKernel) returns (NAV_UNIT) {
+    //     // The tranche's balance of the AToken is the total assets it is owed from the Aave pool
+    //     /// @dev This does not treat illiquidity in the Aave pool as a loss: we assume that total lent will be withdrawable at some point
+    //     AaveV3KernelState storage $ = AaveV3KernelStorageLib._getAaveV3KernelStorage();
+    //     return IERC20($.aToken).balanceOf(address(this));
+    // }
 
     /// @inheritdoc RoycoKernel
-    function _maxJTDepositGlobally(address) internal view override(RoycoKernel) returns (uint256) {
+    function _jtMaxAssetDepositGlobally(address) internal view override(RoycoKernel) returns (TRANCHE_UNIT) {
         // Retrieve the Pool's data provider and asset
         AaveV3KernelState storage $ = AaveV3KernelStorageLib._getAaveV3KernelStorage();
         IPoolDataProvider poolDataProvider = IPoolDataProvider(IPoolAddressesProvider($.poolAddressesProvider).getPoolDataProvider());
@@ -120,11 +130,11 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
 
         // If the reserve asset is inactive, frozen, or paused, supplies are forbidden
         (uint256 decimals,,,,,,,, bool isActive, bool isFrozen) = poolDataProvider.getReserveConfigurationData(asset);
-        if (!isActive || isFrozen || poolDataProvider.getPaused(asset)) return 0;
+        if (!isActive || isFrozen || poolDataProvider.getPaused(asset)) return ZERO_TRANCHE_UNITS;
 
         // Get the supply cap for the reserve asset. If unset, the suppliable amount is unbounded
         (, uint256 supplyCap) = poolDataProvider.getReserveCaps(asset);
-        if (supplyCap == 0) return type(uint256).max;
+        if (supplyCap == 0) return toTrancheUnits(type(uint256).max);
 
         // Compute the total reserve assets supplied and accrued to the treasury
         (, uint256 totalAccruedToTreasury, uint256 totalLent,,,,,,,,,) = poolDataProvider.getReserveData(asset);
@@ -133,11 +143,11 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
         supplyCap = supplyCap * (10 ** decimals);
 
         // If supply cap hit, no incremental supplies are permitted. Else, return the max suppliable amount within the cap.
-        return (currentlySupplied >= supplyCap) ? 0 : (supplyCap - currentlySupplied);
+        return toTrancheUnits((currentlySupplied >= supplyCap) ? 0 : (supplyCap - currentlySupplied));
     }
 
     /// @inheritdoc RoycoKernel
-    function _maxJTWithdrawalGlobally(address) internal view override(RoycoKernel) returns (uint256) {
+    function _maxJTWithdrawalGlobally(address) internal view override(RoycoKernel) returns (TRANCHE_UNIT) {
         // Retrieve the Pool's data provider and asset
         AaveV3KernelState storage $ = AaveV3KernelStorageLib._getAaveV3KernelStorage();
         IPoolDataProvider poolDataProvider = IPoolDataProvider(IPoolAddressesProvider($.poolAddressesProvider).getPoolDataProvider());
@@ -145,9 +155,9 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
 
         // If the reserve asset is inactive or paused, withdrawals are forbidden
         (,,,,,,,, bool isActive,) = poolDataProvider.getReserveConfigurationData(asset);
-        if (!isActive || poolDataProvider.getPaused(asset)) return 0;
+        if (!isActive || poolDataProvider.getPaused(asset)) return ZERO_TRANCHE_UNITS;
 
         // Return the minimum of the assets lent by the JT and the total idle/unborrowed reserve assets (currently withdrawable from the pool)
-        return Math.min(_getJuniorTrancheRawNAV(), IERC20(asset).balanceOf($.aToken));
+        return toTrancheUnits(IERC20(asset).balanceOf($.aToken));
     }
 }

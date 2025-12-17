@@ -363,18 +363,16 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     function _maxJTWithdrawalGlobally(address _owner) internal view virtual returns (TRANCHE_UNIT);
 
     /**
-     * @notice Covers senior tranche losses from the junior tranche's controlled assets
-     * @param _asset The asset to cover losses in
-     * @param _nav The NAV to claim from JT to ST
-     * @param _receiver The receiver of the assets
+     * @notice Withdraws ST assets to the specified receiver
+     * @param _stAssets The ST assets denominated in its tranche units to withdraw to the receiver
+     * @param _receiver The receiver of the ST assets
      */
-    function _claimSeniorNAVFromJunior(address _asset, NAV_UNIT _nav, address _receiver) internal virtual;
+    function _withdrawSTAssets(TRANCHE_UNIT _stAssets, address _receiver) internal virtual;
 
     /**
-     * @notice Claims junior tranche yield and debt repayment from the senior tranche's controlled assets
-     * @param _asset The asset to claim yield and debt repayment in
-     * @param _nav The NAV to claim from S to ST
-     * @param _receiver The receiver of the assets
+     * @notice Withdraws JT assets to the specified receiver
+     * @param _jtAssets The JT assets denominated in its tranche units to withdraw to the receiver
+     * @param _receiver The receiver of the JT assets
      */
-    function _claimJuniorNAVFromSenior(address _asset, NAV_UNIT _nav, address _receiver) internal virtual;
+    function _withdrawJTAssets(TRANCHE_UNIT _jtAssets, address _receiver) internal virtual;
 }
