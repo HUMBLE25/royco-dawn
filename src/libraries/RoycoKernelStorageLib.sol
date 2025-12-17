@@ -35,7 +35,7 @@ struct RoycoKernelState {
 library RoycoKernelStorageLib {
     /// @dev Storage slot for RoycoKernelState using ERC-7201 pattern
     // keccak256(abi.encode(uint256(keccak256("Royco.storage.RoycoKernelState")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant BASE_KERNEL_STORAGE_SLOT = 0x0e1123d8194dcf603de811512b2b6334f106b53313663d6b2df1a2b814038e00;
+    bytes32 private constant BASE_KERNEL_STORAGE_SLOT = 0xf8fc0d016168fef0a165a086b5a5dc3ffa533689ceaf1369717758ae5224c600;
 
     /// @notice Returns a storage pointer to the RoycoKernelState storage
     /// @dev Uses ERC-7201 storage slot pattern for collision-resistant storage

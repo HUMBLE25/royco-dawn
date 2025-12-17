@@ -18,7 +18,7 @@ struct ERC7540KernelState {
 library ERC7540KernelStorageLib {
     /// @dev Storage slot for ERC7540KernelState using ERC-7201 pattern
     // keccak256(abi.encode(uint256(keccak256("Royco.storage.ERC7540KernelState")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant ERC7540_KERNEL_STORAGE_SLOT = 0xf6ffdef339f66397e33108678ec67b03203354b5f8acd2b5f86364018df63000;
+    bytes32 private constant ERC7540_KERNEL_STORAGE_SLOT = 0xdaa5bb55f16aaf200370cbb7df50dfda60f81e43dd25b2fc364686fc0ca800;
 
     /// @notice Returns a storage pointer to the ERC7540KernelState storage
     /// @dev Uses ERC-7201 storage slot pattern for collision-resistant storage

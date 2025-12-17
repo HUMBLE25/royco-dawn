@@ -15,16 +15,19 @@ import { ERC4626ST_AaveV3JT_Kernel } from "../../src/kernels/ERC4626ST_AaveV3JT_
 import { RoycoKernel } from "../../src/kernels/base/RoycoKernel.sol";
 import { RoycoAccountantInitParams } from "../../src/libraries/RoycoAccountantStorageLib.sol";
 import { RoycoKernelInitParams } from "../../src/libraries/RoycoKernelStorageLib.sol";
+import { TrancheAssetClaims } from "../../src/libraries/Types.sol";
+import { NAV_UNIT, TRANCHE_UNIT } from "../../src/libraries/Units.sol";
 import { RoycoJT } from "../../src/tranches/RoycoJT.sol";
 import { RoycoST } from "../../src/tranches/RoycoST.sol";
 import { RoycoVaultTranche } from "../../src/tranches/RoycoVaultTranche.sol";
 
 contract BaseTest is Test, RoycoRoles {
     struct TrancheState {
-        uint256 rawNAV;
-        uint256 effectiveNAV;
-        uint256 totalEffectiveAssets;
-        uint256 protocolFeeValue;
+        NAV_UNIT rawNAV;
+        NAV_UNIT effectiveNAV;
+        TRANCHE_UNIT stAssetsClaim;
+        TRANCHE_UNIT jtAssetsClaim;
+        NAV_UNIT protocolFeeValue;
         uint256 totalShares;
     }
 
@@ -269,11 +272,16 @@ contract BaseTest is Test, RoycoRoles {
         assertTrue(address(JT) != address(0), "Junior tranche is not deployed");
 
         assertApproxEqAbs(ST.getRawNAV(), _stState.rawNAV, _maxAbsDelta, "ST raw NAV mismatch");
-        assertApproxEqAbs(ST.getEffectiveNAV(), _stState.effectiveNAV, _maxAbsDelta, "ST effective NAV mismatch");
-        assertApproxEqAbs(ST.totalAssets(), _stState.totalEffectiveAssets, _maxAbsDelta, "ST total effective ASSETS mismatch");
+        TrancheAssetClaims memory stClaims = ST.totalAssets();
+        assertApproxEqAbs(stClaims.effectiveNAV, _stState.effectiveNAV, _maxAbsDelta, "ST effective NAV mismatch");
+        assertApproxEqAbs(stClaims.stAssets, _stState.stAssetsClaim, _maxAbsDelta, "ST st assets claim mismatch");
+        assertApproxEqAbs(stClaims.jtAssets, _stState.jtAssetsClaim, _maxAbsDelta, "ST jt assets claim mismatch");
 
         assertApproxEqAbs(JT.getRawNAV(), _jtState.rawNAV, _maxAbsDelta, "JT raw NAV mismatch");
-        assertApproxEqAbs(JT.getEffectiveNAV(), _jtState.effectiveNAV, _maxAbsDelta, "JT effective NAV mismatch");
+        TrancheAssetClaims memory jtClaims = JT.totalAssets();
+        assertApproxEqAbs(jtClaims.effectiveNAV, _jtState.effectiveNAV, _maxAbsDelta, "JT effective NAV mismatch");
+        assertApproxEqAbs(jtClaims.stAssets, _jtState.stAssetsClaim, _maxAbsDelta, "JT st assets claim mismatch");
+        assertApproxEqAbs(jtClaims.jtAssets, _jtState.jtAssetsClaim, _maxAbsDelta, "JT jt assets claim mismatch");
         assertApproxEqAbs(JT.totalAssets(), _jtState.totalEffectiveAssets, _maxAbsDelta, "JT total effective ASSETS mismatch");
     }
 
@@ -295,21 +303,46 @@ contract BaseTest is Test, RoycoRoles {
     /// @param _trancheState The state of the tranche
     /// @param _assets The amount of ASSETS deposited
     /// @param _assetsValue The value of the ASSETS deposited
-    function _updateOnDeposit(TrancheState storage _trancheState, uint256 _assets, uint256 _assetsValue, uint256 _shares) internal {
-        _trancheState.rawNAV += _assetsValue;
-        _trancheState.effectiveNAV += _assetsValue;
-        _trancheState.totalEffectiveAssets += _assets;
+    /// @param _shares The amount of shares deposited
+    /// @param _trancheType The type of tranche
+    function _updateOnDeposit(
+        TrancheState storage _trancheState,
+        TRANCHE_UNIT _assets,
+        NAV_UNIT _assetsValue,
+        uint256 _shares,
+        TrancheType _trancheType
+    )
+        internal
+    {
+        _trancheState.rawNAV = _trancheState.rawNAV + _assetsValue;
+        _trancheState.effectiveNAV = _trancheState.effectiveNAV + _assetsValue;
+        if (_trancheType == TrancheType.SENIOR) {
+            _trancheState.stAssetsClaim = _trancheState.stAssetsClaim + _assets;
+        } else {
+            _trancheState.jtAssetsClaim = _trancheState.jtAssetsClaim + _assets;
+        }
         _trancheState.totalShares += _shares;
     }
 
     /// @notice Updates the state of the senior and junior tranches on a withdrawal
     /// @param _trancheState The state of the tranche
-    /// @param _assets The amount of ASSETS withdrawn
-    /// @param _assetsValue The value of the ASSETS withdrawn
-    function _updateOnWithdraw(TrancheState storage _trancheState, uint256 _assets, uint256 _assetsValue, uint256 _shares) internal {
-        _trancheState.rawNAV -= _assetsValue;
-        _trancheState.effectiveNAV -= _assetsValue;
-        _trancheState.totalEffectiveAssets -= _assets;
+    /// @param _stAssetsWithdrawn The amount of ST assets withdrawn
+    /// @param _jtAssetsWithdrawn The amount of JT assets withdrawn
+    /// @param _totalAssetsValueWithdrawn The value of the ASSETS withdrawn
+    /// @param _shares The amount of shares withdrawn
+    function _updateOnWithdraw(
+        TrancheState storage _trancheState,
+        TRANCHE_UNIT _stAssetsWithdrawn,
+        TRANCHE_UNIT _jtAssetsWithdrawn,
+        NAV_UNIT _totalAssetsValueWithdrawn,
+        uint256 _shares
+    )
+        internal
+    {
+        _trancheState.rawNAV -= _totalAssetsValueWithdrawn;
+        _trancheState.effectiveNAV -= _totalAssetsValueWithdrawn;
+        _trancheState.stAssetsClaim -= _stAssetsWithdrawn;
+        _trancheState.jtAssetsClaim -= _jtAssetsWithdrawn;
         _trancheState.totalShares -= _shares;
     }
 

@@ -62,7 +62,7 @@ struct RoycoAccountantState {
 library RoycoAccountantStorageLib {
     /// @dev Storage slot for RoycoAccountantState using ERC-7201 pattern
     // keccak256(abi.encode(uint256(keccak256("Royco.storage.RoycoAccountantState")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant ROYCO_ACCOUNTANT_STORAGE_SLOT = 0x0e1123d8194dcf603de811512b2b6334f106b53313663d6b2df1a2b814038e00;
+    bytes32 private constant ROYCO_ACCOUNTANT_STORAGE_SLOT = 0xc8240830e1172c6f1489139d8edb11776c3d3b2f893e3f4ce0fb541305a63a00;
 
     /// @notice Returns a storage pointer to the RoycoAccountantState storage
     /// @dev Uses ERC-7201 storage slot pattern for collision-resistant storage
