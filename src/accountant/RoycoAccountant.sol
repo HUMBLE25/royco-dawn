@@ -497,12 +497,11 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         return RoycoAccountantStorageLib._getRoycoAccountantStorage();
     }
 
-    /// @notice Validates the coverage requirement parameters of the market
-    /// @param _coverageWAD The coverage ratio that the senior tranche is expected to be protected by, scaled to WAD precision
-    /// @param _betaWAD The JT's sensitivity to the same downside stress that affects ST, scaled to WAD precision
-    /// @dev Ensures coverage is within bounds and prevents JT withdrawal lockup
-    /// @dev Coverage must be >= MIN_COVERAGE_WAD and < WAD to maintain valid range
-    /// @dev The product of coverage and beta must be < WAD to prevent permanent withdrawal blocking
+    /**
+     * @notice Validates the coverage requirement parameters of the market
+     * @param _coverageWAD The coverage ratio that the senior tranche is expected to be protected by, scaled to WAD precision
+     * @param _betaWAD The JT's sensitivity to the same downside stress that affects ST, scaled to WAD precisiong
+     */
     function _validateCoverageRequirement(uint64 _coverageWAD, uint96 _betaWAD) internal pure {
         // Ensure that the coverage requirement is valid
         require((_coverageWAD >= MIN_COVERAGE_WAD) && (_coverageWAD < WAD), INVALID_COVERAGE_CONFIG());

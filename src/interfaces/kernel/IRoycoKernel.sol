@@ -82,18 +82,18 @@ interface IRoycoKernel {
         view
         returns (SyncedAccountingState memory state, TrancheAssetClaims memory claims);
 
-    function stMaxAssetsDeposit(address _receiver) external view returns (TRANCHE_UNIT assets);
+    function stMaxDeposit(address _receiver) external view returns (TRANCHE_UNIT assets);
 
-    function stMaxWithdrawableNAV(address _owner) external view returns (NAV_UNIT maxWithdrawableNAV);
+    function stMaxWithdrawable(address _owner) external view returns (NAV_UNIT maxWithdrawableNAV);
 
     // Assumes that the funds are transferred to the kernel before the deposit call is made
     function stDeposit(TRANCHE_UNIT _assets, address _caller, address _receiver) external returns (NAV_UNIT valueAllocated, NAV_UNIT navToMintAt);
 
     function stRedeem(uint256 _shares, address _controller, address _receiver) external returns (TrancheAssetClaims memory claims);
 
-    function jtMaxAssetsDeposit(address _receiver) external view returns (TRANCHE_UNIT assets);
+    function jtMaxDeposit(address _receiver) external view returns (TRANCHE_UNIT assets);
 
-    function jtMaxWithdrawableNAV(address _owner) external view returns (NAV_UNIT maxWithdrawableNAV);
+    function jtMaxWithdrawable(address _owner) external view returns (NAV_UNIT maxWithdrawableNAV);
 
     // Assumes that the funds are transferred to the kernel before the deposit call is made
     function jtDeposit(TRANCHE_UNIT _assets, address _caller, address _receiver) external returns (NAV_UNIT valueAllocated, NAV_UNIT navToMintAt);

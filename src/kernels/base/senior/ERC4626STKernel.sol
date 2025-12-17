@@ -84,11 +84,11 @@ abstract contract ERC4626STKernel is RoycoKernel {
 
         // Compute the JT assets to claim and withdraw them
         claims.jtAssets = claims.jtAssets.mulDiv(_shares, totalTrancheShares, Math.Rounding.Floor);
-        if (claims.jtAssets != ZERO_TRANCHE_UNITS) _withdrawJTAssets(claims.jtAssets, _receiver);
+        if (claims.jtAssets != ZERO_TRANCHE_UNITS) _jtWithdrawAssets(claims.jtAssets, _receiver);
 
         // Compute the ST assets to claim and withdraw them
         claims.stAssets = claims.stAssets.mulDiv(_shares, totalTrancheShares, Math.Rounding.Floor);
-        if (claims.stAssets != ZERO_TRANCHE_UNITS) _withdrawSTAssets(claims.stAssets, _receiver);
+        if (claims.stAssets != ZERO_TRANCHE_UNITS) _stWithdrawAssets(claims.stAssets, _receiver);
 
         // Execute a post-op sync on accounting
         _postOpSyncTrancheAccounting(Operation.ST_DECREASE_NAV);
@@ -96,27 +96,27 @@ abstract contract ERC4626STKernel is RoycoKernel {
 
     /// @inheritdoc RoycoKernel
     function _getSeniorTrancheRawNAV() internal view override(RoycoKernel) returns (NAV_UNIT) {
-        // Must use preview redeem for the tranche owned shares
-        // Max withdraw will mistake illiquidity for NAV losses
+        // Must use convert to assets for the tranche owned shares in order to be exlusive of any fixed fees on withdrawal
+        // Cannot use max withdraw since it will mistake illiquidity for NAV losses
         address vault = ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault;
         uint256 trancheSharesBalance = IERC4626(vault).balanceOf(address(this));
-        return _stConvertTrancheUnitsToNAVUnits(toTrancheUnits(IERC4626(vault).previewRedeem(trancheSharesBalance)));
+        return _stConvertTrancheUnitsToNAVUnits(toTrancheUnits(IERC4626(vault).convertToAssets(trancheSharesBalance)));
     }
 
     /// @inheritdoc RoycoKernel
-    function _maxSTDepositGlobally(address) internal view override(RoycoKernel) returns (TRANCHE_UNIT) {
+    function _stMaxDepositGlobally(address) internal view override(RoycoKernel) returns (TRANCHE_UNIT) {
         // Max deposit takes global withdrawal limits into account
         return toTrancheUnits(IERC4626(ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault).maxDeposit(address(this)));
     }
 
     /// @inheritdoc RoycoKernel
-    function _maxSTWithdrawalGlobally(address) internal view override(RoycoKernel) returns (TRANCHE_UNIT) {
+    function _stMaxWithdrawableGlobally(address) internal view override(RoycoKernel) returns (TRANCHE_UNIT) {
         // Max withdraw takes global withdrawal limits into account
         return toTrancheUnits(IERC4626(ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault).maxWithdraw(address(this)));
     }
 
     /// @inheritdoc RoycoKernel
-    function _withdrawSTAssets(TRANCHE_UNIT _stAssets, address _receiver) internal override(RoycoKernel) {
+    function _stWithdrawAssets(TRANCHE_UNIT _stAssets, address _receiver) internal override(RoycoKernel) {
         IERC4626(ERC4626STKernelStorageLib._getERC4626STKernelStorage().vault).withdraw(toUint256(_stAssets), _receiver, address(this));
     }
 }

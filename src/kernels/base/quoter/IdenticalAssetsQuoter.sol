@@ -10,7 +10,7 @@ import { RoycoKernel } from "../RoycoKernel.sol";
  * @notice Quoter for markets where both tranches use the same unit precision and the NAV is expressed in tranche units
  * @dev Supported use-cases include:
  *      - ST and JT share the exact same tranche asset and the NAV is expressed in that asset
- *      - ST and JT use in kind assets that share the same precision and are treated as pegged to each other
+ *      - ST and JT use in kind assets that share the same precision
  *        For example, USDC and USDT where NAV is expressed in USD with 6 decimals of precision
  */
 abstract contract IdenticalAssetsQuoter is RoycoKernel {

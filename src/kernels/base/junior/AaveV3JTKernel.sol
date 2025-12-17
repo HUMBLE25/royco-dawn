@@ -99,11 +99,11 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
 
         // Compute the ST assets to claim and withdraw them
         claims.stAssets = claims.stAssets.mulDiv(navToWithdraw, state.jtEffectiveNAV, Math.Rounding.Floor);
-        if (claims.stAssets != ZERO_TRANCHE_UNITS) _withdrawSTAssets(claims.stAssets, _receiver);
+        if (claims.stAssets != ZERO_TRANCHE_UNITS) _stWithdrawAssets(claims.stAssets, _receiver);
 
         // Compute the JT assets to claim and withdraw them
         claims.jtAssets = claims.jtAssets.mulDiv(navToWithdraw, state.jtEffectiveNAV, Math.Rounding.Floor);
-        if (claims.jtAssets != ZERO_TRANCHE_UNITS) _withdrawJTAssets(claims.jtAssets, _receiver);
+        if (claims.jtAssets != ZERO_TRANCHE_UNITS) _jtWithdrawAssets(claims.jtAssets, _receiver);
 
         // Execute a post-op sync on accounting and enforce the market's coverage requirement
         _postOpSyncTrancheAccountingAndEnforceCoverage(Operation.JT_DECREASE_NAV);
@@ -117,7 +117,7 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
     }
 
     /// @inheritdoc RoycoKernel
-    function _jtMaxAssetDepositGlobally(address) internal view override(RoycoKernel) returns (TRANCHE_UNIT) {
+    function _jtMaxDepositGlobally(address) internal view override(RoycoKernel) returns (TRANCHE_UNIT) {
         // Retrieve the Pool's data provider and asset
         IPoolDataProvider poolDataProvider =
             IPoolDataProvider(IPoolAddressesProvider(AaveV3KernelStorageLib._getAaveV3KernelStorage().poolAddressesProvider).getPoolDataProvider());
@@ -171,7 +171,7 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
     }
 
     /// @inheritdoc RoycoKernel
-    function _maxJTWithdrawalGlobally(address) internal view override(RoycoKernel) returns (TRANCHE_UNIT) {
+    function _jtMaxWithdrawableGlobally(address) internal view override(RoycoKernel) returns (TRANCHE_UNIT) {
         // Retrieve the Pool's data provider and asset
         AaveV3KernelState storage $ = AaveV3KernelStorageLib._getAaveV3KernelStorage();
         IPoolDataProvider poolDataProvider = IPoolDataProvider(IPoolAddressesProvider($.poolAddressesProvider).getPoolDataProvider());
@@ -186,7 +186,7 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
     }
 
     /// @inheritdoc RoycoKernel
-    function _withdrawJTAssets(TRANCHE_UNIT _jtAssets, address _receiver) internal override(RoycoKernel) {
+    function _jtWithdrawAssets(TRANCHE_UNIT _jtAssets, address _receiver) internal override(RoycoKernel) {
         IPool(AaveV3KernelStorageLib._getAaveV3KernelStorage().pool).withdraw(
             RoycoKernelStorageLib._getRoycoKernelStorage().jtAsset, toUint256(_jtAssets), _receiver
         );

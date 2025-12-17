@@ -75,24 +75,34 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     }
 
     /// @inheritdoc IRoycoKernel
-    function stMaxAssetsDeposit(address _receiver) external view override(IRoycoKernel) returns (TRANCHE_UNIT) {
-        NAV_UNIT stMaxAssetsDepositableNAV = _accountant().maxSTDepositGivenCoverage(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV());
-        return UnitsMathLib.min(_maxSTDepositGlobally(_receiver), _stConvertNAVUnitsToTrancheUnits(stMaxAssetsDepositableNAV));
+    function stMaxDeposit(address _receiver) external view override(IRoycoKernel) returns (TRANCHE_UNIT) {
+        NAV_UNIT stMaxDepositableNAV = previewSyncTrancheAccounting(_trancheType);
+        return UnitsMathLib.min(_stMaxDepositGlobally(_receiver), _stConvertNAVUnitsToTrancheUnits(stMaxDepositableNAV));
     }
 
     /// @inheritdoc IRoycoKernel
-    function stMaxWithdrawableNAV(address) external view override(IRoycoKernel) returns (NAV_UNIT) {
-        // TODO: account for liq constraints
-        return _accountant().previewSyncTrancheAccounting(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV()).stEffectiveNAV;
+    function stMaxWithdrawable(address _owner)
+        external
+        view
+        override(IRoycoKernel)
+        returns (SyncedAccountingState memory state, TrancheAssetClaims memory stNotionalClaims, TrancheAssetClaims memory stMaxClaims)
+    {
+        // Get the total claims the senior tranche has on each tranche's assets
+        (state, stNotionalClaims) = previewSyncTrancheAccounting(TrancheType.SENIOR);
+
+        // Bound the claims by the max withdrawable assets globally for each tranche and compute the cumulative NAV
+        stMaxClaims.stAssets = _stMaxWithdrawableGlobally(_owner);
+        stMaxClaims.jtAssets = _jtMaxWithdrawableGlobally(_owner);
+        stMaxClaims.effectiveNAV = stConvertTrancheUnitsToNAVUnits(stMaxClaims.stAssets) + stConvertTrancheUnitsToNAVUnits(stMaxClaims.jtAssets);
     }
 
     /// @inheritdoc IRoycoKernel
-    function jtMaxAssetsDeposit(address _receiver) external view override(IRoycoKernel) returns (TRANCHE_UNIT) {
-        return _jtMaxAssetDepositGlobally(_receiver);
+    function jtMaxDeposit(address _receiver) external view override(IRoycoKernel) returns (TRANCHE_UNIT) {
+        return _jtMaxDepositGlobally(_receiver);
     }
 
     /// @inheritdoc IRoycoKernel
-    function jtMaxWithdrawableNAV(address) external view override(IRoycoKernel) returns (NAV_UNIT) {
+    function jtMaxWithdrawable(address) external view override(IRoycoKernel) returns (NAV_UNIT) {
         // TODO: account for liq constraints
         return _accountant().maxJTWithdrawalGivenCoverage(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV());
     }
@@ -357,40 +367,40 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
      * @dev Implementation should consider protocol-wide limits and liquidity constraints
      * @param _receiver The receiver of the shares for the assets being deposited (used to enforce white/black lists)
      */
-    function _maxSTDepositGlobally(address _receiver) internal view virtual returns (TRANCHE_UNIT);
+    function _stMaxDepositGlobally(address _receiver) internal view virtual returns (TRANCHE_UNIT);
 
     /**
      * @notice Returns the maximum amount of assets that can be deposited into the junior tranche globally
      * @dev Implementation should consider protocol-wide limits and liquidity constraints
      * @param _receiver The receiver of the shares for the assets being deposited (used to enforce white/black lists)
      */
-    function _jtMaxAssetDepositGlobally(address _receiver) internal view virtual returns (TRANCHE_UNIT);
+    function _jtMaxDepositGlobally(address _receiver) internal view virtual returns (TRANCHE_UNIT);
 
     /**
      * @notice Returns the maximum amount of assets that can be withdrawn from the senior tranche globally
      * @dev Implementation should consider protocol-wide limits and liquidity constraints
      * @param _owner The owner of the assets being withdrawn (used to enforce white/black lists)
      */
-    function _maxSTWithdrawalGlobally(address _owner) internal view virtual returns (TRANCHE_UNIT);
+    function _stMaxWithdrawableGlobally(address _owner) internal view virtual returns (TRANCHE_UNIT);
 
     /**
      * @notice Returns the maximum amount of assets that can be withdrawn from the junior tranche globally
      * @dev Implementation should consider protocol-wide limits and liquidity constraints
      * @param _owner The owner of the assets being withdrawn (used to enforce white/black lists)
      */
-    function _maxJTWithdrawalGlobally(address _owner) internal view virtual returns (TRANCHE_UNIT);
+    function _jtMaxWithdrawableGlobally(address _owner) internal view virtual returns (TRANCHE_UNIT);
 
     /**
      * @notice Withdraws ST assets to the specified receiver
      * @param _stAssets The ST assets denominated in its tranche units to withdraw to the receiver
      * @param _receiver The receiver of the ST assets
      */
-    function _withdrawSTAssets(TRANCHE_UNIT _stAssets, address _receiver) internal virtual;
+    function _stWithdrawAssets(TRANCHE_UNIT _stAssets, address _receiver) internal virtual;
 
     /**
      * @notice Withdraws JT assets to the specified receiver
      * @param _jtAssets The JT assets denominated in its tranche units to withdraw to the receiver
      * @param _receiver The receiver of the JT assets
      */
-    function _withdrawJTAssets(TRANCHE_UNIT _jtAssets, address _receiver) internal virtual;
+    function _jtWithdrawAssets(TRANCHE_UNIT _jtAssets, address _receiver) internal virtual;
 }
