@@ -5,12 +5,13 @@ import { RoycoKernelState } from "../../libraries/RoycoKernelStorageLib.sol";
 import { ExecutionModel, RequestRedeemSharesBehavior, SyncedAccountingState, TrancheAssetClaims } from "../../libraries/Types.sol";
 import { TrancheType } from "../../libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT } from "../../libraries/Units.sol";
+import { IRoycoQuoter } from "./IRoycoQuoter.sol";
 
 /**
  * @title IRoycoKernel
  *
  */
-interface IRoycoKernel {
+interface IRoycoKernel is IRoycoQuoter {
     /// @notice Thrown when any of the required initialization params are null
     error NULL_ADDRESS();
 
@@ -36,34 +37,6 @@ interface IRoycoKernel {
     function getJTAssetClaims() external view returns (TrancheAssetClaims memory claims);
 
     /**
-     * @notice Converts the specified ST assets denominated in its tranche units to the kernel's NAV units
-     * @param _stAssets The ST assets denominated in tranche units to convert to the kernel's NAV units
-     * @return The specified ST assets denominated in its tranche units converted to the kernel's NAV units
-     */
-    function stConvertTrancheUnitsToNAVUnits(TRANCHE_UNIT _stAssets) external view returns (NAV_UNIT);
-
-    /**
-     * @notice Converts the specified JT assets denominated in its tranche units to the kernel's NAV units
-     * @param _jtAssets The JT assets denominated in tranche units to convert to the kernel's NAV units
-     * @return The specified JT assets denominated in its tranche units converted to the kernel's NAV units
-     */
-    function jtConvertTrancheUnitsToNAVUnits(TRANCHE_UNIT _jtAssets) external view returns (NAV_UNIT);
-
-    /**
-     * @notice Converts the specified assets denominated in the kernel's NAV units to assets denominated in ST's tranche units
-     * @param _navAssets The NAV of the assets denominated in the kernel's NAV units to convert to assets denominated in ST's tranche units
-     * @return The specified NAV of the assets denominated in the kernel's NAV units converted to assets denominated in ST's tranche units
-     */
-    function stConvertNAVUnitsToTrancheUnits(NAV_UNIT _navAssets) external view returns (TRANCHE_UNIT);
-
-    /**
-     * @notice Converts the specified assets denominated in the kernel's NAV units to assets denominated in JT's tranche units
-     * @param _navAssets The NAV of the assets denominated in the kernel's NAV units to convert to assets denominated in JT's tranche units
-     * @return The specified NAV of the assets denominated in the kernel's NAV units converted to assets denominated in JT's tranche units
-     */
-    function jtConvertNAVUnitsToTrancheUnits(NAV_UNIT _navAssets) external view returns (TRANCHE_UNIT);
-
-    /**
      * @notice Synchronizes and persists the raw and effective NAVs of both tranches
      * @dev Only executes a pre-op sync because there is no operation being executed in the same call as this sync
      * @return state The synced NAV, debt, and fee accounting containing all mark to market accounting data
@@ -77,7 +50,10 @@ interface IRoycoKernel {
      * @return state The synced NAV, debt, and fee accounting containing all mark to market accounting data
      * @return claims The claims on ST and JT assets that the specified tranche has denominated in tranche-native units
      */
-    function previewSyncTrancheAccounting(TrancheType _trancheType) external view returns (SyncedAccountingState memory state, TrancheAssetClaims memory claims);
+    function previewSyncTrancheAccounting(TrancheType _trancheType)
+        external
+        view
+        returns (SyncedAccountingState memory state, TrancheAssetClaims memory claims);
 
     function stMaxAssetsDeposit(address _receiver) external view returns (TRANCHE_UNIT assets);
 
