@@ -94,15 +94,15 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
         // Get the total NAV to withdraw on this redemption
         NAV_UNIT navToWithdraw = _processClaimableRedeemRequest(_controller, state.jtEffectiveNAV, _shares, totalTrancheShares);
 
-        // Compute the ST assets to withdraw and claim them
+        // Compute the ST assets to claim and withdraw them
         claims.stAssets = claims.stAssets.mulDiv(navToWithdraw, state.jtEffectiveNAV, Math.Rounding.Floor);
         if (claims.stAssets != ZERO_TRANCHE_UNITS) _withdrawSTAssets(claims.stAssets, _receiver);
 
-        // Facilitate the remainder of the withdrawal from JT exposure
+        // Compute the JT assets to claim and withdraw them
         claims.jtAssets = claims.jtAssets.mulDiv(navToWithdraw, state.jtEffectiveNAV, Math.Rounding.Floor);
         if (claims.jtAssets != ZERO_TRANCHE_UNITS) _withdrawJTAssets(claims.jtAssets, _receiver);
 
-        // Execute a post-op sync on NAV accounting and enforce the market's coverage requirement
+        // Execute a post-op sync on accounting and enforce the market's coverage requirement
         _postOpSyncTrancheAccountingAndEnforceCoverage(Operation.JT_DECREASE_NAV);
     }
 
