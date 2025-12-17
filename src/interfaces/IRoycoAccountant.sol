@@ -56,8 +56,9 @@ interface IRoycoAccountant {
      * @param _stRawNAV The senior tranche's current raw NAV: the pure value of its invested assets
      * @param _jtRawNAV The junior tranche's current raw NAV: the pure value of its invested assets
      * @param _op The operation being executed in between the pre and post synchronizations
+     * @return state The synced NAV, debt, and fee accounting containing all mark to market accounting data
      */
-    function postOpSyncTrancheAccounting(NAV_UNIT _stRawNAV, NAV_UNIT _jtRawNAV, Operation _op) external;
+    function postOpSyncTrancheAccounting(NAV_UNIT _stRawNAV, NAV_UNIT _jtRawNAV, Operation _op) external returns (SyncedAccountingState memory state);
 
     /**
      * @notice Applies post-operation (deposit and withdrawal) raw NAV deltas to effective NAV checkpoints and enforces the coverage condition of the market
@@ -66,8 +67,15 @@ interface IRoycoAccountant {
      * @param _stRawNAV The senior tranche's current raw NAV: the pure value of its invested assets
      * @param _jtRawNAV The junior tranche's current raw NAV: the pure value of its invested assets
      * @param _op The operation being executed in between the pre and post synchronizations
+     * @return state The synced NAV, debt, and fee accounting containing all mark to market accounting data
      */
-    function postOpSyncTrancheAccountingAndEnforceCoverage(NAV_UNIT _stRawNAV, NAV_UNIT _jtRawNAV, Operation _op) external;
+    function postOpSyncTrancheAccountingAndEnforceCoverage(
+        NAV_UNIT _stRawNAV,
+        NAV_UNIT _jtRawNAV,
+        Operation _op
+    )
+        external
+        returns (SyncedAccountingState memory state);
 
     /**
      * @notice Returns if the market’s coverage requirement is satisfied

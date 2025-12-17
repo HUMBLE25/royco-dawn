@@ -7,8 +7,9 @@ import { IPool } from "../../../interfaces/aave/IPool.sol";
 import { IPoolAddressesProvider } from "../../../interfaces/aave/IPoolAddressesProvider.sol";
 import { IPoolDataProvider } from "../../../interfaces/aave/IPoolDataProvider.sol";
 import { ExecutionModel, IRoycoKernel } from "../../../interfaces/kernel/IRoycoKernel.sol";
+import { NAV_UNIT, TRANCHE_UNIT } from "../../../libraries/Units.sol";
 import { AaveV3KernelState, AaveV3KernelStorageLib } from "../../../libraries/kernels/AaveV3KernelStorageLib.sol";
-import { Operation, RoycoKernel, SyncedAccountingState } from "../RoycoKernel.sol";
+import { Operation, RoycoKernel, SyncedAccountingState, TrancheAssetClaims } from "../RoycoKernel.sol";
 import { BaseAsyncJTRedemptionDelayKernel } from "./BaseAsyncJTRedemptionDelayKernel.sol";
 
 abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKernel {
@@ -19,10 +20,11 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
     ExecutionModel public constant JT_INCREASE_NAV_EXECUTION_MODEL = ExecutionModel.SYNC;
 
     /// @inheritdoc IRoycoKernel
-    ExecutionModel public constant JT_DECREASE_NAVAL_EXECUTION_MODEL = ExecutionModel.ASYNC;
+    ExecutionModel public constant JT_DECREASE_NAV_EXECUTION_MODEL = ExecutionModel.ASYNC;
 
     /// @notice Thrown when the JT base asset is not a supported reserve token in the Aave V3 Pool
     error UNSUPPORTED_RESERVE_TOKEN();
+
     /// @notice Thrown when the shares to redeem are greater than the claimable shares
     error INSUFFICIENT_CLAIMABLE_SHARES(uint256 sharesToRedeem, uint256 claimableShares);
     /// @notice Thrown when a low-level call fails
@@ -30,7 +32,6 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
 
     /**
      * @notice Initializes a kernel where the junior tranche is deployed into Aave V3
-     * @dev Mandates that the base kernel state is already initialized
      * @param _aaveV3Pool The address of the Aave V3 Pool
      * @param _jtAsset The address of the base asset of the junior tranche
      */
@@ -47,14 +48,8 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
     }
 
     /// @inheritdoc IRoycoKernel
-    function getJTTotalEffectiveAssets() external view override(IRoycoKernel) returns (uint256) {
-        return previewSyncTrancheAccounting().jtEffectiveNAV;
-    }
-
-    /// @inheritdoc IRoycoKernel
     function jtDeposit(
-        address _asset,
-        uint256 _assets,
+        TRANCHE_UNIT _assets,
         address,
         address
     )
@@ -62,48 +57,47 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
         override(IRoycoKernel)
         onlyJuniorTranche
         whenNotPaused
-        returns (uint256 valueAllocated, uint256 effectiveNAVToMintAt)
+        returns (NAV_UNIT valueAllocated, NAV_UNIT navToMintAt)
     {
-        // Execute a pre-op sync on NAV accounting
+        // Execute a pre-op sync on accounting
         valueAllocated = _assets;
-        effectiveNAVToMintAt = (_preOpSyncTrancheAccounting()).jtEffectiveNAV;
+        navToMintAt = (_preOpSyncTrancheAccounting()).jtEffectiveNAV;
 
         // Max approval already given to the pool on initialization
         IPool(AaveV3KernelStorageLib._getAaveV3KernelStorage().pool).supply(_asset, _assets, address(this), 0);
 
-        // Execute a post-op sync on NAV accounting
+        // Execute a post-op sync on accounting
         _postOpSyncTrancheAccounting(Operation.JT_INCREASE_NAV);
     }
 
     /// @inheritdoc IRoycoKernel
     function jtRedeem(
-        address _asset,
         uint256 _shares,
-        uint256 _totalShares,
         address _controller,
         address _receiver
     )
         external
         override(IRoycoKernel)
         onlyJuniorTranche
-        returns (uint256 assetsWithdrawn)
+        returns (TrancheAssetClaims memory claims)
     {
-        SyncedAccountingState memory state = _preOpSyncTrancheAccounting();
+        // Execute a pre-op sync on accounting
+        (SyncedAccountingState memory state, TrancheAssetClaims memory claims, uint256 totalTrancheShares) = _preOpSyncTrancheAccounting(TrancheType.JUNIOR);
+
+        // Ensure that the shares to redeem are actually claimable right now
         require(_shares <= _jtClaimableRedeemRequest(_controller), INSUFFICIENT_CLAIMABLE_SHARES(_shares, _jtClaimableRedeemRequest(_controller)));
         // Calculate the value of the shares to claim and update the controller's redemption request
-        assetsWithdrawn = _processClaimableRedeemRequest(_controller, state.jtEffectiveNAV, _shares, _totalShares);
+        assetsWithdrawn = _processClaimableRedeemRequest(_controller, state.jtEffectiveNAV, _shares, totalTrancheShares);
 
-        // The difference between the JT effective NAV and raw NAV is the amount of assets it is owed from ST raw NAV
-        uint256 totalJTClaimOnSTAssets = Math.saturatingSub(state.jtEffectiveNAV, state.jtRawNAV);
         // Compute and claim the assets that need to be pulled from ST for this withdrawal, rounding in favor of the senior tranche
         uint256 stAssetsToWithdraw = _shares.mulDiv(totalJTClaimOnSTAssets, _totalShares, Math.Rounding.Floor);
         if (stAssetsToWithdraw != 0) _claimJuniorAssetsFromSenior(_asset, stAssetsToWithdraw, _receiver);
 
-        // Facilitate the remainder of the withdrawal from JT exposure
-        IPool(AaveV3KernelStorageLib._getAaveV3KernelStorage().pool).withdraw(_asset, (assetsWithdrawn - stAssetsToWithdraw), _receiver);
+        // // Facilitate the remainder of the withdrawal from JT exposure
+        // IPool(AaveV3KernelStorageLib._getAaveV3KernelStorage().pool).withdraw(_asset, (assetsWithdrawn - stAssetsToWithdraw), _receiver);
 
-        // Execute a post-op sync on NAV accounting and enforce the market's coverage requirement
-        _postOpSyncTrancheAccountingAndEnforceCoverage(Operation.JT_DECREASE_NAV);
+        // // Execute a post-op sync on NAV accounting and enforce the market's coverage requirement
+        // _postOpSyncTrancheAccountingAndEnforceCoverage(Operation.JT_DECREASE_NAV);
     }
 
     /// @inheritdoc RoycoKernel

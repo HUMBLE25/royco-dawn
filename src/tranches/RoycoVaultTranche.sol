@@ -124,7 +124,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Upgra
 
     /// @inheritdoc IRoycoVaultTranche
     function totalAssets() external view virtual override(IRoycoVaultTranche) returns (TrancheAssetClaims memory claims) {
-        return (TRANCHE_TYPE() == TrancheType.SENIOR ? IRoycoKernel(kernel()).getSTTotalEffectiveAssets() : IRoycoKernel(kernel()).getJTTotalEffectiveAssets());
+        return (TRANCHE_TYPE() == TrancheType.SENIOR ? IRoycoKernel(kernel()).getSTAssetClaims() : IRoycoKernel(kernel()).getJTAssetClaims());
     }
 
     /// @inheritdoc IRoycoVaultTranche

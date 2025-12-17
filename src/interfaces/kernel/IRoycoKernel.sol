@@ -24,16 +24,16 @@ interface IRoycoKernel {
     function JT_REQUEST_REDEEM_SHARES_BEHAVIOR() external pure returns (RequestRedeemSharesBehavior);
 
     function ST_INCREASE_NAV_EXECUTION_MODEL() external pure returns (ExecutionModel);
-    function ST_DECREASE_NAVAL_EXECUTION_MODEL() external pure returns (ExecutionModel);
+    function ST_DECREASE_NAV_EXECUTION_MODEL() external pure returns (ExecutionModel);
 
     function JT_INCREASE_NAV_EXECUTION_MODEL() external pure returns (ExecutionModel);
-    function JT_DECREASE_NAVAL_EXECUTION_MODEL() external pure returns (ExecutionModel);
+    function JT_DECREASE_NAV_EXECUTION_MODEL() external pure returns (ExecutionModel);
 
     function getSTRawNAV() external view returns (NAV_UNIT nav);
     function getJTRawNAV() external view returns (NAV_UNIT nav);
 
-    function getSTTotalEffectiveAssets() external view returns (TrancheAssetClaims memory claims);
-    function getJTTotalEffectiveAssets() external view returns (TrancheAssetClaims memory claims);
+    function getSTAssetClaims() external view returns (TrancheAssetClaims memory claims);
+    function getJTAssetClaims() external view returns (TrancheAssetClaims memory claims);
 
     /**
      * @notice Converts the specified ST assets denominated in its tranche units to the kernel's NAV units
