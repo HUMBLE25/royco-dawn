@@ -366,13 +366,15 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
             }
             /// @dev STEP_DISTRIBUTE_YIELD: There are no remaining debts in the system, the residual gains will be used to distribute yield to both tranches
             if (stGain != ZERO_NAV_UNITS) {
+                // Bring the twJTYieldShareAccruedWAD to the top of the stack
+                uint256 twJTYieldShareAccruedWAD = _twJTYieldShareAccruedWAD;
                 // Compute the time weighted average JT share of yield
                 uint256 elapsed = block.timestamp - $.lastDistributionTimestamp;
                 uint256 protocolFeeWAD = $.protocolFeeWAD;
                 // If the last yield distribution wasn't in this block, split the yield between ST and JT
                 if (elapsed != 0) {
                     // Compute the ST gain allocated to JT based on its time weighted yield share since the last distribution, rounding in favor of the senior tranche
-                    NAV_UNIT jtGain = stGain.mulDiv(_twJTYieldShareAccruedWAD, (elapsed * WAD), Math.Rounding.Floor);
+                    NAV_UNIT jtGain = stGain.mulDiv(twJTYieldShareAccruedWAD, (elapsed * WAD), Math.Rounding.Floor);
                     // Apply the yield split to JT's effective NAV
                     if (jtGain != ZERO_NAV_UNITS) {
                         // Compute the protocol fee taken on this JT yield accrual (will be used to mint shares to the protocol fee recipient) at the updated JT effective NAV
