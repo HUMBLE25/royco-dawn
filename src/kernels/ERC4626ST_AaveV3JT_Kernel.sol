@@ -24,16 +24,16 @@ contract ERC4626ST_AaveV3JT_Kernel is ERC4626STKernel, AaveV3JTKernel {
     }
 
     /// @inheritdoc IRoycoKernel
-    function stConvertTrancheUnitsToNAVUnits(TRANCHE_UNIT _stAssets) public view override(IRoycoKernel, RoycoKernel) returns (NAV_UNIT) { }
+    function stConvertTrancheUnitsToNAVUnits(TRANCHE_UNIT _stAssets) public view virtual override(IRoycoKernel, RoycoKernel) returns (NAV_UNIT) { }
 
     /// @inheritdoc IRoycoKernel
-    function jtConvertTrancheUnitsToNAVUnits(TRANCHE_UNIT _jtAssets) public view override(IRoycoKernel, RoycoKernel) returns (NAV_UNIT) { }
+    function jtConvertTrancheUnitsToNAVUnits(TRANCHE_UNIT _jtAssets) public view virtual override(IRoycoKernel, RoycoKernel) returns (NAV_UNIT) { }
 
     /// @inheritdoc IRoycoKernel
-    function stConvertNAVUnitsToTrancheUnits(NAV_UNIT _navAssets) public view override(IRoycoKernel, RoycoKernel) returns (TRANCHE_UNIT) { }
+    function stConvertNAVUnitsToTrancheUnits(NAV_UNIT _navAssets) public view virtual override(IRoycoKernel, RoycoKernel) returns (TRANCHE_UNIT) { }
 
     /// @inheritdoc IRoycoKernel
-    function jtConvertNAVUnitsToTrancheUnits(NAV_UNIT _navAssets) public view override(IRoycoKernel, RoycoKernel) returns (TRANCHE_UNIT) { }
+    function jtConvertNAVUnitsToTrancheUnits(NAV_UNIT _navAssets) public view virtual override(IRoycoKernel, RoycoKernel) returns (TRANCHE_UNIT) { }
 
     /// @inheritdoc RoycoKernel
     function _getJuniorTrancheRawNAV() internal view override(RoycoKernel) returns (NAV_UNIT) {

@@ -130,7 +130,9 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         (NAV_UNIT stNAVClaimOnSelf, NAV_UNIT stNAVClaimOnJT, NAV_UNIT jtNAVClaimOnSelf, NAV_UNIT jtNAVClaimOnST) = _decomposeNAVClaims(state);
 
         // Marshal the tranche claims for this tranche given the decomposed claims
-        claims = _marshalTrancheAssetClaims(_trancheType, stNAVClaimOnSelf, stNAVClaimOnJT, jtNAVClaimOnSelf, jtNAVClaimOnST);
+        claims = _marshalTrancheAssetClaims(
+            _trancheType, state.stEffectiveNAV, state.jtEffectiveNAV, stNAVClaimOnSelf, stNAVClaimOnJT, jtNAVClaimOnSelf, jtNAVClaimOnST
+        );
     }
 
     /**
@@ -171,7 +173,9 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         (NAV_UNIT stNAVClaimOnSelf, NAV_UNIT stNAVClaimOnJT, NAV_UNIT jtNAVClaimOnSelf, NAV_UNIT jtNAVClaimOnST) = _decomposeNAVClaims(state);
 
         // Marshal the tranche claims for this tranche given the decomposed claims
-        claims = _marshalTrancheAssetClaims(_trancheType, stNAVClaimOnSelf, stNAVClaimOnJT, jtNAVClaimOnSelf, jtNAVClaimOnST);
+        claims = _marshalTrancheAssetClaims(
+            _trancheType, state.stEffectiveNAV, state.jtEffectiveNAV, stNAVClaimOnSelf, stNAVClaimOnJT, jtNAVClaimOnSelf, jtNAVClaimOnST
+        );
     }
 
     /**
@@ -196,7 +200,9 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         (NAV_UNIT stNAVClaimOnSelf, NAV_UNIT stNAVClaimOnJT, NAV_UNIT jtNAVClaimOnSelf, NAV_UNIT jtNAVClaimOnST) = _decomposeNAVClaims(state);
 
         // Marshal the tranche claims for this tranche given the decomposed claims
-        claims = _marshalTrancheAssetClaims(_trancheType, stNAVClaimOnSelf, stNAVClaimOnJT, jtNAVClaimOnSelf, jtNAVClaimOnST);
+        claims = _marshalTrancheAssetClaims(
+            _trancheType, state.stEffectiveNAV, state.jtEffectiveNAV, stNAVClaimOnSelf, stNAVClaimOnJT, jtNAVClaimOnSelf, jtNAVClaimOnST
+        );
     }
 
     /**
@@ -256,6 +262,8 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     /**
      * @notice Converts NAV denominated claim components into concrete claimable tranche units
      * @param _trancheType An enum indicating which tranche to construct the claim for
+     * @param _stEffectiveNAV The effective NAV of the senior tranche
+     * @param _jtEffectiveNAV The effective NAV of the junior tranche
      * @param _stNAVClaimOnSelf The portion of ST's effective NAV that must be funded by ST’s raw NAV
      * @param _stNAVClaimOnJT The portion of ST's effective NAV that must be funded by JT’s raw NAV
      * @param _jtNAVClaimOnSelf The portion of JT's effective NAV that must be funded by JT’s raw NAV
@@ -264,6 +272,8 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
      */
     function _marshalTrancheAssetClaims(
         TrancheType _trancheType,
+        NAV_UNIT _stEffectiveNAV,
+        NAV_UNIT _jtEffectiveNAV,
         NAV_UNIT _stNAVClaimOnSelf,
         NAV_UNIT _stNAVClaimOnJT,
         NAV_UNIT _jtNAVClaimOnSelf,
@@ -276,9 +286,11 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         if (_trancheType == TrancheType.SENIOR) {
             if (_stNAVClaimOnSelf != ZERO_NAV_UNITS) claims.stAssets = stConvertNAVUnitsToTrancheUnits(_stNAVClaimOnSelf);
             if (_stNAVClaimOnJT != ZERO_NAV_UNITS) claims.jtAssets = jtConvertNAVUnitsToTrancheUnits(_stNAVClaimOnJT);
+            claims.effectiveNAV = _stEffectiveNAV;
         } else {
             if (_jtNAVClaimOnST != ZERO_NAV_UNITS) claims.stAssets = stConvertNAVUnitsToTrancheUnits(_jtNAVClaimOnST);
             if (_jtNAVClaimOnSelf != ZERO_NAV_UNITS) claims.jtAssets = jtConvertNAVUnitsToTrancheUnits(_jtNAVClaimOnSelf);
+            claims.effectiveNAV = _jtEffectiveNAV;
         }
     }
 
