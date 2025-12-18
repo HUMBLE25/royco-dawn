@@ -14,6 +14,7 @@ import { IRoycoAsyncCancellableVault } from "./interfaces/tranche/IRoycoAsyncCan
 import { IRoycoAsyncVault } from "./interfaces/tranche/IRoycoAsyncVault.sol";
 import { IRoycoVaultTranche } from "./interfaces/tranche/IRoycoVaultTranche.sol";
 import { RedemptionDelayJTKernel } from "./kernels/base/junior/base/RedemptionDelayJTKernel.sol";
+import { RolesConfiguration } from "./libraries/Types.sol";
 import { DeployedContracts, MarketDeploymentParams } from "./libraries/Types.sol";
 
 /// @title RoycoFactory
@@ -67,6 +68,10 @@ contract RoycoFactory is AccessManager, RoycoRoles {
     error FailedToInitializeSeniorTranche(bytes data);
     /// @notice Thrown when the junior tranche failed to initialize
     error FailedToInitializeJuniorTranche(bytes data);
+    /// @notice Thrown when the roles configuration length mismatch
+    error RolesConfigurationLengthMismatch();
+    /// @notice Thrown when the target is invalid
+    error InvalidTarget(address target);
 
     /// @notice Emitted when a new market is deployed
     event MarketDeployed(DeployedContracts deployedContracts, MarketDeploymentParams params);
@@ -89,7 +94,7 @@ contract RoycoFactory is AccessManager, RoycoRoles {
         _validateDeployment(deployedContracts);
 
         // Configure the roles
-        _configureRoles(deployedContracts);
+        _configureRoles(deployedContracts, _params.roles);
 
         emit MarketDeployed(deployedContracts, _params);
     }
@@ -188,40 +193,26 @@ contract RoycoFactory is AccessManager, RoycoRoles {
 
     /// @notice Configures the roles for the deployed contracts
     /// @param _deployedContracts The deployed contracts to configure
-    function _configureRoles(DeployedContracts memory _deployedContracts) internal {
-        // Configure the roles for the accountant
-        _setTargetFunctionRole(address(_deployedContracts.accountant), UUPSUpgradeable.upgradeToAndCall.selector, UPGRADER_ROLE);
-        _setTargetFunctionRole(address(_deployedContracts.accountant), IRoycoAuth.pause.selector, PAUSER_ROLE);
-        _setTargetFunctionRole(address(_deployedContracts.accountant), IRoycoAuth.unpause.selector, PAUSER_ROLE);
+    /// @param _roles The roles to configure
+    function _configureRoles(DeployedContracts memory _deployedContracts, RolesConfiguration[] calldata _roles) internal {
+        for (uint256 i = 0; i < _roles.length; ++i) {
+            RolesConfiguration calldata role = _roles[i];
 
-        // Configure the roles for the kernel
-        _setTargetFunctionRole(address(_deployedContracts.kernel), UUPSUpgradeable.upgradeToAndCall.selector, UPGRADER_ROLE);
-        _setTargetFunctionRole(address(_deployedContracts.kernel), IRoycoAuth.pause.selector, PAUSER_ROLE);
-        _setTargetFunctionRole(address(_deployedContracts.kernel), IRoycoAuth.unpause.selector, PAUSER_ROLE);
-        _setTargetFunctionRole(address(_deployedContracts.kernel), IRoycoKernel.syncTrancheAccounting.selector, SYNC_ROLE);
-        _setTargetFunctionRole(address(_deployedContracts.kernel), RedemptionDelayJTKernel.setJuniorTrancheRedemptionDelay.selector, KERNEL_ADMIN_ROLE);
+            // Validate that the selectors and roles length match
+            require(role.selectors.length == role.roles.length, RolesConfigurationLengthMismatch());
 
-        // Configure the roles for the senior tranche
-        _configureRolesForTranche(_deployedContracts.seniorTranche);
+            // Validate that the target is one of the deployed contracts
+            address target = role.target;
+            require(
+                target == address(_deployedContracts.accountant) || target == address(_deployedContracts.kernel)
+                    || target == address(_deployedContracts.seniorTranche) || target == address(_deployedContracts.juniorTranche),
+                InvalidTarget(target)
+            );
 
-        // Configure the roles for the junior tranche
-        _configureRolesForTranche(_deployedContracts.juniorTranche);
-    }
-
-    /// @notice Configures the roles for a tranche
-    /// @param _tranche The tranche to configure the roles for
-    function _configureRolesForTranche(IRoycoVaultTranche _tranche) internal {
-        _setTargetFunctionRole(address(_tranche), UUPSUpgradeable.upgradeToAndCall.selector, UPGRADER_ROLE);
-        _setTargetFunctionRole(address(_tranche), IRoycoAuth.pause.selector, PAUSER_ROLE);
-        _setTargetFunctionRole(address(_tranche), IRoycoAuth.unpause.selector, PAUSER_ROLE);
-        _setTargetFunctionRole(address(_tranche), IRoycoVaultTranche.deposit.selector, DEPOSIT_ROLE);
-        _setTargetFunctionRole(address(_tranche), IRoycoVaultTranche.redeem.selector, REDEEM_ROLE);
-        _setTargetFunctionRole(address(_tranche), IRoycoAsyncVault.requestDeposit.selector, DEPOSIT_ROLE);
-        _setTargetFunctionRole(address(_tranche), IRoycoAsyncVault.requestRedeem.selector, REDEEM_ROLE);
-        _setTargetFunctionRole(address(_tranche), IRoycoAsyncCancellableVault.cancelDepositRequest.selector, CANCEL_DEPOSIT_ROLE);
-        _setTargetFunctionRole(address(_tranche), IRoycoAsyncCancellableVault.cancelRedeemRequest.selector, CANCEL_REDEEM_ROLE);
-        _setTargetFunctionRole(address(_tranche), IRoycoAsyncCancellableVault.claimCancelDepositRequest.selector, CANCEL_DEPOSIT_ROLE);
-        _setTargetFunctionRole(address(_tranche), IRoycoAsyncCancellableVault.claimCancelRedeemRequest.selector, CANCEL_REDEEM_ROLE);
+            for (uint256 j = 0; j < role.selectors.length; ++j) {
+                _setTargetFunctionRole(target, role.selectors[j], role.roles[j]);
+            }
+        }
     }
 
     /// @notice Deploys a tranche using ERC1967 proxy deterministically

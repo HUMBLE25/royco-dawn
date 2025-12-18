@@ -146,6 +146,18 @@ struct MarketDeploymentParams {
     bytes32 juniorTrancheProxyDeploymentSalt;
     bytes32 kernelProxyDeploymentSalt;
     bytes32 accountantProxyDeploymentSalt;
+    // Initial Roles Configuration
+    RolesConfiguration[] roles;
+}
+
+/// @notice The configuration for a role
+/// @custom:field target The target address of the role
+/// @custom:field selectors The selectors of the role
+/// @custom:field roles The roles of the role
+struct RolesConfiguration {
+    address target;
+    bytes4[] selectors;
+    uint64[] roles;
 }
 
 /// @notice The deployed contracts for a new market

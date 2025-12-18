@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import { Vm } from "../../../lib/forge-std/src/Vm.sol";
 import { IERC20 } from "../../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { RoycoAccountant } from "../../../src/accountant/RoycoAccountant.sol";
+import { ERC4626ST_AaveV3JT_IdenticalAssets_Kernel } from "../../../src/kernels/ERC4626ST_AaveV3JT_IdenticalAssets_Kernel.sol";
 import { RoycoKernel } from "../../../src/kernels/base/RoycoKernel.sol";
 import { RoycoAccountantInitParams } from "../../../src/libraries/RoycoAccountantStorageLib.sol";
 import { RoycoKernelInitParams } from "../../../src/libraries/RoycoKernelStorageLib.sol";
@@ -13,7 +14,6 @@ import { NAV_UNIT, TRANCHE_UNIT, toNAVUnits, toTrancheUnits, toUint256 } from ".
 import { RoycoVaultTranche } from "../../../src/tranches/RoycoVaultTranche.sol";
 import { BaseTest } from "../../base/BaseTest.sol";
 import { ERC4626Mock } from "../../mock/ERC4626Mock.sol";
-import { USDC_ERC4626_AaveV3JT_Kernel } from "../../mock/USDC_ERC4626_AaveV3JT_Kernel.sol";
 
 abstract contract MainnetForkWithAaveTestBase is BaseTest {
     // TODO: Review All
@@ -28,7 +28,6 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
 
     // Deployed contracts
     ERC4626Mock internal MOCK_UNDERLYING_ST_VAULT;
-    USDC_ERC4626_AaveV3JT_Kernel internal USDC_ERC4626_AaveV3JT_KERNEL;
 
     // External Contracts
     IERC20 internal USDC;
@@ -100,12 +99,12 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
         bytes32 salt = keccak256(abi.encodePacked("SALT"));
         address expectedSeniorTrancheAddress = FACTORY.predictERC1967ProxyAddress(address(ST_IMPL), salt);
         address expectedJuniorTrancheAddress = FACTORY.predictERC1967ProxyAddress(address(JT_IMPL), salt);
-        address expectedKernelAddress = FACTORY.predictERC1967ProxyAddress(address(USDC_ERC4626_AaveV3JT_KERNEL_IMPL), salt);
+        address expectedKernelAddress = FACTORY.predictERC1967ProxyAddress(address(ERC4626ST_AaveV3JT_IdenticalAssets_Kernel_IMPL), salt);
         address expectedAccountantAddress = FACTORY.predictERC1967ProxyAddress(address(ACCOUNTANT_IMPL), salt);
 
         // Create the initialization data
         bytes memory kernelInitializationData = abi.encodeCall(
-            USDC_ERC4626_AaveV3JT_KERNEL_IMPL.initialize,
+            ERC4626ST_AaveV3JT_IdenticalAssets_Kernel_IMPL.initialize,
             (
                 RoycoKernelInitParams({
                     seniorTranche: expectedSeniorTrancheAddress,
@@ -158,7 +157,7 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
                 marketId: marketID,
                 seniorTrancheImplementation: ST_IMPL,
                 juniorTrancheImplementation: JT_IMPL,
-                kernelImplementation: IRoycoKernel(address(USDC_ERC4626_AaveV3JT_KERNEL_IMPL)),
+                kernelImplementation: IRoycoKernel(address(ERC4626ST_AaveV3JT_IdenticalAssets_Kernel_IMPL)),
                 seniorTrancheInitializationData: seniorTrancheInitializationData,
                 juniorTrancheInitializationData: juniorTrancheInitializationData,
                 accountantImplementation: IRoycoAccountant(address(ACCOUNTANT_IMPL)),
@@ -167,7 +166,8 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
                 seniorTrancheProxyDeploymentSalt: salt,
                 juniorTrancheProxyDeploymentSalt: salt,
                 kernelProxyDeploymentSalt: salt,
-                accountantProxyDeploymentSalt: salt
+                accountantProxyDeploymentSalt: salt,
+                roles: _generateRolesConfiguration(expectedSeniorTrancheAddress, expectedJuniorTrancheAddress, expectedKernelAddress, expectedAccountantAddress)
             })
         );
     }

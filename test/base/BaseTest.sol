@@ -8,14 +8,22 @@ import { ERC1967Proxy } from "../../lib/openzeppelin-contracts/contracts/proxy/E
 import { RoycoFactory } from "../../src/RoycoFactory.sol";
 import { RoycoAccountant } from "../../src/accountant/RoycoAccountant.sol";
 import { RoycoRoles } from "../../src/auth/RoycoRoles.sol";
+import { IRoycoAccountant } from "../../src/interfaces/IRoycoAccountant.sol";
+import { IRoycoAuth } from "../../src/interfaces/IRoycoAuth.sol";
+import { IAsyncJTRedemptionDelayKernel } from "../../src/interfaces/kernel/IAsyncJTRedemptionDelayKernel.sol";
+import { IRoycoKernel } from "../../src/interfaces/kernel/IRoycoKernel.sol";
+import { IRoycoAsyncCancellableVault } from "../../src/interfaces/tranche/IRoycoAsyncCancellableVault.sol";
+import { IRoycoAsyncVault } from "../../src/interfaces/tranche/IRoycoAsyncVault.sol";
+import { IRoycoVaultTranche } from "../../src/interfaces/tranche/IRoycoVaultTranche.sol";
+import { ERC4626ST_AaveV3JT_IdenticalAssets_Kernel } from "../../src/kernels/ERC4626ST_AaveV3JT_IdenticalAssets_Kernel.sol";
 import { RoycoKernel } from "../../src/kernels/base/RoycoKernel.sol";
-import { AssetClaims, TrancheType } from "../../src/libraries/Types.sol";
+import { RedemptionDelayJTKernel } from "../../src/kernels/base/junior/base/RedemptionDelayJTKernel.sol";
+import { AssetClaims, RolesConfiguration, TrancheType } from "../../src/libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, toUint256 } from "../../src/libraries/Units.sol";
 import { StaticCurveRDM } from "../../src/rdm/StaticCurveRDM.sol";
 import { RoycoJT } from "../../src/tranches/RoycoJT.sol";
 import { RoycoST } from "../../src/tranches/RoycoST.sol";
 import { RoycoVaultTranche } from "../../src/tranches/RoycoVaultTranche.sol";
-import { USDC_ERC4626_AaveV3JT_Kernel } from "../mock/USDC_ERC4626_AaveV3JT_Kernel.sol";
 import { Assertions } from "./Assertions.sol";
 
 contract BaseTest is Test, RoycoRoles, Assertions {
@@ -69,12 +77,12 @@ contract BaseTest is Test, RoycoRoles, Assertions {
     // -----------------------------------------
 
     // Initial Deployments
-    RoycoFactory public FACTORY;
-    StaticCurveRDM public RDM;
+    RoycoFactory internal FACTORY;
+    StaticCurveRDM internal RDM;
     RoycoST public ST_IMPL;
-    RoycoJT public JT_IMPL;
-    USDC_ERC4626_AaveV3JT_Kernel public USDC_ERC4626_AaveV3JT_KERNEL_IMPL;
-    RoycoAccountant public ACCOUNTANT_IMPL;
+    RoycoJT internal JT_IMPL;
+    ERC4626ST_AaveV3JT_IdenticalAssets_Kernel internal ERC4626ST_AaveV3JT_IdenticalAssets_Kernel_IMPL;
+    RoycoAccountant internal ACCOUNTANT_IMPL;
 
     // Deployed Later in the concrete tests
     RoycoVaultTranche internal ST;
@@ -134,8 +142,8 @@ contract BaseTest is Test, RoycoRoles, Assertions {
         vm.label(address(ACCOUNTANT_IMPL), "AccountantImpl");
 
         // Deploy KERNEL implementation
-        USDC_ERC4626_AaveV3JT_KERNEL_IMPL = new USDC_ERC4626_AaveV3JT_Kernel();
-        vm.label(address(USDC_ERC4626_AaveV3JT_KERNEL_IMPL), "KernelImpl");
+        ERC4626ST_AaveV3JT_IdenticalAssets_Kernel_IMPL = new ERC4626ST_AaveV3JT_IdenticalAssets_Kernel();
+        vm.label(address(ERC4626ST_AaveV3JT_IdenticalAssets_Kernel_IMPL), "KernelImpl");
 
         // Deploy FACTORY
         FACTORY = new RoycoFactory(OWNER_ADDRESS);
@@ -347,6 +355,138 @@ contract BaseTest is Test, RoycoRoles, Assertions {
         _trancheState.stAssetsClaim = _trancheState.stAssetsClaim - _stAssetsWithdrawn;
         _trancheState.jtAssetsClaim = _trancheState.jtAssetsClaim - _jtAssetsWithdrawn;
         _trancheState.totalShares = _trancheState.totalShares - _shares;
+    }
+
+    /// @notice Generates the roles configuration for a market
+    /// @param _seniorTranche The senior tranche address
+    /// @param _juniorTranche The junior tranche address
+    /// @param _kernel The kernel address
+    /// @param _accountant The accountant address
+    /// @return roles The roles configuration
+    function _generateRolesConfiguration(
+        address _seniorTranche,
+        address _juniorTranche,
+        address _kernel,
+        address _accountant
+    )
+        internal
+        view
+        returns (RolesConfiguration[] memory roles)
+    {
+        // Senior Tranche: 10 functions (deposit, redeem, requestDeposit, requestRedeem, cancelDepositRequest, claimCancelDepositRequest, cancelRedeemRequest, claimCancelRedeemRequest, pause, unpause)
+        bytes4[] memory stSelectors = new bytes4[](10);
+        uint64[] memory stRoles = new uint64[](10);
+
+        stSelectors[0] = IRoycoVaultTranche.deposit.selector;
+        stRoles[0] = DEPOSIT_ROLE;
+
+        stSelectors[1] = IRoycoVaultTranche.redeem.selector;
+        stRoles[1] = REDEEM_ROLE;
+
+        stSelectors[2] = IRoycoAsyncVault.requestDeposit.selector;
+        stRoles[2] = DEPOSIT_ROLE;
+
+        stSelectors[3] = IRoycoAsyncVault.requestRedeem.selector;
+        stRoles[3] = REDEEM_ROLE;
+
+        stSelectors[4] = IRoycoAsyncCancellableVault.cancelDepositRequest.selector;
+        stRoles[4] = CANCEL_DEPOSIT_ROLE;
+
+        stSelectors[5] = IRoycoAsyncCancellableVault.claimCancelDepositRequest.selector;
+        stRoles[5] = CANCEL_DEPOSIT_ROLE;
+
+        stSelectors[6] = IRoycoAsyncCancellableVault.cancelRedeemRequest.selector;
+        stRoles[6] = CANCEL_REDEEM_ROLE;
+
+        stSelectors[7] = IRoycoAsyncCancellableVault.claimCancelRedeemRequest.selector;
+        stRoles[7] = CANCEL_REDEEM_ROLE;
+
+        stSelectors[8] = IRoycoAuth.pause.selector;
+        stRoles[8] = PAUSER_ROLE;
+
+        stSelectors[9] = IRoycoAuth.unpause.selector;
+        stRoles[9] = PAUSER_ROLE;
+
+        // Junior Tranche: same as senior tranche
+        bytes4[] memory jtSelectors = new bytes4[](10);
+        uint64[] memory jtRoles = new uint64[](10);
+
+        jtSelectors[0] = IRoycoVaultTranche.deposit.selector;
+        jtRoles[0] = DEPOSIT_ROLE;
+
+        jtSelectors[1] = IRoycoVaultTranche.redeem.selector;
+        jtRoles[1] = REDEEM_ROLE;
+
+        jtSelectors[2] = IRoycoAsyncVault.requestDeposit.selector;
+        jtRoles[2] = DEPOSIT_ROLE;
+
+        jtSelectors[3] = IRoycoAsyncVault.requestRedeem.selector;
+        jtRoles[3] = REDEEM_ROLE;
+
+        jtSelectors[4] = IRoycoAsyncCancellableVault.cancelDepositRequest.selector;
+        jtRoles[4] = CANCEL_DEPOSIT_ROLE;
+
+        jtSelectors[5] = IRoycoAsyncCancellableVault.claimCancelDepositRequest.selector;
+        jtRoles[5] = CANCEL_DEPOSIT_ROLE;
+
+        jtSelectors[6] = IRoycoAsyncCancellableVault.cancelRedeemRequest.selector;
+        jtRoles[6] = CANCEL_REDEEM_ROLE;
+
+        jtSelectors[7] = IRoycoAsyncCancellableVault.claimCancelRedeemRequest.selector;
+        jtRoles[7] = CANCEL_REDEEM_ROLE;
+
+        jtSelectors[8] = IRoycoAuth.pause.selector;
+        jtRoles[8] = PAUSER_ROLE;
+
+        jtSelectors[9] = IRoycoAuth.unpause.selector;
+        jtRoles[9] = PAUSER_ROLE;
+
+        bytes4[] memory kernelSelectors = new bytes4[](5);
+        uint64[] memory kernelRoles = new uint64[](5);
+
+        kernelSelectors[0] = IRoycoKernel.setProtocolFeeRecipient.selector;
+        kernelRoles[0] = KERNEL_ADMIN_ROLE;
+
+        kernelSelectors[1] = IRoycoKernel.syncTrancheAccounting.selector;
+        kernelRoles[1] = SYNC_ROLE;
+
+        kernelSelectors[2] = IRoycoAuth.pause.selector;
+        kernelRoles[2] = PAUSER_ROLE;
+
+        kernelSelectors[3] = IRoycoAuth.unpause.selector;
+        kernelRoles[3] = PAUSER_ROLE;
+
+        kernelSelectors[4] = RedemptionDelayJTKernel.setJuniorTrancheRedemptionDelay.selector;
+        kernelRoles[4] = KERNEL_ADMIN_ROLE;
+
+        // Accountant: 6 functions (setRDM, setProtocolFee, setCoverage, setBeta, pause, unpause)
+        bytes4[] memory accountantSelectors = new bytes4[](6);
+        uint64[] memory accountantRoles = new uint64[](6);
+
+        accountantSelectors[0] = IRoycoAccountant.setRDM.selector;
+        accountantRoles[0] = KERNEL_ADMIN_ROLE;
+
+        accountantSelectors[1] = IRoycoAccountant.setProtocolFee.selector;
+        accountantRoles[1] = KERNEL_ADMIN_ROLE;
+
+        accountantSelectors[2] = IRoycoAccountant.setCoverage.selector;
+        accountantRoles[2] = KERNEL_ADMIN_ROLE;
+
+        accountantSelectors[3] = IRoycoAccountant.setBeta.selector;
+        accountantRoles[3] = KERNEL_ADMIN_ROLE;
+
+        accountantSelectors[4] = IRoycoAuth.pause.selector;
+        accountantRoles[4] = PAUSER_ROLE;
+
+        accountantSelectors[5] = IRoycoAuth.unpause.selector;
+        accountantRoles[5] = PAUSER_ROLE;
+
+        // Create roles configuration array
+        roles = new RolesConfiguration[](4);
+        roles[0] = RolesConfiguration({ target: _seniorTranche, selectors: stSelectors, roles: stRoles });
+        roles[1] = RolesConfiguration({ target: _juniorTranche, selectors: jtSelectors, roles: jtRoles });
+        roles[2] = RolesConfiguration({ target: _kernel, selectors: kernelSelectors, roles: kernelRoles });
+        roles[3] = RolesConfiguration({ target: _accountant, selectors: accountantSelectors, roles: accountantRoles });
     }
 
     /// @notice Converts the specified assets denominated in JT's tranche units to the kernel's NAV units
