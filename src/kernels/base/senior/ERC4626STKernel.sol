@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import { IERC4626 } from "../../../../lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 import { IERC20, SafeERC20 } from "../../../../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
-import { ExecutionModel, IRoycoKernel, RequestRedeemSharesBehavior } from "../../../interfaces/kernel/IRoycoKernel.sol";
+import { ExecutionModel, IRoycoKernel, SharesRedemptionModel } from "../../../interfaces/kernel/IRoycoKernel.sol";
 import { AssetClaims } from "../../../libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib, toTrancheUnits, toUint256 } from "../../../libraries/Units.sol";
 import { UtilsLib } from "../../../libraries/UtilsLib.sol";
@@ -21,7 +21,7 @@ abstract contract ERC4626STKernel is RoycoKernel {
     ExecutionModel public constant ST_REDEEM_EXECUTION_MODEL = ExecutionModel.SYNC;
 
     /// @inheritdoc IRoycoKernel
-    RequestRedeemSharesBehavior public constant ST_REQUEST_REDEEM_SHARES_BEHAVIOR = RequestRedeemSharesBehavior.BURN_ON_REDEEM;
+    SharesRedemptionModel public constant ST_REQUEST_REDEEM_SHARES_BEHAVIOR = SharesRedemptionModel.BURN_ON_CLAIM_REDEEM;
 
     /// @notice Thrown when the ST base asset is different the the ERC4626 vault's base asset
     error TRANCHE_AND_VAULT_ASSET_MISMATCH();

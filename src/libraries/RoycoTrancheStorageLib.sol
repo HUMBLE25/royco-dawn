@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import { ExecutionModel, IRoycoKernel, RequestRedeemSharesBehavior } from "../interfaces/kernel/IRoycoKernel.sol";
+import { ExecutionModel, IRoycoKernel, SharesRedemptionModel } from "../interfaces/kernel/IRoycoKernel.sol";
 import { TrancheType } from "./Types.sol";
 
 /// @notice Storage state for Royco Tranche contracts
@@ -24,8 +24,8 @@ struct RoycoTrancheState {
     bytes32 marketId;
     ExecutionModel DEPOSIT_EXECUTION_MODEL;
     ExecutionModel WITHDRAW_EXECUTION_MODEL;
-    RequestRedeemSharesBehavior REQUEST_REDEEM_SHARES_ST_BEHAVIOR;
-    RequestRedeemSharesBehavior REQUEST_REDEEM_SHARES_JT_BEHAVIOR;
+    SharesRedemptionModel REQUEST_REDEEM_SHARES_ST_BEHAVIOR;
+    SharesRedemptionModel REQUEST_REDEEM_SHARES_JT_BEHAVIOR;
     mapping(address owner => mapping(address operator => bool isOperator)) isOperator;
 }
 

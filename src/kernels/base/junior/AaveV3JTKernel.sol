@@ -10,9 +10,8 @@ import { ZERO_TRANCHE_UNITS } from "../../../libraries/Constants.sol";
 import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib, toTrancheUnits, toUint256 } from "../../../libraries/Units.sol";
 import { UtilsLib } from "../../../libraries/UtilsLib.sol";
 import { AssetClaims, Operation, RoycoKernel, RoycoKernelStorageLib, SyncedAccountingState, TrancheType } from "../RoycoKernel.sol";
-import { RedemptionDelayJTKernel } from "./base/RedemptionDelayJTKernel.sol";
 
-abstract contract AaveV3JTKernel is RoycoKernel, RedemptionDelayJTKernel {
+abstract contract AaveV3JTKernel is RoycoKernel {
     using SafeERC20 for IERC20;
     using UnitsMathLib for TRANCHE_UNIT;
 
@@ -38,9 +37,6 @@ abstract contract AaveV3JTKernel is RoycoKernel, RedemptionDelayJTKernel {
 
     /// @notice Thrown when the JT base asset is not a supported reserve token in the Aave V3 Pool
     error UNSUPPORTED_RESERVE_TOKEN();
-
-    /// @notice Thrown when the shares to redeem are greater than the claimable shares
-    error INSUFFICIENT_CLAIMABLE_SHARES(uint256 sharesToRedeem, uint256 claimableShares);
 
     /// @notice Thrown when a low-level call fails
     error FAILED_CALL();
@@ -162,9 +158,9 @@ abstract contract AaveV3JTKernel is RoycoKernel, RedemptionDelayJTKernel {
 
     /// @inheritdoc RoycoKernel
     function _jtDepositAssets(TRANCHE_UNIT _jtAssets) internal override(RoycoKernel) {
-        // Deposit the assets into the underlying investment vault and add to the number of ST controlled shares for this vault
-        ERC4626KernelState storage $ = ERC4626KernelStorageLib._getERC4626KernelStorage();
-        $.jtOwnedShares += IERC4626($.jtVault).deposit(toUint256(_jtAssets), address(this));
+        // Supply the specified assets to the pool
+        // Max approval already given to the pool on initialization
+        IPool(_getAaveV3JTKernelStorage().pool).supply(RoycoKernelStorageLib._getRoycoKernelStorage().jtAsset, toUint256(_jtAssets), address(this), 0);
     }
 
     /// @inheritdoc RoycoKernel

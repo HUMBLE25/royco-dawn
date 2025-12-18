@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import { IERC4626 } from "../../../../lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 import { IERC20, SafeERC20 } from "../../../../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import { Math } from "../../../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
-import { ExecutionModel, IRoycoKernel, RequestRedeemSharesBehavior } from "../../../interfaces/kernel/IRoycoKernel.sol";
+import { ExecutionModel, IRoycoKernel, SharesRedemptionModel } from "../../../interfaces/kernel/IRoycoKernel.sol";
 import { ZERO_TRANCHE_UNITS } from "../../../libraries/Constants.sol";
 import { SyncedAccountingState } from "../../../libraries/Types.sol";
 import { AssetClaims } from "../../../libraries/Types.sol";
@@ -12,9 +12,8 @@ import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib, toTrancheUnits, toUint256 } from 
 import { UtilsLib } from "../../../libraries/UtilsLib.sol";
 import { ERC4626KernelState, ERC4626KernelStorageLib } from "../../../libraries/kernels/ERC4626KernelStorageLib.sol";
 import { Operation, RoycoKernel, TrancheType } from "../RoycoKernel.sol";
-import { RedemptionDelayJTKernel } from "./base/RedemptionDelayJTKernel.sol";
 
-abstract contract ERC4626JTKernel is RoycoKernel, RedemptionDelayJTKernel {
+abstract contract ERC4626JTKernel is RoycoKernel {
     using SafeERC20 for IERC20;
     using UnitsMathLib for TRANCHE_UNIT;
 
@@ -24,16 +23,12 @@ abstract contract ERC4626JTKernel is RoycoKernel, RedemptionDelayJTKernel {
     /// @notice Thrown when the ST base asset is different the the ERC4626 vault's base asset
     error TRANCHE_AND_VAULT_ASSET_MISMATCH();
 
-    /// @notice Thrown when the shares to redeem are greater than the claimable shares
-    error INSUFFICIENT_CLAIMABLE_SHARES(uint256 sharesToRedeem, uint256 claimableShares);
-
     /**
      * @notice Initializes a kernel where the junior tranche is deployed into an ERC4626 vault
      * @param _jtVault The address of the ERC4626 compliant vault the junior tranche will deploy into
      * @param _jtAsset The address of the base asset of the junior tranche
-     * @param _jtRedemptionDelaySeconds The delay in seconds between a junior tranche LP requesting a redemption and being able to execute it
      */
-    function __ERC4626_JT_Kernel_init_unchained(address _jtVault, address _jtAsset, uint256 _jtRedemptionDelaySeconds) internal onlyInitializing {
+    function __ERC4626_JT_Kernel_init_unchained(address _jtVault, address _jtAsset) internal onlyInitializing {
         // Ensure that the ST base asset is identical to the ERC4626 vault's base asset
         require(IERC4626(_jtVault).asset() == _jtAsset, TRANCHE_AND_VAULT_ASSET_MISMATCH());
 
@@ -61,9 +56,9 @@ abstract contract ERC4626JTKernel is RoycoKernel, RedemptionDelayJTKernel {
 
     /// @inheritdoc RoycoKernel
     function _jtDepositAssets(TRANCHE_UNIT _jtAssets) internal override(RoycoKernel) {
-        // Supply the specified assets to the pool
-        // Max approval already given to the pool on initialization
-        IPool(_getAaveV3JTKernelStorage().pool).supply(RoycoKernelStorageLib._getRoycoKernelStorage().jtAsset, toUint256(_assets), address(this), 0);
+        // Deposit the assets into the underlying investment vault and add to the number of ST controlled shares for this vault
+        ERC4626KernelState storage $ = ERC4626KernelStorageLib._getERC4626KernelStorage();
+        $.jtOwnedShares += IERC4626($.jtVault).deposit(toUint256(_jtAssets), address(this));
     }
 
     /// @inheritdoc RoycoKernel

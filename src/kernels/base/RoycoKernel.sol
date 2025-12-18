@@ -2,12 +2,12 @@
 pragma solidity ^0.8.28;
 
 import { RoycoBase } from "../../base/RoycoBase.sol";
-import { IRoycoKernel } from "../../interfaces/kernel/IRoycoKernel.sol";
+import { ExecutionModel, IRoycoKernel, SharesRedemptionModel } from "../../interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoVaultTranche } from "../../interfaces/tranche/IRoycoVaultTranche.sol";
 import { ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, ZERO_NAV_UNITS, ZERO_TRANCHE_UNITS } from "../../libraries/Constants.sol";
-import { RoycoKernelInitParams, RoycoKernelState, RoycoKernelStorageLib } from "../../libraries/RoycoKernelStorageLib.sol";
+import { RedemptionRequest, RoycoKernelInitParams, RoycoKernelState, RoycoKernelStorageLib } from "../../libraries/RoycoKernelStorageLib.sol";
 import { AssetClaims, SyncedAccountingState, TrancheType } from "../../libraries/Types.sol";
-import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib } from "../../libraries/Units.sol";
+import { Math, NAV_UNIT, TRANCHE_UNIT, UnitsMathLib } from "../../libraries/Units.sol";
 import { UtilsLib } from "../../libraries/UtilsLib.sol";
 import { IRoycoAccountant, Operation } from "./../../interfaces/IRoycoAccountant.sol";
 
@@ -26,7 +26,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     ExecutionModel public constant JT_REDEEM_EXECUTION_MODEL = ExecutionModel.ASYNC;
 
     /// @inheritdoc IRoycoKernel
-    RequestRedeemSharesBehavior public constant JT_REQUEST_REDEEM_SHARES_BEHAVIOR = RequestRedeemSharesBehavior.BURN_ON_REDEEM;
+    SharesRedemptionModel public constant JT_REQUEST_REDEEM_SHARES_BEHAVIOR = SharesRedemptionModel.BURN_ON_CLAIM_REDEEM;
 
     /// @dev Permissions the function to only the market's senior tranche
     /// @dev Should be placed on all ST deposit and withdraw functions
@@ -60,28 +60,20 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
      * @param _stAsset The address of the asset that ST is denominated in: constitutes the ST's tranche units (type and precision)
      * @param _jtAsset The address of the asset that JT is denominated in: constitutes the JT's tranche units (type and precision)
      * @param _initialAuthority The initial authority for the base kernel
-     * @param _jtRedemptionDelaySeconds The delay in seconds between a junior tranche LP requesting a redemption and being able to execute it
      */
-<<<<<<< HEAD
     function __RoycoKernel_init(
         RoycoKernelInitParams memory _params,
         address _stAsset,
         address _jtAsset,
-        address _initialAuthority,
-        uint256 _jtRedemptionDelaySeconds
+        address _initialAuthority
     )
         internal
         onlyInitializing
     {
         // Initialize the Royco base state
-=======
-    function __RoycoKernel_init(RoycoKernelInitParams memory _params, address _stAsset, address _jtAsset, address _initialAuthority) internal onlyInitializing {
->>>>>>> 3e8282d81d9d50f89b18399211df5627b5dc5223
         __RoycoBase_init(_initialAuthority);
         // Initialize the Royco kernel state
         __RoycoKernel_init_unchained(_params, _stAsset, _jtAsset);
-        // Initialize the redemption delay junior tranche kernel state
-        __RedemptionDelay_JT_Kernel_init_unchained(_jtRedemptionDelaySeconds);
     }
 
     /**
@@ -117,22 +109,6 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
 
     /// @inheritdoc IRoycoKernel
     function jtConvertNAVUnitsToTrancheUnits(NAV_UNIT _navAssets) public view virtual override(IRoycoKernel) returns (TRANCHE_UNIT);
-
-<<<<<<< HEAD
-    // =============================
-    // External Accounting Synchronization Functions
-    // =============================
-=======
-    /// @inheritdoc IRoycoKernel
-    function getState() external view override(IRoycoKernel) returns (RoycoKernelState memory) {
-        return RoycoKernelStorageLib._getRoycoKernelStorage();
-    }
-
-    /// @inheritdoc IRoycoKernel
-    function setProtocolFeeRecipient(address _protocolFeeRecipient) external restricted {
-        require(_protocolFeeRecipient != address(0), NULL_ADDRESS());
-        RoycoKernelStorageLib._getRoycoKernelStorage().protocolFeeRecipient = _protocolFeeRecipient;
-    }
 
     /// @inheritdoc IRoycoKernel
     function stMaxDeposit(address _receiver) external view override(IRoycoKernel) returns (TRANCHE_UNIT) {
@@ -173,13 +149,12 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         (SyncedAccountingState memory state, AssetClaims memory jtNotionalClaims,) = previewSyncTrancheAccounting(TrancheType.JUNIOR);
 
         // Get the max withdrawable st and jt assets in NAV units from the accountant consider coverage requirement
-        (, NAV_UNIT stClaimableGivenCoverage, NAV_UNIT jtClaimableGivenCoverage) = _accountant()
-            .maxJTWithdrawalGivenCoverage(
-                state.stRawNAV,
-                state.jtRawNAV,
-                stConvertTrancheUnitsToNAVUnits(jtNotionalClaims.stAssets),
-                jtConvertTrancheUnitsToNAVUnits(jtNotionalClaims.jtAssets)
-            );
+        (, NAV_UNIT stClaimableGivenCoverage, NAV_UNIT jtClaimableGivenCoverage) = _accountant().maxJTWithdrawalGivenCoverage(
+            state.stRawNAV,
+            state.jtRawNAV,
+            stConvertTrancheUnitsToNAVUnits(jtNotionalClaims.stAssets),
+            jtConvertTrancheUnitsToNAVUnits(jtNotionalClaims.jtAssets)
+        );
 
         claimOnStNAV = stConvertTrancheUnitsToNAVUnits(jtNotionalClaims.stAssets);
         claimOnJtNAV = jtConvertTrancheUnitsToNAVUnits(jtNotionalClaims.jtAssets);
@@ -188,7 +163,6 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         stMaxWithdrawableNAV = UnitsMathLib.min(stConvertTrancheUnitsToNAVUnits(_stMaxWithdrawableGlobally(_owner)), stClaimableGivenCoverage);
         jtMaxWithdrawableNAV = UnitsMathLib.min(jtConvertTrancheUnitsToNAVUnits(_jtMaxWithdrawableGlobally(_owner)), jtClaimableGivenCoverage);
     }
->>>>>>> 3e8282d81d9d50f89b18399211df5627b5dc5223
 
     /// @inheritdoc IRoycoKernel
     function syncTrancheAccounting() external override(IRoycoKernel) restricted returns (SyncedAccountingState memory state) {
@@ -225,28 +199,6 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     // =============================
     // Senior Tranche Deposit and Redeem Functions
     // =============================
-
-    /// @inheritdoc IRoycoKernel
-    function stMaxDeposit(address _receiver) external view override(IRoycoKernel) returns (TRANCHE_UNIT) {
-        NAV_UNIT stMaxDepositableNAV = _accountant().maxSTDepositGivenCoverage(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV());
-        return UnitsMathLib.min(_stMaxDepositGlobally(_receiver), stConvertNAVUnitsToTrancheUnits(stMaxDepositableNAV));
-    }
-
-    /// @inheritdoc IRoycoKernel
-    function stMaxWithdrawable(address _owner)
-        external
-        view
-        override(IRoycoKernel)
-        returns (SyncedAccountingState memory state, AssetClaims memory stNotionalClaims, AssetClaims memory stMaxClaims)
-    {
-        // Get the total claims the senior tranche has on each tranche's assets
-        (state, stNotionalClaims,) = previewSyncTrancheAccounting(TrancheType.SENIOR);
-
-        // Bound the claims by the max withdrawable assets globally for each tranche and compute the cumulative NAV
-        stMaxClaims.stAssets = _stMaxWithdrawableGlobally(_owner);
-        stMaxClaims.jtAssets = _jtMaxWithdrawableGlobally(_owner);
-        stMaxClaims.nav = stConvertTrancheUnitsToNAVUnits(stMaxClaims.stAssets) + jtConvertTrancheUnitsToNAVUnits(stMaxClaims.jtAssets);
-    }
 
     /// @inheritdoc IRoycoKernel
     function stDeposit(
@@ -303,17 +255,6 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     // =============================
 
     /// @inheritdoc IRoycoKernel
-    function jtMaxDeposit(address _receiver) external view override(IRoycoKernel) returns (TRANCHE_UNIT) {
-        return _jtMaxDepositGlobally(_receiver);
-    }
-
-    /// @inheritdoc IRoycoKernel
-    function jtMaxWithdrawable(address) external view override(IRoycoKernel) returns (NAV_UNIT) {
-        // TODO: account for liq constraints
-        return _accountant().maxJTWithdrawalGivenCoverage(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV());
-    }
-
-    /// @inheritdoc IRoycoKernel
     function jtPreviewRedeem(uint256) external view virtual override returns (AssetClaims memory) {
         revert PREVIEW_REDEEM_DISABLED_FOR_ASYNC_REDEMPTION();
     }
@@ -342,30 +283,138 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         valueAllocated = jtPostDepositNAV - navToMintAt;
     }
 
-    /// @inheritdoc IAsyncJTRedemptionDelayKernel
-    function jtRequestRedeem(address, uint256 _shares, address _controller) external onlyJuniorTranche whenNotPaused returns (uint256 requestId) {
+    /// @inheritdoc IRoycoKernel
+    function jtRequestRedeem(
+        address,
+        uint256 _shares,
+        address _controller
+    )
+        external
+        override(IRoycoKernel)
+        onlyJuniorTranche
+        whenNotPaused
+        returns (uint256 requestId)
+    {
         // Execute a pre-op sync on accounting
         (SyncedAccountingState memory state,, uint256 totalTrancheShares) = _preOpSyncTrancheAccounting(TrancheType.JUNIOR);
 
-        // Ensure that the redemption for this controller isn't cancelled
-        RoycoKernelState storage $ = _getRedemptionDelayJTKernelState();
-        Redemption storage redemption = $.controllerToRedemptionState[_controller];
-        require(!redemption.isCanceled, REDEMPTION_ALREADY_CANCELED());
+        // Ensure that the redemption request for this controller isn't canceled
+        RoycoKernelState storage $ = RoycoKernelStorageLib._getRoycoKernelStorage();
+        RedemptionRequest storage request = $.jtControllerToRedemptionRequest[_controller];
+        require(!request.isCanceled, REDEMPTION_REQUEST_CANCELED());
 
-        // Compute the redemption value at request
-        NAV_UNIT redemptionValueAtRequest = _redemptionValue(state.jtEffectiveNAV, _shares, totalTrancheShares);
+        /// @dev JT LPs are not entitled to any JT upside during the redemption delay, but they are liable for providing coverage to ST LPs during the redemption delay
+        // Compute the current NAV of the shares being requested to be redeemed
+        NAV_UNIT redemptionValueAtRequestTime = state.jtEffectiveNAV.mulDiv(_shares, totalTrancheShares, Math.Rounding.Floor);
 
         // Add the shares to the total shares to redeem in the controller's current redemption request
-        // If an existing redemption request exists, it's redemption delay is extended by the new redemption delay
-        redemption.totalJTSharesToRedeem += _shares;
-        redemption.redemptionValueAtRequest = redemption.redemptionValueAtRequest + redemptionValueAtRequest;
-        redemption.redemptionAllowedAtTimestamp = uint32(block.timestamp + $.jtRedemptionDelaySeconds);
-
-        // Execute a post-op sync on accounting
-        _postOpSyncTrancheAccounting(Operation.JT_DECREASE_NAV);
+        // If an existing redemption request exists, it's redemption delay is refreshed based on the current time
+        request.totalJTSharesToRedeem += _shares;
+        request.redemptionValueAtRequestTime = request.redemptionValueAtRequestTime + redemptionValueAtRequestTime;
+        request.claimableAtTimestamp = uint32(block.timestamp + $.jtRedemptionDelayInSeconds);
 
         // Redeem Requests are purely controller-discriminated, so the request ID is 0
         requestId = ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID;
+    }
+
+    /// @inheritdoc IRoycoKernel
+    function jtPendingRedeemRequest(
+        uint256 _requestId,
+        address _controller
+    )
+        external
+        view
+        override(IRoycoKernel)
+        checkJTRedemptionRequestId(_requestId)
+        returns (uint256 pendingShares)
+    {
+        RedemptionRequest storage request = RoycoKernelStorageLib._getRoycoKernelStorage().jtControllerToRedemptionRequest[_controller];
+        // If the redemption is canceled or the request is claimable, no shares are still in a pending state
+        if (request.isCanceled || request.claimableAtTimestamp >= block.timestamp) return 0;
+        // The shares in the controller's redemption request are still pending
+        pendingShares = request.totalJTSharesToRedeem;
+    }
+
+    /// @inheritdoc IRoycoKernel
+    function jtClaimableRedeemRequest(
+        uint256 _requestId,
+        address _controller
+    )
+        external
+        view
+        override(IRoycoKernel)
+        checkJTRedemptionRequestId(_requestId)
+        returns (uint256 claimableShares)
+    {
+        // Get how many shares from the request are now in a redeemable (claimable) state
+        RedemptionRequest storage request = RoycoKernelStorageLib._getRoycoKernelStorage().jtControllerToRedemptionRequest[_controller];
+        claimableShares = _getRedeemableSharesForRequest(request);
+    }
+
+    /// @inheritdoc IRoycoKernel
+    function jtCancelRedeemRequest(
+        uint256 _requestId,
+        address _controller
+    )
+        external
+        override(IRoycoKernel)
+        whenNotPaused
+        onlyJuniorTranche
+        checkJTRedemptionRequestId(_requestId)
+    {
+        RedemptionRequest storage request = RoycoKernelStorageLib._getRoycoKernelStorage().jtControllerToRedemptionRequest[_controller];
+        // Cannot cancel an already canceled request
+        require(!request.isCanceled, REDEMPTION_REQUEST_CANCELED());
+        // Cannot cancel a non-existant redemption request
+        require(request.totalJTSharesToRedeem != 0, NONEXISTANT_REQUEST_TO_CANCEL());
+        // Mark this request as canceled
+        request.isCanceled = true;
+    }
+
+    /// @inheritdoc IRoycoKernel
+    function jtPendingCancelRedeemRequest(uint256, address) external pure override(IRoycoKernel) returns (bool isPending) {
+        // Cancellation requests are always processed instantly, so there can never be a pending cancellation
+        isPending = false;
+    }
+
+    /// @inheritdoc IRoycoKernel
+    function jtClaimableCancelRedeemRequest(
+        uint256 _requestId,
+        address _controller
+    )
+        external
+        view
+        override(IRoycoKernel)
+        checkJTRedemptionRequestId(_requestId)
+        returns (uint256 shares)
+    {
+        RedemptionRequest storage request = RoycoKernelStorageLib._getRoycoKernelStorage().jtControllerToRedemptionRequest[_controller];
+        // If the redemption is not canceled, there are no shares to claim
+        if (!request.isCanceled) return 0;
+        // Return the shares for the redemption request that has been requested to be canceled
+        shares = request.totalJTSharesToRedeem;
+    }
+
+    /// @inheritdoc IRoycoKernel
+    function jtClaimCancelRedeemRequest(
+        uint256 _requestId,
+        address _controller
+    )
+        external
+        override(IRoycoKernel)
+        whenNotPaused
+        onlyJuniorTranche
+        checkJTRedemptionRequestId(_requestId)
+        returns (uint256 shares)
+    {
+        RoycoKernelState storage $ = RoycoKernelStorageLib._getRoycoKernelStorage();
+        RedemptionRequest storage request = $.jtControllerToRedemptionRequest[_controller];
+        // Cannot claim back shares from a request that hasn't been cancelled
+        require(request.isCanceled, REDEMPTION_REQUEST_NOT_CANCELED());
+        // Return the number of shares that need to be claimed after request cancellation
+        shares = request.totalJTSharesToRedeem;
+        // Clear all redemption state since cancellation has been processed
+        delete $.jtControllerToRedemptionRequest[_controller];
     }
 
     /// @inheritdoc IRoycoKernel
@@ -384,8 +433,29 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         uint256 totalTrancheShares;
         (state, userAssetClaims, totalTrancheShares) = _preOpSyncTrancheAccounting(TrancheType.JUNIOR);
 
-        // Get the total NAV to withdraw on this redemption
-        NAV_UNIT navOfSharesToRedeem = _processClaimableRedeemRequest(_controller, state.jtEffectiveNAV, _shares, totalTrancheShares);
+        RoycoKernelState storage $ = RoycoKernelStorageLib._getRoycoKernelStorage();
+        RedemptionRequest storage request = $.jtControllerToRedemptionRequest[_controller];
+        // Ensure that the the shares that need to be redeemed are allowed to be redeemed for this controller
+        uint256 redeemableShares = _getRedeemableSharesForRequest(request);
+        require(_shares <= redeemableShares, INSUFFICIENT_REDEEMABLE_SHARES(_shares, redeemableShares));
+
+        // Compute the current NAV and the NAV at request time of the shares being redeemed
+        NAV_UNIT redemptionValueAtCurrentTime = state.jtEffectiveNAV.mulDiv(_shares, totalTrancheShares, Math.Rounding.Floor);
+        NAV_UNIT redemptionValueAtRequestTime = request.redemptionValueAtRequestTime.mulDiv(_shares, request.totalJTSharesToRedeem, Math.Rounding.Floor);
+
+        /// @dev JT LPs are not entitled to any JT upside during the redemption delay, but they are liable for providing coverage to ST LPs during the redemption delay
+        NAV_UNIT navOfSharesToRedeem = UnitsMathLib.min(redemptionValueAtCurrentTime, redemptionValueAtRequestTime);
+
+        // Update the request accounting based on the shares being redeemed
+        uint256 sharesRemaining = request.totalJTSharesToRedeem - _shares;
+        // If there are no remaining shares, delete the controller's redemption
+        if (sharesRemaining == 0) {
+            delete $.jtControllerToRedemptionRequest[_controller];
+        } else {
+            // Update the redemption value at request for the remaining shares by the amount that
+            request.redemptionValueAtRequestTime = request.redemptionValueAtRequestTime - redemptionValueAtRequestTime;
+            request.totalJTSharesToRedeem = sharesRemaining;
+        }
 
         // Scale the claims based on the NAV to liquidate for the user relative to the total JT controlled NAV
         userAssetClaims = UtilsLib.scaleTrancheAssetsClaim(userAssetClaims, navOfSharesToRedeem, state.jtEffectiveNAV);
@@ -398,6 +468,25 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     }
 
     /// @inheritdoc IRoycoKernel
+    function getState()
+        external
+        view
+        override(IRoycoKernel)
+        returns (
+            address seniorTranche,
+            address stAsset,
+            address juniorTranche,
+            address jtAsset,
+            address protocolFeeRecipient,
+            address accountant,
+            uint24 jtRedemptionDelayInSeconds
+        )
+    {
+        RoycoKernelState storage $ = RoycoKernelStorageLib._getRoycoKernelStorage();
+        return ($.seniorTranche, $.stAsset, $.juniorTranche, $.jtAsset, $.protocolFeeRecipient, $.accountant, $.jtRedemptionDelayInSeconds);
+    }
+
+    /// @inheritdoc IRoycoKernel
     function setProtocolFeeRecipient(address _protocolFeeRecipient) external override(IRoycoKernel) restricted {
         require(_protocolFeeRecipient != address(0), NULL_ADDRESS());
         RoycoKernelStorageLib._getRoycoKernelStorage().protocolFeeRecipient = _protocolFeeRecipient;
@@ -405,14 +494,9 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     }
 
     /// @inheritdoc IRoycoKernel
-    function setJuniorTrancheRedemptionDelay(uint256 _jtRedemptionDelaySeconds) external override(IRoycoKernel) restricted {
-        RoycoKernelStorageLib._getRoycoKernelStorage().jtRedemptionDelaySeconds = _jtRedemptionDelaySeconds;
-        emit JuniorTrancheRedemptionDelayUpdated(_jtRedemptionDelaySeconds);
-    }
-
-    /// @inheritdoc IRoycoKernel
-    function getState() external view override(IRoycoKernel) returns (RoycoKernelState memory) {
-        return RoycoKernelStorageLib._getRoycoKernelStorage();
+    function setJuniorTrancheRedemptionDelay(uint24 _jtRedemptionDelayInSeconds) external override(IRoycoKernel) restricted {
+        RoycoKernelStorageLib._getRoycoKernelStorage().jtRedemptionDelayInSeconds = _jtRedemptionDelayInSeconds;
+        emit JuniorTrancheRedemptionDelayUpdated(_jtRedemptionDelayInSeconds);
     }
 
     // =============================
@@ -550,10 +634,6 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         }
     }
 
-    // =============================
-    // Senior Tranche Deposit and Redeem Functions
-    // =============================
-
     /**
      * @notice Withdraws any specified assets from each tranche and transfer them to the receiver
      * @param _claims The ST and JT assets to withdraw and transfer to the specified receiver
@@ -588,6 +668,18 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     /// @return The Royco Accountant for this kernel
     function _accountant() internal view returns (IRoycoAccountant) {
         return IRoycoAccountant(RoycoKernelStorageLib._getRoycoKernelStorage().accountant);
+    }
+
+    /**
+     * @notice Returns the amount of JT shares redeemable from a redemption request
+     * @param _request The redemption request to get redeemable shares for
+     * @return claimableShares The amount of JT shares currently redeemable from the specified redemption request
+     */
+    function _getRedeemableSharesForRequest(RedemptionRequest storage _request) internal view returns (uint256 claimableShares) {
+        // If the request is canceled or not claimable, no shares are claimable
+        if (_request.isCanceled || _request.claimableAtTimestamp < block.timestamp) return 0;
+        // Return the shares in the request
+        claimableShares = _request.totalJTSharesToRedeem;
     }
 
     // =============================
