@@ -136,14 +136,15 @@ interface IRoycoKernel {
     /**
      * @notice Returns the maximum amount of assets that can be withdrawn from the senior tranche
      * @param _owner The address that is withdrawing the assets
-     * @return state The synced NAV, debt, and fee accounting containing all mark to market accounting data
-     * @return stNotionalClaims The notional claims on ST assets that the senior tranche has denominated in tranche-native units
-     * @return stMaxClaims The maximum claims on ST assets that the senior tranche can withdraw, denominated in the senior tranche's tranche units
+     * @return claimOnStNAV The notional claims on ST assets that the senior tranche has denominated in kernel's NAV units
+     * @return claimOnJtNAV The notional claims on JT assets that the senior tranche has denominated in kernel's NAV units
+     * @return stMaxWithdrawableNAV The maximum amount of assets that can be withdrawn from the senior tranche, denominated in the kernel's NAV units
+     * @return jtMaxWithdrawableNAV The maximum amount of assets that can be withdrawn from the junior tranche, denominated in the kernel's NAV units
      */
     function stMaxWithdrawable(address _owner)
         external
         view
-        returns (SyncedAccountingState memory state, AssetClaims memory stNotionalClaims, AssetClaims memory stMaxClaims);
+        returns (NAV_UNIT claimOnStNAV, NAV_UNIT claimOnJtNAV, NAV_UNIT stMaxWithdrawableNAV, NAV_UNIT jtMaxWithdrawableNAV);
 
     /**
      * @notice Previews the deposit of a specified amount of assets into the senior tranche
@@ -193,11 +194,17 @@ interface IRoycoKernel {
     function jtMaxDeposit(address _receiver) external view returns (TRANCHE_UNIT assets);
 
     /**
-     * @notice Returns the maximum amount of assets that can be withdrawn from the senior tranche
+     * @notice Returns the maximum amount of assets that can be withdrawn from the junior tranche
      * @param _owner The address that is withdrawing the assets
-     * @return maxWithdrawableNAV The maximum amount of assets that can be withdrawn from the senior tranche, denominated in the senior tranche's NAV units
+     * @return claimOnStNAV The notional claims on ST assets that the junior tranche has denominated in kernel's NAV units
+     * @return claimOnJtNAV The notional claims on JT assets that the junior tranche has denominated in kernel's NAV units
+     * @return stMaxWithdrawableNAV The maximum amount of assets that can be withdrawn from the senior tranche, denominated in the kernel's NAV units
+     * @return jtMaxWithdrawableNAV The maximum amount of assets that can be withdrawn from the junior tranche, denominated in the kernel's NAV units
      */
-    function jtMaxWithdrawable(address _owner) external view returns (NAV_UNIT maxWithdrawableNAV);
+    function jtMaxWithdrawable(address _owner)
+        external
+        view
+        returns (NAV_UNIT claimOnStNAV, NAV_UNIT claimOnJtNAV, NAV_UNIT stMaxWithdrawableNAV, NAV_UNIT jtMaxWithdrawableNAV);
 
     /**
      * @notice Previews the deposit of a specified amount of assets into the junior tranche

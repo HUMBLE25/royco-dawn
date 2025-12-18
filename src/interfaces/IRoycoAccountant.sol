@@ -98,9 +98,21 @@ interface IRoycoAccountant {
      * @dev Always rounds in favor of senior tranche protection
      * @param _stRawNAV The senior tranche's current raw NAV: the pure value of its invested assets
      * @param _jtRawNAV The junior tranche's current raw NAV: the pure value of its invested assets
-     * @return maxJTWithdrawal The maximum assets withdrawable from the junior tranche without violating the market's coverage requirement
+     * @param _jtClaimOnStUnits The total claims on ST assets that the junior tranche has denominated in NAV units
+     * @param _jtClaimOnJtUnits The total claims on JT assets that the junior tranche has denominated in NAV units
+     * @return totalNAVClaimable The maximum NAV that can be claimed from the junior tranche without violating the market's coverage requirement
+     * @return stClaimable The maximum claims on ST assets that the junior tranche can withdraw, denominated in NAV units
+     * @return jtClaimable The maximum claims on JT assets that the junior tranche can withdraw, denominated in NAV units
      */
-    function maxJTWithdrawalGivenCoverage(NAV_UNIT _stRawNAV, NAV_UNIT _jtRawNAV) external view returns (NAV_UNIT maxJTWithdrawal);
+    function maxJTWithdrawalGivenCoverage(
+        NAV_UNIT _stRawNAV,
+        NAV_UNIT _jtRawNAV,
+        NAV_UNIT _jtClaimOnStUnits,
+        NAV_UNIT _jtClaimOnJtUnits
+    )
+        external
+        view
+        returns (NAV_UNIT totalNAVClaimable, NAV_UNIT stClaimable, NAV_UNIT jtClaimable);
 
     /**
      * @notice Updates the RDM (Reward Distribution Model) address

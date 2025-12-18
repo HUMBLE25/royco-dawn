@@ -63,6 +63,11 @@ library UnitsMathLib {
     function mulDiv(TRANCHE_UNIT _a, uint256 _b, uint256 _c, Math.Rounding _rounding) internal pure returns (TRANCHE_UNIT) {
         return toTrancheUnits(Math.mulDiv(toUint256(_a), _b, _c, _rounding));
     }
+
+    /// @notice Returns `(_a * _b) / _c` where `_a` is a scalar and `_b/_c` are NAV-denominated, with explicit rounding.
+    function mulDiv(uint256 _a, NAV_UNIT _b, NAV_UNIT _c, Math.Rounding _rounding) internal pure returns (uint256) {
+        return Math.mulDiv(_a, toUint256(_b), toUint256(_c), _rounding);
+    }
 }
 
 /// -----------------------------------------------------------------------

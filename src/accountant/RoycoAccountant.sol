@@ -9,6 +9,7 @@ import { RoycoAccountantInitParams, RoycoAccountantState, RoycoAccountantStorage
 import { NAV_UNIT, SyncedAccountingState } from "../libraries/Types.sol";
 import { UnitsMathLib, toNAVUnits } from "../libraries/Units.sol";
 import { Math, UtilsLib } from "../libraries/UtilsLib.sol";
+import { toUint256 } from "../libraries/UtilsLib.sol";
 
 contract RoycoAccountant is IRoycoAccountant, RoycoBase {
     using Math for uint256;
@@ -233,14 +234,32 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
     /**
      * @inheritdoc IRoycoAccountant
      * @dev Coverage Invariant: JT_EFFECTIVE_NAV >= (ST_RAW_NAV + (JT_RAW_NAV * BETA_%)) * COV_%
-     * @dev Max assets withdrawable from JT, y: (JT_EFFECTIVE_NAV - y) = (ST_RAW_NAV + ((JT_RAW_NAV - y) * BETA_%)) * COV_%
-     *      Isolate y: y = (JT_EFFECTIVE_NAV - (COV_% * (ST_RAW_NAV + (JT_RAW_NAV * BETA_%)))) / (1 - (BETA_% * COV_%))
+     * @dev When assets are claimed from the JT, they are always liquidated in the same proportion as the tranche's total claims on the ST and JT assets
+     * @dev Let S be the JT's total claims on ST assets and J be the JT's total claims on JT assets, in NAV Units. The total claims on the ST and JT assets are S + J NAV Units
+     * @dev Let K_S be S / (S + J) and K_J be J / (S + J)
+     * @dev Therefore, if a total NAV of y is claimed from the JT, K_S * y will be claimed from the ST_RAW_NAV and K_J * y will be claimed from the JT_RAW_NAV
+     * @dev Max assets withdrawable from JT, y: (JT_EFFECTIVE_NAV - y) = ((ST_RAW_NAV - K_S * y) + ((JT_RAW_NAV - K_J * y) * BETA_%)) * COV_%
+     *      Isolate y: y = (JT_EFFECTIVE_NAV - (COV_% * (ST_RAW_NAV + (JT_RAW_NAV * BETA_%)))) / (1 - (COV_% * (K_S + BETA_% * K_J)))
      */
-    function maxJTWithdrawalGivenCoverage(NAV_UNIT _stRawNAV, NAV_UNIT _jtRawNAV) external view override(IRoycoAccountant) returns (NAV_UNIT) {
+    function maxJTWithdrawalGivenCoverage(
+        NAV_UNIT _stRawNAV,
+        NAV_UNIT _jtRawNAV,
+        NAV_UNIT _jtClaimOnStUnits,
+        NAV_UNIT _jtClaimOnJtUnits
+    )
+        external
+        view
+        override(IRoycoAccountant)
+        returns (NAV_UNIT totalNAVClaimable, NAV_UNIT stClaimable, NAV_UNIT jtClaimable)
+    {
         // Get the storage pointer to the base kernel state and cache beta and coverage
         RoycoAccountantState storage $ = RoycoAccountantStorageLib._getRoycoAccountantStorage();
         uint256 betaWAD = $.betaWAD;
         uint256 coverageWAD = $.coverageWAD;
+        // Calculate K_S
+        uint256 kS_WAD = toUint256(_jtClaimOnStUnits.mulDiv(WAD, _jtClaimOnStUnits + _jtClaimOnJtUnits, Math.Rounding.Floor));
+        // Calculate K_J
+        uint256 kJ_WAD = toUint256(_jtClaimOnJtUnits.mulDiv(WAD, _jtClaimOnStUnits + _jtClaimOnJtUnits, Math.Rounding.Floor));
         // Preview a NAV sync to get the market's current state
         (SyncedAccountingState memory state,) = _previewSyncTrancheAccounting(_stRawNAV, _jtRawNAV, _previewJTYieldShareAccrual());
         // Solve for y, rounding in favor of senior protection
@@ -250,10 +269,12 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         NAV_UNIT requiredJTAssets = totalCoveredExposure.mulDiv(coverageWAD, WAD, Math.Rounding.Ceil);
         // Compute the surplus coverage currently provided by the junior tranche based on its currently remaining loss-absorption buffer
         NAV_UNIT surplusJTAssets = UnitsMathLib.saturatingSub(state.jtEffectiveNAV, requiredJTAssets);
-        // Compute how much coverage the system retains per 1 unit of JT assets withdrawn scaled to WAD precision
-        uint256 coverageRetentionWAD = WAD - betaWAD.mulDiv(coverageWAD, WAD, Math.Rounding.Floor);
+        // Compute how much coverage the system retains per 1 nav unit of JT assets withdrawn scaled to WAD precision
+        uint256 coverageRetentionWAD = (WAD - coverageWAD.mulDiv(kS_WAD + betaWAD.mulDiv(kJ_WAD, WAD, Math.Rounding.Floor), WAD, Math.Rounding.Floor));
         // Return how much of the surplus can be withdrawn while satisfying the coverage requirement
-        return surplusJTAssets.mulDiv(WAD, coverageRetentionWAD, Math.Rounding.Floor);
+        totalNAVClaimable = surplusJTAssets.mulDiv(WAD, coverageRetentionWAD, Math.Rounding.Floor);
+        stClaimable = totalNAVClaimable.mulDiv(kS_WAD, WAD, Math.Rounding.Floor);
+        jtClaimable = totalNAVClaimable.mulDiv(kJ_WAD, WAD, Math.Rounding.Floor);
     }
 
     /**

@@ -20,6 +20,7 @@ import { RoycoTrancheStorageLib } from "../libraries/RoycoTrancheStorageLib.sol"
 import { AssetClaims, TrancheType } from "../libraries/Types.sol";
 import { Action, SyncedAccountingState, TrancheDeploymentParams } from "../libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, toNAVUnits, toTrancheUnits, toUint256 } from "../libraries/Units.sol";
+import { UnitsMathLib } from "../libraries/Units.sol";
 import { UtilsLib } from "../libraries/UtilsLib.sol";
 
 /**
@@ -28,6 +29,7 @@ import { UtilsLib } from "../libraries/UtilsLib.sol";
  */
 abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20PausableUpgradeable, ERC20PermitUpgradeable {
     using Math for uint256;
+    using UnitsMathLib for uint256;
     using SafeERC20 for IERC20;
 
     /// @notice Thrown when the specified action is disabled
@@ -153,20 +155,33 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         assets = (TRANCHE_TYPE() == TrancheType.SENIOR ? IRoycoKernel(kernel()).stMaxDeposit(_receiver) : IRoycoKernel(kernel()).jtMaxDeposit(_receiver));
     }
 
-    /// @inheritdoc IRoycoVaultTranche
+    /**
+     * @inheritdoc IRoycoVaultTranche
+     * @dev Returns the maximum amount of shares that can be redeemed from the tranche
+     * @dev We query the kernel for (a) N_s and N_j - the notional claim of the tranch on the ST and JT assets respectively in NAV units, and
+     *                              (b) L_s and L_j - the amount that can be withdrawn from the senior and junior tranches globally in NAV units, respectively
+     *      When shares are redeemed, assets from the senior and junior tranches are withdrawn proportionally to the notional claims of the tranche on the respective assets.
+     *      But, the global max withdrawable assets for each tranche are also considered. These are inclusive of any coverage requirements, as well as liquidity constraints.
+     *      If T respresents the total shares in the tranche, s the total shares owned by the owner, then the maximum amount of shares that can be redeemed s' is subject to:
+     *      (a) s' * N_s / T  <= min(s * N_s / T, L_s) => s' <= min(s, T * L_s / N_s)
+     *      (b) s' * N_j / T  <= min(s * N_j / T, L_j) => s' <= min(s, T * L_j / N_j)
+     *      Therefore, the maximum amount of shares that can be redeemed is:
+     *      s' = min(s, T * L_s / N_s, T * L_j / N_j)
+     */
     function maxRedeem(address _owner) external view virtual override(IRoycoVaultTranche) returns (uint256 shares) {
-        NAV_UNIT maxWithdrawableNAV = ZERO_NAV_UNITS;
-        // (TRANCHE_TYPE() == TrancheType.SENIOR ? IRoycoKernel(kernel()).stMaxWithdrawable(_owner) : IRoycoKernel(kernel()).jtMaxWithdrawable(_owner));
-        if (maxWithdrawableNAV == ZERO_NAV_UNITS) return 0;
+        // Get the notional claims and the max withdrawable assets for the tranche
+        (NAV_UNIT claimOnStNAV, NAV_UNIT claimOnJtNAV, NAV_UNIT stMaxWithdrawableNAV, NAV_UNIT jtMaxWithdrawableNAV) =
+            (TRANCHE_TYPE() == TrancheType.SENIOR ? IRoycoKernel(kernel()).stMaxWithdrawable(_owner) : IRoycoKernel(kernel()).jtMaxWithdrawable(_owner));
+        uint256 ownerShares = balanceOf(_owner);
+        uint256 totalShares = _withVirtualShares(totalSupply());
 
-        // Get the post-sync tranche state: applying NAV reconciliation and fee share minting
-        (AssetClaims memory trancheClaims, uint256 trancheTotalShares) = _previewPostSyncTrancheState();
-
-        // Compute the max withdrawable shares based on max withdrawable assets
-        uint256 maxRedeemableShares = _convertToShares(maxWithdrawableNAV, trancheTotalShares, trancheClaims.nav, Math.Rounding.Floor);
-
-        // Return the minimum of the max redeemable shares and the balance of the owner
-        shares = Math.min(maxRedeemableShares, balanceOf(_owner));
+        // Calculate the maximum amount of shares that can be redeemed based on the senior and junior constraints
+        // If the notional claim of the tranche on the ST or JT assets is zero, ignore the constraints since the tranche has no claims on the assets
+        uint256 sharesWithdrawableBasedOnSeniorConstraints =
+            claimOnStNAV == ZERO_NAV_UNITS ? ownerShares : totalShares.mulDiv(stMaxWithdrawableNAV, claimOnStNAV, Math.Rounding.Floor);
+        uint256 sharesWithdrawableBasedOnJuniorConstraints =
+            claimOnJtNAV == ZERO_NAV_UNITS ? ownerShares : totalShares.mulDiv(jtMaxWithdrawableNAV, claimOnJtNAV, Math.Rounding.Floor);
+        shares = Math.min(ownerShares, Math.min(sharesWithdrawableBasedOnSeniorConstraints, sharesWithdrawableBasedOnJuniorConstraints));
     }
 
     /// @inheritdoc IRoycoVaultTranche
@@ -198,11 +213,10 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
     /// @inheritdoc IRoycoVaultTranche
     function convertToShares(TRANCHE_UNIT _assets) public view virtual override(IRoycoVaultTranche) returns (uint256 shares) {
         // Get the post-sync tranche state: applying NAV reconciliation.
-        NAV_UNIT navAssets = (
-            TRANCHE_TYPE() == TrancheType.SENIOR
+        NAV_UNIT navAssets =
+        (TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IRoycoKernel(kernel()).stConvertTrancheUnitsToNAVUnits(_assets)
-                : IRoycoKernel(kernel()).jtConvertTrancheUnitsToNAVUnits(_assets)
-        );
+                : IRoycoKernel(kernel()).jtConvertTrancheUnitsToNAVUnits(_assets));
         (AssetClaims memory trancheClaims, uint256 trancheTotalShares) = _previewPostSyncTrancheState();
         shares = _convertToShares(navAssets, trancheTotalShares, trancheClaims.nav, Math.Rounding.Floor);
     }
@@ -267,11 +281,10 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
 
         // Process the withdrawal from the underlying investment opportunity
         // It is expected that the kernel transfers the assets directly to the receiver
-        claims = (
-            TRANCHE_TYPE() == TrancheType.SENIOR
+        claims =
+        (TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IRoycoKernel(kernel()).stRedeem(_shares, _controller, _receiver)
-                : IRoycoKernel(kernel()).jtRedeem(_shares, _controller, _receiver)
-        );
+                : IRoycoKernel(kernel()).jtRedeem(_shares, _controller, _receiver));
 
         // Account for the redemption
         // Shares must be burned after the kernel processes the redemption since the kernel has a causal dependency on the pre-burn and post-sync total share supply
@@ -321,11 +334,10 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         IERC20(asset()).safeTransferFrom(_owner, kernel_, toUint256(_assets));
 
         // Queue the deposit request and get the request ID from the kernel
-        requestId = (
-            TRANCHE_TYPE() == TrancheType.SENIOR
+        requestId =
+        (TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTDepositKernel(kernel_).stRequestDeposit(msg.sender, _assets, _controller)
-                : IAsyncJTDepositKernel(kernel_).jtRequestDeposit(msg.sender, _assets, _controller)
-        );
+                : IAsyncJTDepositKernel(kernel_).jtRequestDeposit(msg.sender, _assets, _controller));
 
         emit DepositRequest(_controller, _owner, requestId, msg.sender, _assets);
     }
@@ -343,11 +355,10 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         executionIsAsync(Action.DEPOSIT)
         returns (TRANCHE_UNIT pendingAssets)
     {
-        pendingAssets = (
-            TRANCHE_TYPE() == TrancheType.SENIOR
+        pendingAssets =
+        (TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTDepositKernel(kernel()).stPendingDepositRequest(_requestId, _controller)
-                : IAsyncJTDepositKernel(kernel()).jtPendingDepositRequest(_requestId, _controller)
-        );
+                : IAsyncJTDepositKernel(kernel()).jtPendingDepositRequest(_requestId, _controller));
     }
 
     /// @inheritdoc IRoycoAsyncVault
@@ -363,11 +374,10 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         executionIsAsync(Action.DEPOSIT)
         returns (TRANCHE_UNIT claimableAssets)
     {
-        claimableAssets = (
-            TRANCHE_TYPE() == TrancheType.SENIOR
+        claimableAssets =
+        (TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTDepositKernel(kernel()).stClaimableDepositRequest(_requestId, _controller)
-                : IAsyncJTDepositKernel(kernel()).jtClaimableDepositRequest(_requestId, _controller)
-        );
+                : IAsyncJTDepositKernel(kernel()).jtClaimableDepositRequest(_requestId, _controller));
     }
 
     /// @inheritdoc IRoycoAsyncVault
@@ -394,11 +404,10 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         }
 
         // Queue the redemption request and get the request ID from the kernel
-        requestId = (
-            TRANCHE_TYPE() == TrancheType.SENIOR
+        requestId =
+        (TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTWithdrawalKernel(kernel()).stRequestRedeem(msg.sender, _shares, _controller)
-                : IAsyncJTRedemptionDelayKernel(kernel()).jtRequestRedeem(msg.sender, _shares, _controller)
-        );
+                : IAsyncJTRedemptionDelayKernel(kernel()).jtRequestRedeem(msg.sender, _shares, _controller));
 
         // Handle the shares being redeemed from the owner using the tranche's redemption behavior
         if (_requestRedeemSharesBehavior() == RequestRedeemSharesBehavior.BURN_ON_REDEEM) {
@@ -425,11 +434,10 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         executionIsAsync(Action.WITHDRAW)
         returns (uint256 pendingShares)
     {
-        pendingShares = (
-            TRANCHE_TYPE() == TrancheType.SENIOR
+        pendingShares =
+        (TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTWithdrawalKernel(kernel()).stPendingRedeemRequest(_requestId, _controller)
-                : IAsyncJTRedemptionDelayKernel(kernel()).jtPendingRedeemRequest(_requestId, _controller)
-        );
+                : IAsyncJTRedemptionDelayKernel(kernel()).jtPendingRedeemRequest(_requestId, _controller));
     }
 
     /// @inheritdoc IRoycoAsyncVault
@@ -445,11 +453,10 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         executionIsAsync(Action.WITHDRAW)
         returns (uint256 claimableShares)
     {
-        claimableShares = (
-            TRANCHE_TYPE() == TrancheType.SENIOR
+        claimableShares =
+        (TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTWithdrawalKernel(kernel()).stClaimableRedeemRequest(_requestId, _controller)
-                : IAsyncJTRedemptionDelayKernel(kernel()).jtClaimableRedeemRequest(_requestId, _controller)
-        );
+                : IAsyncJTRedemptionDelayKernel(kernel()).jtClaimableRedeemRequest(_requestId, _controller));
     }
 
     // =============================
@@ -492,11 +499,9 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         executionIsAsync(Action.DEPOSIT)
         returns (bool isPending)
     {
-        return (
-            TRANCHE_TYPE() == TrancheType.SENIOR
+        return (TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTDepositKernel(kernel()).stPendingCancelDepositRequest(_requestId, _controller)
-                : IAsyncJTDepositKernel(kernel()).jtPendingCancelDepositRequest(_requestId, _controller)
-        );
+                : IAsyncJTDepositKernel(kernel()).jtPendingCancelDepositRequest(_requestId, _controller));
     }
 
     /// @inheritdoc IRoycoAsyncCancellableVault
@@ -512,11 +517,10 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         executionIsAsync(Action.DEPOSIT)
         returns (TRANCHE_UNIT assets)
     {
-        assets = (
-            TRANCHE_TYPE() == TrancheType.SENIOR
+        assets =
+        (TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTDepositKernel(kernel()).stClaimableCancelDepositRequest(_requestId, _controller)
-                : IAsyncJTDepositKernel(kernel()).jtClaimableCancelDepositRequest(_requestId, _controller)
-        );
+                : IAsyncJTDepositKernel(kernel()).jtClaimableCancelDepositRequest(_requestId, _controller));
     }
 
     /// @inheritdoc IRoycoAsyncCancellableVault
@@ -535,11 +539,10 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         executionIsAsync(Action.DEPOSIT)
     {
         // Expect the kernel to transfer the assets to the receiver directly after the cancellation is processed
-        TRANCHE_UNIT claimedAssets = (
-            TRANCHE_TYPE() == TrancheType.SENIOR
+        TRANCHE_UNIT claimedAssets =
+        (TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTDepositKernel(kernel()).stClaimCancelDepositRequest(_requestId, _receiver, _controller)
-                : IAsyncJTDepositKernel(kernel()).jtClaimCancelDepositRequest(_requestId, _receiver, _controller)
-        );
+                : IAsyncJTDepositKernel(kernel()).jtClaimCancelDepositRequest(_requestId, _receiver, _controller));
         emit CancelDepositClaim(_controller, _receiver, _requestId, msg.sender, claimedAssets);
     }
 
@@ -580,11 +583,10 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         executionIsAsync(Action.WITHDRAW)
         returns (bool isPending)
     {
-        isPending = (
-            TRANCHE_TYPE() == TrancheType.SENIOR
+        isPending =
+        (TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTWithdrawalKernel(kernel()).stPendingCancelRedeemRequest(_requestId, _controller)
-                : IAsyncJTRedemptionDelayKernel(kernel()).jtPendingCancelRedeemRequest(_requestId, _controller)
-        );
+                : IAsyncJTRedemptionDelayKernel(kernel()).jtPendingCancelRedeemRequest(_requestId, _controller));
     }
 
     /// @inheritdoc IRoycoAsyncCancellableVault
@@ -600,11 +602,10 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         executionIsAsync(Action.WITHDRAW)
         returns (uint256 shares)
     {
-        shares = (
-            TRANCHE_TYPE() == TrancheType.SENIOR
+        shares =
+        (TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTWithdrawalKernel(kernel()).stClaimableCancelRedeemRequest(_requestId, _controller)
-                : IAsyncJTRedemptionDelayKernel(kernel()).jtClaimableCancelRedeemRequest(_requestId, _controller)
-        );
+                : IAsyncJTRedemptionDelayKernel(kernel()).jtClaimableCancelRedeemRequest(_requestId, _controller));
     }
 
     /// @inheritdoc IRoycoAsyncCancellableVault
@@ -623,11 +624,10 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         executionIsAsync(Action.WITHDRAW)
     {
         // Get the number of shares in a cancelled state for this request ID
-        uint256 shares = (
-            TRANCHE_TYPE() == TrancheType.SENIOR
+        uint256 shares =
+            (TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTWithdrawalKernel(kernel()).stClaimCancelRedeemRequest(_requestId, _owner)
-                : IAsyncJTRedemptionDelayKernel(kernel()).jtClaimCancelRedeemRequest(_requestId, _owner)
-        );
+                : IAsyncJTRedemptionDelayKernel(kernel()).jtClaimCancelRedeemRequest(_requestId, _owner));
 
         // Ensure a non-zero amount can be claimed
         require(shares != 0, MUST_CLAIM_NON_ZERO_SHARES());
@@ -764,20 +764,16 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
 
     /// @dev Returns if the specified action employs a synchronous execution model
     function _isSync(Action _action) internal view returns (bool) {
-        return (
-            _action == Action.DEPOSIT
-                ? RoycoTrancheStorageLib._getRoycoTrancheStorage().DEPOSIT_EXECUTION_MODEL
-                : RoycoTrancheStorageLib._getRoycoTrancheStorage().WITHDRAW_EXECUTION_MODEL
-        ) == ExecutionModel.SYNC;
+        return (_action == Action.DEPOSIT
+                    ? RoycoTrancheStorageLib._getRoycoTrancheStorage().DEPOSIT_EXECUTION_MODEL
+                    : RoycoTrancheStorageLib._getRoycoTrancheStorage().WITHDRAW_EXECUTION_MODEL) == ExecutionModel.SYNC;
     }
 
     /// @dev Returns whether or not shares should be burned upon requesting a redeem or executing the redeem
     function _requestRedeemSharesBehavior() internal view virtual returns (RequestRedeemSharesBehavior) {
-        return (
-            TRANCHE_TYPE() == TrancheType.SENIOR
+        return (TRANCHE_TYPE() == TrancheType.SENIOR
                 ? RoycoTrancheStorageLib._getRoycoTrancheStorage().REQUEST_REDEEM_SHARES_ST_BEHAVIOR
-                : RoycoTrancheStorageLib._getRoycoTrancheStorage().REQUEST_REDEEM_SHARES_JT_BEHAVIOR
-        );
+                : RoycoTrancheStorageLib._getRoycoTrancheStorage().REQUEST_REDEEM_SHARES_JT_BEHAVIOR);
     }
 
     /// @dev Returns the specified share quantity added to the tranche's virtual shares

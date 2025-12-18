@@ -62,6 +62,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
      * @param _initialAuthority The initial authority for the base kernel
      * @param _jtRedemptionDelaySeconds The delay in seconds between a junior tranche LP requesting a redemption and being able to execute it
      */
+<<<<<<< HEAD
     function __RoycoKernel_init(
         RoycoKernelInitParams memory _params,
         address _stAsset,
@@ -73,6 +74,9 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         onlyInitializing
     {
         // Initialize the Royco base state
+=======
+    function __RoycoKernel_init(RoycoKernelInitParams memory _params, address _stAsset, address _jtAsset, address _initialAuthority) internal onlyInitializing {
+>>>>>>> 3e8282d81d9d50f89b18399211df5627b5dc5223
         __RoycoBase_init(_initialAuthority);
         // Initialize the Royco kernel state
         __RoycoKernel_init_unchained(_params, _stAsset, _jtAsset);
@@ -114,9 +118,77 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     /// @inheritdoc IRoycoKernel
     function jtConvertNAVUnitsToTrancheUnits(NAV_UNIT _navAssets) public view virtual override(IRoycoKernel) returns (TRANCHE_UNIT);
 
+<<<<<<< HEAD
     // =============================
     // External Accounting Synchronization Functions
     // =============================
+=======
+    /// @inheritdoc IRoycoKernel
+    function getState() external view override(IRoycoKernel) returns (RoycoKernelState memory) {
+        return RoycoKernelStorageLib._getRoycoKernelStorage();
+    }
+
+    /// @inheritdoc IRoycoKernel
+    function setProtocolFeeRecipient(address _protocolFeeRecipient) external restricted {
+        require(_protocolFeeRecipient != address(0), NULL_ADDRESS());
+        RoycoKernelStorageLib._getRoycoKernelStorage().protocolFeeRecipient = _protocolFeeRecipient;
+    }
+
+    /// @inheritdoc IRoycoKernel
+    function stMaxDeposit(address _receiver) external view override(IRoycoKernel) returns (TRANCHE_UNIT) {
+        NAV_UNIT stMaxDepositableNAV = _accountant().maxSTDepositGivenCoverage(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV());
+        return UnitsMathLib.min(_stMaxDepositGlobally(_receiver), stConvertNAVUnitsToTrancheUnits(stMaxDepositableNAV));
+    }
+
+    /// @inheritdoc IRoycoKernel
+    function stMaxWithdrawable(address _owner)
+        external
+        view
+        override(IRoycoKernel)
+        returns (NAV_UNIT claimOnStNAV, NAV_UNIT claimOnJtNAV, NAV_UNIT stMaxWithdrawableNAV, NAV_UNIT jtMaxWithdrawableNAV)
+    {
+        // Get the total claims the senior tranche has on each tranche's assets
+        (, AssetClaims memory stNotionalClaims,) = previewSyncTrancheAccounting(TrancheType.SENIOR);
+        claimOnStNAV = stConvertTrancheUnitsToNAVUnits(stNotionalClaims.stAssets);
+        claimOnJtNAV = jtConvertTrancheUnitsToNAVUnits(stNotionalClaims.jtAssets);
+
+        // Bound the claims by the max withdrawable assets globally for each tranche and compute the cumulative NAV
+        stMaxWithdrawableNAV = stConvertTrancheUnitsToNAVUnits(_stMaxWithdrawableGlobally(_owner));
+        jtMaxWithdrawableNAV = jtConvertTrancheUnitsToNAVUnits(_jtMaxWithdrawableGlobally(_owner));
+    }
+
+    /// @inheritdoc IRoycoKernel
+    function jtMaxDeposit(address _receiver) external view override(IRoycoKernel) returns (TRANCHE_UNIT) {
+        return _jtMaxDepositGlobally(_receiver);
+    }
+
+    /// @inheritdoc IRoycoKernel
+    function jtMaxWithdrawable(address _owner)
+        external
+        view
+        override(IRoycoKernel)
+        returns (NAV_UNIT claimOnStNAV, NAV_UNIT claimOnJtNAV, NAV_UNIT stMaxWithdrawableNAV, NAV_UNIT jtMaxWithdrawableNAV)
+    {
+        // Get the total claims the junior tranche has on each tranche's assets
+        (SyncedAccountingState memory state, AssetClaims memory jtNotionalClaims,) = previewSyncTrancheAccounting(TrancheType.JUNIOR);
+
+        // Get the max withdrawable st and jt assets in NAV units from the accountant consider coverage requirement
+        (, NAV_UNIT stClaimableGivenCoverage, NAV_UNIT jtClaimableGivenCoverage) = _accountant()
+            .maxJTWithdrawalGivenCoverage(
+                state.stRawNAV,
+                state.jtRawNAV,
+                stConvertTrancheUnitsToNAVUnits(jtNotionalClaims.stAssets),
+                jtConvertTrancheUnitsToNAVUnits(jtNotionalClaims.jtAssets)
+            );
+
+        claimOnStNAV = stConvertTrancheUnitsToNAVUnits(jtNotionalClaims.stAssets);
+        claimOnJtNAV = jtConvertTrancheUnitsToNAVUnits(jtNotionalClaims.jtAssets);
+
+        // Bound the claims by the max withdrawable assets globally for each tranche and compute the cumulative NAV
+        stMaxWithdrawableNAV = UnitsMathLib.min(stConvertTrancheUnitsToNAVUnits(_stMaxWithdrawableGlobally(_owner)), stClaimableGivenCoverage);
+        jtMaxWithdrawableNAV = UnitsMathLib.min(jtConvertTrancheUnitsToNAVUnits(_jtMaxWithdrawableGlobally(_owner)), jtClaimableGivenCoverage);
+    }
+>>>>>>> 3e8282d81d9d50f89b18399211df5627b5dc5223
 
     /// @inheritdoc IRoycoKernel
     function syncTrancheAccounting() external override(IRoycoKernel) restricted returns (SyncedAccountingState memory state) {

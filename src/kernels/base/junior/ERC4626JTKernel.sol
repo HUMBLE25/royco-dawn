@@ -6,6 +6,7 @@ import { IERC20, SafeERC20 } from "../../../../lib/openzeppelin-contracts/contra
 import { Math } from "../../../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 import { ExecutionModel, IRoycoKernel, RequestRedeemSharesBehavior } from "../../../interfaces/kernel/IRoycoKernel.sol";
 import { ZERO_TRANCHE_UNITS } from "../../../libraries/Constants.sol";
+import { SyncedAccountingState } from "../../../libraries/Types.sol";
 import { AssetClaims } from "../../../libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib, toTrancheUnits, toUint256 } from "../../../libraries/Units.sol";
 import { UtilsLib } from "../../../libraries/UtilsLib.sol";
@@ -22,6 +23,9 @@ abstract contract ERC4626JTKernel is RoycoKernel, RedemptionDelayJTKernel {
 
     /// @notice Thrown when the ST base asset is different the the ERC4626 vault's base asset
     error TRANCHE_AND_VAULT_ASSET_MISMATCH();
+
+    /// @notice Thrown when the shares to redeem are greater than the claimable shares
+    error INSUFFICIENT_CLAIMABLE_SHARES(uint256 sharesToRedeem, uint256 claimableShares);
 
     /**
      * @notice Initializes a kernel where the junior tranche is deployed into an ERC4626 vault
