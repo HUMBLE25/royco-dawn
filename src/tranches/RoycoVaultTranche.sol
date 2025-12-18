@@ -77,6 +77,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
      * @param _account The address that the caller should match or have operator approval for
      * @dev Reverts if caller is neither the address nor an approved operator
      */
+    /// forge-lint: disable-next-item(unwrapped-modifier-logic)
     modifier onlyCallerOrOperator(address _account) {
         require(_isCallerOrOperator(_account), ONLY_CALLER_OR_OPERATOR());
         _;

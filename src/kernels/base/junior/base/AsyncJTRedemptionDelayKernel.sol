@@ -8,7 +8,7 @@ import { IRoycoKernel } from "../../../../interfaces/kernel/IRoycoKernel.sol";
 import { ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID } from "../../../../libraries/Constants.sol";
 import { AssetClaims } from "../../../../libraries/Types.sol";
 import { Operation, RequestRedeemSharesBehavior, SyncedAccountingState, TrancheType } from "../../../../libraries/Types.sol";
-import { NAV_UNIT, UnitsMathLib, toNAVUnits, toUint256 } from "../../../../libraries/Units.sol";
+import { NAV_UNIT, UnitsMathLib } from "../../../../libraries/Units.sol";
 import { RoycoKernel } from "../../RoycoKernel.sol";
 
 /// @title AsyncJTRedemptionDelayKernel
@@ -17,19 +17,19 @@ abstract contract AsyncJTRedemptionDelayKernel is IAsyncJTRedemptionDelayKernel,
     using Math for uint256;
     using UnitsMathLib for NAV_UNIT;
 
-    /// @dev Storage slot for AsyncJTRedemptionDelayKernelState using ERC-7201 pattern
-    // keccak256(abi.encode(uint256(keccak256("Royco.storage.AsyncJTRedemptionDelayKernelState")) - 1)) & ~bytes32(uint256(0xff))
+    /// @dev Storage slot for AsyncJtRedemptionDelayKernelState using ERC-7201 pattern
+    // keccak256(abi.encode(uint256(keccak256("Royco.storage.AsyncJtRedemptionDelayKernelState")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant BASE_ASYNC_JT_REDEMPTION_DELAY_KERNEL_STORAGE_SLOT = 0xded0c80c14aecd5426bd643f18df17d9cea228e72fcaefe1b139ffca90913500;
 
     /// @inheritdoc IRoycoKernel
     RequestRedeemSharesBehavior public constant JT_REQUEST_REDEEM_SHARES_BEHAVIOR = RequestRedeemSharesBehavior.BURN_ON_REDEEM;
 
     /**
-     * @custom:storage-location erc7201:Royco.storage.AsyncJTRedemptionDelayKernelState
+     * @custom:storage-location erc7201:Royco.storage.AsyncJtRedemptionDelayKernelState
      * @custom:field jtRedemptionDelaySeconds - The configured redemption delay in seconds that a JT LP has to wait before executing a redemption
      * @custom:field redemptions - A mapping between a controller and their redemption request state
      */
-    struct AsyncJTRedemptionDelayKernelState {
+    struct AsyncJtRedemptionDelayKernelState {
         uint256 jtRedemptionDelaySeconds;
         mapping(address controller => Redemption redemption) controllerToRedemptionState;
     }
@@ -77,6 +77,7 @@ abstract contract AsyncJTRedemptionDelayKernel is IAsyncJTRedemptionDelayKernel,
 
     /// @notice Modifer to check that the provided request ID implies pure controller discrimination
     /// @param _requestId The request ID to validate
+    /// forge-lint: disable-next-item(unwrapped-modifier-logic)
     modifier checkRequestId(uint256 _requestId) {
         require(_requestId == ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, INVALID_REQUEST_ID(_requestId));
         _;
@@ -87,7 +88,7 @@ abstract contract AsyncJTRedemptionDelayKernel is IAsyncJTRedemptionDelayKernel,
      * @param _jtRedemptionDelaySeconds The delay in seconds between a junior tranche LP requesting a redemption and being able to execute it
      */
     function __AsyncJTRedemptionDelayKernel_init_unchained(uint256 _jtRedemptionDelaySeconds) internal onlyInitializing {
-        _getAsyncJTRedemptionDelayKernelState().jtRedemptionDelaySeconds = _jtRedemptionDelaySeconds;
+        _getAsyncJtRedemptionDelayKernelState().jtRedemptionDelaySeconds = _jtRedemptionDelaySeconds;
     }
 
     /// @inheritdoc IRoycoKernel
@@ -105,7 +106,7 @@ abstract contract AsyncJTRedemptionDelayKernel is IAsyncJTRedemptionDelayKernel,
         (SyncedAccountingState memory state,, uint256 totalTrancheShares) = _preOpSyncTrancheAccounting(TrancheType.JUNIOR);
 
         // Ensure that the redemption for this controller isn't cancelled
-        AsyncJTRedemptionDelayKernelState storage $ = _getAsyncJTRedemptionDelayKernelState();
+        AsyncJtRedemptionDelayKernelState storage $ = _getAsyncJtRedemptionDelayKernelState();
         Redemption storage redemption = $.controllerToRedemptionState[_controller];
         require(!redemption.isCanceled, WITHDRAWAL_CANCELLED__CLAIM_BEFORE_REQUESTING_AGAIN());
 
@@ -127,7 +128,7 @@ abstract contract AsyncJTRedemptionDelayKernel is IAsyncJTRedemptionDelayKernel,
 
     /// @inheritdoc IAsyncJTRedemptionDelayKernel
     function jtPendingRedeemRequest(uint256 _requestId, address _controller) external view checkRequestId(_requestId) returns (uint256 pendingShares) {
-        Redemption storage redemption = _getAsyncJTRedemptionDelayKernelState().controllerToRedemptionState[_controller];
+        Redemption storage redemption = _getAsyncJtRedemptionDelayKernelState().controllerToRedemptionState[_controller];
         // If the redemption is canceled or the request is claimable, no shares are still in a pending state
         if (redemption.isCanceled || redemption.redemptionAllowedAtTimestamp >= block.timestamp) return 0;
         // The shares in the controller's redemption request are still pending
@@ -145,7 +146,7 @@ abstract contract AsyncJTRedemptionDelayKernel is IAsyncJTRedemptionDelayKernel,
      * @return claimableShares The amount of JT shares claimable from the redemption request
      */
     function _jtClaimableRedeemRequest(address _controller) internal view returns (uint256 claimableShares) {
-        Redemption storage redemption = _getAsyncJTRedemptionDelayKernelState().controllerToRedemptionState[_controller];
+        Redemption storage redemption = _getAsyncJtRedemptionDelayKernelState().controllerToRedemptionState[_controller];
         // If the redemption is canceled or not claimable, no shares are claimable
         if (redemption.isCanceled || redemption.redemptionAllowedAtTimestamp < block.timestamp) return 0;
         // Return the shares in the request
@@ -158,7 +159,7 @@ abstract contract AsyncJTRedemptionDelayKernel is IAsyncJTRedemptionDelayKernel,
 
     /// @inheritdoc IAsyncJTRedemptionDelayKernel
     function jtCancelRedeemRequest(uint256 _requestId, address _controller) external whenNotPaused onlyJuniorTranche checkRequestId(_requestId) {
-        Redemption storage redemption = _getAsyncJTRedemptionDelayKernelState().controllerToRedemptionState[_controller];
+        Redemption storage redemption = _getAsyncJtRedemptionDelayKernelState().controllerToRedemptionState[_controller];
         // Cannot cancel an already cancelled request
         require(!redemption.isCanceled, REDEMPTION_ALREADY_CANCELED());
         // Mark this request as canceled
@@ -166,14 +167,14 @@ abstract contract AsyncJTRedemptionDelayKernel is IAsyncJTRedemptionDelayKernel,
     }
 
     /// @inheritdoc IAsyncJTRedemptionDelayKernel
-    function jtPendingCancelRedeemRequest(uint256, address) external view returns (bool isPending) {
+    function jtPendingCancelRedeemRequest(uint256, address) external pure returns (bool isPending) {
         // Cancelation requests are always processed instantly, so there is never a pending cancelation
         isPending = false;
     }
 
     /// @inheritdoc IAsyncJTRedemptionDelayKernel
     function jtClaimableCancelRedeemRequest(uint256 _requestId, address _controller) external view checkRequestId(_requestId) returns (uint256 shares) {
-        AsyncJTRedemptionDelayKernelState storage $ = _getAsyncJTRedemptionDelayKernelState();
+        AsyncJtRedemptionDelayKernelState storage $ = _getAsyncJtRedemptionDelayKernelState();
         // If the redemption is not canceled, there are no shares to claim
         if (!$.controllerToRedemptionState[_controller].isCanceled) return 0;
         // Return the shares for the redemption request that has been requested to be cancelled
@@ -191,7 +192,7 @@ abstract contract AsyncJTRedemptionDelayKernel is IAsyncJTRedemptionDelayKernel,
         checkRequestId(_requestId)
         returns (uint256 shares)
     {
-        AsyncJTRedemptionDelayKernelState storage $ = _getAsyncJTRedemptionDelayKernelState();
+        AsyncJtRedemptionDelayKernelState storage $ = _getAsyncJtRedemptionDelayKernelState();
         Redemption storage redemption = $.controllerToRedemptionState[_controller];
         // Cannot claim a non-existant cancellation request
         require(redemption.isCanceled, REDEMPTION_NOT_CANCELED());
@@ -204,13 +205,13 @@ abstract contract AsyncJTRedemptionDelayKernel is IAsyncJTRedemptionDelayKernel,
     /// @notice Returns the junior tranche's redemption delay
     /// @return jtRedemptionDelaySeconds The junior tranche's redemption delay in seconds
     function getJuniorTrancheRedemptionDelay() external view returns (uint256) {
-        return _getAsyncJTRedemptionDelayKernelState().jtRedemptionDelaySeconds;
+        return _getAsyncJtRedemptionDelayKernelState().jtRedemptionDelaySeconds;
     }
 
     /// @notice Sets the junior tranche's redemption delay
     /// @param _jtRedemptionDelaySeconds The new junior tranche's redemption delay in seconds
     function setJuniorTrancheRedemptionDelay(uint256 _jtRedemptionDelaySeconds) external restricted {
-        _getAsyncJTRedemptionDelayKernelState().jtRedemptionDelaySeconds = _jtRedemptionDelaySeconds;
+        _getAsyncJtRedemptionDelayKernelState().jtRedemptionDelaySeconds = _jtRedemptionDelaySeconds;
         emit RedemptionDelayUpdated(_jtRedemptionDelaySeconds);
     }
 
@@ -234,7 +235,7 @@ abstract contract AsyncJTRedemptionDelayKernel is IAsyncJTRedemptionDelayKernel,
     {
         // JT LPs are not entitled to any JT upside during the redemption delay
         // However, they are liable for providing coverage to ST LPs during the redemption delay
-        AsyncJTRedemptionDelayKernelState storage $ = _getAsyncJTRedemptionDelayKernelState();
+        AsyncJtRedemptionDelayKernelState storage $ = _getAsyncJtRedemptionDelayKernelState();
         Redemption storage redemption = $.controllerToRedemptionState[_controller];
 
         // Calculate the current NAV of the shares being redeemed
@@ -268,11 +269,11 @@ abstract contract AsyncJTRedemptionDelayKernel is IAsyncJTRedemptionDelayKernel,
     }
 
     /**
-     * @notice Returns a storage pointer to the AsyncJTRedemptionDelayKernelState storage
+     * @notice Returns a storage pointer to the AsyncJtRedemptionDelayKernelState storage
      * @dev Uses ERC-7201 storage slot pattern for collision-resistant storage
      * @return $ Storage pointer to the base async redemption delay kernel
      */
-    function _getAsyncJTRedemptionDelayKernelState() private pure returns (AsyncJTRedemptionDelayKernelState storage $) {
+    function _getAsyncJtRedemptionDelayKernelState() private pure returns (AsyncJtRedemptionDelayKernelState storage $) {
         assembly ("memory-safe") {
             $.slot := BASE_ASYNC_JT_REDEMPTION_DELAY_KERNEL_STORAGE_SLOT
         }

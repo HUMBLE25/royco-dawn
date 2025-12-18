@@ -37,25 +37,25 @@ interface IRoycoKernel {
      * @notice Returns the execution model for the senior tranche's increase NAV operation
      * @return The execution model for the senior tranche's increase NAV operation - SYNC or ASYNC
      */
-    function ST_INCREASE_NAV_EXECUTION_MODEL() external pure returns (ExecutionModel);
+    function ST_DEPOSIT_EXECUTION_MODEL() external pure returns (ExecutionModel);
 
     /**
      * @notice Returns the execution model for the senior tranche's decrease NAV operation
      * @return The execution model for the senior tranche's decrease NAV operation - SYNC or ASYNC
      */
-    function ST_DECREASE_NAV_EXECUTION_MODEL() external pure returns (ExecutionModel);
+    function ST_REDEEM_EXECUTION_MODEL() external pure returns (ExecutionModel);
 
     /**
      * @notice Returns the execution model for the junior tranche's increase NAV operation
      * @return The execution model for the junior tranche's increase NAV operation - SYNC or ASYNC
      */
-    function JT_INCREASE_NAV_EXECUTION_MODEL() external pure returns (ExecutionModel);
+    function JT_DEPOSIT_EXECUTION_MODEL() external pure returns (ExecutionModel);
 
     /**
      * @notice Returns the execution model for the junior tranche's decrease NAV operation
      * @return The execution model for the junior tranche's decrease NAV operation - SYNC or ASYNC
      */
-    function JT_DECREASE_NAV_EXECUTION_MODEL() external pure returns (ExecutionModel);
+    function JT_REDEEM_EXECUTION_MODEL() external pure returns (ExecutionModel);
 
     /**
      * @notice Returns the raw NAV of the senior tranche.
@@ -138,6 +138,13 @@ interface IRoycoKernel {
      */
     function stMaxDeposit(address _receiver) external view returns (TRANCHE_UNIT assets);
 
+    /**
+     * @notice Returns the maximum amount of assets that can be withdrawn from the senior tranche
+     * @param _owner The address that is withdrawing the assets
+     * @return state The synced NAV, debt, and fee accounting containing all mark to market accounting data
+     * @return stNotionalClaims The notional claims on ST assets that the senior tranche has denominated in tranche-native units
+     * @return stMaxClaims The maximum claims on ST assets that the senior tranche can withdraw, denominated in the senior tranche's tranche units
+     */
     function stMaxWithdrawable(address _owner)
         external
         view
