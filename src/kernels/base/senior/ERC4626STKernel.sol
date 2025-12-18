@@ -111,8 +111,8 @@ abstract contract ERC4626STKernel is RoycoKernel {
         (, claims, totalTrancheShares) = _preOpSyncTrancheAccounting(TrancheType.SENIOR);
         claims = UtilsLib.scaleTrancheAssetsClaim(claims, _shares, totalTrancheShares);
 
-        // Claim assets from each tranche and transfer them to the receiver
-        _claimAssetsForUser(claims, _receiver);
+        // Withdraw the asset claims from each tranche and transfer them to the receiver
+        _withdrawAssets(claims, _receiver);
 
         // Execute a post-op sync on accounting
         _postOpSyncTrancheAccounting(Operation.ST_DECREASE_NAV);

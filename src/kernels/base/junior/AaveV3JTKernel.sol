@@ -137,8 +137,8 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
         // Scale the claims based on the NAV to liquidate for the user relative to the total JT controlled NAV
         claims = UtilsLib.scaleTrancheAssetsClaim(claims, navOfSharesToRedeem, state.jtEffectiveNAV);
 
-        // Claim assets from each tranche and transfer them to the receiver
-        _claimAssetsForUser(claims, _receiver);
+        // Withdraw the asset claims from each tranche and transfer them to the receiver
+        _withdrawAssets(claims, _receiver);
 
         // Execute a post-op sync on accounting and enforce the market's coverage requirement
         _postOpSyncTrancheAccountingAndEnforceCoverage(Operation.JT_DECREASE_NAV);
