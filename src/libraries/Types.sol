@@ -84,13 +84,13 @@ enum TrancheType {
     SENIOR
 }
 
-/// @title RequestRedeemSharesBehavior
+/// @title SharesRedemptionModel
 /// @dev Defines the behavior of the shares when a redeem request is made
-/// @custom:type BURN_ON_REQUEST The shares are burned when calling requestRedeem
-/// @custom:type BURN_ON_REDEEM The shares are burned when calling redeem
-enum RequestRedeemSharesBehavior {
-    BURN_ON_REQUEST,
-    BURN_ON_REDEEM
+/// @custom:type BURN_ON_REQUEST_REDEEM The shares are burned when calling requestRedeem
+/// @custom:type BURN_ON_CLAIM_REDEEM The shares are burned when calling redeem
+enum SharesRedemptionModel {
+    BURN_ON_REQUEST_REDEEM,
+    BURN_ON_CLAIM_REDEEM
 }
 
 /// @title ExecutionModel

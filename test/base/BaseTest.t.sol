@@ -10,14 +10,12 @@ import { RoycoAccountant } from "../../src/accountant/RoycoAccountant.sol";
 import { RoycoRoles } from "../../src/auth/RoycoRoles.sol";
 import { IRoycoAccountant } from "../../src/interfaces/IRoycoAccountant.sol";
 import { IRoycoAuth } from "../../src/interfaces/IRoycoAuth.sol";
-import { IAsyncJTRedemptionDelayKernel } from "../../src/interfaces/kernel/IAsyncJTRedemptionDelayKernel.sol";
 import { IRoycoKernel } from "../../src/interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoAsyncCancellableVault } from "../../src/interfaces/tranche/IRoycoAsyncCancellableVault.sol";
 import { IRoycoAsyncVault } from "../../src/interfaces/tranche/IRoycoAsyncVault.sol";
 import { IRoycoVaultTranche } from "../../src/interfaces/tranche/IRoycoVaultTranche.sol";
 import { ERC4626ST_AaveV3JT_IdenticalAssets_Kernel } from "../../src/kernels/ERC4626ST_AaveV3JT_IdenticalAssets_Kernel.sol";
 import { RoycoKernel } from "../../src/kernels/base/RoycoKernel.sol";
-import { RedemptionDelayJTKernel } from "../../src/kernels/base/junior/base/RedemptionDelayJTKernel.sol";
 import { AssetClaims, RolesConfiguration, TrancheType } from "../../src/libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, toUint256 } from "../../src/libraries/Units.sol";
 import { StaticCurveRDM } from "../../src/rdm/StaticCurveRDM.sol";
@@ -458,7 +456,7 @@ abstract contract BaseTest is Test, RoycoRoles, Assertions {
         kernelSelectors[3] = IRoycoAuth.unpause.selector;
         kernelRoles[3] = PAUSER_ROLE;
 
-        kernelSelectors[4] = RedemptionDelayJTKernel.setJuniorTrancheRedemptionDelay.selector;
+        kernelSelectors[4] = IRoycoKernel.setJuniorTrancheRedemptionDelay.selector;
         kernelRoles[4] = KERNEL_ADMIN_ROLE;
 
         // Accountant: 6 functions (setRDM, setProtocolFee, setCoverage, setBeta, pause, unpause)

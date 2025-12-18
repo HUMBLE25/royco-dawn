@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import { IERC4626 } from "../../../../lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 import { IERC20, SafeERC20 } from "../../../../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
-import { ExecutionModel, IRoycoKernel, RequestRedeemSharesBehavior } from "../../../interfaces/kernel/IRoycoKernel.sol";
+import { ExecutionModel, IRoycoKernel, SharesRedemptionModel } from "../../../interfaces/kernel/IRoycoKernel.sol";
 import { AssetClaims } from "../../../libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib, toTrancheUnits, toUint256 } from "../../../libraries/Units.sol";
 import { UtilsLib } from "../../../libraries/UtilsLib.sol";
@@ -21,7 +21,7 @@ abstract contract ERC4626STKernel is RoycoKernel {
     ExecutionModel public constant ST_REDEEM_EXECUTION_MODEL = ExecutionModel.SYNC;
 
     /// @inheritdoc IRoycoKernel
-    RequestRedeemSharesBehavior public constant ST_REQUEST_REDEEM_SHARES_BEHAVIOR = RequestRedeemSharesBehavior.BURN_ON_REDEEM;
+    SharesRedemptionModel public constant ST_REQUEST_REDEEM_SHARES_BEHAVIOR = SharesRedemptionModel.BURN_ON_CLAIM_REDEEM;
 
     /// @notice Thrown when the ST base asset is different the the ERC4626 vault's base asset
     error TRANCHE_AND_VAULT_ASSET_MISMATCH();
@@ -62,57 +62,6 @@ abstract contract ERC4626STKernel is RoycoKernel {
         userClaim = _previewRedeem(_shares, TrancheType.SENIOR);
     }
 
-    /// @inheritdoc IRoycoKernel
-    function stDeposit(
-        TRANCHE_UNIT _assets,
-        address,
-        address
-    )
-        external
-        override(IRoycoKernel)
-        onlySeniorTranche
-        whenNotPaused
-        returns (NAV_UNIT valueAllocated, NAV_UNIT navToMintAt)
-    {
-        // Execute a pre-op sync on accounting
-        navToMintAt = (_preOpSyncTrancheAccounting()).stEffectiveNAV;
-
-        // Deposit the assets into the underlying investment vault and add to the number of ST controlled shares for this vault
-        ERC4626KernelState storage $ = ERC4626KernelStorageLib._getERC4626KernelStorage();
-        $.stOwnedShares += IERC4626($.stVault).deposit(toUint256(_assets), address(this));
-
-        // Execute a post-op sync on accounting and enforce the market's coverage requirement
-        NAV_UNIT postDepositNAV = (_postOpSyncTrancheAccountingAndEnforceCoverage(Operation.ST_INCREASE_NAV)).stEffectiveNAV;
-        // The value allocated after any fees/slippage incurred on deposit
-        valueAllocated = postDepositNAV - navToMintAt;
-    }
-
-    /// @inheritdoc IRoycoKernel
-    function stRedeem(
-        uint256 _shares,
-        address,
-        address _receiver
-    )
-        external
-        override(IRoycoKernel)
-        onlySeniorTranche
-        whenNotPaused
-        returns (AssetClaims memory userAssetClaims)
-    {
-        // Execute a pre-op sync on accounting
-        uint256 totalTrancheShares;
-        (, userAssetClaims, totalTrancheShares) = _preOpSyncTrancheAccounting(TrancheType.SENIOR);
-
-        // Scale total tranche asset claims by the ratio of shares this user owns of the tranche vault
-        userAssetClaims = UtilsLib.scaleTrancheAssetsClaim(userAssetClaims, _shares, totalTrancheShares);
-
-        // Withdraw the asset claims from each tranche and transfer them to the receiver
-        _withdrawAssets(userAssetClaims, _receiver);
-
-        // Execute a post-op sync on accounting
-        _postOpSyncTrancheAccounting(Operation.ST_DECREASE_NAV);
-    }
-
     /// @inheritdoc RoycoKernel
     function _getSeniorTrancheRawNAV() internal view override(RoycoKernel) returns (NAV_UNIT) {
         ERC4626KernelState storage $ = ERC4626KernelStorageLib._getERC4626KernelStorage();
@@ -135,18 +84,25 @@ abstract contract ERC4626STKernel is RoycoKernel {
     }
 
     /// @inheritdoc RoycoKernel
-    function _stWithdrawAssets(TRANCHE_UNIT _stAssets, address _receiver) internal override(RoycoKernel) {
-        ERC4626KernelState storage $ = ERC4626KernelStorageLib._getERC4626KernelStorage();
-        // Withdraw the specified assets and deduct the burned shares from the ST controlled shares for the underlying ST ERC4626 vault
-        $.stOwnedShares -= IERC4626($.stVault).withdraw(toUint256(_stAssets), _receiver, address(this));
-    }
-
-    /// @inheritdoc RoycoKernel
     function _previewWithdrawSTAssets(TRANCHE_UNIT _stAssets) internal view override(RoycoKernel) returns (TRANCHE_UNIT redeemedSTAssets) {
         IERC4626 stVault = IERC4626(ERC4626KernelStorageLib._getERC4626KernelStorage().stVault);
         // Convert the ST assets to underlying shares
         uint256 underlyingShares = stVault.convertToShares(toUint256(_stAssets));
         // Preview the amount of ST assets that would be redeemed for the given amount of underlying shares
         redeemedSTAssets = toTrancheUnits(stVault.previewRedeem(underlyingShares));
+    }
+
+    /// @inheritdoc RoycoKernel
+    function _stDepositAssets(TRANCHE_UNIT _stAssets) internal override(RoycoKernel) {
+        // Deposit the assets into the underlying investment vault and add to the number of ST controlled shares for this vault
+        ERC4626KernelState storage $ = ERC4626KernelStorageLib._getERC4626KernelStorage();
+        $.stOwnedShares += IERC4626($.stVault).deposit(toUint256(_stAssets), address(this));
+    }
+
+    /// @inheritdoc RoycoKernel
+    function _stWithdrawAssets(TRANCHE_UNIT _stAssets, address _receiver) internal override(RoycoKernel) {
+        ERC4626KernelState storage $ = ERC4626KernelStorageLib._getERC4626KernelStorage();
+        // Withdraw the specified assets and deduct the burned shares from the ST controlled shares for the underlying ST ERC4626 vault
+        $.stOwnedShares -= IERC4626($.stVault).withdraw(toUint256(_stAssets), _receiver, address(this));
     }
 }

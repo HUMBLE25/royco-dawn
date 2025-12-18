@@ -13,7 +13,7 @@ contract ERC4626ST_AaveV3JT_InKindAssets_Kernel is ERC4626STKernel, AaveV3JTKern
         address _initialAuthority,
         address _stVault,
         address _aaveV3Pool,
-        uint256 _jtRedemptionDelaySeconds
+        uint256 _jtRedemptionDelayInSeconds
     )
         external
         initializer
@@ -29,6 +29,6 @@ contract ERC4626ST_AaveV3JT_InKindAssets_Kernel is ERC4626STKernel, AaveV3JTKern
         // Initialize the ERC4626 senior tranche state
         __ERC4626_ST_Kernel_init_unchained(_stVault, stAsset);
         // Initialize the Aave V3 junior tranche state
-        __AaveV3_JT_Kernel_init(_aaveV3Pool, jtAsset, _jtRedemptionDelaySeconds);
+        __AaveV3_JT_Kernel_init_unchained(_aaveV3Pool, jtAsset);
     }
 }

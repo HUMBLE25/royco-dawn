@@ -13,9 +13,7 @@ import { IRoycoKernel } from "./interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoAsyncCancellableVault } from "./interfaces/tranche/IRoycoAsyncCancellableVault.sol";
 import { IRoycoAsyncVault } from "./interfaces/tranche/IRoycoAsyncVault.sol";
 import { IRoycoVaultTranche } from "./interfaces/tranche/IRoycoVaultTranche.sol";
-import { RedemptionDelayJTKernel } from "./kernels/base/junior/base/RedemptionDelayJTKernel.sol";
-import { RolesConfiguration } from "./libraries/Types.sol";
-import { DeployedContracts, MarketDeploymentParams } from "./libraries/Types.sol";
+import { DeployedContracts, MarketDeploymentParams, RolesConfiguration } from "./libraries/Types.sol";
 
 /// @title RoycoFactory
 /// @notice Factory contract for deploying Royco tranches (ST and JT) and their associated kernel using ERC1967 proxies
@@ -161,8 +159,9 @@ contract RoycoFactory is AccessManager, RoycoRoles {
         require(address(_deployedContracts.seniorTranche.kernel()) == address(_deployedContracts.kernel), InvalidKernelOnSeniorTranche());
         require(address(_deployedContracts.juniorTranche.kernel()) == address(_deployedContracts.kernel), InvalidKernelOnJuniorTranche());
 
+        (,,,,, address accountant,) = _deployedContracts.kernel.getState();
         // Check that the accountant is set on the kernel
-        require(address(_deployedContracts.kernel.getState().accountant) == address(_deployedContracts.accountant), InvalidAccountantOnKernel());
+        require(address(accountant) == address(_deployedContracts.accountant), InvalidAccountantOnKernel());
 
         // Check that the kernel is set on the accountant
         require(address(_deployedContracts.accountant.getState().kernel) == address(_deployedContracts.kernel), InvalidKernelOnAccountant());

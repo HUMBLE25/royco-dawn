@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import { RoycoKernelState } from "../../libraries/RoycoKernelStorageLib.sol";
-import { AssetClaims, ExecutionModel, RequestRedeemSharesBehavior, SyncedAccountingState } from "../../libraries/Types.sol";
+import { AssetClaims, ExecutionModel, SharesRedemptionModel, SyncedAccountingState } from "../../libraries/Types.sol";
 import { TrancheType } from "../../libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT } from "../../libraries/Units.sol";
 
@@ -12,6 +12,12 @@ import { NAV_UNIT, TRANCHE_UNIT } from "../../libraries/Units.sol";
  * @dev The kernel contract is responsible for defining the execution model and logic of the Senior and Junior tranches of a given Royco market
  */
 interface IRoycoKernel {
+    /// @notice Emitted when the protocol fee recipient is updated
+    event ProtocolFeeRecipientUpdated(address protocolFeeRecipient);
+
+    /// @notice Emitted when the redemption delay is updated
+    event JuniorTrancheRedemptionDelayUpdated(uint256 jtRedemptionDelayInSeconds);
+
     /// @notice Thrown when any of the required initialization params are null
     error NULL_ADDRESS();
 
@@ -21,17 +27,35 @@ interface IRoycoKernel {
     /// @notice Thrown when the caller of a permissioned function isn't the market's junior tranche
     error ONLY_JUNIOR_TRANCHE();
 
+    /// @notice Thrown when the total shares claimable for redemption are less than what the user is trying to redeem
+    error INSUFFICIENT_REDEEMABLE_SHARES(uint256 sharesToRedeem, uint256 redeemableShares);
+
+    /// @notice Thrown when the JT redemption request ID is invalid
+    error INVALID_REQUEST_ID(uint256 requestId);
+
+    /// @notice Thrown when the redemption is already canceled
+    error REDEMPTION_REQUEST_CANCELED();
+
+    /// @notice Thrown when trying to a cancel a redemption request that doesn't exist
+    error NONEXISTANT_REQUEST_TO_CANCEL();
+
+    /// @notice Thrown when trying to claim a cancellation without having an existing cancellation
+    error REDEMPTION_REQUEST_NOT_CANCELED();
+
+    /// @notice Thrown when the function is not implemented
+    error PREVIEW_REDEEM_DISABLED_FOR_ASYNC_REDEMPTION();
+
     /**
      * @notice Returns the request redeem shares behavior for the senior tranche
-     * @return The request redeem shares behavior for the senior tranche - BURN_ON_REQUEST or BURN_ON_REDEEM
+     * @return The request redeem shares behavior for the senior tranche - BURN_ON_REQUEST_REDEEM or BURN_ON_CLAIM_REDEEM
      */
-    function ST_REQUEST_REDEEM_SHARES_BEHAVIOR() external pure returns (RequestRedeemSharesBehavior);
+    function ST_REQUEST_REDEEM_SHARES_BEHAVIOR() external pure returns (SharesRedemptionModel);
 
     /**
      * @notice Returns the request redeem shares behavior for the junior tranche
-     * @return The request redeem shares behavior for the junior tranche - BURN_ON_REQUEST or BURN_ON_REDEEM
+     * @return The request redeem shares behavior for the junior tranche - BURN_ON_REQUEST_REDEEM or BURN_ON_CLAIM_REDEEM
      */
-    function JT_REQUEST_REDEEM_SHARES_BEHAVIOR() external pure returns (RequestRedeemSharesBehavior);
+    function JT_REQUEST_REDEEM_SHARES_BEHAVIOR() external pure returns (SharesRedemptionModel);
 
     /**
      * @notice Returns the execution model for the senior tranche's increase NAV operation
@@ -216,6 +240,66 @@ interface IRoycoKernel {
     function jtDeposit(TRANCHE_UNIT _assets, address _caller, address _receiver) external returns (NAV_UNIT valueAllocated, NAV_UNIT navToMintAt);
 
     /**
+     * @notice Requests a redemption for a specified amount of shares from the underlying investment opportunity
+     * @param _caller The address of the user requesting the withdrawal for the junior tranche
+     * @param _shares The amount of shares of the junior tranche being requested to be redeemed
+     * @param _controller The controller that is allowed to operate the lifecycle of the request.
+     * @return requestId The request ID of this withdrawal request
+     */
+    function jtRequestRedeem(address _caller, uint256 _shares, address _controller) external returns (uint256 requestId);
+
+    /**
+     * @notice Returns the amount of assets pending redemption for a specific controller
+     * @param _requestId The request ID of this withdrawal request
+     * @param _controller The controller to query pending redemptions for
+     * @return pendingShares The amount of shares pending redemption for the controller
+     */
+    function jtPendingRedeemRequest(uint256 _requestId, address _controller) external view returns (uint256 pendingShares);
+
+    /**
+     * @notice Returns the amount of shares claimable from completed redemption requests for a specific controller
+     * @param _requestId The request ID of this withdrawal request
+     * @param _controller The controller to query claimable redemptions for
+     * @return claimableShares The amount of shares claimable from completed redemption requests
+     */
+    function jtClaimableRedeemRequest(uint256 _requestId, address _controller) external view returns (uint256 claimableShares);
+
+    /**
+     * @notice Cancels a pending redeem request for the specified controller
+     * @dev This function is only relevant if the kernel supports redeem cancellation
+     * @param _requestId The request ID of this deposit request
+     * @param _controller The controller that is allowed to operate the cancellation
+     */
+    function jtCancelRedeemRequest(uint256 _requestId, address _controller) external;
+
+    /**
+     * @notice Returns whether there is a pending redeem cancellation for the specified controller
+     * @dev This function is only relevant if the kernel supports redeem cancellation
+     * @param _requestId The request ID of this deposit request
+     * @param _controller The controller to query for pending cancellation
+     * @return isPending True if there is a pending redeem cancellation
+     */
+    function jtPendingCancelRedeemRequest(uint256 _requestId, address _controller) external view returns (bool isPending);
+
+    /**
+     * @notice Returns the amount of assets claimable from a redeem cancellation for the specified controller
+     * @dev This function is only relevant if the kernel supports redeem cancellation
+     * @param _requestId The request ID of this deposit request
+     * @param _controller The controller to query for claimable cancellation assets
+     * @return shares The amount of shares claimable from redeem cancellation
+     */
+    function jtClaimableCancelRedeemRequest(uint256 _requestId, address _controller) external view returns (uint256 shares);
+
+    /**
+     * @notice Claims a canceled redeem request for a specified controller
+     * @dev This function is only relevant if the kernel supports redeem cancellation
+     * @param _requestId The request ID of this deposit request
+     * @param _controller The controller corresponding to this request
+     * @return shares The amount of shares claimed from the canceled redeem request
+     */
+    function jtClaimCancelRedeemRequest(uint256 _requestId, address _controller) external returns (uint256 shares);
+
+    /**
      * @notice Processes the redemption of a specified number of shares from the junior tranche
      * @dev The function is expected to transfer the senior and junior assets directly to the receiver, based on the redemption claims
      * @param _shares The number of shares to redeem
@@ -232,8 +316,31 @@ interface IRoycoKernel {
     function setProtocolFeeRecipient(address _protocolFeeRecipient) external;
 
     /**
-     * @notice Returns the state of the kernel
-     * @return The state of the kernel
+     * @notice Sets the new junior tranche redemption delay
+     * @param _jtRedemptionDelayInSeconds The new junior tranche redemption delay in seconds
      */
-    function getState() external view returns (RoycoKernelState memory);
+    function setJuniorTrancheRedemptionDelay(uint24 _jtRedemptionDelayInSeconds) external;
+
+    /**
+     * @notice Returns the state of the kernel
+     * @param seniorTranche The address of the Royco senior tranche associated with this kernel
+     * @param stAsset The address of the asset that ST is denominated in: constitutes the ST's tranche units (type and precision)
+     * @param juniorTranche The address of the Royco junior tranche associated with this kernel
+     * @param jtAsset The address of the asset that JT is denominated in: constitutes the ST's tranche units (type and precision)
+     * @param protocolFeeRecipient The market's configured protocol fee recipient
+     * @param accountant The address of the Royco accountant used to perform per operation accounting for this kernel
+     * @param jtRedemptionDelayInSeconds The redemption delay in seconds that a JT LP has to wait between requesting and executing a redemption
+     */
+    function getState()
+        external
+        view
+        returns (
+            address seniorTranche,
+            address stAsset,
+            address juniorTranche,
+            address jtAsset,
+            address protocolFeeRecipient,
+            address accountant,
+            uint24 jtRedemptionDelayInSeconds
+        );
 }
