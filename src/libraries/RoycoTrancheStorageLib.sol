@@ -53,7 +53,6 @@ library RoycoTrancheStorageLib {
     /// @param _marketId The identifier of the Royco market this tranche is linked to
     /// @param _underlyingAssetDecimals The decimals of the tranche's underlying asset
     /// @param _decimalsOffset Decimals offset for share token precision
-
     /// @param _trancheType The type of the tranche
     function __RoycoTranche_init(
         address _kernel,

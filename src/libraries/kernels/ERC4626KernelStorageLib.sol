@@ -3,11 +3,14 @@ pragma solidity ^0.8.28;
 
 /// @notice Storage state for the Royco ERC4626 Senior Tranche Kernel
 /// @custom:storage-location erc7201:Royco.storage.ERC4626KernelState
-/// @custom:field vault - The address of the ERC4626 vault
-/// forge-lint: disable-next-item(pascal-case-struct)
+/// @custom:field stVault - The address of the ERC4626 vault for the ST
+/// @custom:field stOwnedShares - The number of shares ST owns for ST's ERC4626 vault
+/// @custom:field jtVault - The address of the ERC4626 vault for the JT
+/// @custom:field jtOwnedShares - The number of shares JT owns for JT's ERC4626 vault
 struct ERC4626KernelState {
-    address vault;
+    address stVault;
     uint256 stOwnedShares;
+    address jtVault;
     uint256 jtOwnedShares;
 }
 
@@ -27,12 +30,5 @@ library ERC4626KernelStorageLib {
         assembly ("memory-safe") {
             $.slot := ERC4626_KERNEL_STORAGE_SLOT
         }
-    }
-
-    /// @notice Initializes the ERC4626 kernel state
-    /// @param _vault The address of the ERC4626 vault
-    function __ERC4626Kernel_init(address _vault) internal {
-        ERC4626KernelState storage $ = _getERC4626KernelStorage();
-        $.vault = _vault;
     }
 }
