@@ -198,7 +198,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         returns (SyncedAccountingState memory state, AssetClaims memory claims, uint256 totalTrancheShares)
     {
         // Preview an accounting sync via the accountant
-        state = _accountant().previewSyncTrancheAccounting(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV());
+        state = _previewSyncTrancheAccounting();
 
         // Decompose effective NAVs into self-backed NAV claims and cross-tranche NAV claims
         (NAV_UNIT stNAVClaimOnSelf, NAV_UNIT stNAVClaimOnJT, NAV_UNIT jtNAVClaimOnSelf, NAV_UNIT jtNAVClaimOnST) = _decomposeNAVClaims(state);
@@ -520,6 +520,15 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     // =============================
 
     /**
+     * @notice Previews an accounting sync via the accountant
+     * @return state The synced NAV, debt, and fee accounting containing all mark to market accounting data
+     */
+    function _previewSyncTrancheAccounting() internal view returns (SyncedAccountingState memory state) {
+        // Preview an accounting sync via the accountant
+        state = _accountant().previewSyncTrancheAccounting(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV());
+    }
+
+    /**
      * @notice Invokes the accountant to do a pre-operation (deposit and withdrawal) NAV sync and mints any protocol fee shares accrued
      * @notice Also returns the asset claims and total tranche shares after minting any fees
      * @dev Should be called on every NAV mutating user operation
@@ -722,12 +731,12 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     // =============================
 
     /// @notice Returns the raw net asset value of the senior tranche denominated in the NAV units (USD, BTC, etc.) for this kernel
-    /// @return The pure net asset value of the senior tranche invested assets
-    function _getSeniorTrancheRawNAV() internal view virtual returns (NAV_UNIT);
+    /// @return stRawNAV The pure net asset value of the senior tranche invested assets
+    function _getSeniorTrancheRawNAV() internal view virtual returns (NAV_UNIT stRawNAV);
 
     /// @notice Returns the raw net asset value of the junior tranche denominated in the NAV units (USD, BTC, etc.) for this kernel
-    /// @return The pure net asset value of the junior tranche invested assets
-    function _getJuniorTrancheRawNAV() internal view virtual returns (NAV_UNIT);
+    /// @return jtRawNAV The pure net asset value of the junior tranche invested assets
+    function _getJuniorTrancheRawNAV() internal view virtual returns (NAV_UNIT jtRawNAV);
 
     // =============================
     // Internal Tranche Specific Helper Functions
