@@ -3,12 +3,21 @@ pragma solidity ^0.8.28;
 
 import { RoycoFactory } from "../../src/RoycoFactory.sol";
 import { RoycoAccountant } from "../../src/accountant/RoycoAccountant.sol";
+import { RoycoRoles } from "../../src/auth/RoycoRoles.sol";
+import { IRoycoAuth } from "../../src/interfaces/IRoycoAuth.sol";
 import { IPool } from "../../src/interfaces/aave/IPool.sol";
 import { TrancheType } from "../../src/interfaces/kernel/IRoycoKernel.sol";
 import { ZERO_NAV_UNITS, ZERO_TRANCHE_UNITS } from "../../src/libraries/Constants.sol";
 import { RoycoAccountantInitParams, RoycoAccountantState } from "../../src/libraries/RoycoAccountantStorageLib.sol";
 import { RoycoKernelInitParams, RoycoKernelState } from "../../src/libraries/RoycoKernelStorageLib.sol";
-import { IRoycoAccountant, IRoycoKernel, MarketDeploymentParams, SyncedAccountingState, TrancheDeploymentParams } from "../../src/libraries/Types.sol";
+import {
+    IRoycoAccountant,
+    IRoycoKernel,
+    MarketDeploymentParams,
+    RolesConfiguration,
+    SyncedAccountingState,
+    TrancheDeploymentParams
+} from "../../src/libraries/Types.sol";
 import { MainnetForkWithAaveTestBase } from "./base/MainnetForkWithAaveBaseTest.sol";
 
 contract DeploymentsTest is MainnetForkWithAaveTestBase {
@@ -446,6 +455,80 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         );
 
         vm.expectRevert(RoycoFactory.InvalidKernelOnAccountant.selector);
+        FACTORY.deployMarket(params);
+    }
+
+    function test_deployMarket_revertsOnRolesConfigurationLengthMismatch() public {
+        bytes32 salt = keccak256(abi.encodePacked("SALT", "ROLES_LENGTH_MISMATCH"));
+        (MarketDeploymentParams memory params,) = _buildValidMarketParamsForSalt(salt);
+
+        // Create a roles configuration with mismatched lengths
+        RolesConfiguration[] memory roles = new RolesConfiguration[](1);
+        bytes4[] memory selectors = new bytes4[](2);
+        uint64[] memory rolesArray = new uint64[](1); // Different length!
+
+        selectors[0] = IRoycoAuth.pause.selector;
+        selectors[1] = IRoycoAuth.unpause.selector;
+        rolesArray[0] = RoycoRoles.PAUSER_ROLE;
+
+        roles[0] = RolesConfiguration({
+            target: params.roles[0].target, // Use a valid target
+            selectors: selectors,
+            roles: rolesArray
+        });
+
+        params.roles = roles;
+
+        vm.expectRevert(RoycoFactory.RolesConfigurationLengthMismatch.selector);
+        FACTORY.deployMarket(params);
+    }
+
+    function test_deployMarket_revertsOnInvalidTarget() public {
+        bytes32 salt = keccak256(abi.encodePacked("SALT", "INVALID_TARGET"));
+        (MarketDeploymentParams memory params,) = _buildValidMarketParamsForSalt(salt);
+
+        // Create a roles configuration with an invalid target (not one of the deployed contracts)
+        RolesConfiguration[] memory roles = new RolesConfiguration[](1);
+        bytes4[] memory selectors = new bytes4[](1);
+        uint64[] memory rolesArray = new uint64[](1);
+
+        selectors[0] = IRoycoAuth.pause.selector;
+        rolesArray[0] = RoycoRoles.PAUSER_ROLE;
+
+        roles[0] = RolesConfiguration({
+            target: address(0xdead), // Invalid target - not one of the deployed contracts
+            selectors: selectors,
+            roles: rolesArray
+        });
+
+        params.roles = roles;
+
+        vm.expectRevert(abi.encodeWithSelector(RoycoFactory.InvalidTarget.selector, address(0xdead)));
+        FACTORY.deployMarket(params);
+    }
+
+    function test_deployMarket_revertsOnInvalidTargetForRandomAddress() public {
+        bytes32 salt = keccak256(abi.encodePacked("SALT", "INVALID_TARGET_RANDOM"));
+        (MarketDeploymentParams memory params,) = _buildValidMarketParamsForSalt(salt);
+
+        // Create a roles configuration with an invalid target
+        RolesConfiguration[] memory roles = new RolesConfiguration[](1);
+        bytes4[] memory selectors = new bytes4[](1);
+        uint64[] memory rolesArray = new uint64[](1);
+
+        selectors[0] = IRoycoAuth.pause.selector;
+        rolesArray[0] = RoycoRoles.PAUSER_ROLE;
+
+        address invalidTarget = address(0x1234567890123456789012345678901234567890);
+        roles[0] = RolesConfiguration({
+            target: invalidTarget, // Invalid target - not one of the deployed contracts
+            selectors: selectors,
+            roles: rolesArray
+        });
+
+        params.roles = roles;
+
+        vm.expectRevert(abi.encodeWithSelector(RoycoFactory.InvalidTarget.selector, invalidTarget));
         FACTORY.deployMarket(params);
     }
 
