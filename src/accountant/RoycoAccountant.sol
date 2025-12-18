@@ -473,7 +473,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
 
         // Get the instantaneous JT yield share, scaled to WAD precision
         uint256 jtYieldShareWAD = IRDM($.rdm).jtYieldShare($.lastSTRawNAV, $.lastJTRawNAV, $.betaWAD, $.coverageWAD, $.lastJTEffectiveNAV);
-        // TODO: Should we revert instead? Don't want to DOS system on faulty RDM, so this seems like the best possible way to handle
+        // Ensure that JT cannot earn more than 100% of senior appreciation
         if (jtYieldShareWAD > WAD) jtYieldShareWAD = WAD;
         // Accrue the time-weighted yield share accrued to JT since the last tranche interaction
         $.lastAccrualTimestamp = uint32(block.timestamp);
@@ -501,7 +501,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
 
         // Get the instantaneous JT yield share, scaled to WAD precision
         uint256 jtYieldShareWAD = IRDM($.rdm).previewJTYieldShare($.lastSTRawNAV, $.lastJTRawNAV, $.betaWAD, $.coverageWAD, $.lastJTEffectiveNAV);
-        // TODO: Should we revert instead? Don't want to DOS system on faulty RDM, so this seems like the best possible way to handle
+        // Ensure that JT cannot earn more than 100% of senior appreciation
         if (jtYieldShareWAD > WAD) jtYieldShareWAD = WAD;
         // Apply the accural of JT yield share to the accumulator, weighted by the time elapsed
         /// forge-lint: disable-next-item(unsafe-typecast)

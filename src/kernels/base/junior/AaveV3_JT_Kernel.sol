@@ -159,7 +159,6 @@ abstract contract AaveV3_JT_Kernel is RoycoKernel {
 
     /// @inheritdoc RoycoKernel
     function _jtPreviewWithdraw(TRANCHE_UNIT _jtAssets) internal view override(RoycoKernel) returns (TRANCHE_UNIT withdrawnJTAssets) {
-        // TODO: Do we want to bound this to max withdrawable?
         return _jtAssets;
     }
 
@@ -172,7 +171,14 @@ abstract contract AaveV3_JT_Kernel is RoycoKernel {
 
     /// @inheritdoc RoycoKernel
     function _jtWithdrawAssets(TRANCHE_UNIT _jtAssets, address _receiver) internal override(RoycoKernel) {
-        IPool(_getAaveV3_JT_KernelStorage().pool).withdraw(RoycoKernelStorageLib._getRoycoKernelStorage().jtAsset, toUint256(_jtAssets), _receiver);
+        // Try and withdraw the requested assets from the Aave pool
+        AaveV3_JT_KernelState storage $ = _getAaveV3_JT_KernelStorage();
+        (bool withdrawalSucceeded,) =
+            $.pool.call(abi.encodeCall(IPool.withdraw, (RoycoKernelStorageLib._getRoycoKernelStorage().jtAsset, toUint256(_jtAssets), _receiver)));
+        if (withdrawalSucceeded) return;
+
+        // The Pool lacks the liquidity to withdraw the requested assets, transfer A Tokens instead
+        IERC20($.jtAssetAToken).safeTransfer(_receiver, toUint256(_jtAssets));
     }
 
     /**

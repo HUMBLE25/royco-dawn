@@ -103,7 +103,17 @@ abstract contract ERC4626_ST_Kernel is RoycoKernel {
     /// @inheritdoc RoycoKernel
     function _stWithdrawAssets(TRANCHE_UNIT _stAssets, address _receiver) internal override(RoycoKernel) {
         ERC4626KernelState storage $ = ERC4626KernelStorageLib._getERC4626KernelStorage();
-        // Withdraw the specified assets and deduct the burned shares from the ST controlled shares for the underlying ST ERC4626 vault
-        $.stOwnedShares -= IERC4626($.stVault).withdraw(toUint256(_stAssets), _receiver, address(this));
+        IERC4626 stVault = IERC4626($.stVault);
+        // Get the currently withdrawable liquidity from the vault
+        TRANCHE_UNIT maxWithdrawableAssets = toTrancheUnits(stVault.maxWithdraw(address(this)));
+        // If the vault has sufficient liquidity to withdraw the specified assets, do so
+        if (maxWithdrawableAssets >= _stAssets) {
+            $.jtOwnedShares -= stVault.withdraw(toUint256(_stAssets), _receiver, address(this));
+            // If the vault has insufficient liquidity to withdraw the specified assets, transfer the equivalent number of shares to the receiver
+        } else {
+            // Transfer the assets equivalent of shares to transfer to the receiver
+            uint256 sharesEquivalentToWithdraw = ($.jtOwnedShares -= stVault.convertToShares(toUint256(_stAssets)));
+            IERC20(address(stVault)).safeTransfer(_receiver, sharesEquivalentToWithdraw);
+        }
     }
 }

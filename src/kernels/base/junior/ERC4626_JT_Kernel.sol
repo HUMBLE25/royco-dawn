@@ -70,18 +70,18 @@ abstract contract ERC4626_JT_Kernel is RoycoKernel {
     }
 
     /// @inheritdoc RoycoKernel
+    function _jtMaxWithdrawableGlobally(address) internal view override(RoycoKernel) returns (TRANCHE_UNIT) {
+        // Max withdraw takes global withdrawal limits into account
+        return toTrancheUnits(IERC4626(ERC4626KernelStorageLib._getERC4626KernelStorage().jtVault).maxWithdraw(address(this)));
+    }
+
+    /// @inheritdoc RoycoKernel
     function _jtPreviewWithdraw(TRANCHE_UNIT _jtAssets) internal view override(RoycoKernel) returns (TRANCHE_UNIT withdrawnJTAssets) {
         IERC4626 jtVault = IERC4626(ERC4626KernelStorageLib._getERC4626KernelStorage().jtVault);
         // Convert the ST assets to underlying shares
         uint256 jtVaultShares = jtVault.convertToShares(toUint256(_jtAssets));
         // Preview the amount of ST assets that would be redeemed for the given amount of underlying shares
         withdrawnJTAssets = toTrancheUnits(jtVault.previewRedeem(jtVaultShares));
-    }
-
-    /// @inheritdoc RoycoKernel
-    function _jtMaxWithdrawableGlobally(address) internal view override(RoycoKernel) returns (TRANCHE_UNIT) {
-        // Max withdraw takes global withdrawal limits into account
-        return toTrancheUnits(IERC4626(ERC4626KernelStorageLib._getERC4626KernelStorage().jtVault).maxWithdraw(address(this)));
     }
 
     /// @inheritdoc RoycoKernel
@@ -94,7 +94,17 @@ abstract contract ERC4626_JT_Kernel is RoycoKernel {
     /// @inheritdoc RoycoKernel
     function _jtWithdrawAssets(TRANCHE_UNIT _jtAssets, address _receiver) internal override(RoycoKernel) {
         ERC4626KernelState storage $ = ERC4626KernelStorageLib._getERC4626KernelStorage();
-        // Withdraw the specified assets and deduct the burned shares from the ST controlled shares for the underlying ST ERC4626 vault
-        $.jtOwnedShares -= IERC4626($.jtVault).withdraw(toUint256(_jtAssets), _receiver, address(this));
+        IERC4626 jtVault = IERC4626($.jtVault);
+        // Get the currently withdrawable liquidity from the vault
+        TRANCHE_UNIT maxWithdrawableAssets = toTrancheUnits(jtVault.maxWithdraw(address(this)));
+        // If the vault has sufficient liquidity to withdraw the specified assets, do so
+        if (maxWithdrawableAssets >= _jtAssets) {
+            $.jtOwnedShares -= jtVault.withdraw(toUint256(_jtAssets), _receiver, address(this));
+            // If the vault has insufficient liquidity to withdraw the specified assets, transfer the equivalent number of shares to the receiver
+        } else {
+            // Transfer the assets equivalent of shares to transfer to the receiver
+            uint256 sharesEquivalentToWithdraw = ($.jtOwnedShares -= jtVault.convertToShares(toUint256(_jtAssets)));
+            IERC20(address(jtVault)).safeTransfer(_receiver, sharesEquivalentToWithdraw);
+        }
     }
 }
