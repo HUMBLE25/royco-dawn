@@ -102,15 +102,16 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         external
         view
         override(IRoycoKernel)
-        returns (SyncedAccountingState memory state, AssetClaims memory stNotionalClaims, AssetClaims memory stMaxClaims)
+        returns (NAV_UNIT claimOnStNAV, NAV_UNIT claimOnJtNAV, NAV_UNIT stMaxWithdrawableNAV, NAV_UNIT jtMaxWithdrawableNAV)
     {
         // Get the total claims the senior tranche has on each tranche's assets
-        (state, stNotionalClaims,) = previewSyncTrancheAccounting(TrancheType.SENIOR);
+        (, AssetClaims memory stNotionalClaims,) = previewSyncTrancheAccounting(TrancheType.SENIOR);
+        claimOnStNAV = stConvertTrancheUnitsToNAVUnits(stNotionalClaims.stAssets);
+        claimOnJtNAV = jtConvertTrancheUnitsToNAVUnits(stNotionalClaims.jtAssets);
 
         // Bound the claims by the max withdrawable assets globally for each tranche and compute the cumulative NAV
-        stMaxClaims.stAssets = _stMaxWithdrawableGlobally(_owner);
-        stMaxClaims.jtAssets = _jtMaxWithdrawableGlobally(_owner);
-        stMaxClaims.nav = stConvertTrancheUnitsToNAVUnits(stMaxClaims.stAssets) + jtConvertTrancheUnitsToNAVUnits(stMaxClaims.jtAssets);
+        stMaxWithdrawableNAV = stConvertTrancheUnitsToNAVUnits(_stMaxWithdrawableGlobally(_owner));
+        jtMaxWithdrawableNAV = jtConvertTrancheUnitsToNAVUnits(_jtMaxWithdrawableGlobally(_owner));
     }
 
     /// @inheritdoc IRoycoKernel
@@ -119,9 +120,30 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     }
 
     /// @inheritdoc IRoycoKernel
-    function jtMaxWithdrawable(address) external view override(IRoycoKernel) returns (NAV_UNIT) {
-        // TODO: account for liq constraints
-        return _accountant().maxJTWithdrawalGivenCoverage(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV());
+    function jtMaxWithdrawable(address _owner)
+        external
+        view
+        override(IRoycoKernel)
+        returns (NAV_UNIT claimOnStNAV, NAV_UNIT claimOnJtNAV, NAV_UNIT stMaxWithdrawableNAV, NAV_UNIT jtMaxWithdrawableNAV)
+    {
+        // Get the total claims the junior tranche has on each tranche's assets
+        (SyncedAccountingState memory state, AssetClaims memory jtNotionalClaims,) = previewSyncTrancheAccounting(TrancheType.JUNIOR);
+
+        // Get the max withdrawable st and jt assets in NAV units from the accountant consider coverage requirement
+        (, NAV_UNIT stClaimableGivenCoverage, NAV_UNIT jtClaimableGivenCoverage) = _accountant()
+            .maxJTWithdrawalGivenCoverage(
+                state.stRawNAV,
+                state.jtRawNAV,
+                stConvertTrancheUnitsToNAVUnits(jtNotionalClaims.stAssets),
+                jtConvertTrancheUnitsToNAVUnits(jtNotionalClaims.jtAssets)
+            );
+
+        claimOnStNAV = stConvertTrancheUnitsToNAVUnits(jtNotionalClaims.stAssets);
+        claimOnJtNAV = jtConvertTrancheUnitsToNAVUnits(jtNotionalClaims.jtAssets);
+
+        // Bound the claims by the max withdrawable assets globally for each tranche and compute the cumulative NAV
+        stMaxWithdrawableNAV = UnitsMathLib.min(stConvertTrancheUnitsToNAVUnits(_stMaxWithdrawableGlobally(_owner)), stClaimableGivenCoverage);
+        jtMaxWithdrawableNAV = UnitsMathLib.min(jtConvertTrancheUnitsToNAVUnits(_jtMaxWithdrawableGlobally(_owner)), jtClaimableGivenCoverage);
     }
 
     /// @inheritdoc IRoycoKernel
