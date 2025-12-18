@@ -757,8 +757,8 @@ DA:210,673
 BRDA:210,5,0,-
 DA:213,673
 DA:217,0
-FN:217,AaveV3JTKernel._previewWithdrawJTAssets
-FNDA:0,AaveV3JTKernel._previewWithdrawJTAssets
+FN:217,AaveV3JTKernel._jtPreviewWithdraw
+FNDA:0,AaveV3JTKernel._jtPreviewWithdraw
 DA:219,0
 DA:223,0
 FN:223,AaveV3JTKernel._jtWithdrawAssets
@@ -1071,8 +1071,8 @@ FNDA:0,ERC4626STKernel._stWithdrawAssets
 DA:140,0
 DA:142,0
 DA:146,0
-FN:146,ERC4626STKernel._previewWithdrawSTAssets
-FNDA:0,ERC4626STKernel._previewWithdrawSTAssets
+FN:146,ERC4626STKernel._stPreviewWithdraw
+FNDA:0,ERC4626STKernel._stPreviewWithdraw
 DA:147,0
 DA:149,0
 DA:151,0

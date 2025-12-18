@@ -694,8 +694,8 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         AssetClaims memory scaledClaims = UtilsLib.scaleAssetClaims(totalClaims, _shares, totalTrancheShares);
 
         // Preview the amount of ST assets that would be redeemed for the given amount of shares
-        userClaim.stAssets = _previewWithdrawSTAssets(scaledClaims.stAssets);
-        userClaim.jtAssets = _previewWithdrawJTAssets(scaledClaims.jtAssets);
+        userClaim.stAssets = _stPreviewWithdraw(scaledClaims.stAssets);
+        userClaim.jtAssets = _jtPreviewWithdraw(scaledClaims.jtAssets);
         userClaim.nav = stConvertTrancheUnitsToNAVUnits(userClaim.stAssets) + jtConvertTrancheUnitsToNAVUnits(userClaim.jtAssets);
     }
 
@@ -766,14 +766,14 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
      * @param _stAssets The ST assets denominated in its tranche units to redeem
      * @return redeemedSTAssets The amount of ST assets that would be redeemed for the given amount of ST assets
      */
-    function _previewWithdrawSTAssets(TRANCHE_UNIT _stAssets) internal view virtual returns (TRANCHE_UNIT redeemedSTAssets);
+    function _stPreviewWithdraw(TRANCHE_UNIT _stAssets) internal view virtual returns (TRANCHE_UNIT redeemedSTAssets);
 
     /**
      * @notice Previews the amount of JT assets that would be redeemed for a given amount of JT assets
      * @param _jtAssets The JT assets denominated in its tranche units to redeem
-     * @return redeemedJTAssets The amount of JT assets that would be redeemed for the given amount of JT assets
+     * @return withdrawnJTAssets The amount of JT assets that would be redeemed for the given amount of JT assets
      */
-    function _previewWithdrawJTAssets(TRANCHE_UNIT _jtAssets) internal view virtual returns (TRANCHE_UNIT redeemedJTAssets);
+    function _jtPreviewWithdraw(TRANCHE_UNIT _jtAssets) internal view virtual returns (TRANCHE_UNIT withdrawnJTAssets);
 
     /**
      * @notice Deposits ST assets into its underlying investment opportunity

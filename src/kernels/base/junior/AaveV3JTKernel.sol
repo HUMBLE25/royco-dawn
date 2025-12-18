@@ -6,7 +6,7 @@ import { IPool } from "../../../interfaces/aave/IPool.sol";
 import { IPoolAddressesProvider } from "../../../interfaces/aave/IPoolAddressesProvider.sol";
 import { IPoolDataProvider } from "../../../interfaces/aave/IPoolDataProvider.sol";
 import { ExecutionModel, IRoycoKernel } from "../../../interfaces/kernel/IRoycoKernel.sol";
-import { ZERO_TRANCHE_UNITS } from "../../../libraries/Constants.sol";
+import { MAX_TRANCHE_UNITS, ZERO_TRANCHE_UNITS } from "../../../libraries/Constants.sol";
 import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib, toTrancheUnits, toUint256 } from "../../../libraries/Units.sol";
 import { UtilsLib } from "../../../libraries/UtilsLib.sol";
 import { AssetClaims, Operation, RoycoKernel, RoycoKernelStorageLib, SyncedAccountingState, TrancheType } from "../RoycoKernel.sol";
@@ -88,7 +88,7 @@ abstract contract AaveV3JTKernel is RoycoKernel {
 
         // Get the supply cap for the reserve asset. If unset, the suppliable amount is unbounded
         (, uint256 supplyCap) = poolDataProvider.getReserveCaps(asset);
-        if (supplyCap == 0) return toTrancheUnits(type(uint256).max);
+        if (supplyCap == 0) return MAX_TRANCHE_UNITS;
 
         // Compute the total reserve assets supplied and accrued to the treasury
         (uint256 totalAccruedToTreasury, uint256 totalLent) = _getTotalAccruedToTreasuryAndLent(poolDataProvider, asset);
@@ -151,7 +151,7 @@ abstract contract AaveV3JTKernel is RoycoKernel {
     }
 
     /// @inheritdoc RoycoKernel
-    function _previewWithdrawJTAssets(TRANCHE_UNIT _jtAssets) internal view override(RoycoKernel) returns (TRANCHE_UNIT redeemedJTAssets) {
+    function _jtPreviewWithdraw(TRANCHE_UNIT _jtAssets) internal view override(RoycoKernel) returns (TRANCHE_UNIT withdrawnJTAssets) {
         // TODO: Do we want to bound this to max withdrawable?
         return _jtAssets;
     }
