@@ -43,7 +43,15 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
      * @param _jtAsset The address of the asset that JT is denominated in: constitutes the JT's tranche units (type and precision)
      * @param _initialAuthority The initial authority for the base kernel
      */
-    function __RoycoKernel_init(RoycoKernelInitParams memory _params, address _stAsset, address _jtAsset, address _initialAuthority) internal onlyInitializing {
+    function __RoycoKernel_init(
+        RoycoKernelInitParams memory _params,
+        address _stAsset,
+        address _jtAsset,
+        address _initialAuthority
+    )
+        internal
+        onlyInitializing
+    {
         __RoycoBase_init(_initialAuthority);
         __RoycoKernel_init_unchained(_params, _stAsset, _jtAsset);
     }
@@ -64,6 +72,37 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         );
         // Initialize the base kernel state
         RoycoKernelStorageLib.__RoycoKernel_init(_params, _stAsset, _jtAsset);
+    }
+
+    /// @inheritdoc IRoycoKernel
+    function stConvertTrancheUnitsToNAVUnits(TRANCHE_UNIT _stAssets) external view override(IRoycoKernel) returns (NAV_UNIT) {
+        return _stConvertTrancheUnitsToNAVUnits(_stAssets);
+    }
+
+    /// @inheritdoc IRoycoKernel
+    function jtConvertTrancheUnitsToNAVUnits(TRANCHE_UNIT _jtAssets) external view override(IRoycoKernel) returns (NAV_UNIT) {
+        return _jtConvertTrancheUnitsToNAVUnits(_jtAssets);
+    }
+
+    /// @inheritdoc IRoycoKernel
+    function stConvertNAVUnitsToTrancheUnits(NAV_UNIT _navAssets) external view override(IRoycoKernel) returns (TRANCHE_UNIT) {
+        return _stConvertNAVUnitsToTrancheUnits(_navAssets);
+    }
+
+    /// @inheritdoc IRoycoKernel
+    function jtConvertNAVUnitsToTrancheUnits(NAV_UNIT _navAssets) external view override(IRoycoKernel) returns (TRANCHE_UNIT) {
+        return _jtConvertNAVUnitsToTrancheUnits(_navAssets);
+    }
+
+    /// @inheritdoc IRoycoKernel
+    function getState() external view override(IRoycoKernel) returns (RoycoKernelState memory) {
+        return RoycoKernelStorageLib._getRoycoKernelStorage();
+    }
+
+    /// @inheritdoc IRoycoKernel
+    function setProtocolFeeRecipient(address _protocolFeeRecipient) external restricted {
+        require(_protocolFeeRecipient != address(0), NULL_ADDRESS());
+        RoycoKernelStorageLib._getRoycoKernelStorage().protocolFeeRecipient = _protocolFeeRecipient;
     }
 
     /// @inheritdoc IRoycoKernel
@@ -97,51 +136,6 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     function jtMaxWithdrawable(address) external view override(IRoycoKernel) returns (NAV_UNIT) {
         // TODO: account for liq constraints
         return _accountant().maxJTWithdrawalGivenCoverage(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV());
-    }
-
-    /// @inheritdoc IRoycoKernel
-    function stConvertTrancheUnitsToNAVUnits(TRANCHE_UNIT _stAssets) external view override(IRoycoKernel) returns (NAV_UNIT) {
-        return _stConvertTrancheUnitsToNAVUnits(_stAssets);
-    }
-
-    /// @inheritdoc IRoycoKernel
-    function jtConvertTrancheUnitsToNAVUnits(TRANCHE_UNIT _jtAssets) external view override(IRoycoKernel) returns (NAV_UNIT) {
-        return _jtConvertTrancheUnitsToNAVUnits(_jtAssets);
-    }
-
-    /// @inheritdoc IRoycoKernel
-    function stConvertNAVUnitsToTrancheUnits(NAV_UNIT _navAssets) external view override(IRoycoKernel) returns (TRANCHE_UNIT) {
-        return _stConvertNAVUnitsToTrancheUnits(_navAssets);
-    }
-
-    /// @inheritdoc IRoycoKernel
-    function jtConvertNAVUnitsToTrancheUnits(NAV_UNIT _navAssets) external view override(IRoycoKernel) returns (TRANCHE_UNIT) {
-        return _jtConvertNAVUnitsToTrancheUnits(_navAssets);
-    }
-
-    /// @inheritdoc IRoycoKernel
-    function getSTRawNAV() external view override(IRoycoKernel) returns (NAV_UNIT) {
-        return _getSeniorTrancheRawNAV();
-    }
-
-    /// @inheritdoc IRoycoKernel
-    function getJTRawNAV() external view override(IRoycoKernel) returns (NAV_UNIT) {
-        return _getJuniorTrancheRawNAV();
-    }
-
-    /// @inheritdoc IRoycoKernel
-    function getJTAssetClaims() external view override(IRoycoKernel) returns (AssetClaims memory claims) {
-        (, claims,) = previewSyncTrancheAccounting(TrancheType.JUNIOR);
-    }
-
-    /// @inheritdoc IRoycoKernel
-    function getSTAssetClaims() external view override(IRoycoKernel) returns (AssetClaims memory claims) {
-        (, claims,) = previewSyncTrancheAccounting(TrancheType.SENIOR);
-    }
-
-    /// @inheritdoc IRoycoKernel
-    function getState() external view override(IRoycoKernel) returns (RoycoKernelState memory) {
-        return RoycoKernelStorageLib._getRoycoKernelStorage();
     }
 
     /// @inheritdoc IRoycoKernel
@@ -209,32 +203,6 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
 
         // Set the total tranche shares to the specified tranche's shares after minting fees
         totalTrancheShares = (_trancheType == TrancheType.SENIOR) ? stTotalTrancheSharesAfterMintingFees : jtTotalTrancheSharesAfterMintingFees;
-
-        // Decompose effective NAVs into self-backed NAV claims and cross-tranche NAV claims
-        (NAV_UNIT stNAVClaimOnSelf, NAV_UNIT stNAVClaimOnJT, NAV_UNIT jtNAVClaimOnSelf, NAV_UNIT jtNAVClaimOnST) = _decomposeNAVClaims(state);
-
-        // Marshal the tranche claims for this tranche given the decomposed claims
-        claims =
-            _marshalAssetClaims(_trancheType, state.stEffectiveNAV, state.jtEffectiveNAV, stNAVClaimOnSelf, stNAVClaimOnJT, jtNAVClaimOnSelf, jtNAVClaimOnST);
-    }
-
-    /**
-     * @notice Invokes the accountant to do a post-operation (deposit and withdrawal) NAV sync
-     * @dev Should be called on every NAV mutating user operation
-     * @param _trancheType An enum indicating which tranche to return claims and total tranche shares for
-     * @param _op The operation being executed in between the pre and post synchronizations
-     * @return state The synced NAV, debt, and fee accounting containing all mark to market accounting data
-     * @return claims The claims on ST and JT assets that the specified tranche has denominated in tranche-native units
-     */
-    function _postOpSyncTrancheAccounting(
-        TrancheType _trancheType,
-        Operation _op
-    )
-        internal
-        returns (SyncedAccountingState memory state, AssetClaims memory claims)
-    {
-        // Execute the pre-op sync via the accountant
-        state = _postOpSyncTrancheAccounting(_op);
 
         // Decompose effective NAVs into self-backed NAV claims and cross-tranche NAV claims
         (NAV_UNIT stNAVClaimOnSelf, NAV_UNIT stNAVClaimOnJT, NAV_UNIT jtNAVClaimOnSelf, NAV_UNIT jtNAVClaimOnST) = _decomposeNAVClaims(state);
