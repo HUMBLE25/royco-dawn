@@ -6,7 +6,7 @@ import { RoycoAuth } from "../../../../auth/RoycoAuth.sol";
 import { IAsyncJTWithdrawalKernel } from "../../../../interfaces/kernel/IAsyncJTWithdrawalKernel.sol";
 import { IRoycoKernel } from "../../../../interfaces/kernel/IRoycoKernel.sol";
 import { ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID } from "../../../../libraries/Constants.sol";
-import { TrancheAssetClaims } from "../../../../libraries/Types.sol";
+import { AssetClaims } from "../../../../libraries/Types.sol";
 import { Operation, RequestRedeemSharesBehavior, SyncedAccountingState, TrancheType } from "../../../../libraries/Types.sol";
 import { NAV_UNIT, UnitsMathLib, toNAVUnits, toUint256 } from "../../../../libraries/Units.sol";
 import { RoycoKernel } from "../../RoycoKernel.sol";
@@ -91,7 +91,7 @@ abstract contract BaseAsyncJTRedemptionDelayKernel is IAsyncJTWithdrawalKernel, 
     }
 
     /// @inheritdoc IRoycoKernel
-    function jtPreviewRedeem(uint256) external view virtual override returns (TrancheAssetClaims memory) {
+    function jtPreviewRedeem(uint256) external view virtual override returns (AssetClaims memory) {
         revert PREVIEW_REDEEM_DISABLED_FOR_ASYNC_REDEMPTION();
     }
 

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import { IERC165 } from "../../../lib/openzeppelin-contracts/contracts/utils/introspection/IERC165.sol";
-import { TrancheAssetClaims } from "../../libraries/Types.sol";
+import { AssetClaims } from "../../libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT } from "../../libraries/Units.sol";
 import { IRoycoAsyncCancellableVault } from "./IRoycoAsyncCancellableVault.sol";
 import { IRoycoAsyncVault } from "./IRoycoAsyncVault.sol";
@@ -24,7 +24,7 @@ interface IRoycoVaultTranche is IERC165, IRoycoAsyncVault, IRoycoAsyncCancellabl
      * @param claims A struct representing the assets received on redemption and their value at the time of redemption in NAV units
      * @param shares The amount of shares redeemed
      */
-    event Redeem(address indexed sender, address indexed receiver, TrancheAssetClaims claims, uint256 shares);
+    event Redeem(address indexed sender, address indexed receiver, AssetClaims claims, uint256 shares);
 
     /**
      * @notice Emitted when protocol fee shares are minted to the protocol fee recipient
@@ -58,7 +58,7 @@ interface IRoycoVaultTranche is IERC165, IRoycoAsyncVault, IRoycoAsyncCancellabl
      * @dev The NAV is expressed in the tranche's base asset
      * @return claims The breakdown of assets that represent the value of the tranche's shares
      */
-    function totalAssets() external view returns (TrancheAssetClaims memory claims);
+    function totalAssets() external view returns (AssetClaims memory claims);
 
     /**
      * @notice Returns the maximum amount of assets that can be deposited into the tranche
@@ -100,7 +100,7 @@ interface IRoycoVaultTranche is IERC165, IRoycoAsyncVault, IRoycoAsyncCancellabl
      * @param _shares The number of shares to convert to claims
      * @return claims The breakdown of assets that the shares have a claim on
      */
-    function previewRedeem(uint256 _shares) external view returns (TrancheAssetClaims memory claims);
+    function previewRedeem(uint256 _shares) external view returns (AssetClaims memory claims);
 
     /**
      * @notice Returns the breakdown of assets that the shares have a claim on
@@ -108,7 +108,7 @@ interface IRoycoVaultTranche is IERC165, IRoycoAsyncVault, IRoycoAsyncCancellabl
      * @param _shares The number of shares to convert to assets
      * @return claims The breakdown of assets that the shares have a claim on
      */
-    function convertToAssets(uint256 _shares) external view returns (TrancheAssetClaims memory claims);
+    function convertToAssets(uint256 _shares) external view returns (AssetClaims memory claims);
 
     /**
      * @notice Mints tranche shares to the receiver
@@ -128,7 +128,7 @@ interface IRoycoVaultTranche is IERC165, IRoycoAsyncVault, IRoycoAsyncCancellabl
      * @param _controller The controller of the request
      * @return claims The breakdown of assets that the redeemed shares have a claim on
      */
-    function redeem(uint256 _shares, address _receiver, address _controller) external returns (TrancheAssetClaims memory claims);
+    function redeem(uint256 _shares, address _receiver, address _controller) external returns (AssetClaims memory claims);
 
     /**
      * @notice Previews the number of shares that would be minted to the protocol fee recipient to satisfy the ratio of total assets that the fee represents

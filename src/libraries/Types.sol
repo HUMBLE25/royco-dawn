@@ -16,13 +16,13 @@ struct TrancheDeploymentParams {
 }
 
 /**
- * @title TrancheAssetClaims
- * @dev A struct representing claims on ST assets, JT assets, and NAV
+ * @title AssetClaims
+ * @dev A struct representing claims on senior tranche assets, junior tranche assets, and NAV
  * @custom:field stAssets - The claim on senior tranche assets denominated in ST's tranche units
  * @custom:field jtAssets - The claim on junior tranche assets denominated in JT's tranche units
  * @custom:field nav - The net asset value of these claims in NAV units
  */
-struct TrancheAssetClaims {
+struct AssetClaims {
     TRANCHE_UNIT stAssets;
     TRANCHE_UNIT jtAssets;
     NAV_UNIT nav;

@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import { Math } from "../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 import { WAD, ZERO_NAV_UNITS } from "./Constants.sol";
-import { TrancheAssetClaims } from "./Types.sol";
+import { AssetClaims } from "./Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib, toUint256 } from "./Units.sol";
 
 library UtilsLib {
@@ -44,13 +44,13 @@ library UtilsLib {
     /// @param _totalTrancheShares The total number of shares that exist in the tranche
     /// @return scaledClaims The scaled claims on ST and JT assets of the tranche
     function scaleTrancheAssetsClaim(
-        TrancheAssetClaims memory _claims,
+        AssetClaims memory _claims,
         uint256 _shares,
         uint256 _totalTrancheShares
     )
         internal
         pure
-        returns (TrancheAssetClaims memory scaledClaims)
+        returns (AssetClaims memory scaledClaims)
     {
         scaledClaims.nav = _claims.nav.mulDiv(_shares, _totalTrancheShares, Math.Rounding.Floor);
         scaledClaims.stAssets = _claims.stAssets.mulDiv(_shares, _totalTrancheShares, Math.Rounding.Floor);
@@ -63,13 +63,13 @@ library UtilsLib {
     /// @param _navDenominator The NAV to use for the denominator
     /// @return scaledClaims The scaled claims on ST and JT assets of the tranche
     function scaleTrancheAssetsClaim(
-        TrancheAssetClaims memory _claims,
+        AssetClaims memory _claims,
         NAV_UNIT _navNumerator,
         NAV_UNIT _navDenominator
     )
         internal
         pure
-        returns (TrancheAssetClaims memory scaledClaims)
+        returns (AssetClaims memory scaledClaims)
     {
         scaledClaims.nav = _claims.nav.mulDiv(_navNumerator, _navDenominator, Math.Rounding.Floor);
         scaledClaims.stAssets = _claims.stAssets.mulDiv(_navNumerator, _navDenominator, Math.Rounding.Floor);

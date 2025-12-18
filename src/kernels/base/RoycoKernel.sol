@@ -6,7 +6,7 @@ import { IRoycoKernel } from "../../interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoVaultTranche } from "../../interfaces/tranche/IRoycoVaultTranche.sol";
 import { ZERO_NAV_UNITS, ZERO_TRANCHE_UNITS } from "../../libraries/Constants.sol";
 import { RoycoKernelInitParams, RoycoKernelState, RoycoKernelStorageLib } from "../../libraries/RoycoKernelStorageLib.sol";
-import { SyncedAccountingState, TrancheAssetClaims, TrancheType } from "../../libraries/Types.sol";
+import { AssetClaims, SyncedAccountingState, TrancheType } from "../../libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib } from "../../libraries/Units.sol";
 import { IRoycoAccountant, Operation } from "./../../interfaces/IRoycoAccountant.sol";
 
@@ -84,7 +84,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         external
         view
         override(IRoycoKernel)
-        returns (SyncedAccountingState memory state, TrancheAssetClaims memory stNotionalClaims, TrancheAssetClaims memory stMaxClaims)
+        returns (SyncedAccountingState memory state, AssetClaims memory stNotionalClaims, AssetClaims memory stMaxClaims)
     {
         // Get the total claims the senior tranche has on each tranche's assets
         (state, stNotionalClaims,) = previewSyncTrancheAccounting(TrancheType.SENIOR);
@@ -137,12 +137,12 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     }
 
     /// @inheritdoc IRoycoKernel
-    function getJTAssetClaims() external view override(IRoycoKernel) returns (TrancheAssetClaims memory claims) {
+    function getJTAssetClaims() external view override(IRoycoKernel) returns (AssetClaims memory claims) {
         (, claims,) = previewSyncTrancheAccounting(TrancheType.JUNIOR);
     }
 
     /// @inheritdoc IRoycoKernel
-    function getSTAssetClaims() external view override(IRoycoKernel) returns (TrancheAssetClaims memory claims) {
+    function getSTAssetClaims() external view override(IRoycoKernel) returns (AssetClaims memory claims) {
         (, claims,) = previewSyncTrancheAccounting(TrancheType.SENIOR);
     }
 
@@ -162,7 +162,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         public
         view
         override(IRoycoKernel)
-        returns (SyncedAccountingState memory state, TrancheAssetClaims memory claims, uint256 totalTrancheShares)
+        returns (SyncedAccountingState memory state, AssetClaims memory claims, uint256 totalTrancheShares)
     {
         // Preview an accounting sync via the accountant
         state = _accountant().previewSyncTrancheAccounting(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV());
@@ -171,9 +171,8 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         (NAV_UNIT stNAVClaimOnSelf, NAV_UNIT stNAVClaimOnJT, NAV_UNIT jtNAVClaimOnSelf, NAV_UNIT jtNAVClaimOnST) = _decomposeNAVClaims(state);
 
         // Marshal the tranche claims for this tranche given the decomposed claims
-        claims = _marshalTrancheAssetClaims(
-            _trancheType, state.stEffectiveNAV, state.jtEffectiveNAV, stNAVClaimOnSelf, stNAVClaimOnJT, jtNAVClaimOnSelf, jtNAVClaimOnST
-        );
+        claims =
+            _marshalAssetClaims(_trancheType, state.stEffectiveNAV, state.jtEffectiveNAV, stNAVClaimOnSelf, stNAVClaimOnJT, jtNAVClaimOnSelf, jtNAVClaimOnST);
 
         // Preview the total tranche shares after minting any protocol fee shares post-sync
         RoycoKernelState storage $ = RoycoKernelStorageLib._getRoycoKernelStorage();
@@ -194,7 +193,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
      */
     function _preOpSyncTrancheAccounting(TrancheType _trancheType)
         internal
-        returns (SyncedAccountingState memory state, TrancheAssetClaims memory claims, uint256 totalTrancheShares)
+        returns (SyncedAccountingState memory state, AssetClaims memory claims, uint256 totalTrancheShares)
     {
         // Execute the pre-op sync via the accountant
         state = _preOpSyncTrancheAccounting();
@@ -222,9 +221,8 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         (NAV_UNIT stNAVClaimOnSelf, NAV_UNIT stNAVClaimOnJT, NAV_UNIT jtNAVClaimOnSelf, NAV_UNIT jtNAVClaimOnST) = _decomposeNAVClaims(state);
 
         // Marshal the tranche claims for this tranche given the decomposed claims
-        claims = _marshalTrancheAssetClaims(
-            _trancheType, state.stEffectiveNAV, state.jtEffectiveNAV, stNAVClaimOnSelf, stNAVClaimOnJT, jtNAVClaimOnSelf, jtNAVClaimOnST
-        );
+        claims =
+            _marshalAssetClaims(_trancheType, state.stEffectiveNAV, state.jtEffectiveNAV, stNAVClaimOnSelf, stNAVClaimOnJT, jtNAVClaimOnSelf, jtNAVClaimOnST);
     }
 
     /**
@@ -240,7 +238,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         Operation _op
     )
         internal
-        returns (SyncedAccountingState memory state, TrancheAssetClaims memory claims)
+        returns (SyncedAccountingState memory state, AssetClaims memory claims)
     {
         // Execute the pre-op sync via the accountant
         state = _postOpSyncTrancheAccounting(_op);
@@ -249,9 +247,8 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         (NAV_UNIT stNAVClaimOnSelf, NAV_UNIT stNAVClaimOnJT, NAV_UNIT jtNAVClaimOnSelf, NAV_UNIT jtNAVClaimOnST) = _decomposeNAVClaims(state);
 
         // Marshal the tranche claims for this tranche given the decomposed claims
-        claims = _marshalTrancheAssetClaims(
-            _trancheType, state.stEffectiveNAV, state.jtEffectiveNAV, stNAVClaimOnSelf, stNAVClaimOnJT, jtNAVClaimOnSelf, jtNAVClaimOnST
-        );
+        claims =
+            _marshalAssetClaims(_trancheType, state.stEffectiveNAV, state.jtEffectiveNAV, stNAVClaimOnSelf, stNAVClaimOnJT, jtNAVClaimOnSelf, jtNAVClaimOnST);
     }
 
     /**
@@ -319,7 +316,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
      * @param _jtNAVClaimOnST The portion of JT's effective NAV that must be funded by ST’s raw NAV
      * @return claims The claims on ST and JT assets that the specified tranche has denominated in tranche-native units
      */
-    function _marshalTrancheAssetClaims(
+    function _marshalAssetClaims(
         TrancheType _trancheType,
         NAV_UNIT _stEffectiveNAV,
         NAV_UNIT _jtEffectiveNAV,
@@ -330,7 +327,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     )
         internal
         view
-        returns (TrancheAssetClaims memory claims)
+        returns (AssetClaims memory claims)
     {
         if (_trancheType == TrancheType.SENIOR) {
             if (_stNAVClaimOnSelf != ZERO_NAV_UNITS) claims.stAssets = _stConvertNAVUnitsToTrancheUnits(_stNAVClaimOnSelf);
@@ -348,7 +345,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
      * @param _claims The ST and JT assets to withdraw and transfer to the specified receiver
      * @param _receiver The receiver of the tranche asset claims
      */
-    function _withdrawAssets(TrancheAssetClaims memory _claims, address _receiver) internal {
+    function _withdrawAssets(AssetClaims memory _claims, address _receiver) internal {
         TRANCHE_UNIT stAssetsToClaim = _claims.stAssets;
         TRANCHE_UNIT jtAssetsToClaim = _claims.jtAssets;
         // Withdraw the ST and JT assets if non-zero

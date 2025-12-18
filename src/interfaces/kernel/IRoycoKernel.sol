@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import { RoycoKernelState } from "../../libraries/RoycoKernelStorageLib.sol";
-import { ExecutionModel, RequestRedeemSharesBehavior, SyncedAccountingState, TrancheAssetClaims } from "../../libraries/Types.sol";
+import { AssetClaims, ExecutionModel, RequestRedeemSharesBehavior, SyncedAccountingState } from "../../libraries/Types.sol";
 import { TrancheType } from "../../libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT } from "../../libraries/Units.sol";
 
@@ -75,13 +75,13 @@ interface IRoycoKernel {
      * @notice Returns the distribution the senior's claim of assets across the senior and junior tranches
      * @return claims The distribution of the senior tranche's claim of assets across the senior and junior tranches, denominated in the respective tranches' tranche units
      */
-    function getSTAssetClaims() external view returns (TrancheAssetClaims memory claims);
+    function getSTAssetClaims() external view returns (AssetClaims memory claims);
 
     /**
      * @notice Returns the distribution the junior's claim of assets across the senior and junior tranches
      * @return claims The distribution of the junior tranche's claim of assets across the senior and junior tranches, denominated in the respective tranches' tranche units
      */
-    function getJTAssetClaims() external view returns (TrancheAssetClaims memory claims);
+    function getJTAssetClaims() external view returns (AssetClaims memory claims);
 
     /**
      * @notice Converts the specified ST assets denominated in its tranche units to the kernel's NAV units
@@ -129,7 +129,7 @@ interface IRoycoKernel {
     function previewSyncTrancheAccounting(TrancheType _trancheType)
         external
         view
-        returns (SyncedAccountingState memory state, TrancheAssetClaims memory claims, uint256 totalTrancheShares);
+        returns (SyncedAccountingState memory state, AssetClaims memory claims, uint256 totalTrancheShares);
 
     /**
      * @notice Returns the maximum amount of assets that can be deposited into the senior tranche
@@ -141,7 +141,7 @@ interface IRoycoKernel {
     function stMaxWithdrawable(address _owner)
         external
         view
-        returns (SyncedAccountingState memory state, TrancheAssetClaims memory stNotionalClaims, TrancheAssetClaims memory stMaxClaims);
+        returns (SyncedAccountingState memory state, AssetClaims memory stNotionalClaims, AssetClaims memory stMaxClaims);
 
     /**
      * @notice Previews the deposit of a specified amount of assets into the senior tranche
@@ -185,7 +185,7 @@ interface IRoycoKernel {
      * @param _shares The number of shares to redeem
      * @return userClaim The distribution of assets that would be transferred to the receiver on redemption, denominated in the respective tranches' tranche units
      */
-    function stPreviewRedeem(uint256 _shares) external view returns (TrancheAssetClaims memory userClaim);
+    function stPreviewRedeem(uint256 _shares) external view returns (AssetClaims memory userClaim);
 
     /**
      * @notice Processes the redemption of a specified number of shares from the senior tranche
@@ -195,7 +195,7 @@ interface IRoycoKernel {
      * @param _receiver The address that is receiving the assets
      * @return claims The distribution of assets that were transferred to the receiver on redemption, denominated in the respective tranches' tranche units
      */
-    function stRedeem(uint256 _shares, address _controller, address _receiver) external returns (TrancheAssetClaims memory claims);
+    function stRedeem(uint256 _shares, address _controller, address _receiver) external returns (AssetClaims memory claims);
 
     /**
      * @notice Previews the deposit of a specified amount of assets into the junior tranche
@@ -214,7 +214,7 @@ interface IRoycoKernel {
      * @param _shares The number of shares to redeem
      * @return userClaim The distribution of assets that would be transferred to the receiver on redemption, denominated in the respective tranches' tranche units
      */
-    function jtPreviewRedeem(uint256 _shares) external view returns (TrancheAssetClaims memory userClaim);
+    function jtPreviewRedeem(uint256 _shares) external view returns (AssetClaims memory userClaim);
 
     /**
      * @notice Processes the deposit of a specified amount of assets into the junior tranche
@@ -235,7 +235,7 @@ interface IRoycoKernel {
      * @param _receiver The address that is receiving the assets
      * @return claims The distribution of assets that were transferred to the receiver on redemption, denominated in the respective tranches' tranche units
      */
-    function jtRedeem(uint256 _shares, address _controller, address _receiver) external returns (TrancheAssetClaims memory claims);
+    function jtRedeem(uint256 _shares, address _controller, address _receiver) external returns (AssetClaims memory claims);
 
     /**
      * @notice Returns the state of the kernel

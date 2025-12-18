@@ -16,7 +16,7 @@ import { ExecutionModel, IRoycoKernel, RequestRedeemSharesBehavior } from "../in
 import { IERC165, IRoycoAsyncCancellableVault, IRoycoAsyncVault, IRoycoVaultTranche } from "../interfaces/tranche/IRoycoVaultTranche.sol";
 import { ZERO_NAV_UNITS } from "../libraries/Constants.sol";
 import { RoycoTrancheStorageLib } from "../libraries/RoycoTrancheStorageLib.sol";
-import { TrancheAssetClaims, TrancheType } from "../libraries/Types.sol";
+import { AssetClaims, TrancheType } from "../libraries/Types.sol";
 import { Action, SyncedAccountingState, TrancheDeploymentParams } from "../libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, toNAVUnits, toTrancheUnits, toUint256 } from "../libraries/Units.sol";
 import { UtilsLib } from "../libraries/UtilsLib.sol";
@@ -136,7 +136,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
     }
 
     /// @inheritdoc IRoycoVaultTranche
-    function totalAssets() external view virtual override(IRoycoVaultTranche) returns (TrancheAssetClaims memory claims) {
+    function totalAssets() external view virtual override(IRoycoVaultTranche) returns (AssetClaims memory claims) {
         return (TRANCHE_TYPE() == TrancheType.SENIOR ? IRoycoKernel(kernel()).getSTAssetClaims() : IRoycoKernel(kernel()).getJTAssetClaims());
     }
 
@@ -157,7 +157,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         if (maxWithdrawableNAV == ZERO_NAV_UNITS) return 0;
 
         // Get the post-sync tranche state: applying NAV reconciliation and fee share minting
-        (TrancheAssetClaims memory trancheClaims, uint256 trancheTotalShares) = _previewPostSyncTrancheState();
+        (AssetClaims memory trancheClaims, uint256 trancheTotalShares) = _previewPostSyncTrancheState();
 
         // Compute the max withdrawable shares based on max withdrawable assets
         uint256 maxRedeemableShares = _convertToShares(maxWithdrawableNAV, trancheTotalShares, trancheClaims.nav, Math.Rounding.Floor);
@@ -180,15 +180,15 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         virtual
         override(IRoycoVaultTranche)
         executionIsSync(Action.WITHDRAW)
-        returns (TrancheAssetClaims memory claims)
+        returns (AssetClaims memory claims)
     {
         claims = (TRANCHE_TYPE() == TrancheType.SENIOR ? IRoycoKernel(kernel()).stPreviewRedeem(_shares) : IRoycoKernel(kernel()).jtPreviewRedeem(_shares));
     }
 
     /// @inheritdoc IRoycoVaultTranche
-    function convertToAssets(uint256 _shares) public view virtual override(IRoycoVaultTranche) returns (TrancheAssetClaims memory claims) {
+    function convertToAssets(uint256 _shares) public view virtual override(IRoycoVaultTranche) returns (AssetClaims memory claims) {
         // Get the post-sync tranche state: applying NAV reconciliation.
-        (TrancheAssetClaims memory trancheClaims, uint256 trancheTotalShares) = _previewPostSyncTrancheState();
+        (AssetClaims memory trancheClaims, uint256 trancheTotalShares) = _previewPostSyncTrancheState();
         return UtilsLib.scaleTrancheAssetsClaim(trancheClaims, _shares, trancheTotalShares);
     }
 
@@ -200,7 +200,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
                 ? IRoycoKernel(kernel()).stConvertTrancheUnitsToNAVUnits(_assets)
                 : IRoycoKernel(kernel()).jtConvertTrancheUnitsToNAVUnits(_assets)
         );
-        (TrancheAssetClaims memory trancheClaims, uint256 trancheTotalShares) = _previewPostSyncTrancheState();
+        (AssetClaims memory trancheClaims, uint256 trancheTotalShares) = _previewPostSyncTrancheState();
         shares = _convertToShares(navAssets, trancheTotalShares, trancheClaims.nav, Math.Rounding.Floor);
     }
 
@@ -258,7 +258,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         restricted
         onlyCallerOrOperator(_controller)
         whenNotPaused
-        returns (TrancheAssetClaims memory claims)
+        returns (AssetClaims memory claims)
     {
         require(_shares != 0, MUST_REQUEST_NON_ZERO_SHARES());
 
@@ -726,7 +726,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
      * @return trancheClaims The breakdown of total tranche's total controlled assets
      * @return trancheTotalShares The total supply of tranche shares (including marginally minted fee shares)
      */
-    function _previewPostSyncTrancheState() internal view returns (TrancheAssetClaims memory trancheClaims, uint256 trancheTotalShares) {
+    function _previewPostSyncTrancheState() internal view returns (AssetClaims memory trancheClaims, uint256 trancheTotalShares) {
         // Get the post-sync state of the kernel for the tranche
         IRoycoKernel kernel_ = IRoycoKernel(kernel());
         SyncedAccountingState memory state;

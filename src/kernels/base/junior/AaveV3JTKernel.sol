@@ -10,7 +10,7 @@ import { ExecutionModel, IRoycoKernel } from "../../../interfaces/kernel/IRoycoK
 import { ZERO_TRANCHE_UNITS } from "../../../libraries/Constants.sol";
 import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib, toTrancheUnits, toUint256 } from "../../../libraries/Units.sol";
 import { UtilsLib } from "../../../libraries/UtilsLib.sol";
-import { Operation, RoycoKernel, RoycoKernelStorageLib, SyncedAccountingState, TrancheAssetClaims, TrancheType } from "../RoycoKernel.sol";
+import { AssetClaims, Operation, RoycoKernel, RoycoKernelStorageLib, SyncedAccountingState, TrancheType } from "../RoycoKernel.sol";
 import { BaseAsyncJTRedemptionDelayKernel } from "./base/BaseAsyncJTRedemptionDelayKernel.sol";
 
 abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKernel {
@@ -121,12 +121,12 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
         external
         override(IRoycoKernel)
         onlyJuniorTranche
-        returns (TrancheAssetClaims memory claims)
+        returns (AssetClaims memory userAssetClaims)
     {
         // Execute a pre-op sync on accounting
         SyncedAccountingState memory state;
         uint256 totalTrancheShares;
-        (state, claims, totalTrancheShares) = _preOpSyncTrancheAccounting(TrancheType.JUNIOR);
+        (state, userAssetClaims, totalTrancheShares) = _preOpSyncTrancheAccounting(TrancheType.JUNIOR);
 
         // Ensure that the shares to redeem are actually claimable right now
         require(_shares <= _jtClaimableRedeemRequest(_controller), INSUFFICIENT_CLAIMABLE_SHARES(_shares, _jtClaimableRedeemRequest(_controller)));
@@ -135,10 +135,10 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
         NAV_UNIT navOfSharesToRedeem = _processClaimableRedeemRequest(_controller, state.jtEffectiveNAV, _shares, totalTrancheShares);
 
         // Scale the claims based on the NAV to liquidate for the user relative to the total JT controlled NAV
-        claims = UtilsLib.scaleTrancheAssetsClaim(claims, navOfSharesToRedeem, state.jtEffectiveNAV);
+        userAssetClaims = UtilsLib.scaleTrancheAssetsClaim(userAssetClaims, navOfSharesToRedeem, state.jtEffectiveNAV);
 
         // Withdraw the asset claims from each tranche and transfer them to the receiver
-        _withdrawAssets(claims, _receiver);
+        _withdrawAssets(userAssetClaims, _receiver);
 
         // Execute a post-op sync on accounting and enforce the market's coverage requirement
         _postOpSyncTrancheAccountingAndEnforceCoverage(Operation.JT_DECREASE_NAV);

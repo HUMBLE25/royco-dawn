@@ -6,7 +6,7 @@ import { IERC20, SafeERC20 } from "../../../../lib/openzeppelin-contracts/contra
 import { Math } from "../../../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 import { ExecutionModel, IRoycoKernel, RequestRedeemSharesBehavior } from "../../../interfaces/kernel/IRoycoKernel.sol";
 import { ZERO_TRANCHE_UNITS } from "../../../libraries/Constants.sol";
-import { TrancheAssetClaims } from "../../../libraries/Types.sol";
+import { AssetClaims } from "../../../libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib, toTrancheUnits, toUint256 } from "../../../libraries/Units.sol";
 import { UtilsLib } from "../../../libraries/UtilsLib.sol";
 import { ERC4626KernelStorageLib } from "../../../libraries/kernels/ERC4626KernelStorageLib.sol";
@@ -83,10 +83,10 @@ abstract contract ERC4626STKernel is RoycoKernel {
     }
 
     /// @inheritdoc IRoycoKernel
-    function stPreviewRedeem(uint256 _shares) external view override onlySeniorTranche returns (TrancheAssetClaims memory userClaim) {
+    function stPreviewRedeem(uint256 _shares) external view override onlySeniorTranche returns (AssetClaims memory userClaim) {
         // Get the total claim of ST on the ST and JT assets, and scale it to the number of shares being redeemed
-        (, TrancheAssetClaims memory totalClaims, uint256 totalTrancheShares) = previewSyncTrancheAccounting(TrancheType.SENIOR);
-        TrancheAssetClaims memory scaledClaims = UtilsLib.scaleTrancheAssetsClaim(totalClaims, _shares, totalTrancheShares);
+        (, AssetClaims memory totalClaims, uint256 totalTrancheShares) = previewSyncTrancheAccounting(TrancheType.SENIOR);
+        AssetClaims memory scaledClaims = UtilsLib.scaleTrancheAssetsClaim(totalClaims, _shares, totalTrancheShares);
 
         // Preview the amount of ST assets that would be redeemed for the given amount of shares
         userClaim.stAssets = _previewWithdrawSTAssets(scaledClaims.stAssets);
@@ -104,15 +104,17 @@ abstract contract ERC4626STKernel is RoycoKernel {
         override(IRoycoKernel)
         onlySeniorTranche
         whenNotPaused
-        returns (TrancheAssetClaims memory claims)
+        returns (AssetClaims memory userAssetClaims)
     {
         // Execute a pre-op sync on accounting
         uint256 totalTrancheShares;
-        (, claims, totalTrancheShares) = _preOpSyncTrancheAccounting(TrancheType.SENIOR);
-        claims = UtilsLib.scaleTrancheAssetsClaim(claims, _shares, totalTrancheShares);
+        (, userAssetClaims, totalTrancheShares) = _preOpSyncTrancheAccounting(TrancheType.SENIOR);
+
+        // Scale total tranche asset claims by the ratio of shares this user owns of the tranche vault
+        userAssetClaims = UtilsLib.scaleTrancheAssetsClaim(userAssetClaims, _shares, totalTrancheShares);
 
         // Withdraw the asset claims from each tranche and transfer them to the receiver
-        _withdrawAssets(claims, _receiver);
+        _withdrawAssets(userAssetClaims, _receiver);
 
         // Execute a post-op sync on accounting
         _postOpSyncTrancheAccounting(Operation.ST_DECREASE_NAV);
