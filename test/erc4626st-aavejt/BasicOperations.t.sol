@@ -2,7 +2,6 @@
 pragma solidity ^0.8.28;
 
 import { Vm } from "../../lib/forge-std/src/Vm.sol";
-import { console2 } from "../../lib/forge-std/src/console2.sol";
 import { Math } from "../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 import { IRoycoAccountant } from "../../src/interfaces/IRoycoAccountant.sol";
 import { WAD, ZERO_TRANCHE_UNITS } from "../../src/libraries/Constants.sol";
@@ -224,7 +223,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         assertApproxEqAbs(previewRedeemResult.nav, _toSTValue(depositAmount), AAVE_MAX_ABS_NAV_DELTA, "Preview redeem should return the correct NAV");
 
         // Verify that ST.maxRedeem returns the correct amount
-        uint256t maxRedeem = ST.maxRedeem(stDepositor);
+        uint256 maxRedeem = ST.maxRedeem(stDepositor);
         assertEq(maxRedeem, sharesMinted, "Max redeem should return the correct amount");
     }
 }

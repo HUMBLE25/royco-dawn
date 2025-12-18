@@ -7,9 +7,8 @@ import { ExecutionModel, IRoycoKernel, SharesRedemptionModel } from "../../../in
 import { AssetClaims } from "../../../libraries/Types.sol";
 import { SyncedAccountingState } from "../../../libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib, toTrancheUnits, toUint256 } from "../../../libraries/Units.sol";
-import { UtilsLib } from "../../../libraries/UtilsLib.sol";
 import { ERC4626KernelState, ERC4626KernelStorageLib } from "../../../libraries/kernels/ERC4626KernelStorageLib.sol";
-import { Operation, RoycoKernel, TrancheType } from "../RoycoKernel.sol";
+import { RoycoKernel, TrancheType } from "../RoycoKernel.sol";
 
 abstract contract ERC4626STKernel is RoycoKernel {
     using SafeERC20 for IERC20;
