@@ -186,9 +186,17 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
 
     /// @inheritdoc IRoycoVaultTranche
     function previewDeposit(TRANCHE_UNIT _assets) external view virtual override(IRoycoVaultTranche) executionIsSync(Action.DEPOSIT) returns (uint256 shares) {
-        (NAV_UNIT navAssets, NAV_UNIT effectiveNAVToMintAt) =
+        // Get the state of the tranche before the deposit and the value allocated to the tranche
+        (SyncedAccountingState memory stateBeforeDeposit, NAV_UNIT valueAllocated) =
             (TRANCHE_TYPE() == TrancheType.SENIOR ? IRoycoKernel(kernel()).stPreviewDeposit(_assets) : IRoycoKernel(kernel()).jtPreviewDeposit(_assets));
-        shares = _convertToShares(navAssets, totalSupply(), effectiveNAVToMintAt, Math.Rounding.Floor);
+
+        // Preview the total tranche shares after minting any protocol fee shares post-sync
+        NAV_UNIT feeAccrued = TRANCHE_TYPE() == TrancheType.SENIOR ? stateBeforeDeposit.stProtocolFeeAccrued : stateBeforeDeposit.jtProtocolFeeAccrued;
+        NAV_UNIT effectiveNAV = TRANCHE_TYPE() == TrancheType.SENIOR ? stateBeforeDeposit.stEffectiveNAV : stateBeforeDeposit.jtEffectiveNAV;
+        (uint256 feeSharesMinted,) = previewMintProtocolFeeShares(feeAccrued, effectiveNAV);
+
+        // Calculate the shares to be minted to the receiver, considering the protocol fee shares
+        shares = _convertToShares(valueAllocated, feeSharesMinted + totalSupply(), effectiveNAV, Math.Rounding.Floor);
     }
 
     /// @inheritdoc IRoycoVaultTranche
