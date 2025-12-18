@@ -18,7 +18,7 @@ import {
     SyncedAccountingState,
     TrancheDeploymentParams
 } from "../../src/libraries/Types.sol";
-import { MainnetForkWithAaveTestBase } from "./base/MainnetForkWithAaveBaseTest.sol";
+import { MainnetForkWithAaveTestBase } from "./base/MainnetForkWithAaveBaseTest.t.sol";
 
 contract DeploymentsTest is MainnetForkWithAaveTestBase {
     constructor() {

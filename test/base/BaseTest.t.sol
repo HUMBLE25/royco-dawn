@@ -24,9 +24,11 @@ import { StaticCurveRDM } from "../../src/rdm/StaticCurveRDM.sol";
 import { RoycoJT } from "../../src/tranches/RoycoJT.sol";
 import { RoycoST } from "../../src/tranches/RoycoST.sol";
 import { RoycoVaultTranche } from "../../src/tranches/RoycoVaultTranche.sol";
-import { Assertions } from "./Assertions.sol";
+import { Assertions } from "./Assertions.t.sol";
 
-contract BaseTest is Test, RoycoRoles, Assertions {
+abstract contract BaseTest is Test, RoycoRoles, Assertions {
+    uint256 internal constant BPS = 0.0001e18;
+
     struct TrancheState {
         NAV_UNIT rawNAV;
         NAV_UNIT effectiveNAV;

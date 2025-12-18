@@ -12,15 +12,15 @@ import { DeployedContracts, IRoycoAccountant, IRoycoKernel, MarketDeploymentPara
 import { TrancheDeploymentParams } from "../../../src/libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, toNAVUnits, toTrancheUnits, toUint256 } from "../../../src/libraries/Units.sol";
 import { RoycoVaultTranche } from "../../../src/tranches/RoycoVaultTranche.sol";
-import { BaseTest } from "../../base/BaseTest.sol";
+import { BaseTest } from "../../base/BaseTest.t.sol";
 import { ERC4626Mock } from "../../mock/ERC4626Mock.sol";
 
 abstract contract MainnetForkWithAaveTestBase is BaseTest {
     // TODO: Review All
     TRANCHE_UNIT internal AAVE_MAX_ABS_TRANCH_UNIT_DELTA = toTrancheUnits(3);
-    NAV_UNIT internal AAVE_MAX_ABS_NAV_DELTA = toNAVUnits(toUint256(AAVE_MAX_ABS_TRANCH_UNIT_DELTA) * 10 ** 21);
-    uint256 internal constant MAX_REDEEM_RELATIVE_DELTA = 0.0001e18; // 0.01%
-    uint256 internal constant MAX_CONVERT_TO_ASSETS_RELATIVE_DELTA = 0.0001e18; // 0.01%
+    NAV_UNIT internal AAVE_MAX_ABS_NAV_DELTA = toNAVUnits(toUint256(AAVE_MAX_ABS_TRANCH_UNIT_DELTA));
+    uint256 internal constant MAX_REDEEM_RELATIVE_DELTA = 1 * BPS;
+    uint256 internal constant MAX_CONVERT_TO_ASSETS_RELATIVE_DELTA = 1 * BPS;
     uint256 internal constant JT_REDEMPTION_DELAY_SECONDS = 100;
 
     Vm.Wallet internal RESERVE;

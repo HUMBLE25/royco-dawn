@@ -37,6 +37,10 @@ contract Assertions is Test {
         assertApproxEqRel(toUint256(left), toUint256(right), maxRelDelta, errorMessage);
     }
 
+    function assertApproxEqAbs(TRANCHE_UNIT left, TRANCHE_UNIT right, TRANCHE_UNIT maxAbsDelta, string memory errorMessage) internal pure {
+        assertApproxEqAbs(toUint256(left), toUint256(right), toUint256(maxAbsDelta), errorMessage);
+    }
+
     function assertEq(NAV_UNIT left, NAV_UNIT right, string memory errorMessage) internal pure {
         assertEq(toUint256(left), toUint256(right), errorMessage);
     }
@@ -63,6 +67,10 @@ contract Assertions is Test {
 
     function assertApproxEqAbs(NAV_UNIT left, NAV_UNIT right, uint256 maxAbsDelta, string memory errorMessage) internal pure {
         assertApproxEqAbs(toUint256(left), toUint256(right), maxAbsDelta, errorMessage);
+    }
+
+    function assertApproxEqAbs(NAV_UNIT left, NAV_UNIT right, NAV_UNIT maxAbsDelta, string memory errorMessage) internal pure {
+        assertApproxEqAbs(toUint256(left), toUint256(right), toUint256(maxAbsDelta), errorMessage);
     }
 
     function assertApproxEqRel(NAV_UNIT left, NAV_UNIT right, uint256 maxRelDelta, string memory errorMessage) internal pure {
