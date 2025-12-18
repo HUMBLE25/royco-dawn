@@ -252,29 +252,41 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         override(IRoycoAccountant)
         returns (NAV_UNIT totalNAVClaimable, NAV_UNIT stClaimable, NAV_UNIT jtClaimable)
     {
-        // Get the storage pointer to the base kernel state and cache beta and coverage
         RoycoAccountantState storage $ = RoycoAccountantStorageLib._getRoycoAccountantStorage();
-        uint256 betaWAD = $.betaWAD;
-        uint256 coverageWAD = $.coverageWAD;
+
+        // Get the surplus JT assets in NAV units
+        NAV_UNIT surplusJTAssets = _calculateSurplusJtAssetsInNav(_stRawNAV, _jtRawNAV);
         // Calculate K_S
         uint256 kS_WAD = toUint256(_jtClaimOnStUnits.mulDiv(WAD, _jtClaimOnStUnits + _jtClaimOnJtUnits, Math.Rounding.Floor));
         // Calculate K_J
         uint256 kJ_WAD = toUint256(_jtClaimOnJtUnits.mulDiv(WAD, _jtClaimOnStUnits + _jtClaimOnJtUnits, Math.Rounding.Floor));
-        // Preview a NAV sync to get the market's current state
-        (SyncedAccountingState memory state,) = _previewSyncTrancheAccounting(_stRawNAV, _jtRawNAV, _previewJTYieldShareAccrual());
-        // Solve for y, rounding in favor of senior protection
-        // Compute the total covered exposure of the underlying investment
-        NAV_UNIT totalCoveredExposure = _stRawNAV + _jtRawNAV.mulDiv(betaWAD, WAD, Math.Rounding.Ceil);
-        // Compute the minimum junior tranche assets required to cover the exposure as per the market's coverage requirement
-        NAV_UNIT requiredJTAssets = totalCoveredExposure.mulDiv(coverageWAD, WAD, Math.Rounding.Ceil);
-        // Compute the surplus coverage currently provided by the junior tranche based on its currently remaining loss-absorption buffer
-        NAV_UNIT surplusJTAssets = UnitsMathLib.saturatingSub(state.jtEffectiveNAV, requiredJTAssets);
         // Compute how much coverage the system retains per 1 nav unit of JT assets withdrawn scaled to WAD precision
-        uint256 coverageRetentionWAD = (WAD - coverageWAD.mulDiv(kS_WAD + betaWAD.mulDiv(kJ_WAD, WAD, Math.Rounding.Floor), WAD, Math.Rounding.Floor));
+        uint256 coverageRetentionWAD =
+            (WAD - uint256($.coverageWAD).mulDiv(kS_WAD + uint256($.betaWAD).mulDiv(kJ_WAD, WAD, Math.Rounding.Floor), WAD, Math.Rounding.Floor));
         // Return how much of the surplus can be withdrawn while satisfying the coverage requirement
         totalNAVClaimable = surplusJTAssets.mulDiv(WAD, coverageRetentionWAD, Math.Rounding.Floor);
         stClaimable = totalNAVClaimable.mulDiv(kS_WAD, WAD, Math.Rounding.Floor);
         jtClaimable = totalNAVClaimable.mulDiv(kJ_WAD, WAD, Math.Rounding.Floor);
+    }
+
+    /**
+     * @notice Calculates the surplus JT assets in NAV units
+     * @param _stRawNAV The senior tranche's current raw NAV in the market's NAV units
+     * @param _jtRawNAV The junior tranche's current raw NAV in the market's NAV units
+     * @return surplusJTAssets The surplus JT assets in NAV units
+     */
+    function _calculateSurplusJtAssetsInNav(NAV_UNIT _stRawNAV, NAV_UNIT _jtRawNAV) internal view returns (NAV_UNIT surplusJTAssets) {
+        // Get the storage pointer to the base kernel state and cache beta and coverage
+        RoycoAccountantState storage $ = RoycoAccountantStorageLib._getRoycoAccountantStorage();
+        uint256 betaWAD = $.betaWAD;
+        // Preview a NAV sync to get the market's current state
+        (SyncedAccountingState memory state,) = _previewSyncTrancheAccounting(_stRawNAV, _jtRawNAV, _previewJTYieldShareAccrual());
+        // Compute the total covered exposure of the underlying investment, rounding in favor of senior protection
+        NAV_UNIT totalCoveredExposure = _stRawNAV + _jtRawNAV.mulDiv(betaWAD, WAD, Math.Rounding.Ceil);
+        // Compute the minimum junior tranche assets required to cover the exposure as per the market's coverage requirement
+        NAV_UNIT requiredJTAssets = totalCoveredExposure.mulDiv($.coverageWAD, WAD, Math.Rounding.Ceil);
+        // Compute the surplus coverage currently provided by the junior tranche based on its currently remaining loss-absorption buffer
+        surplusJTAssets = UnitsMathLib.saturatingSub(state.jtEffectiveNAV, requiredJTAssets);
     }
 
     /**
