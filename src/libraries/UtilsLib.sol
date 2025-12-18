@@ -43,7 +43,7 @@ library UtilsLib {
     /// @param _shares The number of shares to scale the claims by
     /// @param _totalTrancheShares The total number of shares that exist in the tranche
     /// @return scaledClaims The scaled claims on ST and JT assets of the tranche
-    function scaleTrancheAssetsClaim(
+    function scaleAssetClaims(
         AssetClaims memory _claims,
         uint256 _shares,
         uint256 _totalTrancheShares
@@ -62,7 +62,7 @@ library UtilsLib {
     /// @param _navNumerator The NAV to use for the numerator
     /// @param _navDenominator The NAV to use for the denominator
     /// @return scaledClaims The scaled claims on ST and JT assets of the tranche
-    function scaleTrancheAssetsClaim(
+    function scaleAssetClaims(
         AssetClaims memory _claims,
         NAV_UNIT _navNumerator,
         NAV_UNIT _navDenominator

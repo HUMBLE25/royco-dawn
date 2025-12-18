@@ -16,7 +16,7 @@ interface IRoycoKernel {
     event ProtocolFeeRecipientUpdated(address protocolFeeRecipient);
 
     /// @notice Emitted when the redemption delay is updated
-    event JuniorTrancheRedemptionDelayUpdated(uint256 jtRedemptionDelayInSeconds);
+    event JuniorTrancheRedemptionDelayUpdated(uint24 jtRedemptionDelayInSeconds);
 
     /// @notice Thrown when any of the required initialization params are null
     error NULL_ADDRESS();
@@ -46,18 +46,6 @@ interface IRoycoKernel {
     error PREVIEW_REDEEM_DISABLED_FOR_ASYNC_REDEMPTION();
 
     /**
-     * @notice Returns the request redeem shares behavior for the senior tranche
-     * @return The request redeem shares behavior for the senior tranche - BURN_ON_REQUEST_REDEEM or BURN_ON_CLAIM_REDEEM
-     */
-    function ST_REQUEST_REDEEM_SHARES_BEHAVIOR() external pure returns (SharesRedemptionModel);
-
-    /**
-     * @notice Returns the request redeem shares behavior for the junior tranche
-     * @return The request redeem shares behavior for the junior tranche - BURN_ON_REQUEST_REDEEM or BURN_ON_CLAIM_REDEEM
-     */
-    function JT_REQUEST_REDEEM_SHARES_BEHAVIOR() external pure returns (SharesRedemptionModel);
-
-    /**
      * @notice Returns the execution model for the senior tranche's increase NAV operation
      * @return The execution model for the senior tranche's increase NAV operation - SYNC or ASYNC
      */
@@ -80,6 +68,18 @@ interface IRoycoKernel {
      * @return The execution model for the junior tranche's decrease NAV operation - SYNC or ASYNC
      */
     function JT_REDEEM_EXECUTION_MODEL() external pure returns (ExecutionModel);
+
+    /**
+     * @notice Returns the request redeem shares behavior for the senior tranche
+     * @return The request redeem shares behavior for the senior tranche - BURN_ON_REQUEST_REDEEM or BURN_ON_CLAIM_REDEEM
+     */
+    function ST_REQUEST_REDEEM_SHARES_BEHAVIOR() external pure returns (SharesRedemptionModel);
+
+    /**
+     * @notice Returns the request redeem shares behavior for the junior tranche
+     * @return The request redeem shares behavior for the junior tranche - BURN_ON_REQUEST_REDEEM or BURN_ON_CLAIM_REDEEM
+     */
+    function JT_REQUEST_REDEEM_SHARES_BEHAVIOR() external pure returns (SharesRedemptionModel);
 
     /**
      * @notice Converts the specified ST assets denominated in its tranche units to the kernel's NAV units

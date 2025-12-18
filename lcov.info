@@ -1102,8 +1102,8 @@ DA:36,820
 BRDA:36,0,0,103
 DA:38,717
 DA:46,2359
-FN:46,UtilsLib.scaleTrancheAssetsClaim
-FNDA:2359,UtilsLib.scaleTrancheAssetsClaim
+FN:46,UtilsLib.scaleAssetClaims
+FNDA:2359,UtilsLib.scaleAssetClaims
 DA:55,2359
 DA:56,2359
 DA:57,2359
