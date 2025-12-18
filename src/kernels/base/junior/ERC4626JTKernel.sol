@@ -20,8 +20,8 @@ abstract contract ERC4626JTKernel is RoycoKernel {
     /// @inheritdoc IRoycoKernel
     ExecutionModel public constant JT_DEPOSIT_EXECUTION_MODEL = ExecutionModel.SYNC;
 
-    /// @notice Thrown when the ST base asset is different the the ERC4626 vault's base asset
-    error TRANCHE_AND_VAULT_ASSET_MISMATCH();
+    /// @notice Thrown when the JT base asset is different the the ERC4626 vault's base asset
+    error JUNIOR_TRANCHE_AND_VAULT_ASSET_MISMATCH();
 
     /**
      * @notice Initializes a kernel where the junior tranche is deployed into an ERC4626 vault
@@ -30,7 +30,7 @@ abstract contract ERC4626JTKernel is RoycoKernel {
      */
     function __ERC4626_JT_Kernel_init_unchained(address _jtVault, address _jtAsset) internal onlyInitializing {
         // Ensure that the ST base asset is identical to the ERC4626 vault's base asset
-        require(IERC4626(_jtVault).asset() == _jtAsset, TRANCHE_AND_VAULT_ASSET_MISMATCH());
+        require(IERC4626(_jtVault).asset() == _jtAsset, JUNIOR_TRANCHE_AND_VAULT_ASSET_MISMATCH());
 
         // Extend a one time max approval to the ERC4626 vault for the JT's base asset
         IERC20(_jtAsset).forceApprove(address(_jtVault), type(uint256).max);
@@ -52,6 +52,36 @@ abstract contract ERC4626JTKernel is RoycoKernel {
         // Convert the assets allocated to NAV units and preview a sync to get the current NAV to mint shares at for the junior tranche
         valueAllocated = jtConvertTrancheUnitsToNAVUnits(jtAssetsAllocated);
         navToMintAt = (_previewSyncTrancheAccounting()).jtEffectiveNAV;
+    }
+
+    /// @inheritdoc RoycoKernel
+    function _getJuniorTrancheRawNAV() internal view override(RoycoKernel) returns (NAV_UNIT) {
+        ERC4626KernelState storage $ = ERC4626KernelStorageLib._getERC4626KernelStorage();
+        // Must use convert to assets for the tranche owned shares in order to be exlusive of any fixed fees on withdrawal
+        // Cannot use max withdraw since it will treat illiquidity as a NAV loss
+        TRANCHE_UNIT jtOwnedAssets = toTrancheUnits(IERC4626($.jtVault).convertToAssets($.jtOwnedShares));
+        return stConvertTrancheUnitsToNAVUnits(jtOwnedAssets);
+    }
+
+    /// @inheritdoc RoycoKernel
+    function _jtMaxDepositGlobally(address) internal view override(RoycoKernel) returns (TRANCHE_UNIT) {
+        // Max deposit takes global withdrawal limits into account
+        return toTrancheUnits(IERC4626(ERC4626KernelStorageLib._getERC4626KernelStorage().jtVault).maxDeposit(address(this)));
+    }
+
+    /// @inheritdoc RoycoKernel
+    function _jtPreviewWithdraw(TRANCHE_UNIT _jtAssets) internal view override(RoycoKernel) returns (TRANCHE_UNIT withdrawnJTAssets) {
+        IERC4626 jtVault = IERC4626(ERC4626KernelStorageLib._getERC4626KernelStorage().jtVault);
+        // Convert the ST assets to underlying shares
+        uint256 jtVaultShares = jtVault.convertToShares(toUint256(_jtAssets));
+        // Preview the amount of ST assets that would be redeemed for the given amount of underlying shares
+        withdrawnJTAssets = toTrancheUnits(jtVault.previewRedeem(jtVaultShares));
+    }
+
+    /// @inheritdoc RoycoKernel
+    function _jtMaxWithdrawableGlobally(address) internal view override(RoycoKernel) returns (TRANCHE_UNIT) {
+        // Max withdraw takes global withdrawal limits into account
+        return toTrancheUnits(IERC4626(ERC4626KernelStorageLib._getERC4626KernelStorage().jtVault).maxWithdraw(address(this)));
     }
 
     /// @inheritdoc RoycoKernel

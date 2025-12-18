@@ -24,7 +24,7 @@ abstract contract ERC4626STKernel is RoycoKernel {
     SharesRedemptionModel public constant ST_REQUEST_REDEEM_SHARES_BEHAVIOR = SharesRedemptionModel.BURN_ON_CLAIM_REDEEM;
 
     /// @notice Thrown when the ST base asset is different the the ERC4626 vault's base asset
-    error TRANCHE_AND_VAULT_ASSET_MISMATCH();
+    error SENIOR_TRANCHE_AND_VAULT_ASSET_MISMATCH();
 
     /**
      * @notice Initializes a kernel where the senior tranche is deployed into an ERC4626 vault
@@ -33,7 +33,7 @@ abstract contract ERC4626STKernel is RoycoKernel {
      */
     function __ERC4626_ST_Kernel_init_unchained(address _stVault, address _stAsset) internal onlyInitializing {
         // Ensure that the ST base asset is identical to the ERC4626 vault's base asset
-        require(IERC4626(_stVault).asset() == _stAsset, TRANCHE_AND_VAULT_ASSET_MISMATCH());
+        require(IERC4626(_stVault).asset() == _stAsset, SENIOR_TRANCHE_AND_VAULT_ASSET_MISMATCH());
 
         // Extend a one time max approval to the ERC4626 vault for the ST's base asset
         IERC20(_stAsset).forceApprove(address(_stVault), type(uint256).max);
@@ -84,12 +84,12 @@ abstract contract ERC4626STKernel is RoycoKernel {
     }
 
     /// @inheritdoc RoycoKernel
-    function _stPreviewWithdraw(TRANCHE_UNIT _stAssets) internal view override(RoycoKernel) returns (TRANCHE_UNIT redeemedSTAssets) {
+    function _stPreviewWithdraw(TRANCHE_UNIT _stAssets) internal view override(RoycoKernel) returns (TRANCHE_UNIT withdrawnSTAssets) {
         IERC4626 stVault = IERC4626(ERC4626KernelStorageLib._getERC4626KernelStorage().stVault);
         // Convert the ST assets to underlying shares
-        uint256 underlyingShares = stVault.convertToShares(toUint256(_stAssets));
+        uint256 stVaultShares = stVault.convertToShares(toUint256(_stAssets));
         // Preview the amount of ST assets that would be redeemed for the given amount of underlying shares
-        redeemedSTAssets = toTrancheUnits(stVault.previewRedeem(underlyingShares));
+        withdrawnSTAssets = toTrancheUnits(stVault.previewRedeem(stVaultShares));
     }
 
     /// @inheritdoc RoycoKernel

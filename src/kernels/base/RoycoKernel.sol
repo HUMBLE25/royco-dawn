@@ -773,9 +773,9 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     /**
      * @notice Previews the amount of ST assets that would be redeemed for a given amount of ST assets
      * @param _stAssets The ST assets denominated in its tranche units to redeem
-     * @return redeemedSTAssets The amount of ST assets that would be redeemed for the given amount of ST assets
+     * @return withdrawnSTAssets The amount of ST assets that would be redeemed for the given amount of ST assets
      */
-    function _stPreviewWithdraw(TRANCHE_UNIT _stAssets) internal view virtual returns (TRANCHE_UNIT redeemedSTAssets);
+    function _stPreviewWithdraw(TRANCHE_UNIT _stAssets) internal view virtual returns (TRANCHE_UNIT withdrawnSTAssets);
 
     /**
      * @notice Previews the amount of JT assets that would be redeemed for a given amount of JT assets

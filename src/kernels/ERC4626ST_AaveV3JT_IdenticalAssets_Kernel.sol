@@ -15,11 +15,11 @@ contract ERC4626ST_AaveV3JT_IdenticalAssets_Kernel is ERC4626STKernel, AaveV3JTK
 
         // Initialize the base kernel state
         __RoycoKernel_init(_params, stAsset, jtAsset, _initialAuthority);
-        // Initialize the identical assets quoter
-        __IdenticalAssetsQuoter_init_unchained(stAsset, jtAsset);
         // Initialize the ERC4626 senior tranche state
         __ERC4626_ST_Kernel_init_unchained(_stVault, stAsset);
         // Initialize the Aave V3 junior tranche state
         __AaveV3_JT_Kernel_init_unchained(_aaveV3Pool, jtAsset);
+        // Initialize the identical assets quoter
+        __IdenticalAssetsQuoter_init_unchained(stAsset, jtAsset);
     }
 }
