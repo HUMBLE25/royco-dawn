@@ -77,7 +77,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
 
         for (uint256 i = 0; i < _numDepositors; i++) {
             // Generate a provider
-            Vm.Wallet memory provider = _generateProvider(JT, i);
+            Vm.Wallet memory provider = _generateProvider(i);
 
             // Generate a random amount
             uint256 amount = bound(uint256(keccak256(abi.encodePacked(_amountSeed, i))), 1e6, 1_000_000e6);

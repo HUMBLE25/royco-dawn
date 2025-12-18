@@ -184,11 +184,10 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
     }
 
     /// @notice Generates a provider address for the mainnet fork with Aave test base
-    /// @param _tranche The tranche to generate the provider for
     /// @param _index The index of the provider
     /// @return provider The provider wallet
-    function _generateProvider(RoycoVaultTranche _tranche, uint256 _index) internal virtual override returns (Vm.Wallet memory provider) {
-        provider = super._generateProvider(_tranche, _index);
+    function _generateProvider(uint256 _index) internal virtual override returns (Vm.Wallet memory provider) {
+        provider = super._generateProvider(_index);
 
         // Fund the provider with 10M USDC
         deal(ETHEREUM_MAINNET_USDC_ADDRESS, provider.addr, 10_000_000e6);

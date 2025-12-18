@@ -4,10 +4,11 @@ pragma solidity ^0.8.28;
 import { RoycoFactory } from "../../src/RoycoFactory.sol";
 import { RoycoAccountant } from "../../src/accountant/RoycoAccountant.sol";
 import { IPool } from "../../src/interfaces/aave/IPool.sol";
+import { TrancheType } from "../../src/interfaces/kernel/IRoycoKernel.sol";
 import { ZERO_NAV_UNITS, ZERO_TRANCHE_UNITS } from "../../src/libraries/Constants.sol";
 import { RoycoAccountantInitParams, RoycoAccountantState } from "../../src/libraries/RoycoAccountantStorageLib.sol";
 import { RoycoKernelInitParams, RoycoKernelState } from "../../src/libraries/RoycoKernelStorageLib.sol";
-import { IRoycoAccountant, IRoycoKernel, MarketDeploymentParams, TrancheDeploymentParams } from "../../src/libraries/Types.sol";
+import { IRoycoAccountant, IRoycoKernel, MarketDeploymentParams, SyncedAccountingState, TrancheDeploymentParams } from "../../src/libraries/Types.sol";
 import { MainnetForkWithAaveTestBase } from "./base/MainnetForkWithAaveBaseTest.sol";
 
 contract DeploymentsTest is MainnetForkWithAaveTestBase {
@@ -20,7 +21,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
     }
 
     /// @notice Verifies senior tranche deployment parameters
-    function test_SeniorTrancheDeployment() public {
+    function test_SeniorTrancheDeployment() public view {
         // Basic wiring
         assertTrue(address(ST) != address(0), "Senior tranche not deployed");
         // Kernel wiring
@@ -41,7 +42,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
     }
 
     /// @notice Verifies junior tranche deployment parameters
-    function test_JuniorTrancheDeployment() public {
+    function test_JuniorTrancheDeployment() public view {
         // Basic wiring
         assertTrue(address(JT) != address(0), "Junior tranche not deployed");
         // Kernel wiring
@@ -62,7 +63,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
     }
 
     /// @notice Verifies kernel and accountant deployment parameters and wiring
-    function test_KernelAndAccountantDeployment() public {
+    function test_KernelAndAccountantDeployment() public view {
         // Basic wiring
         assertTrue(address(KERNEL) != address(0), "Kernel not deployed");
 
@@ -84,10 +85,11 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         assertEq(accountantState.rdm, address(RDM), "Kernel RDM mismatch");
 
         // Initial NAV / ASSETS via KERNEL view functions
-        assertEq(KERNEL.getSTAssetClaims().nav, ZERO_NAV_UNITS, "Kernel ST total effective ASSETS should be 0");
-        assertEq(KERNEL.getJTAssetClaims().nav, ZERO_NAV_UNITS, "Kernel JT total effective ASSETS should be 0");
-        assertEq(KERNEL.getSTRawNAV(), ZERO_NAV_UNITS, "Kernel ST raw NAV should be 0");
-        assertEq(KERNEL.getJTRawNAV(), ZERO_NAV_UNITS, "Kernel JT raw NAV should be 0");
+        (SyncedAccountingState memory state,,) = KERNEL.previewSyncTrancheAccounting(TrancheType.SENIOR);
+        assertEq(state.stEffectiveNAV, ZERO_NAV_UNITS, "Kernel ST total effective ASSETS should be 0");
+        assertEq(state.jtEffectiveNAV, ZERO_NAV_UNITS, "Kernel JT total effective ASSETS should be 0");
+        assertEq(state.stRawNAV, ZERO_NAV_UNITS, "Kernel ST raw NAV should be 0");
+        assertEq(state.jtRawNAV, ZERO_NAV_UNITS, "Kernel JT raw NAV should be 0");
 
         // Aave wiring: pool and AUSDC mapping must be consistent
         address expectedAToken = IPool(ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS).getReserveAToken(ETHEREUM_MAINNET_USDC_ADDRESS);
@@ -216,7 +218,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
 
     function test_deployMarket_revertsOnFailedSeniorTrancheInitialization() public {
         bytes32 salt = keccak256(abi.encodePacked("SALT", "FAILED_ST_INIT"));
-        (MarketDeploymentParams memory params, bytes32 marketId) = _buildValidMarketParamsForSalt(salt);
+        (MarketDeploymentParams memory params,) = _buildValidMarketParamsForSalt(salt);
 
         // Provide non-empty but invalid initialization data so the call to the senior tranche fails
         params.seniorTrancheInitializationData = abi.encodeWithSignature("nonExistentFunction(address)", address(this));
@@ -227,7 +229,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
 
     function test_deployMarket_revertsOnFailedJuniorTrancheInitialization() public {
         bytes32 salt = keccak256(abi.encodePacked("SALT", "FAILED_JT_INIT"));
-        (MarketDeploymentParams memory params, bytes32 marketId) = _buildValidMarketParamsForSalt(salt);
+        (MarketDeploymentParams memory params,) = _buildValidMarketParamsForSalt(salt);
 
         // Provide non-empty but invalid initialization data so the call to the junior tranche fails
         params.juniorTrancheInitializationData = abi.encodeWithSignature("nonExistentFunction(address)", address(this));
@@ -238,7 +240,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
 
     function test_deployMarket_revertsOnFailedAccountantInitialization() public {
         bytes32 salt = keccak256(abi.encodePacked("SALT", "FAILED_ACCOUNTANT_INIT"));
-        (MarketDeploymentParams memory params, bytes32 marketId) = _buildValidMarketParamsForSalt(salt);
+        (MarketDeploymentParams memory params,) = _buildValidMarketParamsForSalt(salt);
 
         // Provide invalid (but non-empty) initialization data so the call to the accountant fails
         params.accountantInitializationData = abi.encodeWithSignature("nonExistentFunction(address)", address(this));
@@ -249,7 +251,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
 
     function test_deployMarket_revertsOnFailedKernelInitialization() public {
         bytes32 salt = keccak256(abi.encodePacked("SALT", "FAILED_KERNEL_INIT"));
-        (MarketDeploymentParams memory params, bytes32 marketId) = _buildValidMarketParamsForSalt(salt);
+        (MarketDeploymentParams memory params,) = _buildValidMarketParamsForSalt(salt);
 
         // Provide invalid (but non-empty) initialization data so the call to the kernel fails
         params.kernelInitializationData = abi.encodeWithSignature("nonExistentFunction(address)", address(this));
@@ -398,7 +400,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
 
     function test_deployMarket_revertsOnInvalidAccountantOnKernel() public {
         bytes32 salt = keccak256(abi.encodePacked("SALT", "INVALID_ACCOUNTANT_ON_KERNEL"));
-        (MarketDeploymentParams memory params, bytes32 marketId) = _buildValidMarketParamsForSalt(salt);
+        (MarketDeploymentParams memory params,) = _buildValidMarketParamsForSalt(salt);
 
         // Use an incorrect accountant address in the kernel initialization params
         address expectedSeniorTrancheAddress = FACTORY.predictERC1967ProxyAddress(address(ST_IMPL), salt);
@@ -426,7 +428,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
 
     function test_deployMarket_revertsOnInvalidKernelOnAccountant() public {
         bytes32 salt = keccak256(abi.encodePacked("SALT", "INVALID_KERNEL_ON_ACCOUNTANT"));
-        (MarketDeploymentParams memory params, bytes32 marketId) = _buildValidMarketParamsForSalt(salt);
+        (MarketDeploymentParams memory params,) = _buildValidMarketParamsForSalt(salt);
 
         // Use an incorrect kernel address in the accountant initialization params
         params.accountantInitializationData = abi.encodeCall(
@@ -449,14 +451,14 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
 
     /// @dev Helper to construct a valid set of market deployment params that mirrors `_deployMarketWithKernel`
     /// @dev Uses a default salt; useful for tests that only hit parameter validation
-    function _buildValidMarketParams() internal returns (MarketDeploymentParams memory params, bytes32 marketId, bytes32 salt) {
+    function _buildValidMarketParams() internal view returns (MarketDeploymentParams memory params, bytes32 marketId, bytes32 salt) {
         salt = keccak256(abi.encodePacked("SALT"));
         (params, marketId) = _buildValidMarketParamsForSalt(salt);
     }
 
     /// @dev Helper to construct a valid set of market deployment params for a specific salt
     /// @dev Use this when you need to actually deploy contracts (to avoid Create2 collisions)
-    function _buildValidMarketParamsForSalt(bytes32 salt) internal returns (MarketDeploymentParams memory params, bytes32 marketId) {
+    function _buildValidMarketParamsForSalt(bytes32 salt) internal view returns (MarketDeploymentParams memory params, bytes32 marketId) {
         marketId = keccak256(abi.encodePacked(SENIOR_TRANCH_NAME, JUNIOR_TRANCH_NAME, block.timestamp));
 
         // Precompute the expected addresses of the kernel and accountant
