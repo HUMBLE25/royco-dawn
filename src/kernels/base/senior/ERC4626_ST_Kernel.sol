@@ -111,7 +111,7 @@ abstract contract ERC4626_ST_Kernel is RoycoKernel {
             $.jtOwnedShares -= stVault.withdraw(toUint256(_stAssets), _receiver, address(this));
             // If the vault has insufficient liquidity to withdraw the specified assets, transfer the equivalent number of shares to the receiver
         } else {
-            // Transfer the assets equivalent of shares to transfer to the receiver
+            // Transfer the assets equivalent of shares to the receiver
             uint256 sharesEquivalentToWithdraw = ($.jtOwnedShares -= stVault.convertToShares(toUint256(_stAssets)));
             IERC20(address(stVault)).safeTransfer(_receiver, sharesEquivalentToWithdraw);
         }

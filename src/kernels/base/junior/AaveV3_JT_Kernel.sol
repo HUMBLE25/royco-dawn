@@ -158,7 +158,7 @@ abstract contract AaveV3_JT_Kernel is RoycoKernel {
     }
 
     /// @inheritdoc RoycoKernel
-    function _jtPreviewWithdraw(TRANCHE_UNIT _jtAssets) internal view override(RoycoKernel) returns (TRANCHE_UNIT withdrawnJTAssets) {
+    function _jtPreviewWithdraw(TRANCHE_UNIT _jtAssets) internal pure override(RoycoKernel) returns (TRANCHE_UNIT withdrawnJTAssets) {
         return _jtAssets;
     }
 

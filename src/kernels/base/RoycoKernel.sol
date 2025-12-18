@@ -708,12 +708,6 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         userClaim.nav = stConvertTrancheUnitsToNAVUnits(userClaim.stAssets) + jtConvertTrancheUnitsToNAVUnits(userClaim.jtAssets);
     }
 
-    /// @notice Returns this kernel's accountant casted to the IRoycoAccountant interface
-    /// @return The Royco Accountant for this kernel
-    function _accountant() internal view returns (IRoycoAccountant) {
-        return IRoycoAccountant(RoycoKernelStorageLib._getRoycoKernelStorage().accountant);
-    }
-
     /**
      * @notice Returns the amount of JT shares redeemable from a redemption request
      * @param _request The redemption request to get redeemable shares for
@@ -726,16 +720,28 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         claimableShares = _request.totalJTSharesToRedeem;
     }
 
+    /**
+     * @notice Returns this kernel's accountant casted to the IRoycoAccountant interface
+     * @return accountant The Royco Accountant for this kernel
+     */
+    function _accountant() internal view returns (IRoycoAccountant accountant) {
+        return IRoycoAccountant(RoycoKernelStorageLib._getRoycoKernelStorage().accountant);
+    }
+
     // =============================
     // Internal NAV Retrieval Functions
     // =============================
 
-    /// @notice Returns the raw net asset value of the senior tranche denominated in the NAV units (USD, BTC, etc.) for this kernel
-    /// @return stRawNAV The pure net asset value of the senior tranche invested assets
+    /**
+     * @notice Returns the raw net asset value of the senior tranche denominated in the NAV units (USD, BTC, etc.) for this kernel
+     * @return stRawNAV The pure net asset value of the senior tranche invested assets
+     */
     function _getSeniorTrancheRawNAV() internal view virtual returns (NAV_UNIT stRawNAV);
 
-    /// @notice Returns the raw net asset value of the junior tranche denominated in the NAV units (USD, BTC, etc.) for this kernel
-    /// @return jtRawNAV The pure net asset value of the junior tranche invested assets
+    /**
+     * @notice Returns the raw net asset value of the junior tranche denominated in the NAV units (USD, BTC, etc.) for this kernel
+     * @return jtRawNAV The pure net asset value of the junior tranche invested assets
+     */
     function _getJuniorTrancheRawNAV() internal view virtual returns (NAV_UNIT jtRawNAV);
 
     // =============================

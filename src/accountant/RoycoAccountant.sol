@@ -5,7 +5,6 @@ import { RoycoBase } from "../base/RoycoBase.sol";
 import { IRDM } from "../interfaces/IRDM.sol";
 import { IRoycoAccountant, Operation } from "../interfaces/IRoycoAccountant.sol";
 import { MAX_PROTOCOL_FEE_WAD, MIN_COVERAGE_WAD, WAD, ZERO_NAV_UNITS } from "../libraries/Constants.sol";
-import { RoycoAccountantInitParams, RoycoAccountantState, RoycoAccountantStorageLib } from "../libraries/RoycoAccountantStorageLib.sol";
 import { NAV_UNIT, SyncedAccountingState } from "../libraries/Types.sol";
 import { UnitsMathLib, toNAVUnits } from "../libraries/Units.sol";
 import { Math, UtilsLib } from "../libraries/UtilsLib.sol";
@@ -15,10 +14,14 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
     using Math for uint256;
     using UnitsMathLib for NAV_UNIT;
 
+    /// @dev Storage slot for RoycoAccountantState using ERC-7201 pattern
+    // keccak256(abi.encode(uint256(keccak256("Royco.storage.RoycoAccountantState")) - 1)) & ~bytes32(uint256(0xff))
+    bytes32 private constant ROYCO_ACCOUNTANT_STORAGE_SLOT = 0xc8240830e1172c6f1489139d8edb11776c3d3b2f893e3f4ce0fb541305a63a00;
+
     /// @dev Enforces that the function is called by the accountant's Royco kernel
     /// forge-lint: disable-next-item(unwrapped-modifier-logic)
     modifier onlyRoycoKernel() {
-        require(msg.sender == RoycoAccountantStorageLib._getRoycoAccountantStorage().kernel, ONLY_ROYCO_KERNEL());
+        require(msg.sender == _getRoycoAccountantStorage().kernel, ONLY_ROYCO_KERNEL());
         _;
     }
 
@@ -34,10 +37,17 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         require(_params.rdm != address(0), NULL_RDM_ADDRESS());
         // Ensure that the protocol fee percentage is valid
         require(_params.protocolFeeWAD <= MAX_PROTOCOL_FEE_WAD, MAX_PROTOCOL_FEE_EXCEEDED());
+
         // Initialize the base state of the accountant
         __RoycoBase_init(_initialAuthority);
+
         // Initialize the state of the accountant
-        RoycoAccountantStorageLib.__RoycoAccountant_init(_params);
+        RoycoAccountantState storage $ = _getRoycoAccountantStorage();
+        $.kernel = _params.kernel;
+        $.protocolFeeWAD = _params.protocolFeeWAD;
+        $.coverageWAD = _params.coverageWAD;
+        $.betaWAD = _params.betaWAD;
+        $.rdm = _params.rdm;
     }
 
     /// @inheritdoc IRoycoAccountant
@@ -51,7 +61,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         returns (SyncedAccountingState memory state)
     {
         // Get the storage pointer to the base kernel state
-        RoycoAccountantState storage $ = RoycoAccountantStorageLib._getRoycoAccountantStorage();
+        RoycoAccountantState storage $ = _getRoycoAccountantStorage();
 
         // Accrue the JT yield share since the last accrual and preview the tranche NAVs and debts synchronization
         bool yieldDistributed;
@@ -98,7 +108,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         returns (SyncedAccountingState memory state)
     {
         // Get the storage pointer to the base kernel state
-        RoycoAccountantState storage $ = RoycoAccountantStorageLib._getRoycoAccountantStorage();
+        RoycoAccountantState storage $ = _getRoycoAccountantStorage();
         if (_op == Operation.ST_INCREASE_NAV) {
             // Compute the delta in the raw NAV of the senior tranche
             int256 deltaST = UnitsMathLib.computeNAVDelta(_stRawNAV, $.lastSTRawNAV);
@@ -203,7 +213,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
      */
     function isCoverageRequirementSatisfied() public view override(IRoycoAccountant) returns (bool) {
         // Get the storage pointer to the base kernel state
-        RoycoAccountantState storage $ = RoycoAccountantStorageLib._getRoycoAccountantStorage();
+        RoycoAccountantState storage $ = _getRoycoAccountantStorage();
         // Compute the utilization and return whether or not the senior tranche is properly collateralized based on persisted NAVs
         uint256 utilization = UtilsLib.computeUtilization($.lastSTRawNAV, $.lastJTRawNAV, $.betaWAD, $.coverageWAD, $.lastJTEffectiveNAV);
         return (utilization <= WAD);
@@ -217,7 +227,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
      */
     function maxSTDepositGivenCoverage(NAV_UNIT _stRawNAV, NAV_UNIT _jtRawNAV) external view override(IRoycoAccountant) returns (NAV_UNIT maxSTDeposit) {
         // Get the storage pointer to the base kernel state
-        RoycoAccountantState storage $ = RoycoAccountantStorageLib._getRoycoAccountantStorage();
+        RoycoAccountantState storage $ = _getRoycoAccountantStorage();
         // Preview a NAV sync to get the market's current state
         (SyncedAccountingState memory state,) = _previewSyncTrancheAccounting(_stRawNAV, _jtRawNAV, _previewJTYieldShareAccrual());
         // Solve for x, rounding in favor of senior protection
@@ -252,7 +262,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         override(IRoycoAccountant)
         returns (NAV_UNIT totalNAVClaimable, NAV_UNIT stClaimable, NAV_UNIT jtClaimable)
     {
-        RoycoAccountantState storage $ = RoycoAccountantStorageLib._getRoycoAccountantStorage();
+        RoycoAccountantState storage $ = _getRoycoAccountantStorage();
 
         // Get the surplus JT assets in NAV units
         NAV_UNIT surplusJTAssets = _calculateSurplusJtAssetsInNav(_stRawNAV, _jtRawNAV);
@@ -277,7 +287,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
      */
     function _calculateSurplusJtAssetsInNav(NAV_UNIT _stRawNAV, NAV_UNIT _jtRawNAV) internal view returns (NAV_UNIT surplusJTAssets) {
         // Get the storage pointer to the base kernel state and cache beta and coverage
-        RoycoAccountantState storage $ = RoycoAccountantStorageLib._getRoycoAccountantStorage();
+        RoycoAccountantState storage $ = _getRoycoAccountantStorage();
         uint256 betaWAD = $.betaWAD;
         // Preview a NAV sync to get the market's current state
         (SyncedAccountingState memory state,) = _previewSyncTrancheAccounting(_stRawNAV, _jtRawNAV, _previewJTYieldShareAccrual());
@@ -307,7 +317,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         returns (SyncedAccountingState memory state, bool yieldDistributed)
     {
         // Get the storage pointer to the base kernel state
-        RoycoAccountantState storage $ = RoycoAccountantStorageLib._getRoycoAccountantStorage();
+        RoycoAccountantState storage $ = _getRoycoAccountantStorage();
 
         // Compute the deltas in the raw NAVs of each tranche
         // The deltas represent the unrealized PNL of the underlying investment since the last NAV checkpoints
@@ -457,7 +467,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
      */
     function _accrueJTYieldShare() internal returns (uint192) {
         // Get the storage pointer to the base kernel state
-        RoycoAccountantState storage $ = RoycoAccountantStorageLib._getRoycoAccountantStorage();
+        RoycoAccountantState storage $ = _getRoycoAccountantStorage();
 
         // Get the last update timestamp
         uint256 lastUpdate = $.lastAccrualTimestamp;
@@ -488,7 +498,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
      */
     function _previewJTYieldShareAccrual() internal view returns (uint192) {
         // Get the storage pointer to the base kernel state
-        RoycoAccountantState storage $ = RoycoAccountantStorageLib._getRoycoAccountantStorage();
+        RoycoAccountantState storage $ = _getRoycoAccountantStorage();
 
         // Get the last update timestamp
         uint256 lastUpdate = $.lastAccrualTimestamp;
@@ -513,7 +523,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         // Ensure that the RDM is not null
         require(_rdm != address(0), NULL_RDM_ADDRESS());
         // Set the new RDM
-        RoycoAccountantStorageLib._getRoycoAccountantStorage().rdm = _rdm;
+        _getRoycoAccountantStorage().rdm = _rdm;
     }
 
     /// @inheritdoc IRoycoAccountant
@@ -521,12 +531,12 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         // Ensure that the protocol fee percentage is valid
         require(_protocolFeeWAD <= MAX_PROTOCOL_FEE_WAD, MAX_PROTOCOL_FEE_EXCEEDED());
         // Set the new protocol fee percentage
-        RoycoAccountantStorageLib._getRoycoAccountantStorage().protocolFeeWAD = _protocolFeeWAD;
+        _getRoycoAccountantStorage().protocolFeeWAD = _protocolFeeWAD;
     }
 
     /// @inheritdoc IRoycoAccountant
     function setCoverage(uint64 _coverageWAD) external override(IRoycoAccountant) restricted {
-        RoycoAccountantState storage $ = RoycoAccountantStorageLib._getRoycoAccountantStorage();
+        RoycoAccountantState storage $ = _getRoycoAccountantStorage();
         // Validate the new coverage requirement
         _validateCoverageRequirement(_coverageWAD, $.betaWAD);
         // Set the new coverage percentage
@@ -535,7 +545,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
 
     /// @inheritdoc IRoycoAccountant
     function setBeta(uint96 _betaWAD) external override(IRoycoAccountant) restricted {
-        RoycoAccountantState storage $ = RoycoAccountantStorageLib._getRoycoAccountantStorage();
+        RoycoAccountantState storage $ = _getRoycoAccountantStorage();
         // Validate the new coverage requirement
         _validateCoverageRequirement($.coverageWAD, _betaWAD);
         // Set the new beta parameter
@@ -544,7 +554,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
 
     /// @inheritdoc IRoycoAccountant
     function getState() external view override(IRoycoAccountant) returns (RoycoAccountantState memory) {
-        return RoycoAccountantStorageLib._getRoycoAccountantStorage();
+        return _getRoycoAccountantStorage();
     }
 
     /**
@@ -557,5 +567,16 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         require((_coverageWAD >= MIN_COVERAGE_WAD) && (_coverageWAD < WAD), INVALID_COVERAGE_CONFIG());
         // Ensure that JT withdrawals are not permanently bricked
         require(uint256(_coverageWAD).mulDiv(_betaWAD, WAD, Math.Rounding.Ceil) < WAD, INVALID_COVERAGE_CONFIG());
+    }
+
+    /**
+     * @notice Returns a storage pointer to the RoycoAccountantState storage
+     * @dev Uses ERC-7201 storage slot pattern for collision-resistant storage
+     * @return $ Storage pointer to the accountant's state
+     */
+    function _getRoycoAccountantStorage() internal pure returns (RoycoAccountantState storage $) {
+        assembly ("memory-safe") {
+            $.slot := ROYCO_ACCOUNTANT_STORAGE_SLOT
+        }
     }
 }

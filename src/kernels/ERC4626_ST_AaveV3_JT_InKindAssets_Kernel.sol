@@ -8,16 +8,7 @@ import { InKindAssetsQuoter } from "./base/quoter/InKindAssetsQuoter.sol";
 import { ERC4626_ST_Kernel } from "./base/senior/ERC4626_ST_Kernel.sol";
 
 contract ERC4626_ST_AaveV3_JT_InKindAssets_Kernel is ERC4626_ST_Kernel, AaveV3_JT_Kernel, InKindAssetsQuoter {
-    function initialize(
-        RoycoKernelInitParams calldata _params,
-        address _initialAuthority,
-        address _stVault,
-        address _aaveV3Pool,
-        uint256 _jtRedemptionDelayInSeconds
-    )
-        external
-        initializer
-    {
+    function initialize(RoycoKernelInitParams calldata _params, address _initialAuthority, address _stVault, address _aaveV3Pool) external initializer {
         // Get the base assets for both tranches and ensure that they are identical
         address stAsset = IRoycoVaultTranche(_params.seniorTranche).asset();
         address jtAsset = IRoycoVaultTranche(_params.juniorTranche).asset();
