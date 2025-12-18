@@ -645,8 +645,8 @@ DA:266,4726
 DA:269,4726
 DA:270,4726
 DA:284,4726
-FN:284,RoycoKernel._marshalTrancheAssetClaims
-FNDA:4726,RoycoKernel._marshalTrancheAssetClaims
+FN:284,RoycoKernel._marshalAssetClaims
+FNDA:4726,RoycoKernel._marshalAssetClaims
 DA:297,4726
 BRDA:297,6,0,1710
 BRDA:297,6,1,3016

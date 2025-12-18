@@ -35,7 +35,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         // Initial NAV and totals
         assertEq(ST.totalSupply(), 0, "ST initial totalSupply should be 0");
         assertEq(ST.getRawNAV(), ZERO_NAV_UNITS, "ST initial raw NAV should be 0");
-        assertEq(ST.totalAssets().effectiveNAV, ZERO_NAV_UNITS, "ST initial effective NAV should be 0");
+        assertEq(ST.totalAssets().nav, ZERO_NAV_UNITS, "ST initial effective NAV should be 0");
         assertEq(ST.totalAssets().stAssets, ZERO_TRANCHE_UNITS, "ST initial total st assets should be 0");
         assertEq(ST.totalAssets().jtAssets, ZERO_TRANCHE_UNITS, "ST initial total jt assets should be 0");
     }
@@ -56,7 +56,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         // Initial NAV and totals
         assertEq(JT.totalSupply(), 0, "JT initial totalSupply should be 0");
         assertEq(JT.getRawNAV(), ZERO_NAV_UNITS, "JT initial raw NAV should be 0");
-        assertEq(JT.totalAssets().effectiveNAV, ZERO_NAV_UNITS, "JT initial effective NAV should be 0");
+        assertEq(JT.totalAssets().nav, ZERO_NAV_UNITS, "JT initial effective NAV should be 0");
         assertEq(JT.totalAssets().stAssets, ZERO_TRANCHE_UNITS, "JT initial total st assets should be 0");
         assertEq(JT.totalAssets().jtAssets, ZERO_TRANCHE_UNITS, "JT initial total jt assets should be 0");
     }
@@ -84,8 +84,8 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         assertEq(accountantState.rdm, address(RDM), "Kernel RDM mismatch");
 
         // Initial NAV / ASSETS via KERNEL view functions
-        assertEq(KERNEL.getSTAssetClaims().effectiveNAV, ZERO_NAV_UNITS, "Kernel ST total effective ASSETS should be 0");
-        assertEq(KERNEL.getJTAssetClaims().effectiveNAV, ZERO_NAV_UNITS, "Kernel JT total effective ASSETS should be 0");
+        assertEq(KERNEL.getSTAssetClaims().nav, ZERO_NAV_UNITS, "Kernel ST total effective ASSETS should be 0");
+        assertEq(KERNEL.getJTAssetClaims().nav, ZERO_NAV_UNITS, "Kernel JT total effective ASSETS should be 0");
         assertEq(KERNEL.getSTRawNAV(), ZERO_NAV_UNITS, "Kernel ST raw NAV should be 0");
         assertEq(KERNEL.getJTRawNAV(), ZERO_NAV_UNITS, "Kernel JT raw NAV should be 0");
 
@@ -320,7 +320,8 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
                 }),
                 OWNER_ADDRESS, // invalid authority: should be FACTORY
                 address(MOCK_UNDERLYING_ST_VAULT),
-                ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS
+                ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS,
+                JT_REDEMPTION_DELAY_SECONDS
             )
         );
 
@@ -414,7 +415,8 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
                 }),
                 address(FACTORY),
                 address(MOCK_UNDERLYING_ST_VAULT),
-                ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS
+                ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS,
+                JT_REDEMPTION_DELAY_SECONDS
             )
         );
 
@@ -475,7 +477,8 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
                 }),
                 address(FACTORY),
                 address(MOCK_UNDERLYING_ST_VAULT),
-                ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS
+                ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS,
+                JT_REDEMPTION_DELAY_SECONDS
             )
         );
         bytes memory accountantInitializationData = abi.encodeCall(

@@ -9,7 +9,7 @@ import { RoycoFactory } from "../../src/RoycoFactory.sol";
 import { RoycoAccountant } from "../../src/accountant/RoycoAccountant.sol";
 import { RoycoRoles } from "../../src/auth/RoycoRoles.sol";
 import { RoycoKernel } from "../../src/kernels/base/RoycoKernel.sol";
-import { TrancheAssetClaims, TrancheType } from "../../src/libraries/Types.sol";
+import { AssetClaims, TrancheType } from "../../src/libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, toUint256 } from "../../src/libraries/Units.sol";
 import { StaticCurveRDM } from "../../src/rdm/StaticCurveRDM.sol";
 import { RoycoJT } from "../../src/tranches/RoycoJT.sol";
@@ -275,14 +275,14 @@ contract BaseTest is Test, RoycoRoles, Assertions {
         assertTrue(address(JT) != address(0), "Junior tranche is not deployed");
 
         assertApproxEqAbs(ST.getRawNAV(), _stState.rawNAV, toUint256(_maxAbsDeltaNAV), "ST raw NAV mismatch");
-        TrancheAssetClaims memory stClaims = ST.totalAssets();
-        assertApproxEqAbs(stClaims.effectiveNAV, _stState.effectiveNAV, toUint256(_maxAbsDeltaNAV), "ST effective NAV mismatch");
+        AssetClaims memory stClaims = ST.totalAssets();
+        assertApproxEqAbs(stClaims.nav, _stState.effectiveNAV, toUint256(_maxAbsDeltaNAV), "ST effective NAV mismatch");
         assertApproxEqAbs(stClaims.stAssets, _stState.stAssetsClaim, toUint256(_maxAbsDeltaTrancheUnits), "ST st assets claim mismatch");
         assertApproxEqAbs(stClaims.jtAssets, _stState.jtAssetsClaim, toUint256(_maxAbsDeltaTrancheUnits), "ST jt assets claim mismatch");
 
         assertApproxEqAbs(JT.getRawNAV(), _jtState.rawNAV, toUint256(_maxAbsDeltaNAV), "JT raw NAV mismatch");
-        TrancheAssetClaims memory jtClaims = JT.totalAssets();
-        assertApproxEqAbs(jtClaims.effectiveNAV, _jtState.effectiveNAV, toUint256(_maxAbsDeltaNAV), "JT effective NAV mismatch");
+        AssetClaims memory jtClaims = JT.totalAssets();
+        assertApproxEqAbs(jtClaims.nav, _jtState.effectiveNAV, toUint256(_maxAbsDeltaNAV), "JT effective NAV mismatch");
         assertApproxEqAbs(jtClaims.stAssets, _jtState.stAssetsClaim, toUint256(_maxAbsDeltaTrancheUnits), "JT st assets claim mismatch");
         assertApproxEqAbs(jtClaims.jtAssets, _jtState.jtAssetsClaim, toUint256(_maxAbsDeltaTrancheUnits), "JT jt assets claim mismatch");
     }
@@ -293,11 +293,11 @@ contract BaseTest is Test, RoycoRoles, Assertions {
     /// @param _feeRecipient The address of the fee recipient
     function _verifyFeeTaken(TrancheState storage _stState, TrancheState storage _jtState, address _feeRecipient) internal {
         uint256 seniorFeeShares = ST.balanceOf(_feeRecipient);
-        NAV_UNIT seniorFeeSharesValue = ST.convertToAssets(seniorFeeShares).effectiveNAV;
+        NAV_UNIT seniorFeeSharesValue = ST.convertToAssets(seniorFeeShares).nav;
         assertEq(seniorFeeSharesValue, _stState.protocolFeeValue, "ST protocol fee value mismatch");
 
         uint256 juniorFeeShares = JT.balanceOf(_feeRecipient);
-        NAV_UNIT juniorFeeSharesValue = JT.convertToAssets(juniorFeeShares).effectiveNAV;
+        NAV_UNIT juniorFeeSharesValue = JT.convertToAssets(juniorFeeShares).nav;
         assertEq(juniorFeeSharesValue, _jtState.protocolFeeValue, "JT protocol fee value mismatch");
     }
 
