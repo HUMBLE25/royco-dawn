@@ -13,7 +13,7 @@ import { IRoycoKernel } from "./interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoAsyncCancellableVault } from "./interfaces/tranche/IRoycoAsyncCancellableVault.sol";
 import { IRoycoAsyncVault } from "./interfaces/tranche/IRoycoAsyncVault.sol";
 import { IRoycoVaultTranche } from "./interfaces/tranche/IRoycoVaultTranche.sol";
-import { AsyncJTRedemptionDelayKernel } from "./kernels/base/junior/base/AsyncJTRedemptionDelayKernel.sol";
+import { RedemptionDelayJTKernel } from "./kernels/base/junior/base/RedemptionDelayJTKernel.sol";
 import { DeployedContracts, MarketDeploymentParams } from "./libraries/Types.sol";
 
 /// @title RoycoFactory
@@ -199,7 +199,7 @@ contract RoycoFactory is AccessManager, RoycoRoles {
         _setTargetFunctionRole(address(_deployedContracts.kernel), IRoycoAuth.pause.selector, PAUSER_ROLE);
         _setTargetFunctionRole(address(_deployedContracts.kernel), IRoycoAuth.unpause.selector, PAUSER_ROLE);
         _setTargetFunctionRole(address(_deployedContracts.kernel), IRoycoKernel.syncTrancheAccounting.selector, SYNC_ROLE);
-        _setTargetFunctionRole(address(_deployedContracts.kernel), AsyncJTRedemptionDelayKernel.setJuniorTrancheRedemptionDelay.selector, KERNEL_ADMIN_ROLE);
+        _setTargetFunctionRole(address(_deployedContracts.kernel), RedemptionDelayJTKernel.setJuniorTrancheRedemptionDelay.selector, KERNEL_ADMIN_ROLE);
 
         // Configure the roles for the senior tranche
         _configureRolesForTranche(_deployedContracts.seniorTranche);
