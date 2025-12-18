@@ -107,6 +107,26 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     }
 
     /// @inheritdoc IRoycoKernel
+    function stConvertTrancheUnitsToNAVUnits(TRANCHE_UNIT _stAssets) external view override(IRoycoKernel) returns (NAV_UNIT) {
+        return _stConvertTrancheUnitsToNAVUnits(_stAssets);
+    }
+
+    /// @inheritdoc IRoycoKernel
+    function jtConvertTrancheUnitsToNAVUnits(TRANCHE_UNIT _jtAssets) external view override(IRoycoKernel) returns (NAV_UNIT) {
+        return _jtConvertTrancheUnitsToNAVUnits(_jtAssets);
+    }
+
+    /// @inheritdoc IRoycoKernel
+    function stConvertNAVUnitsToTrancheUnits(NAV_UNIT _navAssets) external view override(IRoycoKernel) returns (TRANCHE_UNIT) {
+        return _stConvertNAVUnitsToTrancheUnits(_navAssets);
+    }
+
+    /// @inheritdoc IRoycoKernel
+    function jtConvertNAVUnitsToTrancheUnits(NAV_UNIT _navAssets) external view override(IRoycoKernel) returns (TRANCHE_UNIT) {
+        return _jtConvertNAVUnitsToTrancheUnits(_navAssets);
+    }
+
+    /// @inheritdoc IRoycoKernel
     function getSTRawNAV() external view override(IRoycoKernel) returns (NAV_UNIT) {
         return _getSeniorTrancheRawNAV();
     }
@@ -340,26 +360,6 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     /// @return The Royco Accountant for this kernel
     function _accountant() internal view returns (IRoycoAccountant) {
         return IRoycoAccountant(RoycoKernelStorageLib._getRoycoKernelStorage().accountant);
-    }
-
-    /// @inheritdoc IRoycoKernel
-    function stConvertTrancheUnitsToNAVUnits(TRANCHE_UNIT _stAssets) external view override(IRoycoKernel) returns (NAV_UNIT) {
-        return _stConvertTrancheUnitsToNAVUnits(_stAssets);
-    }
-
-    /// @inheritdoc IRoycoKernel
-    function jtConvertTrancheUnitsToNAVUnits(TRANCHE_UNIT _jtAssets) external view override(IRoycoKernel) returns (NAV_UNIT) {
-        return _jtConvertTrancheUnitsToNAVUnits(_jtAssets);
-    }
-
-    /// @inheritdoc IRoycoKernel
-    function stConvertNAVUnitsToTrancheUnits(NAV_UNIT _navAssets) external view override(IRoycoKernel) returns (TRANCHE_UNIT) {
-        return _stConvertNAVUnitsToTrancheUnits(_navAssets);
-    }
-
-    /// @inheritdoc IRoycoKernel
-    function jtConvertNAVUnitsToTrancheUnits(NAV_UNIT _navAssets) external view override(IRoycoKernel) returns (TRANCHE_UNIT) {
-        return _jtConvertNAVUnitsToTrancheUnits(_navAssets);
     }
 
     /// @notice Returns the raw net asset value of the senior tranche denominated in the NAV units (USD, BTC, etc.) for this kernel
