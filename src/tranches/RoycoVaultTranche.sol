@@ -78,6 +78,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
      * @param _account The address that the caller should match or have operator approval for
      * @dev Reverts if caller is neither the address nor an approved operator
      */
+    /// forge-lint: disable-next-item(unwrapped-modifier-logic)
     modifier onlyCallerOrOperator(address _account) {
         require(_isCallerOrOperator(_account), ONLY_CALLER_OR_OPERATOR());
         _;
@@ -138,12 +139,13 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
 
     /// @inheritdoc IRoycoVaultTranche
     function totalAssets() external view virtual override(IRoycoVaultTranche) returns (AssetClaims memory claims) {
-        return (TRANCHE_TYPE() == TrancheType.SENIOR ? IRoycoKernel(kernel()).getSTAssetClaims() : IRoycoKernel(kernel()).getJTAssetClaims());
+        (, claims,) = IRoycoKernel(kernel()).previewSyncTrancheAccounting(TRANCHE_TYPE());
     }
 
     /// @inheritdoc IRoycoVaultTranche
     function getRawNAV() external view virtual override(IRoycoVaultTranche) returns (NAV_UNIT nav) {
-        nav = (TRANCHE_TYPE() == TrancheType.SENIOR ? IRoycoKernel(kernel()).getSTRawNAV() : IRoycoKernel(kernel()).getJTRawNAV());
+        (SyncedAccountingState memory state,,) = IRoycoKernel(kernel()).previewSyncTrancheAccounting(TRANCHE_TYPE());
+        nav = TRANCHE_TYPE() == TrancheType.SENIOR ? state.stRawNAV : state.jtRawNAV;
     }
 
     /// @inheritdoc IRoycoVaultTranche

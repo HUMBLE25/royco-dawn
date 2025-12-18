@@ -2,7 +2,6 @@
 pragma solidity ^0.8.28;
 
 import { IERC20, SafeERC20 } from "../../../../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
-import { Math } from "../../../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 import { IPool } from "../../../interfaces/aave/IPool.sol";
 import { IPoolAddressesProvider } from "../../../interfaces/aave/IPoolAddressesProvider.sol";
 import { IPoolDataProvider } from "../../../interfaces/aave/IPoolDataProvider.sol";
@@ -35,10 +34,10 @@ abstract contract AaveV3JTKernel is RoycoKernel, RedemptionDelayJTKernel {
     }
 
     /// @inheritdoc IRoycoKernel
-    ExecutionModel public constant JT_INCREASE_NAV_EXECUTION_MODEL = ExecutionModel.SYNC;
+    ExecutionModel public constant JT_DEPOSIT_EXECUTION_MODEL = ExecutionModel.SYNC;
 
     /// @inheritdoc IRoycoKernel
-    ExecutionModel public constant JT_DECREASE_NAV_EXECUTION_MODEL = ExecutionModel.ASYNC;
+    ExecutionModel public constant JT_REDEEM_EXECUTION_MODEL = ExecutionModel.ASYNC;
 
     /// @notice Thrown when the JT base asset is not a supported reserve token in the Aave V3 Pool
     error UNSUPPORTED_RESERVE_TOKEN();

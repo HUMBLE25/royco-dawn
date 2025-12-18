@@ -248,7 +248,7 @@ contract BaseTest is Test, RoycoRoles, Assertions {
     /// @notice Generates a provider address
     /// @param index The index of the provider
     /// @return provider The provider address
-    function _generateProvider(RoycoVaultTranche _tranche, uint256 index) internal virtual prankModifier(OWNER_ADDRESS) returns (Vm.Wallet memory provider) {
+    function _generateProvider(uint256 index) internal virtual prankModifier(OWNER_ADDRESS) returns (Vm.Wallet memory provider) {
         // Generate a unique wallet
         string memory providerName = string(abi.encodePacked("PROVIDER", vm.toString(index)));
         provider = _initWallet(providerName, 10_000_000e6);
@@ -270,6 +270,7 @@ contract BaseTest is Test, RoycoRoles, Assertions {
         NAV_UNIT _maxAbsDeltaNAV
     )
         internal
+        view
     {
         assertTrue(address(ST) != address(0), "Senior tranche is not deployed");
         assertTrue(address(JT) != address(0), "Junior tranche is not deployed");
@@ -291,7 +292,7 @@ contract BaseTest is Test, RoycoRoles, Assertions {
     /// @param _stState The state of the senior tranche
     /// @param _jtState The state of the junior tranche
     /// @param _feeRecipient The address of the fee recipient
-    function _verifyFeeTaken(TrancheState storage _stState, TrancheState storage _jtState, address _feeRecipient) internal {
+    function _verifyFeeTaken(TrancheState storage _stState, TrancheState storage _jtState, address _feeRecipient) internal view {
         uint256 seniorFeeShares = ST.balanceOf(_feeRecipient);
         NAV_UNIT seniorFeeSharesValue = ST.convertToAssets(seniorFeeShares).nav;
         assertEq(seniorFeeSharesValue, _stState.protocolFeeValue, "ST protocol fee value mismatch");

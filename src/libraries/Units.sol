@@ -74,6 +74,7 @@ function toNAVUnits(uint256 _assets) pure returns (NAV_UNIT) {
 }
 
 function toNAVUnits(int256 _assets) pure returns (NAV_UNIT) {
+    // forge-lint: disable-next-line(unsafe-typecast)
     return NAV_UNIT.wrap(uint256(_assets));
 }
 

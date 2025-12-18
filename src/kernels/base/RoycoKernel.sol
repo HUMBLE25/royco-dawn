@@ -23,6 +23,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
 
     /// @dev Permissions the function to only the market's senior tranche
     /// @dev Should be placed on all ST deposit and withdraw functions
+    /// forge-lint: disable-next-item(unwrapped-modifier-logic)
     modifier onlySeniorTranche() {
         require(msg.sender == RoycoKernelStorageLib._getRoycoKernelStorage().seniorTranche, ONLY_SENIOR_TRANCHE());
         _;
@@ -30,6 +31,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
 
     /// @dev Permissions the function to only the market's junior tranche
     /// @dev Should be placed on all JT deposit and withdraw functions
+    /// forge-lint: disable-next-item(unwrapped-modifier-logic)
     modifier onlyJuniorTranche() {
         require(msg.sender == RoycoKernelStorageLib._getRoycoKernelStorage().juniorTranche, ONLY_JUNIOR_TRANCHE());
         _;
@@ -43,15 +45,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
      * @param _jtAsset The address of the asset that JT is denominated in: constitutes the JT's tranche units (type and precision)
      * @param _initialAuthority The initial authority for the base kernel
      */
-    function __RoycoKernel_init(
-        RoycoKernelInitParams memory _params,
-        address _stAsset,
-        address _jtAsset,
-        address _initialAuthority
-    )
-        internal
-        onlyInitializing
-    {
+    function __RoycoKernel_init(RoycoKernelInitParams memory _params, address _stAsset, address _jtAsset, address _initialAuthority) internal onlyInitializing {
         __RoycoBase_init(_initialAuthority);
         __RoycoKernel_init_unchained(_params, _stAsset, _jtAsset);
     }
@@ -314,7 +308,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
      */
     function _previewRedeem(uint256 _shares, TrancheType _trancheType) internal view virtual returns (AssetClaims memory userClaim) {
         // Get the total claim of ST on the ST and JT assets, and scale it to the number of shares being redeemed
-        (, AssetClaims memory totalClaims, uint256 totalTrancheShares) = previewSyncTrancheAccounting(TrancheType.SENIOR);
+        (, AssetClaims memory totalClaims, uint256 totalTrancheShares) = previewSyncTrancheAccounting(_trancheType);
         AssetClaims memory scaledClaims = UtilsLib.scaleTrancheAssetsClaim(totalClaims, _shares, totalTrancheShares);
 
         // Preview the amount of ST assets that would be redeemed for the given amount of shares

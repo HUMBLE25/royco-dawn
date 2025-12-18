@@ -15,6 +15,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
     using UnitsMathLib for NAV_UNIT;
 
     /// @dev Enforces that the function is called by the accountant's Royco kernel
+    /// forge-lint: disable-next-item(unwrapped-modifier-logic)
     modifier onlyRoycoKernel() {
         require(msg.sender == RoycoAccountantStorageLib._getRoycoAccountantStorage().kernel, ONLY_ROYCO_KERNEL());
         _;
@@ -155,9 +156,16 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         }
         // Construct the synced NAVs state to return to the caller
         // No fees are ever taken on post-op sync
-        state = SyncedAccountingState(
-            _stRawNAV, _jtRawNAV, $.lastSTEffectiveNAV, $.lastJTEffectiveNAV, $.lastSTCoverageDebt, $.lastJTCoverageDebt, ZERO_NAV_UNITS, ZERO_NAV_UNITS
-        );
+        state = SyncedAccountingState({
+            stRawNAV: _stRawNAV,
+            jtRawNAV: _jtRawNAV,
+            stEffectiveNAV: $.lastSTEffectiveNAV,
+            jtEffectiveNAV: $.lastJTEffectiveNAV,
+            stCoverageDebt: $.lastSTCoverageDebt,
+            jtCoverageDebt: $.lastJTCoverageDebt,
+            stProtocolFeeAccrued: ZERO_NAV_UNITS,
+            jtProtocolFeeAccrued: ZERO_NAV_UNITS
+        });
         // Enforce the NAV conservation invariant
         require((_stRawNAV + _jtRawNAV) == (state.stEffectiveNAV + state.jtEffectiveNAV), NAV_CONSERVATION_VIOLATION());
     }
@@ -397,9 +405,16 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         // Enforce the NAV conservation invariant
         require((_stRawNAV + _jtRawNAV) == (stEffectiveNAV + jtEffectiveNAV), NAV_CONSERVATION_VIOLATION());
         // Construct the synced NAVs state to return to the caller
-        state = SyncedAccountingState(
-            _stRawNAV, _jtRawNAV, stEffectiveNAV, jtEffectiveNAV, stCoverageDebt, jtCoverageDebt, stProtocolFeeAccrued, jtProtocolFeeAccrued
-        );
+        state = SyncedAccountingState({
+            stRawNAV: _stRawNAV,
+            jtRawNAV: _jtRawNAV,
+            stEffectiveNAV: stEffectiveNAV,
+            jtEffectiveNAV: jtEffectiveNAV,
+            stCoverageDebt: stCoverageDebt,
+            jtCoverageDebt: jtCoverageDebt,
+            stProtocolFeeAccrued: stProtocolFeeAccrued,
+            jtProtocolFeeAccrued: jtProtocolFeeAccrued
+        });
     }
 
     /**
@@ -429,6 +444,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         if (jtYieldShareWAD > WAD) jtYieldShareWAD = WAD;
         // Accrue the time-weighted yield share accrued to JT since the last tranche interaction
         $.lastAccrualTimestamp = uint32(block.timestamp);
+        /// forge-lint: disable-next-item(unsafe-typecast)
         return ($.twJTYieldShareAccruedWAD += uint192(jtYieldShareWAD * elapsed));
     }
 
@@ -455,6 +471,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         // TODO: Should we revert instead? Don't want to DOS system on faulty RDM, so this seems like the best possible way to handle
         if (jtYieldShareWAD > WAD) jtYieldShareWAD = WAD;
         // Apply the accural of JT yield share to the accumulator, weighted by the time elapsed
+        /// forge-lint: disable-next-item(unsafe-typecast)
         return ($.twJTYieldShareAccruedWAD + uint192(jtYieldShareWAD * elapsed));
     }
 
