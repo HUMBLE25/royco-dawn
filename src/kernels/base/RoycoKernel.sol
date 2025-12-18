@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import { RoycoBase } from "../../base/RoycoBase.sol";
 import { IRoycoKernel } from "../../interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoVaultTranche } from "../../interfaces/tranche/IRoycoVaultTranche.sol";
-import { ZERO_NAV_UNITS } from "../../libraries/Constants.sol";
+import { ZERO_NAV_UNITS, ZERO_TRANCHE_UNITS } from "../../libraries/Constants.sol";
 import { RoycoKernelInitParams, RoycoKernelState, RoycoKernelStorageLib } from "../../libraries/RoycoKernelStorageLib.sol";
 import { SyncedAccountingState, TrancheAssetClaims, TrancheType } from "../../libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib } from "../../libraries/Units.sol";
@@ -321,6 +321,19 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
             if (_jtNAVClaimOnSelf != ZERO_NAV_UNITS) claims.jtAssets = _jtConvertNAVUnitsToTrancheUnits(_jtNAVClaimOnSelf);
             claims.nav = _jtEffectiveNAV;
         }
+    }
+
+    /**
+     * @notice Claims any specified assets from each tranche and transfer them to the receiver
+     * @param _claims The ST and JT assets to claim and transfer to the specified receiver
+     * @param _receiver The receiver of the tranche asset claims
+     */
+    function _claimAssetsForUser(TrancheAssetClaims memory _claims, address _receiver) internal {
+        TRANCHE_UNIT stAssetsToClaim = _claims.stAssets;
+        TRANCHE_UNIT jtAssetsToClaim = _claims.jtAssets;
+        // Withdraw the ST and JT assets if non-zero
+        if (stAssetsToClaim != ZERO_TRANCHE_UNITS) _stWithdrawAssets(stAssetsToClaim, _receiver);
+        if (jtAssetsToClaim != ZERO_TRANCHE_UNITS) _jtWithdrawAssets(jtAssetsToClaim, _receiver);
     }
 
     /// @notice Returns this kernel's accountant casted to the IRoycoAccountant interface

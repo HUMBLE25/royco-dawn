@@ -11,7 +11,7 @@ import { ZERO_TRANCHE_UNITS } from "../../../libraries/Constants.sol";
 import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib, toTrancheUnits, toUint256 } from "../../../libraries/Units.sol";
 import { UtilsLib } from "../../../libraries/UtilsLib.sol";
 import { Operation, RoycoKernel, RoycoKernelStorageLib, SyncedAccountingState, TrancheAssetClaims, TrancheType } from "../RoycoKernel.sol";
-import { BaseAsyncJTRedemptionDelayKernel } from "./BaseAsyncJTRedemptionDelayKernel.sol";
+import { BaseAsyncJTRedemptionDelayKernel } from "./base/BaseAsyncJTRedemptionDelayKernel.sol";
 
 abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKernel {
     using SafeERC20 for IERC20;
@@ -26,12 +26,12 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
      * @custom:storage-location erc7201:Royco.storage.AaveV3KernelState
      * @custom:field pool - The address of the Aave V3 pool
      * @custom:field poolAddressesProvider - The address of the Aave V3 pool addresses provider
-     * @custom:field aToken - The address of the tranche's base asset's A Token
+     * @custom:field jtAssetAToken - The address of the junior tranche base asset's A Token
      */
     struct AaveV3KernelState {
         address pool;
         address poolAddressesProvider;
-        address aToken;
+        address jtAssetAToken;
     }
 
     /// @inheritdoc IRoycoKernel
@@ -50,6 +50,19 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
     error FAILED_CALL();
 
     /**
+     * @notice Initializes a kernel where the junior tranche is deployed into Aave V3 with a redemption delay
+     * @param _aaveV3Pool The address of the Aave V3 Pool
+     * @param _jtAsset The address of the base asset of the junior tranche
+     * @param _jtRedemptionDelaySeconds The delay in seconds between a junior tranche LP requesting a redemption and being able to execute it
+     */
+    function __AaveV3JTKernel_init(address _aaveV3Pool, address _jtAsset, uint256 _jtRedemptionDelaySeconds) internal onlyInitializing {
+        // Initialize the async redemption delay kernel state
+        __BaseAsyncJTRedemptionDelayKernel_init_unchained(_jtRedemptionDelaySeconds);
+        // Initializes the Aave V3 junior tranche kernel state
+        __AaveV3JTKernel_init_unchained(_aaveV3Pool, _jtAsset);
+    }
+
+    /**
      * @notice Initializes a kernel where the junior tranche is deployed into Aave V3
      * @param _aaveV3Pool The address of the Aave V3 Pool
      * @param _jtAsset The address of the base asset of the junior tranche
@@ -64,9 +77,9 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
 
         // Set the initial state of the Aave V3 kernel
         AaveV3KernelState storage $ = _getAaveV3KernelStorage();
-        $.pool = _pool;
-        $.poolAddressesProvider = _poolAddressesProvider;
-        $.aToken = _aToken;
+        $.pool = _aaveV3Pool;
+        $.poolAddressesProvider = address(IPool(_aaveV3Pool).ADDRESSES_PROVIDER());
+        $.jtAssetAToken = jtAssetAToken;
     }
 
     /// @inheritdoc IRoycoKernel
@@ -119,14 +132,13 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
         require(_shares <= _jtClaimableRedeemRequest(_controller), INSUFFICIENT_CLAIMABLE_SHARES(_shares, _jtClaimableRedeemRequest(_controller)));
 
         // Get the total NAV to withdraw on this redemption
-        NAV_UNIT navToWithdraw = _processClaimableRedeemRequest(_controller, state.jtEffectiveNAV, _shares, totalTrancheShares);
+        NAV_UNIT navOfSharesToRedeem = _processClaimableRedeemRequest(_controller, state.jtEffectiveNAV, _shares, totalTrancheShares);
 
-        // Scale the claims based on the NAV to withdraw for the user
-        claims = UtilsLib.scaleTrancheAssetsClaim(claims, navToWithdraw, state.jtEffectiveNAV);
+        // Scale the claims based on the NAV to liquidate for the user relative to the total JT controlled NAV
+        claims = UtilsLib.scaleTrancheAssetsClaim(claims, navOfSharesToRedeem, state.jtEffectiveNAV);
 
-        // Withdraw the JT and ST assets if non-zero
-        if (claims.jtAssets != ZERO_TRANCHE_UNITS) _jtWithdrawAssets(claims.jtAssets, _receiver);
-        if (claims.stAssets != ZERO_TRANCHE_UNITS) _stWithdrawAssets(claims.stAssets, _receiver);
+        // Claim assets from each tranche and transfer them to the receiver
+        _claimAssetsForUser(claims, _receiver);
 
         // Execute a post-op sync on accounting and enforce the market's coverage requirement
         _postOpSyncTrancheAccountingAndEnforceCoverage(Operation.JT_DECREASE_NAV);
@@ -136,7 +148,7 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
     function _getJuniorTrancheRawNAV() internal view override(RoycoKernel) returns (NAV_UNIT) {
         // The tranche's balance of the AToken is the total assets it is owed from the Aave pool
         /// @dev This does not treat illiquidity in the Aave pool as a loss: we assume that total lent will be withdrawable at some point
-        return _jtConvertTrancheUnitsToNAVUnits(toTrancheUnits(IERC20(_getAaveV3KernelStorage().aToken).balanceOf(address(this))));
+        return _jtConvertTrancheUnitsToNAVUnits(toTrancheUnits(IERC20(_getAaveV3KernelStorage().jtAssetAToken).balanceOf(address(this))));
     }
 
     /// @inheritdoc RoycoKernel
@@ -204,7 +216,7 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
         if (!isActive || poolDataProvider.getPaused(asset)) return ZERO_TRANCHE_UNITS;
 
         // Return the unborrowed/reserve assets of the pool
-        return toTrancheUnits(IERC20(asset).balanceOf($.aToken));
+        return toTrancheUnits(IERC20(asset).balanceOf($.jtAssetAToken));
     }
 
     /// @inheritdoc RoycoKernel
