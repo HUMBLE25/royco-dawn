@@ -63,10 +63,16 @@ abstract contract AaveV3JTKernel is RoycoKernel {
     }
 
     /// @inheritdoc IRoycoKernel
-    function jtPreviewDeposit(TRANCHE_UNIT _assets) external view override onlyJuniorTranche returns (NAV_UNIT valueAllocated, NAV_UNIT navToMintAt) {
+    function jtPreviewDeposit(TRANCHE_UNIT _assets)
+        external
+        view
+        override
+        onlyJuniorTranche
+        returns (SyncedAccountingState memory stateBeforeDeposit, NAV_UNIT valueAllocated)
+    {
         // Preview the deposit by converting the assets to NAV units and returning the NAV at which the shares will be minted
         valueAllocated = jtConvertTrancheUnitsToNAVUnits(_assets);
-        navToMintAt = (_previewSyncTrancheAccounting()).jtEffectiveNAV;
+        stateBeforeDeposit = _previewSyncTrancheAccounting();
     }
 
     /// @inheritdoc RoycoKernel

@@ -40,7 +40,7 @@ abstract contract ERC4626JTKernel is RoycoKernel {
     }
 
     /// @inheritdoc IRoycoKernel
-    function jtPreviewDeposit(TRANCHE_UNIT _assets) external view override returns (NAV_UNIT valueAllocated, NAV_UNIT navToMintAt) {
+    function jtPreviewDeposit(TRANCHE_UNIT _assets) external view override returns (SyncedAccountingState memory stateBeforeDeposit, NAV_UNIT valueAllocated) {
         IERC4626 jtVault = IERC4626(ERC4626KernelStorageLib._getERC4626KernelStorage().jtVault);
 
         // Simulate the deposit of the assets into the underlying investment vault
@@ -51,7 +51,7 @@ abstract contract ERC4626JTKernel is RoycoKernel {
 
         // Convert the assets allocated to NAV units and preview a sync to get the current NAV to mint shares at for the junior tranche
         valueAllocated = jtConvertTrancheUnitsToNAVUnits(jtAssetsAllocated);
-        navToMintAt = (_previewSyncTrancheAccounting()).jtEffectiveNAV;
+        stateBeforeDeposit = _previewSyncTrancheAccounting();
     }
 
     /// @inheritdoc RoycoKernel

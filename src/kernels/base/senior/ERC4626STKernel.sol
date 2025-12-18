@@ -5,6 +5,7 @@ import { IERC4626 } from "../../../../lib/openzeppelin-contracts/contracts/inter
 import { IERC20, SafeERC20 } from "../../../../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import { ExecutionModel, IRoycoKernel, SharesRedemptionModel } from "../../../interfaces/kernel/IRoycoKernel.sol";
 import { AssetClaims } from "../../../libraries/Types.sol";
+import { SyncedAccountingState } from "../../../libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib, toTrancheUnits, toUint256 } from "../../../libraries/Units.sol";
 import { UtilsLib } from "../../../libraries/UtilsLib.sol";
 import { ERC4626KernelState, ERC4626KernelStorageLib } from "../../../libraries/kernels/ERC4626KernelStorageLib.sol";
@@ -43,7 +44,7 @@ abstract contract ERC4626STKernel is RoycoKernel {
     }
 
     /// @inheritdoc IRoycoKernel
-    function stPreviewDeposit(TRANCHE_UNIT _assets) external view override returns (NAV_UNIT valueAllocated, NAV_UNIT navToMintAt) {
+    function stPreviewDeposit(TRANCHE_UNIT _assets) external view override returns (SyncedAccountingState memory stateBeforeDeposit, NAV_UNIT valueAllocated) {
         IERC4626 stVault = IERC4626(ERC4626KernelStorageLib._getERC4626KernelStorage().stVault);
 
         // Simulate the deposit of the assets into the underlying investment vault
@@ -54,7 +55,7 @@ abstract contract ERC4626STKernel is RoycoKernel {
 
         // Convert the assets allocated to NAV units and preview a sync to get the current NAV to mint shares at for the senior tranche
         valueAllocated = stConvertTrancheUnitsToNAVUnits(stAssetsAllocated);
-        navToMintAt = (_previewSyncTrancheAccounting()).stEffectiveNAV;
+        stateBeforeDeposit = _previewSyncTrancheAccounting();
     }
 
     /// @inheritdoc IRoycoKernel
