@@ -84,14 +84,7 @@ abstract contract ERC4626STKernel is RoycoKernel {
 
     /// @inheritdoc IRoycoKernel
     function stPreviewRedeem(uint256 _shares) external view override onlySeniorTranche returns (AssetClaims memory userClaim) {
-        // Get the total claim of ST on the ST and JT assets, and scale it to the number of shares being redeemed
-        (, AssetClaims memory totalClaims, uint256 totalTrancheShares) = previewSyncTrancheAccounting(TrancheType.SENIOR);
-        AssetClaims memory scaledClaims = UtilsLib.scaleTrancheAssetsClaim(totalClaims, _shares, totalTrancheShares);
-
-        // Preview the amount of ST assets that would be redeemed for the given amount of shares
-        userClaim.stAssets = _previewWithdrawSTAssets(scaledClaims.stAssets);
-        userClaim.jtAssets = _previewWithdrawJTAssets(scaledClaims.jtAssets);
-        userClaim.nav = _stConvertTrancheUnitsToNAVUnits(userClaim.stAssets) + _jtConvertTrancheUnitsToNAVUnits(userClaim.jtAssets);
+        userClaim = _previewRedeem(_shares, TrancheType.SENIOR);
     }
 
     /// @inheritdoc IRoycoKernel

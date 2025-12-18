@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import { Math } from "../../../../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 import { RoycoAuth } from "../../../../auth/RoycoAuth.sol";
-import { IAsyncJTWithdrawalKernel } from "../../../../interfaces/kernel/IAsyncJTWithdrawalKernel.sol";
+import { IAsyncJTRedemptionDelayKernel } from "../../../../interfaces/kernel/IAsyncJTRedemptionDelayKernel.sol";
 import { IRoycoKernel } from "../../../../interfaces/kernel/IRoycoKernel.sol";
 import { ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID } from "../../../../libraries/Constants.sol";
 import { AssetClaims } from "../../../../libraries/Types.sol";
@@ -13,7 +13,7 @@ import { RoycoKernel } from "../../RoycoKernel.sol";
 
 /// @title AsyncJTRedemptionDelayKernel
 /// @notice Abstract base contract for the junior tranche redemption delay kernel
-abstract contract AsyncJTRedemptionDelayKernel is IAsyncJTWithdrawalKernel, RoycoAuth, RoycoKernel {
+abstract contract AsyncJTRedemptionDelayKernel is IAsyncJTRedemptionDelayKernel, RoycoAuth, RoycoKernel {
     using Math for uint256;
     using UnitsMathLib for NAV_UNIT;
 
@@ -99,7 +99,7 @@ abstract contract AsyncJTRedemptionDelayKernel is IAsyncJTWithdrawalKernel, Royc
     // ERC7540 Asynchronous Flow Functions
     // =============================
 
-    /// @inheritdoc IAsyncJTWithdrawalKernel
+    /// @inheritdoc IAsyncJTRedemptionDelayKernel
     function jtRequestRedeem(address, uint256 _shares, address _controller) external onlyJuniorTranche whenNotPaused returns (uint256 requestId) {
         // Execute a pre-op sync on accounting
         (SyncedAccountingState memory state,, uint256 totalTrancheShares) = _preOpSyncTrancheAccounting(TrancheType.JUNIOR);
@@ -125,7 +125,7 @@ abstract contract AsyncJTRedemptionDelayKernel is IAsyncJTWithdrawalKernel, Royc
         requestId = ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID;
     }
 
-    /// @inheritdoc IAsyncJTWithdrawalKernel
+    /// @inheritdoc IAsyncJTRedemptionDelayKernel
     function jtPendingRedeemRequest(uint256 _requestId, address _controller) external view checkRequestId(_requestId) returns (uint256 pendingShares) {
         Redemption storage redemption = _getAsyncJTRedemptionDelayKernelState().controllerToRedemptionState[_controller];
         // If the redemption is canceled or the request is claimable, no shares are still in a pending state
@@ -134,7 +134,7 @@ abstract contract AsyncJTRedemptionDelayKernel is IAsyncJTWithdrawalKernel, Royc
         pendingShares = redemption.totalJTSharesToRedeem;
     }
 
-    /// @inheritdoc IAsyncJTWithdrawalKernel
+    /// @inheritdoc IAsyncJTRedemptionDelayKernel
     function jtClaimableRedeemRequest(uint256 _requestId, address _controller) external view checkRequestId(_requestId) returns (uint256 claimableShares) {
         claimableShares = _jtClaimableRedeemRequest(_controller);
     }
@@ -156,7 +156,7 @@ abstract contract AsyncJTRedemptionDelayKernel is IAsyncJTWithdrawalKernel, Royc
     // ERC7887 Cancelation functions
     // =============================
 
-    /// @inheritdoc IAsyncJTWithdrawalKernel
+    /// @inheritdoc IAsyncJTRedemptionDelayKernel
     function jtCancelRedeemRequest(uint256 _requestId, address _controller) external whenNotPaused onlyJuniorTranche checkRequestId(_requestId) {
         Redemption storage redemption = _getAsyncJTRedemptionDelayKernelState().controllerToRedemptionState[_controller];
         // Cannot cancel an already cancelled request
@@ -165,13 +165,13 @@ abstract contract AsyncJTRedemptionDelayKernel is IAsyncJTWithdrawalKernel, Royc
         redemption.isCanceled = true;
     }
 
-    /// @inheritdoc IAsyncJTWithdrawalKernel
+    /// @inheritdoc IAsyncJTRedemptionDelayKernel
     function jtPendingCancelRedeemRequest(uint256, address) external view returns (bool isPending) {
         // Cancelation requests are always processed instantly, so there is never a pending cancelation
         isPending = false;
     }
 
-    /// @inheritdoc IAsyncJTWithdrawalKernel
+    /// @inheritdoc IAsyncJTRedemptionDelayKernel
     function jtClaimableCancelRedeemRequest(uint256 _requestId, address _controller) external view checkRequestId(_requestId) returns (uint256 shares) {
         AsyncJTRedemptionDelayKernelState storage $ = _getAsyncJTRedemptionDelayKernelState();
         // If the redemption is not canceled, there are no shares to claim
@@ -180,10 +180,9 @@ abstract contract AsyncJTRedemptionDelayKernel is IAsyncJTWithdrawalKernel, Royc
         shares = $.controllerToRedemptionState[_controller].totalJTSharesToRedeem;
     }
 
-    /// @inheritdoc IAsyncJTWithdrawalKernel
+    /// @inheritdoc IAsyncJTRedemptionDelayKernel
     function jtClaimCancelRedeemRequest(
         uint256 _requestId,
-        address,
         address _controller
     )
         external

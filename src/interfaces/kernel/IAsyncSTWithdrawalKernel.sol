@@ -45,11 +45,10 @@ interface IAsyncSTWithdrawalKernel {
      * @notice Claims a cancelled redeem request for a specified controller
      * @dev This function is only relevant if the kernel supports redeem cancellation
      * @param _requestId The request ID of this deposit request
-     * @param _receiver The receiver of the cancelled redeem assets
      * @param _controller The controller corresponding to this request
      * @return shares The amount of shares claimed from the cancelled redeem request
      */
-    function stClaimCancelRedeemRequest(uint256 _requestId, address _receiver, address _controller) external returns (uint256 shares);
+    function stClaimCancelRedeemRequest(uint256 _requestId, address _controller) external returns (uint256 shares);
 
     /**
      * @notice Returns whether there is a pending redeem cancellation for the specified controller

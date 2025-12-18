@@ -8,6 +8,7 @@ import { ZERO_NAV_UNITS, ZERO_TRANCHE_UNITS } from "../../libraries/Constants.so
 import { RoycoKernelInitParams, RoycoKernelState, RoycoKernelStorageLib } from "../../libraries/RoycoKernelStorageLib.sol";
 import { AssetClaims, SyncedAccountingState, TrancheType } from "../../libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib } from "../../libraries/Units.sol";
+import { UtilsLib } from "../../libraries/UtilsLib.sol";
 import { IRoycoAccountant, Operation } from "./../../interfaces/IRoycoAccountant.sol";
 
 /**
@@ -42,15 +43,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
      * @param _jtAsset The address of the asset that JT is denominated in: constitutes the JT's tranche units (type and precision)
      * @param _initialAuthority The initial authority for the base kernel
      */
-    function __RoycoKernel_init(
-        RoycoKernelInitParams memory _params,
-        address _stAsset,
-        address _jtAsset,
-        address _initialAuthority
-    )
-        internal
-        onlyInitializing
-    {
+    function __RoycoKernel_init(RoycoKernelInitParams memory _params, address _stAsset, address _jtAsset, address _initialAuthority) internal onlyInitializing {
         __RoycoBase_init(_initialAuthority);
         __RoycoKernel_init_unchained(_params, _stAsset, _jtAsset);
     }
@@ -351,6 +344,23 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         // Withdraw the ST and JT assets if non-zero
         if (stAssetsToClaim != ZERO_TRANCHE_UNITS) _stWithdrawAssets(stAssetsToClaim, _receiver);
         if (jtAssetsToClaim != ZERO_TRANCHE_UNITS) _jtWithdrawAssets(jtAssetsToClaim, _receiver);
+    }
+
+    /**
+     * @notice Previews the amount of ST and JT assets that would be redeemed for a given number of shares
+     * @param _shares The number of shares to redeem
+     * @param _trancheType The type of tranche to preview the redemption for
+     * @return userClaim The amount of ST and JT assets that would be redeemed for the given number of shares
+     */
+    function _previewRedeem(uint256 _shares, TrancheType _trancheType) internal view virtual returns (AssetClaims memory userClaim) {
+        // Get the total claim of ST on the ST and JT assets, and scale it to the number of shares being redeemed
+        (, AssetClaims memory totalClaims, uint256 totalTrancheShares) = previewSyncTrancheAccounting(TrancheType.SENIOR);
+        AssetClaims memory scaledClaims = UtilsLib.scaleTrancheAssetsClaim(totalClaims, _shares, totalTrancheShares);
+
+        // Preview the amount of ST assets that would be redeemed for the given amount of shares
+        userClaim.stAssets = _previewWithdrawSTAssets(scaledClaims.stAssets);
+        userClaim.jtAssets = _previewWithdrawJTAssets(scaledClaims.jtAssets);
+        userClaim.nav = _stConvertTrancheUnitsToNAVUnits(userClaim.stAssets) + _jtConvertTrancheUnitsToNAVUnits(userClaim.jtAssets);
     }
 
     /// @notice Returns this kernel's accountant casted to the IRoycoAccountant interface

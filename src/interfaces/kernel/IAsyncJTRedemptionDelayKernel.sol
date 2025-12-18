@@ -2,12 +2,12 @@
 pragma solidity ^0.8.28;
 
 /**
- * @title IAsyncJTWithdrawalKernel
+ * @title IAsyncJTRedemptionDelayKernel
  * @notice Interface for Royco kernels that employ an asynchronous withdrawal flow for the junior tranche
  * @dev We mandate that kernels implement the cancellation functions because of the market's utilization changing between request and claim
  *      if the underlying investment opportunity supports it
  */
-interface IAsyncJTWithdrawalKernel {
+interface IAsyncJTRedemptionDelayKernel {
     /**
      * @notice Requests a redemption for a specified amount of shares from the underlying investment opportunity
      * @param _caller The address of the user requesting the withdrawal for the junior tranche
@@ -45,11 +45,10 @@ interface IAsyncJTWithdrawalKernel {
      * @notice Claims a cancelled redeem request for a specified controller
      * @dev This function is only relevant if the kernel supports redeem cancellation
      * @param _requestId The request ID of this deposit request
-     * @param _receiver The receiver of the cancelled redeem assets
      * @param _controller The controller corresponding to this request
      * @return shares The amount of shares claimed from the cancelled redeem request
      */
-    function jtClaimCancelRedeemRequest(uint256 _requestId, address _receiver, address _controller) external returns (uint256 shares);
+    function jtClaimCancelRedeemRequest(uint256 _requestId, address _controller) external returns (uint256 shares);
 
     /**
      * @notice Returns whether there is a pending redeem cancellation for the specified controller
