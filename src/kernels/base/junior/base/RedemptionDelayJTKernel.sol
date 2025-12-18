@@ -22,6 +22,9 @@ abstract contract RedemptionDelayJTKernel is IAsyncJTRedemptionDelayKernel, Royc
     bytes32 private constant BASE_ASYNC_JT_REDEMPTION_DELAY_KERNEL_STORAGE_SLOT = 0xded0c80c14aecd5426bd643f18df17d9cea228e72fcaefe1b139ffca90913500;
 
     /// @inheritdoc IRoycoKernel
+    ExecutionModel public constant JT_REDEEM_EXECUTION_MODEL = ExecutionModel.ASYNC;
+
+    /// @inheritdoc IRoycoKernel
     RequestRedeemSharesBehavior public constant JT_REQUEST_REDEEM_SHARES_BEHAVIOR = RequestRedeemSharesBehavior.BURN_ON_REDEEM;
 
     /**
@@ -59,9 +62,6 @@ abstract contract RedemptionDelayJTKernel is IAsyncJTRedemptionDelayKernel, Royc
 
     /// @notice Thrown when the request ID is invalid
     error INVALID_REQUEST_ID(uint256 requestId);
-
-    /// @notice Thrown when the redemption is cancelled and the controller is trying to claim before requesting again
-    error WITHDRAWAL_CANCELLED__CLAIM_BEFORE_REQUESTING_AGAIN();
 
     /// @notice Thrown when the redemption is already canceled
     error REDEMPTION_ALREADY_CANCELED();
@@ -107,7 +107,7 @@ abstract contract RedemptionDelayJTKernel is IAsyncJTRedemptionDelayKernel, Royc
         // Ensure that the redemption for this controller isn't cancelled
         RedemptionDelayJTKernelState storage $ = _getRedemptionDelayJTKernelState();
         Redemption storage redemption = $.controllerToRedemptionState[_controller];
-        require(!redemption.isCanceled, WITHDRAWAL_CANCELLED__CLAIM_BEFORE_REQUESTING_AGAIN());
+        require(!redemption.isCanceled, REDEMPTION_ALREADY_CANCELED());
 
         // Compute the redemption value at request
         NAV_UNIT redemptionValueAtRequest = _redemptionValue(state.jtEffectiveNAV, _shares, totalTrancheShares);

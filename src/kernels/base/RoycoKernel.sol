@@ -23,7 +23,6 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
 
     /// @dev Permissions the function to only the market's senior tranche
     /// @dev Should be placed on all ST deposit and withdraw functions
-    /// forge-lint: disable-next-item(unwrapped-modifier-logic)
     modifier onlySeniorTranche() {
         require(msg.sender == RoycoKernelStorageLib._getRoycoKernelStorage().seniorTranche, ONLY_SENIOR_TRANCHE());
         _;
@@ -31,7 +30,6 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
 
     /// @dev Permissions the function to only the market's junior tranche
     /// @dev Should be placed on all JT deposit and withdraw functions
-    /// forge-lint: disable-next-item(unwrapped-modifier-logic)
     modifier onlyJuniorTranche() {
         require(msg.sender == RoycoKernelStorageLib._getRoycoKernelStorage().juniorTranche, ONLY_JUNIOR_TRANCHE());
         _;
@@ -45,7 +43,15 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
      * @param _jtAsset The address of the asset that JT is denominated in: constitutes the JT's tranche units (type and precision)
      * @param _initialAuthority The initial authority for the base kernel
      */
-    function __RoycoKernel_init(RoycoKernelInitParams memory _params, address _stAsset, address _jtAsset, address _initialAuthority) internal onlyInitializing {
+    function __RoycoKernel_init(
+        RoycoKernelInitParams memory _params,
+        address _stAsset,
+        address _jtAsset,
+        address _initialAuthority
+    )
+        internal
+        onlyInitializing
+    {
         __RoycoBase_init(_initialAuthority);
         __RoycoKernel_init_unchained(_params, _stAsset, _jtAsset);
     }

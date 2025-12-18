@@ -28,7 +28,6 @@ abstract contract ERC4626STKernel is RoycoKernel {
 
     /**
      * @notice Initializes a kernel where the senior tranche is deployed into an ERC4626 vault
-     * @dev Mandates that the base kernel state is already initialized
      * @param _stVault The address of the ERC4626 compliant vault the senior tranche will deploy into
      * @param _stAsset The address of the base asset of the senior tranche
      */
@@ -50,12 +49,17 @@ abstract contract ERC4626STKernel is RoycoKernel {
         // Simulate the deposit of the assets into the underlying investment vault
         uint256 underlyingSTVaultSharesAllocated = stVault.previewDeposit(toUint256(_assets));
 
-        // Convert the underlying vault shares to tranche units. This value may differ from _assets if a fee is applied to the deposit.
+        // Convert the underlying vault shares to tranche units. This value may differ from _assets if a fee or slippage is incurred to the deposit.
         TRANCHE_UNIT stAssetsAllocated = toTrancheUnits(stVault.convertToAssets(underlyingSTVaultSharesAllocated));
 
         // Convert the assets allocated to NAV units and preview a sync to get the current NAV to mint shares at for the senior tranche
         valueAllocated = stConvertTrancheUnitsToNAVUnits(stAssetsAllocated);
         navToMintAt = (_accountant().previewSyncTrancheAccounting(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV())).stEffectiveNAV;
+    }
+
+    /// @inheritdoc IRoycoKernel
+    function stPreviewRedeem(uint256 _shares) external view override returns (AssetClaims memory userClaim) {
+        userClaim = _previewRedeem(_shares, TrancheType.SENIOR);
     }
 
     /// @inheritdoc IRoycoKernel
@@ -79,12 +83,8 @@ abstract contract ERC4626STKernel is RoycoKernel {
 
         // Execute a post-op sync on accounting and enforce the market's coverage requirement
         NAV_UNIT postDepositNAV = (_postOpSyncTrancheAccountingAndEnforceCoverage(Operation.ST_INCREASE_NAV)).stEffectiveNAV;
+        // The value allocated after any fees/slippage incurred on deposit
         valueAllocated = postDepositNAV - navToMintAt;
-    }
-
-    /// @inheritdoc IRoycoKernel
-    function stPreviewRedeem(uint256 _shares) external view override returns (AssetClaims memory userClaim) {
-        userClaim = _previewRedeem(_shares, TrancheType.SENIOR);
     }
 
     /// @inheritdoc IRoycoKernel
@@ -145,10 +145,8 @@ abstract contract ERC4626STKernel is RoycoKernel {
     /// @inheritdoc RoycoKernel
     function _previewWithdrawSTAssets(TRANCHE_UNIT _stAssets) internal view override(RoycoKernel) returns (TRANCHE_UNIT redeemedSTAssets) {
         IERC4626 stVault = IERC4626(ERC4626KernelStorageLib._getERC4626KernelStorage().stVault);
-
         // Convert the ST assets to underlying shares
         uint256 underlyingShares = stVault.convertToShares(toUint256(_stAssets));
-
         // Preview the amount of ST assets that would be redeemed for the given amount of underlying shares
         redeemedSTAssets = toTrancheUnits(stVault.previewRedeem(underlyingShares));
     }

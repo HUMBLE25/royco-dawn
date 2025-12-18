@@ -20,6 +20,9 @@ abstract contract AaveV3JTKernel is RoycoKernel, RedemptionDelayJTKernel {
     // keccak256(abi.encode(uint256(keccak256("Royco.storage.AaveV3JTKernelState")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant AAVE_V3_JT_KERNEL_STORAGE_SLOT = 0x020a998929d5f52fd2ab88c68a53f71f586f1008b18ca7e45b22d0acddbf3e00;
 
+    /// @inheritdoc IRoycoKernel
+    ExecutionModel public constant JT_DEPOSIT_EXECUTION_MODEL = ExecutionModel.SYNC;
+
     /**
      * @notice Storage state for the Royco Aave V3 Kernel
      * @custom:storage-location erc7201:Royco.storage.AaveV3JTKernelState
@@ -32,12 +35,6 @@ abstract contract AaveV3JTKernel is RoycoKernel, RedemptionDelayJTKernel {
         address poolAddressesProvider;
         address jtAssetAToken;
     }
-
-    /// @inheritdoc IRoycoKernel
-    ExecutionModel public constant JT_DEPOSIT_EXECUTION_MODEL = ExecutionModel.SYNC;
-
-    /// @inheritdoc IRoycoKernel
-    ExecutionModel public constant JT_REDEEM_EXECUTION_MODEL = ExecutionModel.ASYNC;
 
     /// @notice Thrown when the JT base asset is not a supported reserve token in the Aave V3 Pool
     error UNSUPPORTED_RESERVE_TOKEN();
@@ -55,18 +52,7 @@ abstract contract AaveV3JTKernel is RoycoKernel, RedemptionDelayJTKernel {
      * @param _jtRedemptionDelaySeconds The delay in seconds between a junior tranche LP requesting a redemption and being able to execute it
      */
     function __AaveV3_JT_Kernel_init(address _aaveV3Pool, address _jtAsset, uint256 _jtRedemptionDelaySeconds) internal onlyInitializing {
-        // Initialize the async redemption delay kernel state
-        __RedemptionDelay_JT_Kernel_init_unchained(_jtRedemptionDelaySeconds);
-        // Initializes the Aave V3 junior tranche kernel state
-        __AaveV3_JT_Kernel_init_unchained(_aaveV3Pool, _jtAsset);
-    }
-
-    /**
-     * @notice Initializes a kernel where the junior tranche is deployed into Aave V3
-     * @param _aaveV3Pool The address of the Aave V3 Pool
-     * @param _jtAsset The address of the base asset of the junior tranche
-     */
-    function __AaveV3_JT_Kernel_init_unchained(address _aaveV3Pool, address _jtAsset) internal onlyInitializing {
+        // Initialize the Aave V3 junior tranche kernel state
         // Ensure that the JT base asset is a supported reserve token in the Aave V3 Pool
         address jtAssetAToken = IPool(_aaveV3Pool).getReserveAToken(_jtAsset);
         require(jtAssetAToken != address(0), UNSUPPORTED_RESERVE_TOKEN());
@@ -79,6 +65,9 @@ abstract contract AaveV3JTKernel is RoycoKernel, RedemptionDelayJTKernel {
         $.pool = _aaveV3Pool;
         $.poolAddressesProvider = address(IPool(_aaveV3Pool).ADDRESSES_PROVIDER());
         $.jtAssetAToken = jtAssetAToken;
+
+        // Initialize the async redemption delay kernel state
+        __RedemptionDelay_JT_Kernel_init_unchained(_jtRedemptionDelaySeconds);
     }
 
     /// @inheritdoc IRoycoKernel
