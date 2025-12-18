@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import { Math } from "../../../../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 import { RoycoAuth } from "../../../../auth/RoycoAuth.sol";
 import { IAsyncJTRedemptionDelayKernel } from "../../../../interfaces/kernel/IAsyncJTRedemptionDelayKernel.sol";
+import { ExecutionModel } from "../../../../interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoKernel } from "../../../../interfaces/kernel/IRoycoKernel.sol";
 import { ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID } from "../../../../libraries/Constants.sol";
 import { AssetClaims } from "../../../../libraries/Types.sol";
