@@ -45,7 +45,15 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
      * @param _jtAsset The address of the asset that JT is denominated in: constitutes the JT's tranche units (type and precision)
      * @param _initialAuthority The initial authority for the base kernel
      */
-    function __RoycoKernel_init(RoycoKernelInitParams memory _params, address _stAsset, address _jtAsset, address _initialAuthority) internal onlyInitializing {
+    function __RoycoKernel_init(
+        RoycoKernelInitParams memory _params,
+        address _stAsset,
+        address _jtAsset,
+        address _initialAuthority
+    )
+        internal
+        onlyInitializing
+    {
         __RoycoBase_init(_initialAuthority);
         __RoycoKernel_init_unchained(_params, _stAsset, _jtAsset);
     }
@@ -69,9 +77,32 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     }
 
     /// @inheritdoc IRoycoKernel
+    function stConvertTrancheUnitsToNAVUnits(TRANCHE_UNIT _stAssets) public view virtual override(IRoycoKernel) returns (NAV_UNIT);
+
+    /// @inheritdoc IRoycoKernel
+    function jtConvertTrancheUnitsToNAVUnits(TRANCHE_UNIT _jtAssets) public view virtual override(IRoycoKernel) returns (NAV_UNIT);
+
+    /// @inheritdoc IRoycoKernel
+    function stConvertNAVUnitsToTrancheUnits(NAV_UNIT _navAssets) public view virtual override(IRoycoKernel) returns (TRANCHE_UNIT);
+
+    /// @inheritdoc IRoycoKernel
+    function jtConvertNAVUnitsToTrancheUnits(NAV_UNIT _navAssets) public view virtual override(IRoycoKernel) returns (TRANCHE_UNIT);
+
+    /// @inheritdoc IRoycoKernel
+    function getState() external view override(IRoycoKernel) returns (RoycoKernelState memory) {
+        return RoycoKernelStorageLib._getRoycoKernelStorage();
+    }
+
+    /// @inheritdoc IRoycoKernel
+    function setProtocolFeeRecipient(address _protocolFeeRecipient) external restricted {
+        require(_protocolFeeRecipient != address(0), NULL_ADDRESS());
+        RoycoKernelStorageLib._getRoycoKernelStorage().protocolFeeRecipient = _protocolFeeRecipient;
+    }
+
+    /// @inheritdoc IRoycoKernel
     function stMaxDeposit(address _receiver) external view override(IRoycoKernel) returns (TRANCHE_UNIT) {
         NAV_UNIT stMaxDepositableNAV = _accountant().maxSTDepositGivenCoverage(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV());
-        return UnitsMathLib.min(_stMaxDepositGlobally(_receiver), _stConvertNAVUnitsToTrancheUnits(stMaxDepositableNAV));
+        return UnitsMathLib.min(_stMaxDepositGlobally(_receiver), stConvertNAVUnitsToTrancheUnits(stMaxDepositableNAV));
     }
 
     /// @inheritdoc IRoycoKernel
@@ -87,7 +118,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         // Bound the claims by the max withdrawable assets globally for each tranche and compute the cumulative NAV
         stMaxClaims.stAssets = _stMaxWithdrawableGlobally(_owner);
         stMaxClaims.jtAssets = _jtMaxWithdrawableGlobally(_owner);
-        stMaxClaims.nav = _stConvertTrancheUnitsToNAVUnits(stMaxClaims.stAssets) + _stConvertTrancheUnitsToNAVUnits(stMaxClaims.jtAssets);
+        stMaxClaims.nav = stConvertTrancheUnitsToNAVUnits(stMaxClaims.stAssets) + jtConvertTrancheUnitsToNAVUnits(stMaxClaims.jtAssets);
     }
 
     /// @inheritdoc IRoycoKernel
@@ -99,51 +130,6 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     function jtMaxWithdrawable(address) external view override(IRoycoKernel) returns (NAV_UNIT) {
         // TODO: account for liq constraints
         return _accountant().maxJTWithdrawalGivenCoverage(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV());
-    }
-
-    /// @inheritdoc IRoycoKernel
-    function stConvertTrancheUnitsToNAVUnits(TRANCHE_UNIT _stAssets) external view override(IRoycoKernel) returns (NAV_UNIT) {
-        return _stConvertTrancheUnitsToNAVUnits(_stAssets);
-    }
-
-    /// @inheritdoc IRoycoKernel
-    function jtConvertTrancheUnitsToNAVUnits(TRANCHE_UNIT _jtAssets) external view override(IRoycoKernel) returns (NAV_UNIT) {
-        return _jtConvertTrancheUnitsToNAVUnits(_jtAssets);
-    }
-
-    /// @inheritdoc IRoycoKernel
-    function stConvertNAVUnitsToTrancheUnits(NAV_UNIT _navAssets) external view override(IRoycoKernel) returns (TRANCHE_UNIT) {
-        return _stConvertNAVUnitsToTrancheUnits(_navAssets);
-    }
-
-    /// @inheritdoc IRoycoKernel
-    function jtConvertNAVUnitsToTrancheUnits(NAV_UNIT _navAssets) external view override(IRoycoKernel) returns (TRANCHE_UNIT) {
-        return _jtConvertNAVUnitsToTrancheUnits(_navAssets);
-    }
-
-    /// @inheritdoc IRoycoKernel
-    function getSTRawNAV() external view override(IRoycoKernel) returns (NAV_UNIT) {
-        return _getSeniorTrancheRawNAV();
-    }
-
-    /// @inheritdoc IRoycoKernel
-    function getJTRawNAV() external view override(IRoycoKernel) returns (NAV_UNIT) {
-        return _getJuniorTrancheRawNAV();
-    }
-
-    /// @inheritdoc IRoycoKernel
-    function getJTAssetClaims() external view override(IRoycoKernel) returns (AssetClaims memory claims) {
-        (, claims,) = previewSyncTrancheAccounting(TrancheType.JUNIOR);
-    }
-
-    /// @inheritdoc IRoycoKernel
-    function getSTAssetClaims() external view override(IRoycoKernel) returns (AssetClaims memory claims) {
-        (, claims,) = previewSyncTrancheAccounting(TrancheType.SENIOR);
-    }
-
-    /// @inheritdoc IRoycoKernel
-    function getState() external view override(IRoycoKernel) returns (RoycoKernelState memory) {
-        return RoycoKernelStorageLib._getRoycoKernelStorage();
     }
 
     /// @inheritdoc IRoycoKernel
@@ -211,32 +197,6 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
 
         // Set the total tranche shares to the specified tranche's shares after minting fees
         totalTrancheShares = (_trancheType == TrancheType.SENIOR) ? stTotalTrancheSharesAfterMintingFees : jtTotalTrancheSharesAfterMintingFees;
-
-        // Decompose effective NAVs into self-backed NAV claims and cross-tranche NAV claims
-        (NAV_UNIT stNAVClaimOnSelf, NAV_UNIT stNAVClaimOnJT, NAV_UNIT jtNAVClaimOnSelf, NAV_UNIT jtNAVClaimOnST) = _decomposeNAVClaims(state);
-
-        // Marshal the tranche claims for this tranche given the decomposed claims
-        claims =
-            _marshalAssetClaims(_trancheType, state.stEffectiveNAV, state.jtEffectiveNAV, stNAVClaimOnSelf, stNAVClaimOnJT, jtNAVClaimOnSelf, jtNAVClaimOnST);
-    }
-
-    /**
-     * @notice Invokes the accountant to do a post-operation (deposit and withdrawal) NAV sync
-     * @dev Should be called on every NAV mutating user operation
-     * @param _trancheType An enum indicating which tranche to return claims and total tranche shares for
-     * @param _op The operation being executed in between the pre and post synchronizations
-     * @return state The synced NAV, debt, and fee accounting containing all mark to market accounting data
-     * @return claims The claims on ST and JT assets that the specified tranche has denominated in tranche-native units
-     */
-    function _postOpSyncTrancheAccounting(
-        TrancheType _trancheType,
-        Operation _op
-    )
-        internal
-        returns (SyncedAccountingState memory state, AssetClaims memory claims)
-    {
-        // Execute the pre-op sync via the accountant
-        state = _postOpSyncTrancheAccounting(_op);
 
         // Decompose effective NAVs into self-backed NAV claims and cross-tranche NAV claims
         (NAV_UNIT stNAVClaimOnSelf, NAV_UNIT stNAVClaimOnJT, NAV_UNIT jtNAVClaimOnSelf, NAV_UNIT jtNAVClaimOnST) = _decomposeNAVClaims(state);
@@ -325,12 +285,12 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         returns (AssetClaims memory claims)
     {
         if (_trancheType == TrancheType.SENIOR) {
-            if (_stNAVClaimOnSelf != ZERO_NAV_UNITS) claims.stAssets = _stConvertNAVUnitsToTrancheUnits(_stNAVClaimOnSelf);
-            if (_stNAVClaimOnJT != ZERO_NAV_UNITS) claims.jtAssets = _jtConvertNAVUnitsToTrancheUnits(_stNAVClaimOnJT);
+            if (_stNAVClaimOnSelf != ZERO_NAV_UNITS) claims.stAssets = stConvertNAVUnitsToTrancheUnits(_stNAVClaimOnSelf);
+            if (_stNAVClaimOnJT != ZERO_NAV_UNITS) claims.jtAssets = jtConvertNAVUnitsToTrancheUnits(_stNAVClaimOnJT);
             claims.nav = _stEffectiveNAV;
         } else {
-            if (_jtNAVClaimOnST != ZERO_NAV_UNITS) claims.stAssets = _stConvertNAVUnitsToTrancheUnits(_jtNAVClaimOnST);
-            if (_jtNAVClaimOnSelf != ZERO_NAV_UNITS) claims.jtAssets = _jtConvertNAVUnitsToTrancheUnits(_jtNAVClaimOnSelf);
+            if (_jtNAVClaimOnST != ZERO_NAV_UNITS) claims.stAssets = stConvertNAVUnitsToTrancheUnits(_jtNAVClaimOnST);
+            if (_jtNAVClaimOnSelf != ZERO_NAV_UNITS) claims.jtAssets = jtConvertNAVUnitsToTrancheUnits(_jtNAVClaimOnSelf);
             claims.nav = _jtEffectiveNAV;
         }
     }
@@ -362,7 +322,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         // Preview the amount of ST assets that would be redeemed for the given amount of shares
         userClaim.stAssets = _previewWithdrawSTAssets(scaledClaims.stAssets);
         userClaim.jtAssets = _previewWithdrawJTAssets(scaledClaims.jtAssets);
-        userClaim.nav = _stConvertTrancheUnitsToNAVUnits(userClaim.stAssets) + _jtConvertTrancheUnitsToNAVUnits(userClaim.jtAssets);
+        userClaim.nav = stConvertTrancheUnitsToNAVUnits(userClaim.stAssets) + jtConvertTrancheUnitsToNAVUnits(userClaim.jtAssets);
     }
 
     /// @notice Returns this kernel's accountant casted to the IRoycoAccountant interface
@@ -378,18 +338,6 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     /// @notice Returns the raw net asset value of the junior tranche denominated in the NAV units (USD, BTC, etc.) for this kernel
     /// @return The pure net asset value of the junior tranche invested assets
     function _getJuniorTrancheRawNAV() internal view virtual returns (NAV_UNIT);
-
-    /// @dev Internal helper used for internal unit converions and the external getters
-    function _stConvertTrancheUnitsToNAVUnits(TRANCHE_UNIT _stAssets) internal view virtual returns (NAV_UNIT);
-
-    /// @dev Internal helper used for internal unit converions and the external getters
-    function _jtConvertTrancheUnitsToNAVUnits(TRANCHE_UNIT _jtAssets) internal view virtual returns (NAV_UNIT);
-
-    /// @dev Internal helper used for internal unit converions and the external getters
-    function _stConvertNAVUnitsToTrancheUnits(NAV_UNIT _navAssets) internal view virtual returns (TRANCHE_UNIT);
-
-    /// @dev Internal helper used for internal unit converions and the external getters
-    function _jtConvertNAVUnitsToTrancheUnits(NAV_UNIT _navAssets) internal view virtual returns (TRANCHE_UNIT);
 
     /**
      * @notice Returns the maximum amount of assets that can be deposited into the senior tranche globally
@@ -427,18 +375,18 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     function _previewWithdrawSTAssets(TRANCHE_UNIT _stAssets) internal view virtual returns (TRANCHE_UNIT redeemedSTAssets);
 
     /**
-     * @notice Withdraws ST assets to the specified receiver
-     * @param _stAssets The ST assets denominated in its tranche units to withdraw to the receiver
-     * @param _receiver The receiver of the ST assets
-     */
-    function _stWithdrawAssets(TRANCHE_UNIT _stAssets, address _receiver) internal virtual;
-
-    /**
      * @notice Previews the amount of JT assets that would be redeemed for a given amount of JT assets
      * @param _jtAssets The JT assets denominated in its tranche units to redeem
      * @return redeemedJTAssets The amount of JT assets that would be redeemed for the given amount of JT assets
      */
     function _previewWithdrawJTAssets(TRANCHE_UNIT _jtAssets) internal view virtual returns (TRANCHE_UNIT redeemedJTAssets);
+
+    /**
+     * @notice Withdraws ST assets to the specified receiver
+     * @param _stAssets The ST assets denominated in its tranche units to withdraw to the receiver
+     * @param _receiver The receiver of the ST assets
+     */
+    function _stWithdrawAssets(TRANCHE_UNIT _stAssets, address _receiver) internal virtual;
 
     /**
      * @notice Withdraws JT assets to the specified receiver

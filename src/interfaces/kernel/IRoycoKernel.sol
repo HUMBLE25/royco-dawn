@@ -58,32 +58,6 @@ interface IRoycoKernel {
     function JT_REDEEM_EXECUTION_MODEL() external pure returns (ExecutionModel);
 
     /**
-     * @notice Returns the raw NAV of the senior tranche.
-     * @dev The raw NAV represents the value of the senior tranche's invested assets, denominated in the kernel's NAV units
-     * @return nav The raw NAV of the senior tranche, denominated in the kernel's NAV units
-     */
-    function getSTRawNAV() external view returns (NAV_UNIT nav);
-
-    /**
-     * @notice Returns the raw NAV of the junior tranche
-     * @dev The raw NAV represents the value of the junior tranche's invested assets, denominated in the kernel's NAV units
-     * @return nav The raw NAV of the junior tranche, denominated in the kernel's NAV units
-     */
-    function getJTRawNAV() external view returns (NAV_UNIT nav);
-
-    /**
-     * @notice Returns the distribution the senior's claim of assets across the senior and junior tranches
-     * @return claims The distribution of the senior tranche's claim of assets across the senior and junior tranches, denominated in the respective tranches' tranche units
-     */
-    function getSTAssetClaims() external view returns (AssetClaims memory claims);
-
-    /**
-     * @notice Returns the distribution the junior's claim of assets across the senior and junior tranches
-     * @return claims The distribution of the junior tranche's claim of assets across the senior and junior tranches, denominated in the respective tranches' tranche units
-     */
-    function getJTAssetClaims() external view returns (AssetClaims memory claims);
-
-    /**
      * @notice Converts the specified ST assets denominated in its tranche units to the kernel's NAV units
      * @param _stAssets The ST assets denominated in tranche units to convert to the kernel's NAV units
      * @return nav The specified ST assets denominated in its tranche units converted to the kernel's NAV units
@@ -161,18 +135,13 @@ interface IRoycoKernel {
     function stPreviewDeposit(TRANCHE_UNIT _assets) external view returns (NAV_UNIT valueAllocated, NAV_UNIT navToMintAt);
 
     /**
-     * @notice Returns the maximum amount of assets that can be deposited into the junior tranche
-     * @param _receiver The address that is depositing the assets
-     * @return assets The maximum amount of assets that can be deposited into the junior tranche, denominated in the junior tranche's tranche units
+     * @notice Previews the redemption of a specified number of shares from the senior tranche
+     * @dev The kernel may decide to simulate the redemption and revert internally with the result
+     * @dev Should revert if redemptions are asynchronous
+     * @param _shares The number of shares to redeem
+     * @return userClaim The distribution of assets that would be transferred to the receiver on redemption, denominated in the respective tranches' tranche units
      */
-    function jtMaxDeposit(address _receiver) external view returns (TRANCHE_UNIT assets);
-
-    /**
-     * @notice Returns the maximum amount of assets that can be withdrawn from the senior tranche
-     * @param _owner The address that is withdrawing the assets
-     * @return maxWithdrawableNAV The maximum amount of assets that can be withdrawn from the senior tranche, denominated in the senior tranche's NAV units
-     */
-    function jtMaxWithdrawable(address _owner) external view returns (NAV_UNIT maxWithdrawableNAV);
+    function stPreviewRedeem(uint256 _shares) external view returns (AssetClaims memory userClaim);
 
     /**
      * @notice Processes the deposit of a specified amount of assets into the senior tranche
@@ -186,15 +155,6 @@ interface IRoycoKernel {
     function stDeposit(TRANCHE_UNIT _assets, address _caller, address _receiver) external returns (NAV_UNIT valueAllocated, NAV_UNIT navToMintAt);
 
     /**
-     * @notice Previews the redemption of a specified number of shares from the senior tranche
-     * @dev The kernel may decide to simulate the redemption and revert internally with the result
-     * @dev Should revert if redemptions are asynchronous
-     * @param _shares The number of shares to redeem
-     * @return userClaim The distribution of assets that would be transferred to the receiver on redemption, denominated in the respective tranches' tranche units
-     */
-    function stPreviewRedeem(uint256 _shares) external view returns (AssetClaims memory userClaim);
-
-    /**
      * @notice Processes the redemption of a specified number of shares from the senior tranche
      * @dev The function is expected to transfer the senior and junior assets directly to the receiver, based on the redemption claims
      * @param _shares The number of shares to redeem
@@ -203,6 +163,20 @@ interface IRoycoKernel {
      * @return claims The distribution of assets that were transferred to the receiver on redemption, denominated in the respective tranches' tranche units
      */
     function stRedeem(uint256 _shares, address _controller, address _receiver) external returns (AssetClaims memory claims);
+
+    /**
+     * @notice Returns the maximum amount of assets that can be deposited into the junior tranche
+     * @param _receiver The address that is depositing the assets
+     * @return assets The maximum amount of assets that can be deposited into the junior tranche, denominated in the junior tranche's tranche units
+     */
+    function jtMaxDeposit(address _receiver) external view returns (TRANCHE_UNIT assets);
+
+    /**
+     * @notice Returns the maximum amount of assets that can be withdrawn from the senior tranche
+     * @param _owner The address that is withdrawing the assets
+     * @return maxWithdrawableNAV The maximum amount of assets that can be withdrawn from the senior tranche, denominated in the senior tranche's NAV units
+     */
+    function jtMaxWithdrawable(address _owner) external view returns (NAV_UNIT maxWithdrawableNAV);
 
     /**
      * @notice Previews the deposit of a specified amount of assets into the junior tranche
@@ -243,6 +217,12 @@ interface IRoycoKernel {
      * @return claims The distribution of assets that were transferred to the receiver on redemption, denominated in the respective tranches' tranche units
      */
     function jtRedeem(uint256 _shares, address _controller, address _receiver) external returns (AssetClaims memory claims);
+
+    /**
+     * @notice Sets the new protocol fee recipient
+     * @param _protocolFeeRecipient The address of the new protocol fee recipient
+     */
+    function setProtocolFeeRecipient(address _protocolFeeRecipient) external;
 
     /**
      * @notice Returns the state of the kernel

@@ -84,7 +84,7 @@ abstract contract AaveV3JTKernel is RoycoKernel, AsyncJTRedemptionDelayKernel {
     /// @inheritdoc IRoycoKernel
     function jtPreviewDeposit(TRANCHE_UNIT _assets) external view override onlyJuniorTranche returns (NAV_UNIT valueAllocated, NAV_UNIT navToMintAt) {
         // Preview the deposit by converting the assets to NAV units and returning the NAV at which the shares will be minted
-        valueAllocated = _jtConvertTrancheUnitsToNAVUnits(_assets);
+        valueAllocated = jtConvertTrancheUnitsToNAVUnits(_assets);
         navToMintAt = (_accountant().previewSyncTrancheAccounting(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV())).jtEffectiveNAV;
     }
 
@@ -101,7 +101,7 @@ abstract contract AaveV3JTKernel is RoycoKernel, AsyncJTRedemptionDelayKernel {
         returns (NAV_UNIT valueAllocated, NAV_UNIT navToMintAt)
     {
         // Execute a pre-op sync on accounting
-        valueAllocated = _jtConvertTrancheUnitsToNAVUnits(_assets);
+        valueAllocated = jtConvertTrancheUnitsToNAVUnits(_assets);
         navToMintAt = (_preOpSyncTrancheAccounting()).jtEffectiveNAV;
 
         // Max approval already given to the pool on initialization
@@ -147,7 +147,7 @@ abstract contract AaveV3JTKernel is RoycoKernel, AsyncJTRedemptionDelayKernel {
     function _getJuniorTrancheRawNAV() internal view override(RoycoKernel) returns (NAV_UNIT) {
         // The tranche's balance of the AToken is the total assets it is owed from the Aave pool
         /// @dev This does not treat illiquidity in the Aave pool as a loss: we assume that total lent will be withdrawable at some point
-        return _jtConvertTrancheUnitsToNAVUnits(toTrancheUnits(IERC20(_getAaveV3KernelStorage().jtAssetAToken).balanceOf(address(this))));
+        return jtConvertTrancheUnitsToNAVUnits(toTrancheUnits(IERC20(_getAaveV3KernelStorage().jtAssetAToken).balanceOf(address(this))));
     }
 
     /// @inheritdoc RoycoKernel

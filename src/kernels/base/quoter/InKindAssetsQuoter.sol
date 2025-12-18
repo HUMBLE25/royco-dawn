@@ -58,25 +58,25 @@ abstract contract InKindAssetsQuoter is Initializable, RoycoKernel {
 
     /// @inheritdoc RoycoKernel
     /// @dev Scale the ST asset quantity up to NAV units (WAD precision)
-    function _stConvertTrancheUnitsToNAVUnits(TRANCHE_UNIT _stAssets) internal view override(RoycoKernel) returns (NAV_UNIT nav) {
+    function stConvertTrancheUnitsToNAVUnits(TRANCHE_UNIT _stAssets) public view override(RoycoKernel) returns (NAV_UNIT nav) {
         return toNAVUnits(toUint256(_stAssets) * _getInKindAssetsQuoterStorage().stScaleFactorToWAD);
     }
 
     /// @inheritdoc RoycoKernel
     /// @dev Scale the JT asset quantity up to NAV units (WAD precision)
-    function _jtConvertTrancheUnitsToNAVUnits(TRANCHE_UNIT _jtAssets) internal view override(RoycoKernel) returns (NAV_UNIT nav) {
+    function jtConvertTrancheUnitsToNAVUnits(TRANCHE_UNIT _jtAssets) public view override(RoycoKernel) returns (NAV_UNIT nav) {
         return toNAVUnits(toUint256(_jtAssets) * _getInKindAssetsQuoterStorage().jtScaleFactorToWAD);
     }
 
     /// @inheritdoc RoycoKernel
     /// @dev Scale the NAV quantity (WAD precision) down to ST asset units, rounding down
-    function _stConvertNAVUnitsToTrancheUnits(NAV_UNIT _nav) internal view override(RoycoKernel) returns (TRANCHE_UNIT stAssets) {
+    function stConvertNAVUnitsToTrancheUnits(NAV_UNIT _nav) public view override(RoycoKernel) returns (TRANCHE_UNIT stAssets) {
         return toTrancheUnits(toUint256(_nav) / _getInKindAssetsQuoterStorage().stScaleFactorToWAD);
     }
 
     /// @inheritdoc RoycoKernel
     /// @dev Scale the NAV quantity (WAD precision) down to JT asset units, rounding down
-    function _jtConvertNAVUnitsToTrancheUnits(NAV_UNIT _nav) internal view override(RoycoKernel) returns (TRANCHE_UNIT jtAssets) {
+    function jtConvertNAVUnitsToTrancheUnits(NAV_UNIT _nav) public view override(RoycoKernel) returns (TRANCHE_UNIT jtAssets) {
         return toTrancheUnits(toUint256(_nav) / _getInKindAssetsQuoterStorage().jtScaleFactorToWAD);
     }
 
