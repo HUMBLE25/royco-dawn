@@ -51,7 +51,7 @@ abstract contract ERC4626JTKernel is RoycoKernel {
 
         // Convert the assets allocated to NAV units and preview a sync to get the current NAV to mint shares at for the junior tranche
         valueAllocated = jtConvertTrancheUnitsToNAVUnits(jtAssetsAllocated);
-        navToMintAt = (_accountant().previewSyncTrancheAccounting(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV())).jtEffectiveNAV;
+        navToMintAt = (_previewSyncTrancheAccounting()).jtEffectiveNAV;
     }
 
     /// @inheritdoc RoycoKernel

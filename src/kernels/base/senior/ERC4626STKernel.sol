@@ -47,14 +47,14 @@ abstract contract ERC4626STKernel is RoycoKernel {
         IERC4626 stVault = IERC4626(ERC4626KernelStorageLib._getERC4626KernelStorage().stVault);
 
         // Simulate the deposit of the assets into the underlying investment vault
-        uint256 underlyingSTVaultSharesAllocated = stVault.previewDeposit(toUint256(_assets));
+        uint256 stVaultSharesMinted = stVault.previewDeposit(toUint256(_assets));
 
         // Convert the underlying vault shares to tranche units. This value may differ from _assets if a fee or slippage is incurred to the deposit.
-        TRANCHE_UNIT stAssetsAllocated = toTrancheUnits(stVault.convertToAssets(underlyingSTVaultSharesAllocated));
+        TRANCHE_UNIT stAssetsAllocated = toTrancheUnits(stVault.convertToAssets(stVaultSharesMinted));
 
         // Convert the assets allocated to NAV units and preview a sync to get the current NAV to mint shares at for the senior tranche
         valueAllocated = stConvertTrancheUnitsToNAVUnits(stAssetsAllocated);
-        navToMintAt = (_accountant().previewSyncTrancheAccounting(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV())).stEffectiveNAV;
+        navToMintAt = (_previewSyncTrancheAccounting()).stEffectiveNAV;
     }
 
     /// @inheritdoc IRoycoKernel
