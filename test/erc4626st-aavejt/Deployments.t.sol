@@ -310,11 +310,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
             RoycoAccountant.initialize,
             (
                 RoycoAccountantInitParams({
-                    kernel: expectedKernelAddress,
-                    protocolFeeWAD: PROTOCOL_FEE_WAD,
-                    coverageWAD: COVERAGE_WAD,
-                    betaWAD: BETA_WAD,
-                    rdm: address(RDM)
+                    kernel: expectedKernelAddress, protocolFeeWAD: PROTOCOL_FEE_WAD, coverageWAD: COVERAGE_WAD, betaWAD: BETA_WAD, rdm: address(RDM)
                 }),
                 OWNER_ADDRESS // invalid authority: should be FACTORY
             )
@@ -583,11 +579,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
             RoycoAccountant.initialize,
             (
                 RoycoAccountantInitParams({
-                    kernel: expectedKernelAddress,
-                    protocolFeeWAD: PROTOCOL_FEE_WAD,
-                    coverageWAD: COVERAGE_WAD,
-                    betaWAD: BETA_WAD,
-                    rdm: address(RDM)
+                    kernel: expectedKernelAddress, protocolFeeWAD: PROTOCOL_FEE_WAD, coverageWAD: COVERAGE_WAD, betaWAD: BETA_WAD, rdm: address(RDM)
                 }),
                 address(FACTORY)
             )

@@ -43,11 +43,7 @@ library UtilsLib {
     /// @param _shares The number of shares to scale the claims by
     /// @param _totalTrancheShares The total number of shares that exist in the tranche
     /// @return scaledClaims The scaled claims on ST and JT assets of the tranche
-    function scaleAssetClaims(
-        AssetClaims memory _claims,
-        uint256 _shares,
-        uint256 _totalTrancheShares
-    )
+    function scaleAssetClaims(AssetClaims memory _claims, uint256 _shares, uint256 _totalTrancheShares)
         internal
         pure
         returns (AssetClaims memory scaledClaims)
