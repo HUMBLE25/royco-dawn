@@ -31,25 +31,25 @@ abstract contract IdenticalAssetsQuoter is RoycoKernel {
 
     /// @inheritdoc RoycoKernel
     /// @dev With identical precision, tranche units map 1:1 into NAV units
-    function _stConvertTrancheUnitsToNAVUnits(TRANCHE_UNIT _stAssets) internal pure override(RoycoKernel) returns (NAV_UNIT nav) {
+    function stConvertTrancheUnitsToNAVUnits(TRANCHE_UNIT _stAssets) public pure override(RoycoKernel) returns (NAV_UNIT nav) {
         return toNAVUnits(toUint256(_stAssets));
     }
 
     /// @inheritdoc RoycoKernel
     /// @dev With identical precision, tranche units map 1:1 into NAV units
-    function _jtConvertTrancheUnitsToNAVUnits(TRANCHE_UNIT _jtAssets) internal pure override(RoycoKernel) returns (NAV_UNIT nav) {
+    function jtConvertTrancheUnitsToNAVUnits(TRANCHE_UNIT _jtAssets) public pure override(RoycoKernel) returns (NAV_UNIT nav) {
         return toNAVUnits(toUint256(_jtAssets));
     }
 
     /// @inheritdoc RoycoKernel
     /// @dev With identical precision, NAV units map 1:1 into senior tranche units
-    function _stConvertNAVUnitsToTrancheUnits(NAV_UNIT _nav) internal pure override(RoycoKernel) returns (TRANCHE_UNIT stAssets) {
+    function stConvertNAVUnitsToTrancheUnits(NAV_UNIT _nav) public pure override(RoycoKernel) returns (TRANCHE_UNIT stAssets) {
         return toTrancheUnits(toUint256(_nav));
     }
 
     /// @inheritdoc RoycoKernel
     /// @dev With identical precision, NAV units map 1:1 into junior tranche units
-    function _jtConvertNAVUnitsToTrancheUnits(NAV_UNIT _nav) internal pure override(RoycoKernel) returns (TRANCHE_UNIT jtAssets) {
+    function jtConvertNAVUnitsToTrancheUnits(NAV_UNIT _nav) public pure override(RoycoKernel) returns (TRANCHE_UNIT jtAssets) {
         return toTrancheUnits(toUint256(_nav));
     }
 }

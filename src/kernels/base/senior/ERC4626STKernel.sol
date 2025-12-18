@@ -55,7 +55,7 @@ abstract contract ERC4626STKernel is RoycoKernel {
         // Convert the underlying vault shares to tranche units. This value may differ from _assets if a fee is applied to the deposit.
         TRANCHE_UNIT allocatedInTrancheUnits = toTrancheUnits(vault.convertToAssets(underlyingVaultSharesAllocated));
 
-        valueAllocated = _stConvertTrancheUnitsToNAVUnits(allocatedInTrancheUnits);
+        valueAllocated = stConvertTrancheUnitsToNAVUnits(allocatedInTrancheUnits);
         navToMintAt = (_accountant().previewSyncTrancheAccounting(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV())).stEffectiveNAV;
     }
 
@@ -119,7 +119,7 @@ abstract contract ERC4626STKernel is RoycoKernel {
         // Cannot use max withdraw since it will mistake illiquidity for NAV losses
         address vault = ERC4626KernelStorageLib._getERC4626KernelStorage().vault;
         uint256 trancheSharesBalance = IERC4626(vault).balanceOf(address(this));
-        return _stConvertTrancheUnitsToNAVUnits(toTrancheUnits(IERC4626(vault).convertToAssets(trancheSharesBalance)));
+        return stConvertTrancheUnitsToNAVUnits(toTrancheUnits(IERC4626(vault).convertToAssets(trancheSharesBalance)));
     }
 
     /// @inheritdoc RoycoKernel
