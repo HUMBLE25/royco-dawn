@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import { RoycoBase } from "../../base/RoycoBase.sol";
 import { IRoycoKernel } from "../../interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoVaultTranche } from "../../interfaces/tranche/IRoycoVaultTranche.sol";
-import { ZERO_NAV_UNITS, ZERO_TRANCHE_UNITS } from "../../libraries/Constants.sol";
+import { ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, ZERO_NAV_UNITS, ZERO_TRANCHE_UNITS } from "../../libraries/Constants.sol";
 import { RoycoKernelInitParams, RoycoKernelState, RoycoKernelStorageLib } from "../../libraries/RoycoKernelStorageLib.sol";
 import { AssetClaims, SyncedAccountingState, TrancheType } from "../../libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib } from "../../libraries/Units.sol";
@@ -21,6 +21,13 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     using UnitsMathLib for NAV_UNIT;
     using UnitsMathLib for TRANCHE_UNIT;
 
+    /// @inheritdoc IRoycoKernel
+    /// @dev There is always a redemption delay on the junior tranche
+    ExecutionModel public constant JT_REDEEM_EXECUTION_MODEL = ExecutionModel.ASYNC;
+
+    /// @inheritdoc IRoycoKernel
+    RequestRedeemSharesBehavior public constant JT_REQUEST_REDEEM_SHARES_BEHAVIOR = RequestRedeemSharesBehavior.BURN_ON_REDEEM;
+
     /// @dev Permissions the function to only the market's senior tranche
     /// @dev Should be placed on all ST deposit and withdraw functions
     modifier onlySeniorTranche() {
@@ -35,6 +42,17 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         _;
     }
 
+    /// @notice Modifer to check that the provided JT redemption request ID implies pure controller discrimination
+    /// @param _requestId The JT redemption request ID to validate
+    modifier checkJTRedemptionRequestId(uint256 _requestId) {
+        require(_requestId == ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, INVALID_REQUEST_ID(_requestId));
+        _;
+    }
+
+    // =============================
+    // Initializers
+    // =============================
+
     /**
      * @notice Initializes the base kernel state
      * @dev Initializes any parent contracts and the base kernel state
@@ -42,18 +60,24 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
      * @param _stAsset The address of the asset that ST is denominated in: constitutes the ST's tranche units (type and precision)
      * @param _jtAsset The address of the asset that JT is denominated in: constitutes the JT's tranche units (type and precision)
      * @param _initialAuthority The initial authority for the base kernel
+     * @param _jtRedemptionDelaySeconds The delay in seconds between a junior tranche LP requesting a redemption and being able to execute it
      */
     function __RoycoKernel_init(
         RoycoKernelInitParams memory _params,
         address _stAsset,
         address _jtAsset,
-        address _initialAuthority
+        address _initialAuthority,
+        uint256 _jtRedemptionDelaySeconds
     )
         internal
         onlyInitializing
     {
+        // Initialize the Royco base state
         __RoycoBase_init(_initialAuthority);
+        // Initialize the Royco kernel state
         __RoycoKernel_init_unchained(_params, _stAsset, _jtAsset);
+        // Initialize the redemption delay junior tranche kernel state
+        __RedemptionDelay_JT_Kernel_init_unchained(_jtRedemptionDelaySeconds);
     }
 
     /**
@@ -74,6 +98,10 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         RoycoKernelStorageLib.__RoycoKernel_init(_params, _stAsset, _jtAsset);
     }
 
+    // =============================
+    // Quoter Functions
+    // =============================
+
     /// @inheritdoc IRoycoKernel
     function stConvertTrancheUnitsToNAVUnits(TRANCHE_UNIT _stAssets) public view virtual override(IRoycoKernel) returns (NAV_UNIT);
 
@@ -86,49 +114,9 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     /// @inheritdoc IRoycoKernel
     function jtConvertNAVUnitsToTrancheUnits(NAV_UNIT _navAssets) public view virtual override(IRoycoKernel) returns (TRANCHE_UNIT);
 
-    /// @inheritdoc IRoycoKernel
-    function getState() external view override(IRoycoKernel) returns (RoycoKernelState memory) {
-        return RoycoKernelStorageLib._getRoycoKernelStorage();
-    }
-
-    /// @inheritdoc IRoycoKernel
-    function setProtocolFeeRecipient(address _protocolFeeRecipient) external restricted {
-        require(_protocolFeeRecipient != address(0), NULL_ADDRESS());
-        RoycoKernelStorageLib._getRoycoKernelStorage().protocolFeeRecipient = _protocolFeeRecipient;
-    }
-
-    /// @inheritdoc IRoycoKernel
-    function stMaxDeposit(address _receiver) external view override(IRoycoKernel) returns (TRANCHE_UNIT) {
-        NAV_UNIT stMaxDepositableNAV = _accountant().maxSTDepositGivenCoverage(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV());
-        return UnitsMathLib.min(_stMaxDepositGlobally(_receiver), stConvertNAVUnitsToTrancheUnits(stMaxDepositableNAV));
-    }
-
-    /// @inheritdoc IRoycoKernel
-    function stMaxWithdrawable(address _owner)
-        external
-        view
-        override(IRoycoKernel)
-        returns (SyncedAccountingState memory state, AssetClaims memory stNotionalClaims, AssetClaims memory stMaxClaims)
-    {
-        // Get the total claims the senior tranche has on each tranche's assets
-        (state, stNotionalClaims,) = previewSyncTrancheAccounting(TrancheType.SENIOR);
-
-        // Bound the claims by the max withdrawable assets globally for each tranche and compute the cumulative NAV
-        stMaxClaims.stAssets = _stMaxWithdrawableGlobally(_owner);
-        stMaxClaims.jtAssets = _jtMaxWithdrawableGlobally(_owner);
-        stMaxClaims.nav = stConvertTrancheUnitsToNAVUnits(stMaxClaims.stAssets) + jtConvertTrancheUnitsToNAVUnits(stMaxClaims.jtAssets);
-    }
-
-    /// @inheritdoc IRoycoKernel
-    function jtMaxDeposit(address _receiver) external view override(IRoycoKernel) returns (TRANCHE_UNIT) {
-        return _jtMaxDepositGlobally(_receiver);
-    }
-
-    /// @inheritdoc IRoycoKernel
-    function jtMaxWithdrawable(address) external view override(IRoycoKernel) returns (NAV_UNIT) {
-        // TODO: account for liq constraints
-        return _accountant().maxJTWithdrawalGivenCoverage(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV());
-    }
+    // =============================
+    // External Accounting Synchronization Functions
+    // =============================
 
     /// @inheritdoc IRoycoKernel
     function syncTrancheAccounting() external override(IRoycoKernel) restricted returns (SyncedAccountingState memory state) {
@@ -161,6 +149,203 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
             (, totalTrancheShares) = IRoycoVaultTranche($.juniorTranche).previewMintProtocolFeeShares(state.jtProtocolFeeAccrued, state.jtEffectiveNAV);
         }
     }
+
+    // =============================
+    // Senior Tranche Deposit and Redeem Functions
+    // =============================
+
+    /// @inheritdoc IRoycoKernel
+    function stMaxDeposit(address _receiver) external view override(IRoycoKernel) returns (TRANCHE_UNIT) {
+        NAV_UNIT stMaxDepositableNAV = _accountant().maxSTDepositGivenCoverage(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV());
+        return UnitsMathLib.min(_stMaxDepositGlobally(_receiver), stConvertNAVUnitsToTrancheUnits(stMaxDepositableNAV));
+    }
+
+    /// @inheritdoc IRoycoKernel
+    function stMaxWithdrawable(address _owner)
+        external
+        view
+        override(IRoycoKernel)
+        returns (SyncedAccountingState memory state, AssetClaims memory stNotionalClaims, AssetClaims memory stMaxClaims)
+    {
+        // Get the total claims the senior tranche has on each tranche's assets
+        (state, stNotionalClaims,) = previewSyncTrancheAccounting(TrancheType.SENIOR);
+
+        // Bound the claims by the max withdrawable assets globally for each tranche and compute the cumulative NAV
+        stMaxClaims.stAssets = _stMaxWithdrawableGlobally(_owner);
+        stMaxClaims.jtAssets = _jtMaxWithdrawableGlobally(_owner);
+        stMaxClaims.nav = stConvertTrancheUnitsToNAVUnits(stMaxClaims.stAssets) + jtConvertTrancheUnitsToNAVUnits(stMaxClaims.jtAssets);
+    }
+
+    /// @inheritdoc IRoycoKernel
+    function stDeposit(
+        TRANCHE_UNIT _assets,
+        address,
+        address
+    )
+        external
+        override(IRoycoKernel)
+        onlySeniorTranche
+        whenNotPaused
+        returns (NAV_UNIT valueAllocated, NAV_UNIT navToMintAt)
+    {
+        // Execute a pre-op sync on accounting
+        navToMintAt = (_preOpSyncTrancheAccounting()).stEffectiveNAV;
+
+        // Deposit the assets into the underlying ST investment
+        _stDepositAssets(_assets);
+
+        // Execute a post-op sync on accounting and enforce the market's coverage requirement
+        NAV_UNIT postDepositNAV = (_postOpSyncTrancheAccountingAndEnforceCoverage(Operation.ST_INCREASE_NAV)).stEffectiveNAV;
+        // The value allocated after any fees/slippage incurred on deposit
+        valueAllocated = postDepositNAV - navToMintAt;
+    }
+
+    /// @inheritdoc IRoycoKernel
+    function stRedeem(
+        uint256 _shares,
+        address,
+        address _receiver
+    )
+        external
+        override(IRoycoKernel)
+        onlySeniorTranche
+        whenNotPaused
+        returns (AssetClaims memory userAssetClaims)
+    {
+        // Execute a pre-op sync on accounting
+        uint256 totalTrancheShares;
+        (, userAssetClaims, totalTrancheShares) = _preOpSyncTrancheAccounting(TrancheType.SENIOR);
+
+        // Scale total tranche asset claims by the ratio of shares this user owns of the tranche vault
+        userAssetClaims = UtilsLib.scaleTrancheAssetsClaim(userAssetClaims, _shares, totalTrancheShares);
+
+        // Withdraw the asset claims from each tranche and transfer them to the receiver
+        _withdrawAssets(userAssetClaims, _receiver);
+
+        // Execute a post-op sync on accounting
+        _postOpSyncTrancheAccounting(Operation.ST_DECREASE_NAV);
+    }
+
+    // =============================
+    // Junior Tranche Deposit and Redeem Functions
+    // =============================
+
+    /// @inheritdoc IRoycoKernel
+    function jtMaxDeposit(address _receiver) external view override(IRoycoKernel) returns (TRANCHE_UNIT) {
+        return _jtMaxDepositGlobally(_receiver);
+    }
+
+    /// @inheritdoc IRoycoKernel
+    function jtMaxWithdrawable(address) external view override(IRoycoKernel) returns (NAV_UNIT) {
+        // TODO: account for liq constraints
+        return _accountant().maxJTWithdrawalGivenCoverage(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV());
+    }
+
+    /// @inheritdoc IRoycoKernel
+    function jtPreviewRedeem(uint256) external view virtual override returns (AssetClaims memory) {
+        revert PREVIEW_REDEEM_DISABLED_FOR_ASYNC_REDEMPTION();
+    }
+
+    /// @inheritdoc IRoycoKernel
+    function jtDeposit(
+        TRANCHE_UNIT _assets,
+        address,
+        address
+    )
+        external
+        override(IRoycoKernel)
+        onlyJuniorTranche
+        whenNotPaused
+        returns (NAV_UNIT valueAllocated, NAV_UNIT navToMintAt)
+    {
+        // Execute a pre-op sync on accounting
+        navToMintAt = (_preOpSyncTrancheAccounting()).stEffectiveNAV;
+
+        // Deposit the assets into the underlying ST investment
+        _jtDepositAssets(_assets);
+
+        // Execute a post-op sync on accounting and enforce the market's coverage requirement
+        NAV_UNIT jtPostDepositNAV = (_postOpSyncTrancheAccounting(Operation.JT_INCREASE_NAV)).jtEffectiveNAV;
+        // The value allocated after any fees/slippage incurred on deposit
+        valueAllocated = jtPostDepositNAV - navToMintAt;
+    }
+
+    /// @inheritdoc IAsyncJTRedemptionDelayKernel
+    function jtRequestRedeem(address, uint256 _shares, address _controller) external onlyJuniorTranche whenNotPaused returns (uint256 requestId) {
+        // Execute a pre-op sync on accounting
+        (SyncedAccountingState memory state,, uint256 totalTrancheShares) = _preOpSyncTrancheAccounting(TrancheType.JUNIOR);
+
+        // Ensure that the redemption for this controller isn't cancelled
+        RoycoKernelState storage $ = _getRedemptionDelayJTKernelState();
+        Redemption storage redemption = $.controllerToRedemptionState[_controller];
+        require(!redemption.isCanceled, REDEMPTION_ALREADY_CANCELED());
+
+        // Compute the redemption value at request
+        NAV_UNIT redemptionValueAtRequest = _redemptionValue(state.jtEffectiveNAV, _shares, totalTrancheShares);
+
+        // Add the shares to the total shares to redeem in the controller's current redemption request
+        // If an existing redemption request exists, it's redemption delay is extended by the new redemption delay
+        redemption.totalJTSharesToRedeem += _shares;
+        redemption.redemptionValueAtRequest = redemption.redemptionValueAtRequest + redemptionValueAtRequest;
+        redemption.redemptionAllowedAtTimestamp = uint32(block.timestamp + $.jtRedemptionDelaySeconds);
+
+        // Execute a post-op sync on accounting
+        _postOpSyncTrancheAccounting(Operation.JT_DECREASE_NAV);
+
+        // Redeem Requests are purely controller-discriminated, so the request ID is 0
+        requestId = ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID;
+    }
+
+    /// @inheritdoc IRoycoKernel
+    function jtRedeem(
+        uint256 _shares,
+        address _controller,
+        address _receiver
+    )
+        external
+        override(IRoycoKernel)
+        onlyJuniorTranche
+        returns (AssetClaims memory userAssetClaims)
+    {
+        // Execute a pre-op sync on accounting
+        SyncedAccountingState memory state;
+        uint256 totalTrancheShares;
+        (state, userAssetClaims, totalTrancheShares) = _preOpSyncTrancheAccounting(TrancheType.JUNIOR);
+
+        // Get the total NAV to withdraw on this redemption
+        NAV_UNIT navOfSharesToRedeem = _processClaimableRedeemRequest(_controller, state.jtEffectiveNAV, _shares, totalTrancheShares);
+
+        // Scale the claims based on the NAV to liquidate for the user relative to the total JT controlled NAV
+        userAssetClaims = UtilsLib.scaleTrancheAssetsClaim(userAssetClaims, navOfSharesToRedeem, state.jtEffectiveNAV);
+
+        // Withdraw the asset claims from each tranche and transfer them to the receiver
+        _withdrawAssets(userAssetClaims, _receiver);
+
+        // Execute a post-op sync on accounting and enforce the market's coverage requirement
+        _postOpSyncTrancheAccountingAndEnforceCoverage(Operation.JT_DECREASE_NAV);
+    }
+
+    /// @inheritdoc IRoycoKernel
+    function setProtocolFeeRecipient(address _protocolFeeRecipient) external override(IRoycoKernel) restricted {
+        require(_protocolFeeRecipient != address(0), NULL_ADDRESS());
+        RoycoKernelStorageLib._getRoycoKernelStorage().protocolFeeRecipient = _protocolFeeRecipient;
+        emit ProtocolFeeRecipientUpdated(_protocolFeeRecipient);
+    }
+
+    /// @inheritdoc IRoycoKernel
+    function setJuniorTrancheRedemptionDelay(uint256 _jtRedemptionDelaySeconds) external override(IRoycoKernel) restricted {
+        RoycoKernelStorageLib._getRoycoKernelStorage().jtRedemptionDelaySeconds = _jtRedemptionDelaySeconds;
+        emit JuniorTrancheRedemptionDelayUpdated(_jtRedemptionDelaySeconds);
+    }
+
+    /// @inheritdoc IRoycoKernel
+    function getState() external view override(IRoycoKernel) returns (RoycoKernelState memory) {
+        return RoycoKernelStorageLib._getRoycoKernelStorage();
+    }
+
+    // =============================
+    // Internal Accounting Synchronization Functions
+    // =============================
 
     /**
      * @notice Invokes the accountant to do a pre-operation (deposit and withdrawal) NAV sync
@@ -293,6 +478,10 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         }
     }
 
+    // =============================
+    // Senior Tranche Deposit and Redeem Functions
+    // =============================
+
     /**
      * @notice Withdraws any specified assets from each tranche and transfer them to the receiver
      * @param _claims The ST and JT assets to withdraw and transfer to the specified receiver
@@ -329,6 +518,10 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         return IRoycoAccountant(RoycoKernelStorageLib._getRoycoKernelStorage().accountant);
     }
 
+    // =============================
+    // Internal NAV Retrieval Functions
+    // =============================
+
     /// @notice Returns the raw net asset value of the senior tranche denominated in the NAV units (USD, BTC, etc.) for this kernel
     /// @return The pure net asset value of the senior tranche invested assets
     function _getSeniorTrancheRawNAV() internal view virtual returns (NAV_UNIT);
@@ -336,6 +529,10 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     /// @notice Returns the raw net asset value of the junior tranche denominated in the NAV units (USD, BTC, etc.) for this kernel
     /// @return The pure net asset value of the junior tranche invested assets
     function _getJuniorTrancheRawNAV() internal view virtual returns (NAV_UNIT);
+
+    // =============================
+    // Internal Tranche Helper Functions
+    // =============================
 
     /**
      * @notice Returns the maximum amount of assets that can be deposited into the senior tranche globally
@@ -378,6 +575,20 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
      * @return redeemedJTAssets The amount of JT assets that would be redeemed for the given amount of JT assets
      */
     function _previewWithdrawJTAssets(TRANCHE_UNIT _jtAssets) internal view virtual returns (TRANCHE_UNIT redeemedJTAssets);
+
+    /**
+     * @notice Deposits ST assets into its underlying investment opportunity
+     * @dev Mandates that the underlying ownership over the deposit (receipt tokens, underlying investment accounting, etc) is retained by the kernel
+     * @param _stAssets The ST assets denominated in its tranche units to deposit into its underlying investment opportunity
+     */
+    function _stDepositAssets(TRANCHE_UNIT _stAssets) internal virtual;
+
+    /**
+     * @notice Deposits JT assets into its underlying investment opportunity
+     * @dev Mandates that the underlying ownership over the deposit (receipt tokens, underlying investment accounting, etc) is retained by the kernel
+     * @param _jtAssets The JT assets denominated in its tranche units to deposit into its underlying investment opportunity
+     */
+    function _jtDepositAssets(TRANCHE_UNIT _jtAssets) internal virtual;
 
     /**
      * @notice Withdraws ST assets to the specified receiver

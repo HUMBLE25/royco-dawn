@@ -12,6 +12,12 @@ import { NAV_UNIT, TRANCHE_UNIT } from "../../libraries/Units.sol";
  * @dev The kernel contract is responsible for defining the execution model and logic of the Senior and Junior tranches of a given Royco market
  */
 interface IRoycoKernel {
+    /// @notice Emitted when the protocol fee recipient is updated
+    event ProtocolFeeRecipientUpdated(address protocolFeeRecipient);
+
+    /// @notice Emitted when the redemption delay is updated
+    event JuniorTrancheRedemptionDelayUpdated(uint256 jtRedemptionDelaySeconds);
+
     /// @notice Thrown when any of the required initialization params are null
     error NULL_ADDRESS();
 
@@ -20,6 +26,21 @@ interface IRoycoKernel {
 
     /// @notice Thrown when the caller of a permissioned function isn't the market's junior tranche
     error ONLY_JUNIOR_TRANCHE();
+
+    /// @notice Thrown when the total shares claimable for redemption are less than what the user is trying to redeem
+    error INSUFFICIENT_CLAIMABLE_SHARES(uint256 sharesToRedeem, uint256 redeemableShares);
+
+    /// @notice Thrown when the request ID is invalid
+    error INVALID_REQUEST_ID(uint256 requestId);
+
+    /// @notice Thrown when the redemption is already canceled
+    error REDEMPTION_ALREADY_CANCELED();
+
+    /// @notice Thrown when the shares to claim are zero
+    error MUST_CLAIM_NON_ZERO_SHARES();
+
+    /// @notice Thrown when trying to claim a cancellation without having an existing cancellation
+    error REDEMPTION_NOT_CANCELED();
 
     /**
      * @notice Returns the request redeem shares behavior for the senior tranche

@@ -38,9 +38,6 @@ abstract contract ERC4626JTKernel is RoycoKernel, RedemptionDelayJTKernel {
 
         // Initialize the ERC4626 JT kernel storage
         ERC4626KernelStorageLib._getERC4626KernelStorage().jtVault = _jtVault;
-
-        // Initialize the async redemption delay kernel state
-        __RedemptionDelay_JT_Kernel_init_unchained(_jtRedemptionDelaySeconds);
     }
 
     /// @inheritdoc IRoycoKernel
@@ -58,60 +55,17 @@ abstract contract ERC4626JTKernel is RoycoKernel, RedemptionDelayJTKernel {
         navToMintAt = (_accountant().previewSyncTrancheAccounting(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV())).jtEffectiveNAV;
     }
 
-    /// @inheritdoc IRoycoKernel
-    function jtDeposit(
-        TRANCHE_UNIT _assets,
-        address,
-        address
-    )
-        external
-        override(IRoycoKernel)
-        onlyJuniorTranche
-        whenNotPaused
-        returns (NAV_UNIT valueAllocated, NAV_UNIT navToMintAt)
-    {
-        // Execute a pre-op sync on accounting
-        navToMintAt = (_preOpSyncTrancheAccounting()).jtEffectiveNAV;
-
-        // Deposit the assets into the underlying investment vault and add to the number of ST controlled shares for this vault
-        ERC4626KernelState storage $ = ERC4626KernelStorageLib._getERC4626KernelStorage();
-        $.jtOwnedShares += IERC4626($.jtVault).deposit(toUint256(_assets), address(this));
-
-        // Execute a post-op sync on accounting
-        NAV_UNIT postDepositNAV = (_postOpSyncTrancheAccounting(Operation.JT_INCREASE_NAV)).jtEffectiveNAV;
-        // The value allocated after any fees/slippage incurred on deposit
-        valueAllocated = postDepositNAV - navToMintAt;
+    /// @inheritdoc RoycoKernel
+    function _jtDepositAssets(TRANCHE_UNIT _jtAssets) internal override(RoycoKernel) {
+        // Supply the specified assets to the pool
+        // Max approval already given to the pool on initialization
+        IPool(_getAaveV3JTKernelStorage().pool).supply(RoycoKernelStorageLib._getRoycoKernelStorage().jtAsset, toUint256(_assets), address(this), 0);
     }
 
-    /// @inheritdoc IRoycoKernel
-    function jtRedeem(
-        uint256 _shares,
-        address _controller,
-        address _receiver
-    )
-        external
-        override(IRoycoKernel)
-        onlyJuniorTranche
-        returns (AssetClaims memory userAssetClaims)
-    {
-        // Execute a pre-op sync on accounting
-        SyncedAccountingState memory state;
-        uint256 totalTrancheShares;
-        (state, userAssetClaims, totalTrancheShares) = _preOpSyncTrancheAccounting(TrancheType.JUNIOR);
-
-        // Ensure that the shares to redeem are actually claimable right now
-        require(_shares <= _jtClaimableRedeemRequest(_controller), INSUFFICIENT_CLAIMABLE_SHARES(_shares, _jtClaimableRedeemRequest(_controller)));
-
-        // Get the total NAV to withdraw on this redemption
-        NAV_UNIT navOfSharesToRedeem = _processClaimableRedeemRequest(_controller, state.jtEffectiveNAV, _shares, totalTrancheShares);
-
-        // Scale the claims based on the NAV to liquidate for the user relative to the total JT controlled NAV
-        userAssetClaims = UtilsLib.scaleTrancheAssetsClaim(userAssetClaims, navOfSharesToRedeem, state.jtEffectiveNAV);
-
-        // Withdraw the asset claims from each tranche and transfer them to the receiver
-        _withdrawAssets(userAssetClaims, _receiver);
-
-        // Execute a post-op sync on accounting and enforce the market's coverage requirement
-        _postOpSyncTrancheAccountingAndEnforceCoverage(Operation.JT_DECREASE_NAV);
+    /// @inheritdoc RoycoKernel
+    function _jtWithdrawAssets(TRANCHE_UNIT _jtAssets, address _receiver) internal override(RoycoKernel) {
+        ERC4626KernelState storage $ = ERC4626KernelStorageLib._getERC4626KernelStorage();
+        // Withdraw the specified assets and deduct the burned shares from the ST controlled shares for the underlying ST ERC4626 vault
+        $.jtOwnedShares -= IERC4626($.jtVault).withdraw(toUint256(_jtAssets), _receiver, address(this));
     }
 }
