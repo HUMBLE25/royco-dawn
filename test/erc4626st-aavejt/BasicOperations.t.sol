@@ -125,7 +125,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
             assertApproxEqRel(maxRedeemableShares, shares, MAX_REDEEM_RELATIVE_DELTA, "Max redeemable shares should return the correct amount");
             assertTrue(maxRedeemableShares <= shares, "Max redeemable shares should be less than or equal to shares");
 
-            // Verify that previewRedeem returns the correct amount
+            // Verify that convertToAssets returns the correct amount
             TRANCHE_UNIT convertedAssets = JT.convertToAssets(shares).jtAssets;
             assertApproxEqRel(convertedAssets, assets, MAX_CONVERT_TO_ASSETS_RELATIVE_DELTA, "Convert to assets should return the correct amount");
             assertTrue(convertedAssets <= assets, "Convert to assets should be less than or equal to amount");
