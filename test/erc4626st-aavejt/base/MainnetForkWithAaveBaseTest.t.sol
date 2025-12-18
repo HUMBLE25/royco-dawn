@@ -4,9 +4,9 @@ pragma solidity ^0.8.28;
 import { Vm } from "../../../lib/forge-std/src/Vm.sol";
 import { IERC20 } from "../../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { RoycoAccountant } from "../../../src/accountant/RoycoAccountant.sol";
+import { IRoycoAccountant } from "../../../src/interfaces/IRoycoAccountant.sol";
 import { ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel } from "../../../src/kernels/ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel.sol";
 import { RoycoKernel } from "../../../src/kernels/base/RoycoKernel.sol";
-import { RoycoAccountantInitParams } from "../../../src/libraries/RoycoAccountantStorageLib.sol";
 import { RoycoKernelInitParams } from "../../../src/libraries/RoycoKernelStorageLib.sol";
 import { DeployedContracts, IRoycoAccountant, IRoycoKernel, MarketDeploymentParams } from "../../../src/libraries/Types.sol";
 import { TrancheDeploymentParams } from "../../../src/libraries/Types.sol";
@@ -121,7 +121,7 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
         bytes memory accountantInitializationData = abi.encodeCall(
             RoycoAccountant.initialize,
             (
-                RoycoAccountantInitParams({
+                IRoycoAccountant.RoycoAccountantInitParams({
                     kernel: expectedKernelAddress, protocolFeeWAD: PROTOCOL_FEE_WAD, coverageWAD: COVERAGE_WAD, betaWAD: BETA_WAD, rdm: address(RDM)
                 }),
                 address(FACTORY)

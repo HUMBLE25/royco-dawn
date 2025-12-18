@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
+import { IRoycoAccountant } from "../../../src/interfaces/IRoycoAccountant.sol";
 import { RoycoFactory } from "../../src/RoycoFactory.sol";
 import { RoycoAccountant } from "../../src/accountant/RoycoAccountant.sol";
 import { RoycoRoles } from "../../src/auth/RoycoRoles.sol";
@@ -8,7 +9,6 @@ import { IRoycoAuth } from "../../src/interfaces/IRoycoAuth.sol";
 import { IPool } from "../../src/interfaces/aave/IPool.sol";
 import { TrancheType } from "../../src/interfaces/kernel/IRoycoKernel.sol";
 import { ZERO_NAV_UNITS, ZERO_TRANCHE_UNITS } from "../../src/libraries/Constants.sol";
-import { RoycoAccountantInitParams, RoycoAccountantState } from "../../src/libraries/RoycoAccountantStorageLib.sol";
 import { RoycoKernelInitParams, RoycoKernelState } from "../../src/libraries/RoycoKernelStorageLib.sol";
 import {
     IRoycoAccountant,
@@ -92,7 +92,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         assertEq(accountant, address(ACCOUNTANT), "Kernel accountant mismatch");
         assertEq(protocolFeeRecipient, PROTOCOL_FEE_RECIPIENT_ADDRESS, "Kernel protocolFeeRecipient mismatch");
 
-        RoycoAccountantState memory accountantState = ACCOUNTANT.getState();
+        IRoycoAccountant.RoycoAccountantState memory accountantState = ACCOUNTANT.getState();
 
         // Coverage, beta, protocol fee configuration
         assertEq(accountantState.coverageWAD, COVERAGE_WAD, "Kernel coverageWAD mismatch");
@@ -309,7 +309,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.accountantInitializationData = abi.encodeCall(
             RoycoAccountant.initialize,
             (
-                RoycoAccountantInitParams({
+                IRoycoAccountant.RoycoAccountantInitParams({
                     kernel: expectedKernelAddress, protocolFeeWAD: PROTOCOL_FEE_WAD, coverageWAD: COVERAGE_WAD, betaWAD: BETA_WAD, rdm: address(RDM)
                 }),
                 OWNER_ADDRESS // invalid authority: should be FACTORY
@@ -452,7 +452,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.accountantInitializationData = abi.encodeCall(
             RoycoAccountant.initialize,
             (
-                RoycoAccountantInitParams({
+                IRoycoAccountant.RoycoAccountantInitParams({
                     kernel: address(0xdead), // wrong kernel
                     protocolFeeWAD: PROTOCOL_FEE_WAD,
                     coverageWAD: COVERAGE_WAD,
@@ -578,7 +578,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         bytes memory accountantInitializationData = abi.encodeCall(
             RoycoAccountant.initialize,
             (
-                RoycoAccountantInitParams({
+                IRoycoAccountant.RoycoAccountantInitParams({
                     kernel: expectedKernelAddress, protocolFeeWAD: PROTOCOL_FEE_WAD, coverageWAD: COVERAGE_WAD, betaWAD: BETA_WAD, rdm: address(RDM)
                 }),
                 address(FACTORY)
