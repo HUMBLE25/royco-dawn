@@ -11,9 +11,9 @@ import { ZERO_TRANCHE_UNITS } from "../../../libraries/Constants.sol";
 import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib, toTrancheUnits, toUint256 } from "../../../libraries/Units.sol";
 import { UtilsLib } from "../../../libraries/UtilsLib.sol";
 import { AssetClaims, Operation, RoycoKernel, RoycoKernelStorageLib, SyncedAccountingState, TrancheType } from "../RoycoKernel.sol";
-import { BaseAsyncJTRedemptionDelayKernel } from "./base/BaseAsyncJTRedemptionDelayKernel.sol";
+import { AsyncJTRedemptionDelayKernel } from "./base/AsyncJTRedemptionDelayKernel.sol";
 
-abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKernel {
+abstract contract AaveV3JTKernel is RoycoKernel, AsyncJTRedemptionDelayKernel {
     using SafeERC20 for IERC20;
     using UnitsMathLib for TRANCHE_UNIT;
 
@@ -57,7 +57,7 @@ abstract contract AaveV3JTKernel is RoycoKernel, BaseAsyncJTRedemptionDelayKerne
      */
     function __AaveV3JTKernel_init(address _aaveV3Pool, address _jtAsset, uint256 _jtRedemptionDelaySeconds) internal onlyInitializing {
         // Initialize the async redemption delay kernel state
-        __BaseAsyncJTRedemptionDelayKernel_init_unchained(_jtRedemptionDelaySeconds);
+        __AsyncJTRedemptionDelayKernel_init_unchained(_jtRedemptionDelaySeconds);
         // Initializes the Aave V3 junior tranche kernel state
         __AaveV3JTKernel_init_unchained(_aaveV3Pool, _jtAsset);
     }
