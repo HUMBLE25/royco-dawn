@@ -179,6 +179,10 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         ST.deposit(depositAmount, stDepositor, stDepositor);
         vm.stopPrank();
 
+        //////////////////////////////////////////////////////
+        /// Deposit a percentage of the max deposit into ST
+        //////////////////////////////////////////////////////
+
         // Deposit a percentage of the max deposit
         depositAmount = expectedMaxDeposit.mulDiv(_stDepositPercentage, 100, Math.Rounding.Floor);
         vm.startPrank(stDepositor);
@@ -207,16 +211,20 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         expectedMaxDeposit = expectedMaxDeposit - depositAmount;
         assertEq(ST.maxDeposit(stDepositor), expectedMaxDeposit, "Max deposit should go down expected amount");
 
-        // Verify that convertToAssets returns the correct amount
+        // Verify that ST.convertToAssets returns the correct amount
         AssetClaims memory convertToAssetsResult = ST.convertToAssets(sharesMinted);
         assertApproxEqAbs(convertToAssetsResult.stAssets, depositAmount, AAVE_MAX_ABS_TRANCH_UNIT_DELTA, "Convert to assets should return the correct amount");
         assertEq(convertToAssetsResult.jtAssets, ZERO_TRANCHE_UNITS, "Convert to assets should return 0 JT assets");
         assertApproxEqAbs(convertToAssetsResult.nav, _toSTValue(depositAmount), AAVE_MAX_ABS_NAV_DELTA, "Convert to assets should return the correct NAV");
 
-        // Verify that previewRedeem returns the correct amount
+        // Verify that ST.previewRedeem returns the correct amount
         AssetClaims memory previewRedeemResult = ST.previewRedeem(sharesMinted);
         assertApproxEqAbs(previewRedeemResult.stAssets, depositAmount, AAVE_MAX_ABS_TRANCH_UNIT_DELTA, "Preview redeem should return the correct amount");
         assertEq(previewRedeemResult.jtAssets, ZERO_TRANCHE_UNITS, "Preview redeem should return 0 JT assets");
         assertApproxEqAbs(previewRedeemResult.nav, _toSTValue(depositAmount), AAVE_MAX_ABS_NAV_DELTA, "Preview redeem should return the correct NAV");
+
+        // Verify that ST.maxRedeem returns the correct amount
+        uint256 maxRedeem = ST.maxRedeem(stDepositor);
+        assertEq(maxRedeem, sharesMinted, "Max redeem should return the correct amount");
     }
 }

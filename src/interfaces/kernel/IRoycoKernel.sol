@@ -154,10 +154,10 @@ interface IRoycoKernel {
      * @dev The kernel may decide to simulate the deposit and revert internally with the result
      * @dev Should revert if deposits are asynchronous
      * @param _assets The amount of assets to deposit, denominated in the senior tranche's tranche units
+     * @return stateBeforeDeposit The state of the senior tranche before the deposit, after applying the pre-op sync
      * @return valueAllocated The value of the assets deposited, denominated in the kernel's NAV units
-     * @return navToMintAt The NAV at which the shares will be minted, exclusive of valueAllocated
      */
-    function stPreviewDeposit(TRANCHE_UNIT _assets) external view returns (NAV_UNIT valueAllocated, NAV_UNIT navToMintAt);
+    function stPreviewDeposit(TRANCHE_UNIT _assets) external view returns (SyncedAccountingState memory stateBeforeDeposit, NAV_UNIT valueAllocated);
 
     /**
      * @notice Previews the redemption of a specified number of shares from the senior tranche
@@ -214,10 +214,10 @@ interface IRoycoKernel {
      * @dev The kernel may decide to simulate the deposit and revert internally with the result
      * @dev Should revert if deposits are asynchronous
      * @param _assets The amount of assets to deposit, denominated in the junior tranche's tranche units
+     * @return stateBeforeDeposit The state of the junior tranche before the deposit, after applying the pre-op sync
      * @return valueAllocated The value of the assets deposited, denominated in the kernel's NAV units
-     * @return navToMintAt The NAV at which the shares will be minted, exclusive of valueAllocated
      */
-    function jtPreviewDeposit(TRANCHE_UNIT _assets) external view returns (NAV_UNIT valueAllocated, NAV_UNIT navToMintAt);
+    function jtPreviewDeposit(TRANCHE_UNIT _assets) external view returns (SyncedAccountingState memory stateBeforeDeposit, NAV_UNIT valueAllocated);
 
     /**
      * @notice Previews the redemption of a specified number of shares from the junior tranche
