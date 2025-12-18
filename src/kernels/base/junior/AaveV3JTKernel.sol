@@ -10,9 +10,8 @@ import { ZERO_TRANCHE_UNITS } from "../../../libraries/Constants.sol";
 import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib, toTrancheUnits, toUint256 } from "../../../libraries/Units.sol";
 import { UtilsLib } from "../../../libraries/UtilsLib.sol";
 import { AssetClaims, Operation, RoycoKernel, RoycoKernelStorageLib, SyncedAccountingState, TrancheType } from "../RoycoKernel.sol";
-import { RedemptionDelayJTKernel } from "./base/RedemptionDelayJTKernel.sol";
 
-abstract contract AaveV3JTKernel is RoycoKernel, RedemptionDelayJTKernel {
+abstract contract AaveV3JTKernel is RoycoKernel {
     using SafeERC20 for IERC20;
     using UnitsMathLib for TRANCHE_UNIT;
 
@@ -39,9 +38,6 @@ abstract contract AaveV3JTKernel is RoycoKernel, RedemptionDelayJTKernel {
     /// @notice Thrown when the JT base asset is not a supported reserve token in the Aave V3 Pool
     error UNSUPPORTED_RESERVE_TOKEN();
 
-    /// @notice Thrown when the shares to redeem are greater than the claimable shares
-    error INSUFFICIENT_CLAIMABLE_SHARES(uint256 sharesToRedeem, uint256 claimableShares);
-
     /// @notice Thrown when a low-level call fails
     error FAILED_CALL();
 
@@ -49,9 +45,8 @@ abstract contract AaveV3JTKernel is RoycoKernel, RedemptionDelayJTKernel {
      * @notice Initializes a kernel where the junior tranche is deployed into Aave V3 with a redemption delay
      * @param _aaveV3Pool The address of the Aave V3 Pool
      * @param _jtAsset The address of the base asset of the junior tranche
-     * @param _jtRedemptionDelaySeconds The delay in seconds between a junior tranche LP requesting a redemption and being able to execute it
      */
-    function __AaveV3_JT_Kernel_init(address _aaveV3Pool, address _jtAsset, uint256 _jtRedemptionDelaySeconds) internal onlyInitializing {
+    function __AaveV3_JT_Kernel_init_unchained(address _aaveV3Pool, address _jtAsset) internal onlyInitializing {
         // Initialize the Aave V3 junior tranche kernel state
         // Ensure that the JT base asset is a supported reserve token in the Aave V3 Pool
         address jtAssetAToken = IPool(_aaveV3Pool).getReserveAToken(_jtAsset);
@@ -65,9 +60,6 @@ abstract contract AaveV3JTKernel is RoycoKernel, RedemptionDelayJTKernel {
         $.pool = _aaveV3Pool;
         $.poolAddressesProvider = address(IPool(_aaveV3Pool).ADDRESSES_PROVIDER());
         $.jtAssetAToken = jtAssetAToken;
-
-        // Initialize the async redemption delay kernel state
-        __RedemptionDelay_JT_Kernel_init_unchained(_jtRedemptionDelaySeconds);
     }
 
     /// @inheritdoc IRoycoKernel
@@ -75,61 +67,6 @@ abstract contract AaveV3JTKernel is RoycoKernel, RedemptionDelayJTKernel {
         // Preview the deposit by converting the assets to NAV units and returning the NAV at which the shares will be minted
         valueAllocated = jtConvertTrancheUnitsToNAVUnits(_assets);
         navToMintAt = (_accountant().previewSyncTrancheAccounting(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV())).jtEffectiveNAV;
-    }
-
-    /// @inheritdoc IRoycoKernel
-    function jtDeposit(
-        TRANCHE_UNIT _assets,
-        address,
-        address
-    )
-        external
-        override(IRoycoKernel)
-        onlyJuniorTranche
-        whenNotPaused
-        returns (NAV_UNIT valueAllocated, NAV_UNIT navToMintAt)
-    {
-        // Execute a pre-op sync on accounting
-        valueAllocated = jtConvertTrancheUnitsToNAVUnits(_assets);
-        navToMintAt = (_preOpSyncTrancheAccounting()).jtEffectiveNAV;
-
-        // Max approval already given to the pool on initialization
-        IPool(_getAaveV3JTKernelStorage().pool).supply(RoycoKernelStorageLib._getRoycoKernelStorage().jtAsset, toUint256(_assets), address(this), 0);
-
-        // Execute a post-op sync on accounting
-        _postOpSyncTrancheAccounting(Operation.JT_INCREASE_NAV);
-    }
-
-    /// @inheritdoc IRoycoKernel
-    function jtRedeem(
-        uint256 _shares,
-        address _controller,
-        address _receiver
-    )
-        external
-        override(IRoycoKernel)
-        onlyJuniorTranche
-        returns (AssetClaims memory userAssetClaims)
-    {
-        // Execute a pre-op sync on accounting
-        SyncedAccountingState memory state;
-        uint256 totalTrancheShares;
-        (state, userAssetClaims, totalTrancheShares) = _preOpSyncTrancheAccounting(TrancheType.JUNIOR);
-
-        // Ensure that the shares to redeem are actually claimable right now
-        require(_shares <= _jtClaimableRedeemRequest(_controller), INSUFFICIENT_CLAIMABLE_SHARES(_shares, _jtClaimableRedeemRequest(_controller)));
-
-        // Get the total NAV to withdraw on this redemption
-        NAV_UNIT navOfSharesToRedeem = _processClaimableRedeemRequest(_controller, state.jtEffectiveNAV, _shares, totalTrancheShares);
-
-        // Scale the claims based on the NAV to liquidate for the user relative to the total JT controlled NAV
-        userAssetClaims = UtilsLib.scaleTrancheAssetsClaim(userAssetClaims, navOfSharesToRedeem, state.jtEffectiveNAV);
-
-        // Withdraw the asset claims from each tranche and transfer them to the receiver
-        _withdrawAssets(userAssetClaims, _receiver);
-
-        // Execute a post-op sync on accounting and enforce the market's coverage requirement
-        _postOpSyncTrancheAccountingAndEnforceCoverage(Operation.JT_DECREASE_NAV);
     }
 
     /// @inheritdoc RoycoKernel
@@ -217,6 +154,13 @@ abstract contract AaveV3JTKernel is RoycoKernel, RedemptionDelayJTKernel {
     function _previewWithdrawJTAssets(TRANCHE_UNIT _jtAssets) internal view override(RoycoKernel) returns (TRANCHE_UNIT redeemedJTAssets) {
         // TODO: Do we want to bound this to max withdrawable?
         return _jtAssets;
+    }
+
+    /// @inheritdoc RoycoKernel
+    function _jtDepositAssets(TRANCHE_UNIT _jtAssets) internal override(RoycoKernel) {
+        // Supply the specified assets to the pool
+        // Max approval already given to the pool on initialization
+        IPool(_getAaveV3JTKernelStorage().pool).supply(RoycoKernelStorageLib._getRoycoKernelStorage().jtAsset, toUint256(_jtAssets), address(this), 0);
     }
 
     /// @inheritdoc RoycoKernel

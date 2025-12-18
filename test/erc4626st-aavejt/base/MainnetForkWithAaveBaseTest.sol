@@ -21,7 +21,7 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
     NAV_UNIT internal AAVE_MAX_ABS_NAV_DELTA = toNAVUnits(toUint256(AAVE_MAX_ABS_TRANCH_UNIT_DELTA) * 10 ** 21);
     uint256 internal constant MAX_REDEEM_RELATIVE_DELTA = 0.0001e18; // 0.01%
     uint256 internal constant MAX_CONVERT_TO_ASSETS_RELATIVE_DELTA = 0.0001e18; // 0.01%
-    uint256 internal constant JT_REDEMPTION_DELAY_SECONDS = 100;
+    uint24 internal constant JT_REDEMPTION_DELAY_SECONDS = 100;
 
     Vm.Wallet internal RESERVE;
     address internal RESERVE_ADDRESS;
@@ -111,19 +111,23 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
                     seniorTranche: expectedSeniorTrancheAddress,
                     juniorTranche: expectedJuniorTrancheAddress,
                     accountant: expectedAccountantAddress,
-                    protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS
+                    protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS,
+                    jtRedemptionDelayInSeconds: JT_REDEMPTION_DELAY_SECONDS
                 }),
                 address(FACTORY),
                 address(MOCK_UNDERLYING_ST_VAULT),
-                ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS,
-                JT_REDEMPTION_DELAY_SECONDS
+                ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS
             )
         );
         bytes memory accountantInitializationData = abi.encodeCall(
             RoycoAccountant.initialize,
             (
                 RoycoAccountantInitParams({
-                    kernel: expectedKernelAddress, protocolFeeWAD: PROTOCOL_FEE_WAD, coverageWAD: COVERAGE_WAD, betaWAD: BETA_WAD, rdm: address(RDM)
+                    kernel: expectedKernelAddress,
+                    protocolFeeWAD: PROTOCOL_FEE_WAD,
+                    coverageWAD: COVERAGE_WAD,
+                    betaWAD: BETA_WAD,
+                    rdm: address(RDM)
                 }),
                 address(FACTORY)
             )

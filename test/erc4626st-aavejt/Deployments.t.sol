@@ -67,14 +67,23 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         // Basic wiring
         assertTrue(address(KERNEL) != address(0), "Kernel not deployed");
 
-        RoycoKernelState memory kernelState = KERNEL.getState();
-        RoycoAccountantState memory accountantState = ACCOUNTANT.getState();
+        (
+            address seniorTranche,
+            address stAsset,
+            address juniorTranche,
+            address jtAsset,
+            address protocolFeeRecipient,
+            address accountant,
+            uint24 jtRedemptionDelayInSeconds
+        ) = KERNEL.getState();
 
         // Tranche wiring
-        assertEq(kernelState.seniorTranche, address(ST), "Kernel ST mismatch");
-        assertEq(kernelState.juniorTranche, address(JT), "Kernel JT mismatch");
-        assertEq(kernelState.accountant, address(ACCOUNTANT), "Kernel accountant mismatch");
-        assertEq(kernelState.protocolFeeRecipient, PROTOCOL_FEE_RECIPIENT_ADDRESS, "Kernel protocolFeeRecipient mismatch");
+        assertEq(seniorTranche, address(ST), "Kernel ST mismatch");
+        assertEq(juniorTranche, address(JT), "Kernel JT mismatch");
+        assertEq(accountant, address(ACCOUNTANT), "Kernel accountant mismatch");
+        assertEq(protocolFeeRecipient, PROTOCOL_FEE_RECIPIENT_ADDRESS, "Kernel protocolFeeRecipient mismatch");
+
+        RoycoAccountantState memory accountantState = ACCOUNTANT.getState();
 
         // Coverage, beta, protocol fee configuration
         assertEq(accountantState.coverageWAD, COVERAGE_WAD, "Kernel coverageWAD mismatch");
@@ -292,7 +301,11 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
             RoycoAccountant.initialize,
             (
                 RoycoAccountantInitParams({
-                    kernel: expectedKernelAddress, protocolFeeWAD: PROTOCOL_FEE_WAD, coverageWAD: COVERAGE_WAD, betaWAD: BETA_WAD, rdm: address(RDM)
+                    kernel: expectedKernelAddress,
+                    protocolFeeWAD: PROTOCOL_FEE_WAD,
+                    coverageWAD: COVERAGE_WAD,
+                    betaWAD: BETA_WAD,
+                    rdm: address(RDM)
                 }),
                 OWNER_ADDRESS // invalid authority: should be FACTORY
             )
@@ -318,12 +331,12 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
                     seniorTranche: expectedSeniorTrancheAddress,
                     juniorTranche: expectedJuniorTrancheAddress,
                     accountant: expectedAccountantAddress,
-                    protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS
+                    protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS,
+                    jtRedemptionDelayInSeconds: JT_REDEMPTION_DELAY_SECONDS
                 }),
                 OWNER_ADDRESS, // invalid authority: should be FACTORY
                 address(MOCK_UNDERLYING_ST_VAULT),
-                ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS,
-                JT_REDEMPTION_DELAY_SECONDS
+                ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS
             )
         );
 
@@ -413,12 +426,12 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
                     seniorTranche: expectedSeniorTrancheAddress,
                     juniorTranche: expectedJuniorTrancheAddress,
                     accountant: address(0xdead), // wrong accountant
-                    protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS
+                    protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS,
+                    jtRedemptionDelayInSeconds: JT_REDEMPTION_DELAY_SECONDS
                 }),
                 address(FACTORY),
                 address(MOCK_UNDERLYING_ST_VAULT),
-                ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS,
-                JT_REDEMPTION_DELAY_SECONDS
+                ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS
             )
         );
 
@@ -475,19 +488,23 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
                     seniorTranche: expectedSeniorTrancheAddress,
                     juniorTranche: expectedJuniorTrancheAddress,
                     accountant: expectedAccountantAddress,
-                    protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS
+                    protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS,
+                    jtRedemptionDelayInSeconds: JT_REDEMPTION_DELAY_SECONDS
                 }),
                 address(FACTORY),
                 address(MOCK_UNDERLYING_ST_VAULT),
-                ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS,
-                JT_REDEMPTION_DELAY_SECONDS
+                ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS
             )
         );
         bytes memory accountantInitializationData = abi.encodeCall(
             RoycoAccountant.initialize,
             (
                 RoycoAccountantInitParams({
-                    kernel: expectedKernelAddress, protocolFeeWAD: PROTOCOL_FEE_WAD, coverageWAD: COVERAGE_WAD, betaWAD: BETA_WAD, rdm: address(RDM)
+                    kernel: expectedKernelAddress,
+                    protocolFeeWAD: PROTOCOL_FEE_WAD,
+                    coverageWAD: COVERAGE_WAD,
+                    betaWAD: BETA_WAD,
+                    rdm: address(RDM)
                 }),
                 address(FACTORY)
             )

@@ -1,18 +1,23 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
+import { NAV_UNIT } from "./Units.sol";
+
 /**
  * @notice Initialization parameters for the Royco Kernel
  * @custom:field seniorTranche - The address of the Royco senior tranche associated with this kernel
  * @custom:field juniorTranche - The address of the Royco junior tranche associated with this kernel
  * @custom:field accountant - The address of the Royco accountant used to perform per operation accounting for this kernel
- * @custom:field protocolFeeRecipient - The market's configured protocol fee recipient
+ * @custom:field protocolFeeRecipient - The market's protocol fee recipient
+ * @custom:field claimableAtTimestamp - The timestamp at which the redemption request is allowed to be claimed
+ * @custom:field jtRedemptionDelayInSeconds - The redemption delay in seconds that a JT LP has to wait between requesting and executing a redemption
  */
 struct RoycoKernelInitParams {
     address seniorTranche;
     address juniorTranche;
     address accountant;
     address protocolFeeRecipient;
+    uint24 jtRedemptionDelayInSeconds;
 }
 
 /**
@@ -22,16 +27,34 @@ struct RoycoKernelInitParams {
  * @custom:field stAsset - The address of the asset that ST is denominated in: constitutes the ST's tranche units (type and precision)
  * @custom:field juniorTranche - The address of the Royco junior tranche associated with this kernel
  * @custom:field jtAsset - The address of the asset that JT is denominated in: constitutes the ST's tranche units (type and precision)
- * @custom:field accountant - The address of the Royco accountant used to perform per operation accounting for this kernel
  * @custom:field protocolFeeRecipient - The market's configured protocol fee recipient
+ * @custom:field accountant - The address of the Royco accountant used to perform per operation accounting for this kernel
+ * @custom:field jtRedemptionDelayInSeconds - The redemption delay in seconds that a JT LP has to wait between requesting and executing a redemption
+ * @custom:field jtControllerToRedemptionRequest - A mapping between a  controller and their redemption request state for the junior tranche
  */
 struct RoycoKernelState {
     address seniorTranche;
     address stAsset;
     address juniorTranche;
     address jtAsset;
-    address accountant;
     address protocolFeeRecipient;
+    address accountant;
+    uint24 jtRedemptionDelayInSeconds;
+    mapping(address controller => RedemptionRequest request) jtControllerToRedemptionRequest;
+}
+
+/**
+ * @notice The state of a JT LP's redemption request
+ * @custom:field isCanceled - A boolean indicating whether the redemption request has been canceled
+ * @custom:field claimableAtTimestamp - The timestamp at which the redemption request is allowed to be claimed/executed
+ * @custom:field totalJTSharesToRedeem - The total number of JT shares to redeem
+ * @custom:field redemptionValueAtRequestTime - The NAV of the redemption request at the time it was requested
+ */
+struct RedemptionRequest {
+    bool isCanceled;
+    uint32 claimableAtTimestamp;
+    uint256 totalJTSharesToRedeem;
+    NAV_UNIT redemptionValueAtRequestTime;
 }
 
 /// @title RoycoKernelStorageLib
@@ -59,7 +82,8 @@ library RoycoKernelStorageLib {
         $.stAsset = _stAsset;
         $.juniorTranche = _params.juniorTranche;
         $.jtAsset = _jtAsset;
-        $.accountant = _params.accountant;
         $.protocolFeeRecipient = _params.protocolFeeRecipient;
+        $.accountant = _params.accountant;
+        $.jtRedemptionDelayInSeconds = _params.jtRedemptionDelayInSeconds;
     }
 }
