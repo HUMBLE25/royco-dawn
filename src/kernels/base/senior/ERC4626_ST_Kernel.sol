@@ -11,7 +11,7 @@ import { UtilsLib } from "../../../libraries/UtilsLib.sol";
 import { ERC4626KernelState, ERC4626KernelStorageLib } from "../../../libraries/kernels/ERC4626KernelStorageLib.sol";
 import { Operation, RoycoKernel, TrancheType } from "../RoycoKernel.sol";
 
-abstract contract ERC4626STKernel is RoycoKernel {
+abstract contract ERC4626_ST_Kernel is RoycoKernel {
     using SafeERC20 for IERC20;
     using UnitsMathLib for TRANCHE_UNIT;
 

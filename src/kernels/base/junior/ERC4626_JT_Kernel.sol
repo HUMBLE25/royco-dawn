@@ -11,9 +11,9 @@ import { AssetClaims } from "../../../libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib, toTrancheUnits, toUint256 } from "../../../libraries/Units.sol";
 import { UtilsLib } from "../../../libraries/UtilsLib.sol";
 import { ERC4626KernelState, ERC4626KernelStorageLib } from "../../../libraries/kernels/ERC4626KernelStorageLib.sol";
-import { Operation, RoycoKernel, TrancheType } from "../RoycoKernel.sol";
+import { Operation, RoycoKernel } from "../RoycoKernel.sol";
 
-abstract contract ERC4626JTKernel is RoycoKernel {
+abstract contract ERC4626_JT_Kernel is RoycoKernel {
     using SafeERC20 for IERC20;
     using UnitsMathLib for TRANCHE_UNIT;
 
@@ -44,10 +44,10 @@ abstract contract ERC4626JTKernel is RoycoKernel {
         IERC4626 jtVault = IERC4626(ERC4626KernelStorageLib._getERC4626KernelStorage().jtVault);
 
         // Simulate the deposit of the assets into the underlying investment vault
-        uint256 underlyingJTVaultSharesAllocated = jtVault.previewDeposit(toUint256(_assets));
+        uint256 jtVaultSharesMinted = jtVault.previewDeposit(toUint256(_assets));
 
         // Convert the underlying vault shares to tranche units. This value may differ from _assets if a fee or slippage is incurred to the deposit.
-        TRANCHE_UNIT jtAssetsAllocated = toTrancheUnits(jtVault.convertToAssets(underlyingJTVaultSharesAllocated));
+        TRANCHE_UNIT jtAssetsAllocated = toTrancheUnits(jtVault.convertToAssets(jtVaultSharesMinted));
 
         // Convert the assets allocated to NAV units and preview a sync to get the current NAV to mint shares at for the junior tranche
         valueAllocated = jtConvertTrancheUnitsToNAVUnits(jtAssetsAllocated);

@@ -14,7 +14,7 @@ import { IRoycoKernel } from "../../src/interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoAsyncCancellableVault } from "../../src/interfaces/tranche/IRoycoAsyncCancellableVault.sol";
 import { IRoycoAsyncVault } from "../../src/interfaces/tranche/IRoycoAsyncVault.sol";
 import { IRoycoVaultTranche } from "../../src/interfaces/tranche/IRoycoVaultTranche.sol";
-import { ERC4626ST_AaveV3JT_IdenticalAssets_Kernel } from "../../src/kernels/ERC4626ST_AaveV3JT_IdenticalAssets_Kernel.sol";
+import { ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel } from "../../src/kernels/ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel.sol";
 import { RoycoKernel } from "../../src/kernels/base/RoycoKernel.sol";
 import { AssetClaims, RolesConfiguration, TrancheType } from "../../src/libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, toUint256 } from "../../src/libraries/Units.sol";
@@ -81,7 +81,7 @@ abstract contract BaseTest is Test, RoycoRoles, Assertions {
     StaticCurveRDM internal RDM;
     RoycoST public ST_IMPL;
     RoycoJT internal JT_IMPL;
-    ERC4626ST_AaveV3JT_IdenticalAssets_Kernel internal ERC4626ST_AaveV3JT_IdenticalAssets_Kernel_IMPL;
+    ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel internal ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel_IMPL;
     RoycoAccountant internal ACCOUNTANT_IMPL;
 
     // Deployed Later in the concrete tests
@@ -142,8 +142,8 @@ abstract contract BaseTest is Test, RoycoRoles, Assertions {
         vm.label(address(ACCOUNTANT_IMPL), "AccountantImpl");
 
         // Deploy KERNEL implementation
-        ERC4626ST_AaveV3JT_IdenticalAssets_Kernel_IMPL = new ERC4626ST_AaveV3JT_IdenticalAssets_Kernel();
-        vm.label(address(ERC4626ST_AaveV3JT_IdenticalAssets_Kernel_IMPL), "KernelImpl");
+        ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel_IMPL = new ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel();
+        vm.label(address(ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel_IMPL), "KernelImpl");
 
         // Deploy FACTORY
         FACTORY = new RoycoFactory(OWNER_ADDRESS);
