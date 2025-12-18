@@ -84,7 +84,7 @@ abstract contract ERC4626STKernel is RoycoKernel {
     }
 
     /// @inheritdoc RoycoKernel
-    function _previewWithdrawSTAssets(TRANCHE_UNIT _stAssets) internal view override(RoycoKernel) returns (TRANCHE_UNIT redeemedSTAssets) {
+    function _stPreviewWithdraw(TRANCHE_UNIT _stAssets) internal view override(RoycoKernel) returns (TRANCHE_UNIT redeemedSTAssets) {
         IERC4626 stVault = IERC4626(ERC4626KernelStorageLib._getERC4626KernelStorage().stVault);
         // Convert the ST assets to underlying shares
         uint256 underlyingShares = stVault.convertToShares(toUint256(_stAssets));

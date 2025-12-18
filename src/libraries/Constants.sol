@@ -9,6 +9,9 @@ NAV_UNIT constant ZERO_NAV_UNITS = NAV_UNIT.wrap(0);
 /// @dev Constant for 0 tranche units
 TRANCHE_UNIT constant ZERO_TRANCHE_UNITS = TRANCHE_UNIT.wrap(0);
 
+/// @dev Constant for the max value expressable as tranche units
+TRANCHE_UNIT constant MAX_TRANCHE_UNITS = TRANCHE_UNIT.wrap(type(uint256).max);
+
 /// @dev Constant for the WAD scaling factor
 uint256 constant WAD = 1e18;
 
