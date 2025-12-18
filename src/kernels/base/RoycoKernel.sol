@@ -185,7 +185,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     // =============================
 
     /// @inheritdoc IRoycoKernel
-    function syncTrancheAccounting() external override(IRoycoKernel) restricted whenNotPaused returns (SyncedAccountingState memory state) {
+    function syncTrancheAccounting() external override(IRoycoKernel) whenNotPaused restricted returns (SyncedAccountingState memory state) {
         // Execute a pre-op accounting sync via the accountant
         return _preOpSyncTrancheAccounting();
     }
@@ -228,8 +228,8 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     )
         external
         override(IRoycoKernel)
-        onlySeniorTranche
         whenNotPaused
+        onlySeniorTranche
         returns (NAV_UNIT valueAllocated, NAV_UNIT navToMintAt)
     {
         // Execute a pre-op sync on accounting
@@ -252,8 +252,8 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     )
         external
         override(IRoycoKernel)
-        onlySeniorTranche
         whenNotPaused
+        onlySeniorTranche
         returns (AssetClaims memory userAssetClaims)
     {
         // Execute a pre-op sync on accounting
@@ -283,8 +283,8 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     )
         external
         override(IRoycoKernel)
-        onlyJuniorTranche
         whenNotPaused
+        onlyJuniorTranche
         returns (NAV_UNIT valueAllocated, NAV_UNIT navToMintAt)
     {
         // Execute a pre-op sync on accounting
@@ -312,8 +312,8 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     )
         external
         override(IRoycoKernel)
-        onlyJuniorTranche
         whenNotPaused
+        onlyJuniorTranche
         returns (uint256 requestId)
     {
         // Execute a pre-op sync on accounting
@@ -393,7 +393,16 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     }
 
     /// @inheritdoc IRoycoKernel
-    function jtPendingCancelRedeemRequest(uint256, address) external pure override(IRoycoKernel) returns (bool isPending) {
+    function jtPendingCancelRedeemRequest(
+        uint256 _requestId,
+        address
+    )
+        external
+        pure
+        override(IRoycoKernel)
+        checkJTRedemptionRequestId(_requestId)
+        returns (bool isPending)
+    {
         // Cancellation requests are always processed instantly, so there can never be a pending cancellation
         isPending = false;
     }
@@ -446,6 +455,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     )
         external
         override(IRoycoKernel)
+        whenNotPaused
         onlyJuniorTranche
         returns (AssetClaims memory userAssetClaims)
     {
@@ -506,7 +516,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     }
 
     // =============================
-    // Internal Accounting Synchronization Functions
+    // Internal Tranche Accounting Synchronization Functions
     // =============================
 
     /**
@@ -655,6 +665,10 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         }
     }
 
+    // =============================
+    // Internal Utility Functions
+    // =============================
+
     /**
      * @notice Withdraws any specified assets from each tranche and transfer them to the receiver
      * @param _claims The ST and JT assets to withdraw and transfer to the specified receiver
@@ -716,7 +730,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     function _getJuniorTrancheRawNAV() internal view virtual returns (NAV_UNIT);
 
     // =============================
-    // Internal Tranche Helper Functions
+    // Internal Tranche Specific Helper Functions
     // =============================
 
     /**
