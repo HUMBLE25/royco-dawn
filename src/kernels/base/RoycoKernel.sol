@@ -61,15 +61,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
      * @param _jtAsset The address of the asset that JT is denominated in: constitutes the JT's tranche units (type and precision)
      * @param _initialAuthority The initial authority for the base kernel
      */
-    function __RoycoKernel_init(
-        RoycoKernelInitParams memory _params,
-        address _stAsset,
-        address _jtAsset,
-        address _initialAuthority
-    )
-        internal
-        onlyInitializing
-    {
+    function __RoycoKernel_init(RoycoKernelInitParams memory _params, address _stAsset, address _jtAsset, address _initialAuthority) internal onlyInitializing {
         // Initialize the Royco base state
         __RoycoBase_init(_initialAuthority);
         // Initialize the Royco kernel state
@@ -172,12 +164,13 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         (SyncedAccountingState memory state, AssetClaims memory jtNotionalClaims,) = previewSyncTrancheAccounting(TrancheType.JUNIOR);
 
         // Get the max withdrawable st and jt assets in NAV units from the accountant consider coverage requirement
-        (, NAV_UNIT stClaimableGivenCoverage, NAV_UNIT jtClaimableGivenCoverage) = _accountant().maxJTWithdrawalGivenCoverage(
-            state.stRawNAV,
-            state.jtRawNAV,
-            stConvertTrancheUnitsToNAVUnits(jtNotionalClaims.stAssets),
-            jtConvertTrancheUnitsToNAVUnits(jtNotionalClaims.jtAssets)
-        );
+        (, NAV_UNIT stClaimableGivenCoverage, NAV_UNIT jtClaimableGivenCoverage) = _accountant()
+            .maxJTWithdrawalGivenCoverage(
+                state.stRawNAV,
+                state.jtRawNAV,
+                stConvertTrancheUnitsToNAVUnits(jtNotionalClaims.stAssets),
+                jtConvertTrancheUnitsToNAVUnits(jtNotionalClaims.jtAssets)
+            );
 
         claimOnStNAV = stConvertTrancheUnitsToNAVUnits(jtNotionalClaims.stAssets);
         claimOnJtNAV = jtConvertTrancheUnitsToNAVUnits(jtNotionalClaims.jtAssets);

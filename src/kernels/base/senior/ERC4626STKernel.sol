@@ -79,7 +79,6 @@ abstract contract ERC4626STKernel is RoycoKernel {
 
     /// @inheritdoc RoycoKernel
     function _stMaxWithdrawableGlobally(address) internal view override(RoycoKernel) returns (TRANCHE_UNIT) {
-        ERC4626KernelState storage $ = ERC4626KernelStorageLib._getERC4626KernelStorage();
         // Max withdraw takes global withdrawal limits into account
         return toTrancheUnits(IERC4626(ERC4626KernelStorageLib._getERC4626KernelStorage().stVault).maxWithdraw(address(this)));
     }

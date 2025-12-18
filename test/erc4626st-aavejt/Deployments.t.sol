@@ -3,13 +3,22 @@ pragma solidity ^0.8.28;
 
 import { RoycoFactory } from "../../src/RoycoFactory.sol";
 import { RoycoAccountant } from "../../src/accountant/RoycoAccountant.sol";
+import { RoycoRoles } from "../../src/auth/RoycoRoles.sol";
+import { IRoycoAuth } from "../../src/interfaces/IRoycoAuth.sol";
 import { IPool } from "../../src/interfaces/aave/IPool.sol";
 import { TrancheType } from "../../src/interfaces/kernel/IRoycoKernel.sol";
 import { ZERO_NAV_UNITS, ZERO_TRANCHE_UNITS } from "../../src/libraries/Constants.sol";
 import { RoycoAccountantInitParams, RoycoAccountantState } from "../../src/libraries/RoycoAccountantStorageLib.sol";
 import { RoycoKernelInitParams, RoycoKernelState } from "../../src/libraries/RoycoKernelStorageLib.sol";
-import { IRoycoAccountant, IRoycoKernel, MarketDeploymentParams, SyncedAccountingState, TrancheDeploymentParams } from "../../src/libraries/Types.sol";
-import { MainnetForkWithAaveTestBase } from "./base/MainnetForkWithAaveBaseTest.sol";
+import {
+    IRoycoAccountant,
+    IRoycoKernel,
+    MarketDeploymentParams,
+    RolesConfiguration,
+    SyncedAccountingState,
+    TrancheDeploymentParams
+} from "../../src/libraries/Types.sol";
+import { MainnetForkWithAaveTestBase } from "./base/MainnetForkWithAaveBaseTest.t.sol";
 
 contract DeploymentsTest is MainnetForkWithAaveTestBase {
     constructor() {
@@ -274,7 +283,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         (MarketDeploymentParams memory params, bytes32 marketId) = _buildValidMarketParamsForSalt(salt);
 
         // Rebuild only the senior tranche initialization data with an invalid authority
-        address expectedKernelAddress = FACTORY.predictERC1967ProxyAddress(address(USDC_ERC4626_AaveV3JT_KERNEL_IMPL), salt);
+        address expectedKernelAddress = FACTORY.predictERC1967ProxyAddress(address(ERC4626ST_AaveV3JT_IdenticalAssets_Kernel_IMPL), salt);
 
         params.seniorTrancheInitializationData = abi.encodeCall(
             ST_IMPL.initialize,
@@ -295,7 +304,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         (MarketDeploymentParams memory params,) = _buildValidMarketParamsForSalt(salt);
 
         // Rebuild only the accountant initialization data with an invalid authority
-        address expectedKernelAddress = FACTORY.predictERC1967ProxyAddress(address(USDC_ERC4626_AaveV3JT_KERNEL_IMPL), salt);
+        address expectedKernelAddress = FACTORY.predictERC1967ProxyAddress(address(ERC4626ST_AaveV3JT_IdenticalAssets_Kernel_IMPL), salt);
 
         params.accountantInitializationData = abi.encodeCall(
             RoycoAccountant.initialize,
@@ -325,7 +334,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         address expectedAccountantAddress = FACTORY.predictERC1967ProxyAddress(address(ACCOUNTANT_IMPL), salt);
 
         params.kernelInitializationData = abi.encodeCall(
-            USDC_ERC4626_AaveV3JT_KERNEL_IMPL.initialize,
+            ERC4626ST_AaveV3JT_IdenticalAssets_Kernel_IMPL.initialize,
             (
                 RoycoKernelInitParams({
                     seniorTranche: expectedSeniorTrancheAddress,
@@ -349,7 +358,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         (MarketDeploymentParams memory params, bytes32 marketId) = _buildValidMarketParamsForSalt(salt);
 
         // Rebuild only the junior tranche initialization data with an invalid authority
-        address expectedKernelAddress = FACTORY.predictERC1967ProxyAddress(address(USDC_ERC4626_AaveV3JT_KERNEL_IMPL), salt);
+        address expectedKernelAddress = FACTORY.predictERC1967ProxyAddress(address(ERC4626ST_AaveV3JT_IdenticalAssets_Kernel_IMPL), salt);
 
         params.juniorTrancheInitializationData = abi.encodeCall(
             JT_IMPL.initialize,
@@ -420,7 +429,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         address expectedJuniorTrancheAddress = FACTORY.predictERC1967ProxyAddress(address(JT_IMPL), salt);
 
         params.kernelInitializationData = abi.encodeCall(
-            USDC_ERC4626_AaveV3JT_KERNEL_IMPL.initialize,
+            ERC4626ST_AaveV3JT_IdenticalAssets_Kernel_IMPL.initialize,
             (
                 RoycoKernelInitParams({
                     seniorTranche: expectedSeniorTrancheAddress,
@@ -462,6 +471,80 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         FACTORY.deployMarket(params);
     }
 
+    function test_deployMarket_revertsOnRolesConfigurationLengthMismatch() public {
+        bytes32 salt = keccak256(abi.encodePacked("SALT", "ROLES_LENGTH_MISMATCH"));
+        (MarketDeploymentParams memory params,) = _buildValidMarketParamsForSalt(salt);
+
+        // Create a roles configuration with mismatched lengths
+        RolesConfiguration[] memory roles = new RolesConfiguration[](1);
+        bytes4[] memory selectors = new bytes4[](2);
+        uint64[] memory rolesArray = new uint64[](1); // Different length!
+
+        selectors[0] = IRoycoAuth.pause.selector;
+        selectors[1] = IRoycoAuth.unpause.selector;
+        rolesArray[0] = RoycoRoles.PAUSER_ROLE;
+
+        roles[0] = RolesConfiguration({
+            target: params.roles[0].target, // Use a valid target
+            selectors: selectors,
+            roles: rolesArray
+        });
+
+        params.roles = roles;
+
+        vm.expectRevert(RoycoFactory.RolesConfigurationLengthMismatch.selector);
+        FACTORY.deployMarket(params);
+    }
+
+    function test_deployMarket_revertsOnInvalidTarget() public {
+        bytes32 salt = keccak256(abi.encodePacked("SALT", "INVALID_TARGET"));
+        (MarketDeploymentParams memory params,) = _buildValidMarketParamsForSalt(salt);
+
+        // Create a roles configuration with an invalid target (not one of the deployed contracts)
+        RolesConfiguration[] memory roles = new RolesConfiguration[](1);
+        bytes4[] memory selectors = new bytes4[](1);
+        uint64[] memory rolesArray = new uint64[](1);
+
+        selectors[0] = IRoycoAuth.pause.selector;
+        rolesArray[0] = RoycoRoles.PAUSER_ROLE;
+
+        roles[0] = RolesConfiguration({
+            target: address(0xdead), // Invalid target - not one of the deployed contracts
+            selectors: selectors,
+            roles: rolesArray
+        });
+
+        params.roles = roles;
+
+        vm.expectRevert(abi.encodeWithSelector(RoycoFactory.InvalidTarget.selector, address(0xdead)));
+        FACTORY.deployMarket(params);
+    }
+
+    function test_deployMarket_revertsOnInvalidTargetForRandomAddress() public {
+        bytes32 salt = keccak256(abi.encodePacked("SALT", "INVALID_TARGET_RANDOM"));
+        (MarketDeploymentParams memory params,) = _buildValidMarketParamsForSalt(salt);
+
+        // Create a roles configuration with an invalid target
+        RolesConfiguration[] memory roles = new RolesConfiguration[](1);
+        bytes4[] memory selectors = new bytes4[](1);
+        uint64[] memory rolesArray = new uint64[](1);
+
+        selectors[0] = IRoycoAuth.pause.selector;
+        rolesArray[0] = RoycoRoles.PAUSER_ROLE;
+
+        address invalidTarget = address(0x1234567890123456789012345678901234567890);
+        roles[0] = RolesConfiguration({
+            target: invalidTarget, // Invalid target - not one of the deployed contracts
+            selectors: selectors,
+            roles: rolesArray
+        });
+
+        params.roles = roles;
+
+        vm.expectRevert(abi.encodeWithSelector(RoycoFactory.InvalidTarget.selector, invalidTarget));
+        FACTORY.deployMarket(params);
+    }
+
     /// @dev Helper to construct a valid set of market deployment params that mirrors `_deployMarketWithKernel`
     /// @dev Uses a default salt; useful for tests that only hit parameter validation
     function _buildValidMarketParams() internal view returns (MarketDeploymentParams memory params, bytes32 marketId, bytes32 salt) {
@@ -477,12 +560,12 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         // Precompute the expected addresses of the kernel and accountant
         address expectedSeniorTrancheAddress = FACTORY.predictERC1967ProxyAddress(address(ST_IMPL), salt);
         address expectedJuniorTrancheAddress = FACTORY.predictERC1967ProxyAddress(address(JT_IMPL), salt);
-        address expectedKernelAddress = FACTORY.predictERC1967ProxyAddress(address(USDC_ERC4626_AaveV3JT_KERNEL_IMPL), salt);
+        address expectedKernelAddress = FACTORY.predictERC1967ProxyAddress(address(ERC4626ST_AaveV3JT_IdenticalAssets_Kernel_IMPL), salt);
         address expectedAccountantAddress = FACTORY.predictERC1967ProxyAddress(address(ACCOUNTANT_IMPL), salt);
 
         // Create the initialization data
         bytes memory kernelInitializationData = abi.encodeCall(
-            USDC_ERC4626_AaveV3JT_KERNEL_IMPL.initialize,
+            ERC4626ST_AaveV3JT_IdenticalAssets_Kernel_IMPL.initialize,
             (
                 RoycoKernelInitParams({
                     seniorTranche: expectedSeniorTrancheAddress,
@@ -538,7 +621,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
             marketId: marketId,
             seniorTrancheImplementation: ST_IMPL,
             juniorTrancheImplementation: JT_IMPL,
-            kernelImplementation: IRoycoKernel(address(USDC_ERC4626_AaveV3JT_KERNEL_IMPL)),
+            kernelImplementation: IRoycoKernel(address(ERC4626ST_AaveV3JT_IdenticalAssets_Kernel_IMPL)),
             seniorTrancheInitializationData: seniorTrancheInitializationData,
             juniorTrancheInitializationData: juniorTrancheInitializationData,
             accountantImplementation: IRoycoAccountant(address(ACCOUNTANT_IMPL)),
@@ -547,7 +630,8 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
             seniorTrancheProxyDeploymentSalt: salt,
             juniorTrancheProxyDeploymentSalt: salt,
             kernelProxyDeploymentSalt: salt,
-            accountantProxyDeploymentSalt: salt
+            accountantProxyDeploymentSalt: salt,
+            roles: _generateRolesConfiguration(expectedSeniorTrancheAddress, expectedJuniorTrancheAddress, expectedKernelAddress, expectedAccountantAddress)
         });
     }
 }
