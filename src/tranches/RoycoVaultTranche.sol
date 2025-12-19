@@ -467,9 +467,9 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
                 : IRoycoKernel(kernel()).jtClaimableRedeemRequest(_requestId, _controller));
     }
 
-    // =============================
+    // ===========================================
     // Royco Tranche Vault Cancellation Functions
-    // =============================
+    // ===========================================
 
     /// @inheritdoc IRoycoAsyncCancellableVault
     /// @dev Will revert if this tranche does not employ an asynchronous withdrawal flow

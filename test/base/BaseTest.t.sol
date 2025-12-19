@@ -237,6 +237,8 @@ abstract contract BaseTest is Test, RoycoRoles, Assertions {
         for (uint256 i = 0; i < _providers.length; i++) {
             FACTORY.grantRole(RoycoRoles.DEPOSIT_ROLE, _providers[i], 0);
             FACTORY.grantRole(RoycoRoles.REDEEM_ROLE, _providers[i], 0);
+            FACTORY.grantRole(RoycoRoles.CANCEL_DEPOSIT_ROLE, _providers[i], 0);
+            FACTORY.grantRole(RoycoRoles.CANCEL_REDEEM_ROLE, _providers[i], 0);
         }
     }
 

@@ -495,4 +495,119 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         // Verify that the claimable redeem request is equal to 0
         assertEq(JT.claimableRedeemRequest(ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, jtDepositor), 0, "Claimable redeem request should be 0");
     }
+
+    function testFuzz_jtDeposit_and_requestWithdraw_thenCancelWithdrawal(uint256 _jtAssets, uint256 _withdrawalPercentage) external {
+        // Bound assets to reasonable range (avoid zero and very large amounts)
+        _jtAssets = bound(_jtAssets, 1e6, 1_000_000e6); // Between 1 USDC and 1M USDC (6 decimals)
+        _withdrawalPercentage = bound(_withdrawalPercentage, 1, 100); // Between 1% and 100%
+
+        TRANCHE_UNIT jtAssets = toTrancheUnits(_jtAssets);
+
+        // Deposit assets into the junior tranche
+        address jtDepositor = ALICE_ADDRESS;
+        uint256 initialDepositorShares = JT.balanceOf(jtDepositor);
+        vm.startPrank(jtDepositor);
+        USDC.approve(address(JT), _jtAssets);
+        uint256 shares = JT.deposit(jtAssets, jtDepositor, jtDepositor);
+        vm.stopPrank();
+
+        _updateOnDeposit(jtState, jtAssets, _toJTValue(jtAssets), shares, TrancheType.JUNIOR);
+        _verifyPreviewNAVs(stState, jtState, AAVE_MAX_ABS_TRANCH_UNIT_DELTA, AAVE_MAX_ABS_NAV_DELTA);
+
+        // Calculate shares to withdraw based on percentage
+        uint256 sharesToWithdraw = shares * _withdrawalPercentage / 100;
+        // Ensure at least 1 share is withdrawn
+        if (sharesToWithdraw == 0) {
+            sharesToWithdraw = 1;
+        }
+        // Ensure we don't withdraw more than available
+        if (sharesToWithdraw > shares) {
+            sharesToWithdraw = shares;
+        }
+
+        uint256 initialTotalShares = JT.totalSupply();
+
+        // Verify initial state: depositor has the shares
+        assertEq(JT.balanceOf(jtDepositor), initialDepositorShares + shares, "Depositor should have all shares initially");
+
+        // Request the redeem
+        vm.prank(jtDepositor);
+        assertEq(
+            JT.requestRedeem(sharesToWithdraw, jtDepositor, jtDepositor),
+            ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID,
+            "Request ID should be the ERC-7540 controller discriminated request ID"
+        );
+
+        // Verify that shares were locked (transferred to the tranche contract) since JT uses BURN_ON_CLAIM_REDEEM
+        assertEq(JT.balanceOf(jtDepositor), initialDepositorShares + shares - sharesToWithdraw, "Depositor should have shares reduced by withdrawal amount");
+        assertEq(JT.balanceOf(address(JT)), sharesToWithdraw, "Tranche should have locked shares");
+
+        // Verify that the pending redeem request is equal to the shares to withdraw
+        assertEq(
+            JT.pendingRedeemRequest(ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, jtDepositor),
+            sharesToWithdraw,
+            "Pending redeem request should be equal to the shares to withdraw"
+        );
+
+        // Verify that the claimable redeem request is 0 (not yet claimable)
+        assertEq(JT.claimableRedeemRequest(ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, jtDepositor), 0, "Claimable redeem request should be 0 initially");
+
+        // Verify that cancel is not yet claimable
+        assertEq(
+            JT.claimableCancelRedeemRequest(ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, jtDepositor), 0, "Claimable cancel should be 0 before cancellation"
+        );
+
+        // Cancel the withdrawal request
+        vm.prank(jtDepositor);
+        JT.cancelRedeemRequest(ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, jtDepositor);
+
+        // Verify that the pending redeem request is 0 after cancellation (cancellation is instant)
+        assertEq(JT.pendingRedeemRequest(ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, jtDepositor), 0, "Pending redeem request should be 0 after cancellation");
+
+        // Verify that claimable cancel redeem request returns the shares
+        assertEq(
+            JT.claimableCancelRedeemRequest(ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, jtDepositor),
+            sharesToWithdraw,
+            "Claimable cancel redeem request should return the shares to withdraw"
+        );
+
+        // Verify that pending cancel is false (cancellation is instant)
+        assertFalse(
+            JT.pendingCancelRedeemRequest(ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, jtDepositor), "Pending cancel should be false (cancellation is instant)"
+        );
+
+        // Claim the cancelled withdrawal to get shares back
+        uint256 depositorSharesBeforeClaim = JT.balanceOf(jtDepositor);
+        vm.prank(jtDepositor);
+        JT.claimCancelRedeemRequest(ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, jtDepositor, jtDepositor);
+
+        // Verify that shares were returned to the depositor (transferred back from the tranche)
+        assertEq(JT.balanceOf(jtDepositor), depositorSharesBeforeClaim + sharesToWithdraw, "Depositor should receive shares back after claiming cancellation");
+        assertEq(JT.balanceOf(address(JT)), 0, "Tranche should have no locked shares after claiming cancellation");
+
+        // Verify that the final balance matches the initial balance (all shares returned)
+        assertEq(JT.balanceOf(jtDepositor), initialDepositorShares + shares, "Depositor should have all original shares back");
+
+        // Verify that claimable cancel redeem request is now 0
+        assertEq(
+            JT.claimableCancelRedeemRequest(ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, jtDepositor),
+            0,
+            "Claimable cancel redeem request should be 0 after claiming"
+        );
+
+        // Verify that pending redeem request is 0
+        assertEq(
+            JT.pendingRedeemRequest(ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, jtDepositor),
+            0,
+            "Pending redeem request should be 0 after cancellation and claim"
+        );
+
+        // Verify that claimable redeem request is 0
+        assertEq(
+            JT.claimableRedeemRequest(ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, jtDepositor), 0, "Claimable redeem request should be 0 after cancellation"
+        );
+
+        // Verify that total shares is the same as the initial total shares
+        assertEq(JT.totalSupply(), initialTotalShares, "Total shares should be the same as the initial total shares");
+    }
 }

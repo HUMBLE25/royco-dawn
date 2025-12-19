@@ -35,4 +35,4 @@ sort_imports = true
 exclude_lints = ["mixed-case-function", "mixed-case-variable"]
 
 [fuzz]
-runs = 100
+runs = 200
