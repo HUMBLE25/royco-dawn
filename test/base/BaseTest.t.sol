@@ -102,7 +102,7 @@ abstract contract BaseTest is Test, RoycoRoles, Assertions {
     string internal JUNIOR_TRANCH_SYMBOL = "RJT";
     uint64 internal COVERAGE_WAD = 0.2e18; // 20% coverage
     uint96 internal BETA_WAD = 0; // Different opportunities
-    uint64 internal PROTOCOL_FEE_WAD = 0.01e18; // 1% protocol fee
+    uint64 internal PROTOCOL_FEE_WAD = 0.1e18; // 10% protocol fee
 
     /// -----------------------------------------
     /// Mainnet Fork Addresses

@@ -6,9 +6,8 @@ import { IRDM } from "../interfaces/IRDM.sol";
 import { IRoycoAccountant, Operation } from "../interfaces/IRoycoAccountant.sol";
 import { MAX_PROTOCOL_FEE_WAD, MIN_COVERAGE_WAD, WAD, ZERO_NAV_UNITS } from "../libraries/Constants.sol";
 import { NAV_UNIT, SyncedAccountingState } from "../libraries/Types.sol";
-import { UnitsMathLib, toNAVUnits } from "../libraries/Units.sol";
+import { UnitsMathLib, toNAVUnits, toUint256 } from "../libraries/Units.sol";
 import { Math, UtilsLib } from "../libraries/UtilsLib.sol";
-import { toUint256 } from "../libraries/UtilsLib.sol";
 
 //........................................................................................................................................................................................................
 //........................................................................................................................................................................................................
