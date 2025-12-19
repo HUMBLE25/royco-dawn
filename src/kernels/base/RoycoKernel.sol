@@ -10,6 +10,7 @@ import { AssetClaims, SyncedAccountingState, TrancheType } from "../../libraries
 import { Math, NAV_UNIT, TRANCHE_UNIT, UnitsMathLib } from "../../libraries/Units.sol";
 import { UtilsLib } from "../../libraries/UtilsLib.sol";
 import { IRoycoAccountant, Operation } from "./../../interfaces/IRoycoAccountant.sol";
+import { console2 } from "forge-std/console2.sol";
 
 /**
  * @title RoycoKernel
@@ -616,7 +617,9 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
      */
     function _postOpSyncTrancheAccounting(Operation _op) internal virtual returns (SyncedAccountingState memory state) {
         // Execute the post-op sync on the accountant
+        console2.log("before post-op sync");
         state = _accountant().postOpSyncTrancheAccounting(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV(), _op);
+        console2.log("after post-op sync");
     }
 
     /**

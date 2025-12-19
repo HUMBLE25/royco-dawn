@@ -614,4 +614,127 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         // Verify that total shares is the same as the initial total shares
         assertEq(JT.totalSupply(), initialTotalShares, "Total shares should be the same as the initial total shares");
     }
+
+    function testFuzz_jtDeposit_allowsSTDeposit_thenSTRedeem_allowsJTExit_verifyVaultEmpty(uint256 _jtAssets, uint256 _stDepositPercentage) external {
+        // TODO: Improve this test by exactly accouning for the JT appreciation
+
+        // Bound assets to reasonable range (avoid zero and very large amounts)
+        _jtAssets = bound(_jtAssets, 1e6, 1_000_000e6); // Between 1 USDC and 1M USDC (6 decimals)
+        _stDepositPercentage = bound(_stDepositPercentage, 1, 100); // Between 1% and 100%
+
+        TRANCHE_UNIT jtAssets = toTrancheUnits(_jtAssets);
+
+        address jtDepositor = ALICE_ADDRESS;
+        address stDepositor = BOB_ADDRESS;
+
+        // Step 1: JT deposits (provides coverage for ST)
+        vm.startPrank(jtDepositor);
+        USDC.approve(address(JT), _jtAssets);
+        uint256 jtShares = JT.deposit(jtAssets, jtDepositor, jtDepositor);
+        vm.stopPrank();
+
+        _updateOnDeposit(jtState, jtAssets, _toJTValue(jtAssets), jtShares, TrancheType.JUNIOR);
+        _verifyPreviewNAVs(stState, jtState, AAVE_MAX_ABS_TRANCH_UNIT_DELTA, AAVE_MAX_ABS_NAV_DELTA);
+
+        // Verify JT can exit initially (no ST deposits yet, so no coverage requirement)
+        {
+            uint256 initialJTMaxRedeem = JT.maxRedeem(jtDepositor);
+            assertEq(initialJTMaxRedeem, jtShares, "JT should be able to redeem all shares initially (no ST deposits)");
+        }
+
+        // Step 2: ST deposits (uses coverage, JT cannot exit now)
+        TRANCHE_UNIT expectedMaxSTDeposit = ST.maxDeposit(stDepositor);
+        TRANCHE_UNIT stDepositAmount = expectedMaxSTDeposit.mulDiv(_stDepositPercentage, 100, Math.Rounding.Floor);
+
+        // Ensure at least some deposit
+        if (stDepositAmount == ZERO_TRANCHE_UNITS) {
+            stDepositAmount = toTrancheUnits(1);
+        }
+
+        vm.startPrank(stDepositor);
+        USDC.approve(address(ST), toUint256(stDepositAmount));
+        uint256 stShares = ST.deposit(stDepositAmount, stDepositor, stDepositor);
+        vm.stopPrank();
+
+        _updateOnDeposit(stState, stDepositAmount, _toSTValue(stDepositAmount), stShares, TrancheType.SENIOR);
+        _verifyPreviewNAVs(stState, jtState, AAVE_MAX_ABS_TRANCH_UNIT_DELTA, AAVE_MAX_ABS_NAV_DELTA);
+
+        // Verify JT cannot exit now (coverage requirement blocks it)
+        {
+            uint256 jtMaxRedeemAfterSTDeposit = JT.maxRedeem(jtDepositor);
+            assertLt(jtMaxRedeemAfterSTDeposit, jtShares, "JT should not be able to redeem all shares after ST deposit");
+
+            uint256 snapshot = vm.snapshotState();
+
+            vm.startPrank(jtDepositor);
+            JT.requestRedeem(jtShares, jtDepositor, jtDepositor);
+            vm.warp(vm.getBlockTimestamp() + JT_REDEMPTION_DELAY_SECONDS);
+            vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.COVERAGE_REQUIREMENT_UNSATISFIED.selector));
+            JT.redeem(jtShares, jtDepositor, jtDepositor);
+            vm.stopPrank();
+
+            vm.revertToState(snapshot);
+        }
+
+        // Step 3: ST redeems synchronously (immediately withdraws)
+        uint256 stDepositorBalanceBeforeRedeem = USDC.balanceOf(stDepositor);
+        vm.startPrank(stDepositor);
+        ST.redeem(stShares, stDepositor, stDepositor);
+        vm.stopPrank();
+
+        // Verify ST received assets
+        assertApproxEqAbs(
+            toTrancheUnits(USDC.balanceOf(stDepositor) - stDepositorBalanceBeforeRedeem),
+            stDepositAmount,
+            toTrancheUnits(1),
+            "ST should receive assets after redeem"
+        );
+
+        // Verify ST shares were burned
+        assertEq(ST.balanceOf(stDepositor), 0, "ST shares should be burned after redeem");
+        assertEq(ST.totalSupply(), 0, "ST total supply should be 0 after redeem");
+
+        // Step 4: After ST redeems, JT can now exit (coverage requirement satisfied again)
+        uint256 jtMaxRedeemAfterSTRedeem = JT.maxRedeem(jtDepositor);
+        assertApproxEqRel(jtMaxRedeemAfterSTRedeem, jtShares, MAX_REDEEM_RELATIVE_DELTA, "JT should be able to redeem all shares after ST redeems");
+
+        // Step 5: JT requests withdrawal (async), waits for delay, then redeems
+        vm.prank(jtDepositor);
+        assertEq(
+            JT.requestRedeem(jtMaxRedeemAfterSTRedeem, jtDepositor, jtDepositor),
+            ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID,
+            "Request ID should be the ERC-7540 controller discriminated request ID"
+        );
+
+        // Wait for the redemption delay
+        vm.warp(vm.getBlockTimestamp() + JT_REDEMPTION_DELAY_SECONDS);
+
+        // Verify the request is claimable
+        assertEq(
+            JT.claimableRedeemRequest(ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, jtDepositor),
+            jtMaxRedeemAfterSTRedeem,
+            "JT redeem request should be claimable after delay"
+        );
+
+        // Claim the redeem
+        uint256 jtDepositorBalanceBeforeRedeem = USDC.balanceOf(jtDepositor);
+        vm.prank(jtDepositor);
+        AssetClaims memory jtRedeemResult = JT.redeem(jtMaxRedeemAfterSTRedeem, jtDepositor, jtDepositor);
+
+        // Verify JT received assets
+        assertApproxEqRel(
+            toTrancheUnits(USDC.balanceOf(jtDepositor) - jtDepositorBalanceBeforeRedeem),
+            jtAssets,
+            MAX_REDEEM_RELATIVE_DELTA,
+            "JT should receive assets after redeem"
+        );
+
+        // Check that no assets remain in the underlying ST vault
+        assertApproxEqAbs(
+            USDC.balanceOf(address(MOCK_UNDERLYING_ST_VAULT)),
+            0,
+            toUint256(AAVE_MAX_ABS_TRANCH_UNIT_DELTA),
+            "Underlying ST vault should have no USDC assets remaining"
+        );
+    }
 }
