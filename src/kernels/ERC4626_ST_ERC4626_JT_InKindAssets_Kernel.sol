@@ -12,6 +12,7 @@ import { ERC4626_ST_Kernel } from "./base/senior/ERC4626_ST_Kernel.sol";
  * @notice The senior and junior tranches are deployed into a ERC4626 compliant vault
  * @notice The two tranches can be deployed into the same ERC4626 compliant vault
  * @notice The tranche assets are identical in value and can have differing precisions (eg. USDC and USDS, USDT and USDE, etc.)
+ * @notice NAV units are always expressed in tranche units scaled to WAD (18 decimals) precision
  */
 contract ERC4626_ST_ERC4626_JT_InKindAssets_Kernel is ERC4626_ST_Kernel, ERC4626_JT_Kernel, InKindAssetsQuoter {
     /**

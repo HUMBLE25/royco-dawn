@@ -11,6 +11,7 @@ import { ERC4626_ST_Kernel } from "./base/senior/ERC4626_ST_Kernel.sol";
  * @title ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel
  * @notice The senior tranche is deployed into a ERC4626 compliant vault and the junior tranche is deployed into Aave V3
  * @notice The tranche assets are identical in value and precision (eg. USDC for both tranches, USDC and USDT, etc.)
+ * @notice Tranche and NAV units are always expressed in the tranche asset's precision
  */
 contract ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel is ERC4626_ST_Kernel, AaveV3_JT_Kernel, IdenticalAssetsQuoter {
     /**

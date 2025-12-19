@@ -9,7 +9,7 @@ import { RoycoKernel } from "../RoycoKernel.sol";
 
 /**
  * @title InKindAssetsQuoter
- * @notice Quoter for markets where both tranches use the different unit precision and the NAV is expressed in tranche units with normalized precision
+ * @notice Quoter for markets where both tranches use the different unit precision and the NAV is expressed in tranche units with WAD (18 decimals) precision
  * @dev Supported use-cases include:
  *      - ST and JT use in kind assets that have different precisions
  *        For example, USDC and USDS (USD pegged assets with 6 and 18 decimals of precision respectively)
