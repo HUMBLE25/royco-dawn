@@ -16,7 +16,7 @@ abstract contract AaveV3_JT_Kernel is RoycoKernel {
 
     /// @dev Storage slot for AaveV3_JT_KernelState using ERC-7201 pattern
     // keccak256(abi.encode(uint256(keccak256("Royco.storage.AaveV3_JT_KernelState")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant AAVE_V3_JT_KERNEL_STORAGE_SLOT = 0x020a998929d5f52fd2ab88c68a53f71f586f1008b18ca7e45b22d0acddbf3e00;
+    bytes32 private constant AAVE_V3_JT_KERNEL_STORAGE_SLOT = 0xbd2cea01170a8a3a63be09b675f1b67e378a959a79f759c2a857613313f76400;
 
     /// @inheritdoc IRoycoKernel
     ExecutionModel public constant JT_DEPOSIT_EXECUTION_MODEL = ExecutionModel.SYNC;

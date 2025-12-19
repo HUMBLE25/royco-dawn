@@ -40,6 +40,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         assertEq(address(ST.asset()), ETHEREUM_MAINNET_USDC_ADDRESS, "ST asset should be USDC");
         assertEq(ST.name(), SENIOR_TRANCH_NAME, "ST name mismatch");
         assertEq(ST.symbol(), SENIOR_TRANCH_SYMBOL, "ST symbol mismatch");
+        assertTrue(ST.TRANCHE_TYPE() == TrancheType.SENIOR, "ST tranche type mismatch");
 
         // Initial NAV and totals
         assertEq(ST.totalSupply(), 0, "ST initial totalSupply should be 0");
@@ -56,6 +57,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         // Kernel wiring
         assertEq(JT.kernel(), address(KERNEL), "JT KERNEL address mismatch");
         assertEq(JT.marketId(), MARKET_ID, "JT MARKET_ID mismatch");
+        assertTrue(JT.TRANCHE_TYPE() == TrancheType.JUNIOR, "JT tranche type mismatch");
 
         // Asset and metadata
         assertEq(address(JT.asset()), ETHEREUM_MAINNET_USDC_ADDRESS, "JT asset should be USDC");
