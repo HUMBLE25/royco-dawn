@@ -3,6 +3,9 @@ pragma solidity ^0.8.28;
 
 import { IRoycoVaultTranche } from "../interfaces/tranche/IRoycoVaultTranche.sol";
 import { RoycoKernelInitParams } from "../libraries/RoycoKernelStorageLib.sol";
+import { Math, NAV_UNIT, TRANCHE_UNIT, UnitsMathLib } from "../libraries/Units.sol";
+import { ERC4626KernelState, ERC4626KernelStorageLib } from "../libraries/kernels/ERC4626KernelStorageLib.sol";
+import { AssetClaims, IRoycoKernel, RoycoKernel, TrancheType } from "./base/RoycoKernel.sol";
 import { ERC4626_JT_Kernel } from "./base/junior/ERC4626_JT_Kernel.sol";
 import { IdenticalAssetsQuoter } from "./base/quoter/IdenticalAssetsQuoter.sol";
 import { ERC4626_ST_Kernel } from "./base/senior/ERC4626_ST_Kernel.sol";
@@ -15,6 +18,8 @@ import { ERC4626_ST_Kernel } from "./base/senior/ERC4626_ST_Kernel.sol";
  * @notice Tranche and NAV units are always expressed in the tranche asset's precision
  */
 contract ERC4626_ST_ERC4626_JT_IdenticalAssets_Kernel is ERC4626_ST_Kernel, ERC4626_JT_Kernel, IdenticalAssetsQuoter {
+    using UnitsMathLib for TRANCHE_UNIT;
+
     /**
      * @notice Initializes the Royco Kernel
      * @param _stVault The ERC4626 compliant vault that the senior tranche will deploy into
@@ -33,5 +38,30 @@ contract ERC4626_ST_ERC4626_JT_IdenticalAssets_Kernel is ERC4626_ST_Kernel, ERC4
         __ERC4626_JT_Kernel_init_unchained(_jtVault, jtAsset);
         // Initialize the identical assets quoter
         __IdenticalAssetsQuoter_init_unchained(stAsset, jtAsset);
+    }
+
+    /// @inheritdoc IRoycoKernel
+    /// @dev Override this function to prevent double counting of max withdrawable assets when both tranches deploy into the same ERC4626 vault
+    function stMaxWithdrawable(address _owner)
+        public
+        view
+        override(RoycoKernel)
+        returns (NAV_UNIT claimOnStNAV, NAV_UNIT claimOnJtNAV, NAV_UNIT stMaxWithdrawableNAV, NAV_UNIT jtMaxWithdrawableNAV)
+    {
+        ERC4626KernelState storage $ = ERC4626KernelStorageLib._getERC4626KernelStorage();
+        // If both tranches are in the same ERC4626 vault, double counting is not possible
+        if ($.stVault != $.jtVault) return super.stMaxWithdrawable(_owner);
+
+        // Get the total claims the senior tranche has on each tranche's assets
+        (, AssetClaims memory stNotionalClaims,) = previewSyncTrancheAccounting(TrancheType.SENIOR);
+        claimOnStNAV = stConvertTrancheUnitsToNAVUnits(stNotionalClaims.stAssets);
+        claimOnJtNAV = jtConvertTrancheUnitsToNAVUnits(stNotionalClaims.jtAssets);
+
+        // Get the maximum withdrawable assets for both tranches combined
+        // Scale the max withdrawable assets by the percentage claims ST has on each tranche
+        TRANCHE_UNIT totalMaxWithdrawableAssets = _stMaxWithdrawableGlobally(_owner);
+        NAV_UNIT totalClaimsNAV = stNotionalClaims.nav;
+        stMaxWithdrawableNAV = stConvertTrancheUnitsToNAVUnits(totalMaxWithdrawableAssets.mulDiv(claimOnStNAV, totalClaimsNAV, Math.Rounding.Floor));
+        jtMaxWithdrawableNAV = jtConvertTrancheUnitsToNAVUnits(totalMaxWithdrawableAssets.mulDiv(claimOnJtNAV, totalClaimsNAV, Math.Rounding.Floor));
     }
 }

@@ -125,15 +125,16 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     // =============================
 
     /// @inheritdoc IRoycoKernel
-    function stMaxDeposit(address _receiver) external view override(IRoycoKernel) returns (TRANCHE_UNIT) {
+    function stMaxDeposit(address _receiver) public view virtual override(IRoycoKernel) returns (TRANCHE_UNIT) {
         NAV_UNIT stMaxDepositableNAV = _accountant().maxSTDepositGivenCoverage(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV());
         return UnitsMathLib.min(_stMaxDepositGlobally(_receiver), stConvertNAVUnitsToTrancheUnits(stMaxDepositableNAV));
     }
 
     /// @inheritdoc IRoycoKernel
     function stMaxWithdrawable(address _owner)
-        external
+        public
         view
+        virtual
         override(IRoycoKernel)
         returns (NAV_UNIT claimOnStNAV, NAV_UNIT claimOnJtNAV, NAV_UNIT stMaxWithdrawableNAV, NAV_UNIT jtMaxWithdrawableNAV)
     {
@@ -148,14 +149,15 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     }
 
     /// @inheritdoc IRoycoKernel
-    function jtMaxDeposit(address _receiver) external view override(IRoycoKernel) returns (TRANCHE_UNIT) {
+    function jtMaxDeposit(address _receiver) public view virtual override(IRoycoKernel) returns (TRANCHE_UNIT) {
         return _jtMaxDepositGlobally(_receiver);
     }
 
     /// @inheritdoc IRoycoKernel
     function jtMaxWithdrawable(address _owner)
-        external
+        public
         view
+        virtual
         override(IRoycoKernel)
         returns (NAV_UNIT claimOnStNAV, NAV_UNIT claimOnJtNAV, NAV_UNIT stMaxWithdrawableNAV, NAV_UNIT jtMaxWithdrawableNAV)
     {
@@ -184,7 +186,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     // =============================
 
     /// @inheritdoc IRoycoKernel
-    function syncTrancheAccounting() external override(IRoycoKernel) whenNotPaused restricted returns (SyncedAccountingState memory state) {
+    function syncTrancheAccounting() public virtual override(IRoycoKernel) whenNotPaused restricted returns (SyncedAccountingState memory state) {
         // Execute a pre-op accounting sync via the accountant
         return _preOpSyncTrancheAccounting();
     }
@@ -193,6 +195,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     function previewSyncTrancheAccounting(TrancheType _trancheType)
         public
         view
+        virtual
         override(IRoycoKernel)
         returns (SyncedAccountingState memory state, AssetClaims memory claims, uint256 totalTrancheShares)
     {
@@ -225,7 +228,8 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         address,
         address
     )
-        external
+        public
+        virtual
         override(IRoycoKernel)
         whenNotPaused
         onlySeniorTranche
@@ -249,7 +253,8 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         address,
         address _receiver
     )
-        external
+        public
+        virtual
         override(IRoycoKernel)
         whenNotPaused
         onlySeniorTranche
@@ -280,7 +285,8 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         address,
         address
     )
-        external
+        public
+        virtual
         override(IRoycoKernel)
         whenNotPaused
         onlyJuniorTranche
@@ -299,7 +305,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     }
 
     /// @inheritdoc IRoycoKernel
-    function jtPreviewRedeem(uint256) external view virtual override returns (AssetClaims memory) {
+    function jtPreviewRedeem(uint256) public view override returns (AssetClaims memory) {
         revert PREVIEW_REDEEM_DISABLED_FOR_ASYNC_REDEMPTION();
     }
 
@@ -309,7 +315,8 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         uint256 _shares,
         address _controller
     )
-        external
+        public
+        virtual
         override(IRoycoKernel)
         whenNotPaused
         onlyJuniorTranche
@@ -342,8 +349,9 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         uint256 _requestId,
         address _controller
     )
-        external
+        public
         view
+        virtual
         override(IRoycoKernel)
         checkJTRedemptionRequestId(_requestId)
         returns (uint256 pendingShares)
@@ -360,8 +368,9 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         uint256 _requestId,
         address _controller
     )
-        external
+        public
         view
+        virtual
         override(IRoycoKernel)
         checkJTRedemptionRequestId(_requestId)
         returns (uint256 claimableShares)
@@ -376,7 +385,8 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         uint256 _requestId,
         address _controller
     )
-        external
+        public
+        virtual
         override(IRoycoKernel)
         whenNotPaused
         onlyJuniorTranche
@@ -396,8 +406,9 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         uint256 _requestId,
         address
     )
-        external
+        public
         pure
+        virtual
         override(IRoycoKernel)
         checkJTRedemptionRequestId(_requestId)
         returns (bool isPending)
@@ -411,8 +422,9 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         uint256 _requestId,
         address _controller
     )
-        external
+        public
         view
+        virtual
         override(IRoycoKernel)
         checkJTRedemptionRequestId(_requestId)
         returns (uint256 shares)
@@ -429,7 +441,8 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         uint256 _requestId,
         address _controller
     )
-        external
+        public
+        virtual
         override(IRoycoKernel)
         whenNotPaused
         onlyJuniorTranche
@@ -452,7 +465,8 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         address _controller,
         address _receiver
     )
-        external
+        public
+        virtual
         override(IRoycoKernel)
         whenNotPaused
         onlyJuniorTranche
@@ -522,7 +536,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
      * @notice Previews an accounting sync via the accountant
      * @return state The synced NAV, debt, and fee accounting containing all mark to market accounting data
      */
-    function _previewSyncTrancheAccounting() internal view returns (SyncedAccountingState memory state) {
+    function _previewSyncTrancheAccounting() internal view virtual returns (SyncedAccountingState memory state) {
         // Preview an accounting sync via the accountant
         state = _accountant().previewSyncTrancheAccounting(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV());
     }
@@ -538,6 +552,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
      */
     function _preOpSyncTrancheAccounting(TrancheType _trancheType)
         internal
+        virtual
         returns (SyncedAccountingState memory state, AssetClaims memory claims, uint256 totalTrancheShares)
     {
         // Execute the pre-op sync via the accountant
@@ -575,7 +590,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
      * @dev Should be called on every NAV mutating user operation
      * @return state The synced NAV, debt, and fee accounting containing all mark to market accounting data
      */
-    function _preOpSyncTrancheAccounting() internal returns (SyncedAccountingState memory state) {
+    function _preOpSyncTrancheAccounting() internal virtual returns (SyncedAccountingState memory state) {
         // Execute the pre-op sync via the accountant
         state = _accountant().preOpSyncTrancheAccounting(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV());
 
@@ -600,7 +615,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
      * @param _op The operation being executed in between the pre and post synchronizations
      * @return state The synced NAV, debt, and fee accounting containing all mark to market accounting data
      */
-    function _postOpSyncTrancheAccounting(Operation _op) internal returns (SyncedAccountingState memory state) {
+    function _postOpSyncTrancheAccounting(Operation _op) internal virtual returns (SyncedAccountingState memory state) {
         // Execute the post-op sync on the accountant
         state = _accountant().postOpSyncTrancheAccounting(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV(), _op);
     }
@@ -611,7 +626,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
      * @param _op The operation being executed in between the pre and post synchronizations
      * @return state The synced NAV, debt, and fee accounting containing all mark to market accounting data
      */
-    function _postOpSyncTrancheAccountingAndEnforceCoverage(Operation _op) internal returns (SyncedAccountingState memory state) {
+    function _postOpSyncTrancheAccountingAndEnforceCoverage(Operation _op) internal virtual returns (SyncedAccountingState memory state) {
         // Execute the post-op sync on the accountant
         return _accountant().postOpSyncTrancheAccountingAndEnforceCoverage(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV(), _op);
     }
@@ -627,6 +642,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     function _decomposeNAVClaims(SyncedAccountingState memory _state)
         internal
         pure
+        virtual
         returns (NAV_UNIT stNAVClaimOnSelf, NAV_UNIT stNAVClaimOnJT, NAV_UNIT jtNAVClaimOnSelf, NAV_UNIT jtNAVClaimOnST)
     {
         // Cross-tranche claims (only one direction should be non-zero under conservation)
@@ -660,6 +676,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     )
         internal
         view
+        virtual
         returns (AssetClaims memory claims)
     {
         if (_trancheType == TrancheType.SENIOR) {
@@ -682,7 +699,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
      * @param _claims The ST and JT assets to withdraw and transfer to the specified receiver
      * @param _receiver The receiver of the tranche asset claims
      */
-    function _withdrawAssets(AssetClaims memory _claims, address _receiver) internal {
+    function _withdrawAssets(AssetClaims memory _claims, address _receiver) internal virtual {
         TRANCHE_UNIT stAssetsToClaim = _claims.stAssets;
         TRANCHE_UNIT jtAssetsToClaim = _claims.jtAssets;
         // Withdraw the ST and JT assets if non-zero
@@ -712,7 +729,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
      * @param _request The redemption request to get redeemable shares for
      * @return claimableShares The amount of JT shares currently redeemable from the specified redemption request
      */
-    function _getRedeemableSharesForRequest(RedemptionRequest storage _request) internal view returns (uint256 claimableShares) {
+    function _getRedeemableSharesForRequest(RedemptionRequest storage _request) internal view virtual returns (uint256 claimableShares) {
         // If the request is canceled or not claimable, no shares are claimable
         if (_request.isCanceled || _request.claimableAtTimestamp < block.timestamp) return 0;
         // Return the shares in the request
