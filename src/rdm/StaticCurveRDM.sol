@@ -64,7 +64,7 @@ contract StaticCurveRDM is IRDM {
         return _computeJTYieldShare(_stRawNAV, _jtRawNAV, _betaWAD, _coverageWAD, _jtEffectiveNAV);
     }
 
-    /// @dev Pure helper to compute the instantaneous JT yield share based on the static curve's output
+    /// @dev Pure helper to compute the instantaneous JT yield share based on the defined static curve
     function _computeJTYieldShare(
         NAV_UNIT _stRawNAV,
         NAV_UNIT _jtRawNAV,

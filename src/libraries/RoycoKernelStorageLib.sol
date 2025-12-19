@@ -32,7 +32,7 @@ struct RoycoKernelInitParams {
  * @custom:field protocolFeeRecipient - The market's configured protocol fee recipient
  * @custom:field accountant - The address of the Royco accountant used to perform per operation accounting for this kernel
  * @custom:field jtRedemptionDelayInSeconds - The redemption delay in seconds that a JT LP has to wait between requesting and executing a redemption
- * @custom:field jtControllerToRedemptionRequest - A mapping between a  controller and their redemption request state for the junior tranche
+ * @custom:field jtControllerToRedemptionRequest - A mapping between a controller and their redemption request state for the junior tranche
  */
 struct RoycoKernelState {
     address seniorTranche;
@@ -66,16 +66,7 @@ library RoycoKernelStorageLib {
     // keccak256(abi.encode(uint256(keccak256("Royco.storage.RoycoKernelState")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant BASE_KERNEL_STORAGE_SLOT = 0xf8fc0d016168fef0a165a086b5a5dc3ffa533689ceaf1369717758ae5224c600;
 
-    /// @notice Returns a storage pointer to the RoycoKernelState storage
-    /// @dev Uses ERC-7201 storage slot pattern for collision-resistant storage
-    /// @return $ Storage pointer to the kernel's state
-    function _getRoycoKernelStorage() internal pure returns (RoycoKernelState storage $) {
-        assembly ("memory-safe") {
-            $.slot := BASE_KERNEL_STORAGE_SLOT
-        }
-    }
-
-    /// @notice Initializes the kernel state
+    /// @notice Initializes the Royco kernel state
     /// @param _params The initialization parameters for the kernel
     function __RoycoKernel_init(RoycoKernelInitParams memory _params, address _stAsset, address _jtAsset) internal {
         // Set the initial state of the kernel
@@ -87,5 +78,16 @@ library RoycoKernelStorageLib {
         $.protocolFeeRecipient = _params.protocolFeeRecipient;
         $.accountant = _params.accountant;
         $.jtRedemptionDelayInSeconds = _params.jtRedemptionDelayInSeconds;
+    }
+
+    /**
+     * @notice Returns a storage pointer to the RoycoKernelState storage
+     * @dev Uses ERC-7201 storage slot pattern for collision-resistant storage
+     * @return $ Storage pointer to the kernel's state
+     */
+    function _getRoycoKernelStorage() internal pure returns (RoycoKernelState storage $) {
+        assembly ("memory-safe") {
+            $.slot := BASE_KERNEL_STORAGE_SLOT
+        }
     }
 }
