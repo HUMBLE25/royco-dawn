@@ -304,7 +304,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     }
 
     /// @inheritdoc IRoycoKernel
-    function jtPreviewRedeem(uint256) public view override returns (AssetClaims memory) {
+    function jtPreviewRedeem(uint256) public pure override returns (AssetClaims memory) {
         revert PREVIEW_REDEEM_DISABLED_FOR_ASYNC_REDEMPTION();
     }
 

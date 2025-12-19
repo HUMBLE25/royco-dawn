@@ -415,4 +415,84 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
             assertEq(JT.claimableRedeemRequest(ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, jtDepositor), 0, "Claimable redeem request should be 0");
         }
     }
+
+    function testFuzz_jtDeposit_and_parallel_jtWithdrawals(uint256 _jtAssets, uint256 _totalWithdrawalRequests) external {
+        // Bound assets to reasonable range (avoid zero and very large amounts)
+        _totalWithdrawalRequests = bound(_totalWithdrawalRequests, 1, 10);
+        _jtAssets = bound(_jtAssets, 1e6, 1_000_000e6);
+
+        TRANCHE_UNIT jtAssets = toTrancheUnits(_jtAssets);
+
+        // Deposit assets into the junior tranche
+        address jtDepositor = ALICE_ADDRESS;
+        vm.startPrank(jtDepositor);
+        USDC.approve(address(JT), _jtAssets);
+        uint256 shares = JT.deposit(jtAssets, jtDepositor, jtDepositor);
+        vm.stopPrank();
+
+        _updateOnDeposit(jtState, jtAssets, _toJTValue(jtAssets), shares, TrancheType.JUNIOR);
+        _verifyPreviewNAVs(stState, jtState, AAVE_MAX_ABS_TRANCH_UNIT_DELTA, AAVE_MAX_ABS_NAV_DELTA);
+
+        // Withdraw assets from the junior tranche
+        uint256 sharesToWithdraw = shares / _totalWithdrawalRequests;
+        uint256 totalSharesWithdrawn = 0;
+        TRANCHE_UNIT totalExpectedAssetsToWithdraw = ZERO_TRANCHE_UNITS;
+        for (uint256 i = 0; i < _totalWithdrawalRequests; i++) {
+            // Calculate the total expected assets to withdraw
+            uint256 sharesToWithdrawForThisRequest = i == _totalWithdrawalRequests - 1 ? shares - totalSharesWithdrawn : sharesToWithdraw;
+            totalExpectedAssetsToWithdraw = totalExpectedAssetsToWithdraw + JT.convertToAssets(sharesToWithdrawForThisRequest).jtAssets;
+            totalSharesWithdrawn += sharesToWithdrawForThisRequest;
+
+            // Request the redeem
+            vm.prank(jtDepositor);
+            assertEq(
+                JT.requestRedeem(sharesToWithdrawForThisRequest, jtDepositor, jtDepositor),
+                ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID,
+                "Request ID should be the ERC-7540 controller discriminated request ID"
+            );
+
+            // Wait for the redemption delay
+            vm.warp(vm.getBlockTimestamp() + 20);
+        }
+
+        // Wait for the redemption delay
+        vm.warp(vm.getBlockTimestamp() + JT_REDEMPTION_DELAY_SECONDS);
+
+        // Verify that the pending redeem request is equal to 0
+        assertEq(JT.pendingRedeemRequest(ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, jtDepositor), 0, "Pending redeem request should be 0");
+
+        // Verify that the claimable redeem request is equal to the shares to withdraw
+        assertEq(
+            JT.claimableRedeemRequest(ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, jtDepositor),
+            shares,
+            "Claimable redeem request should be equal to the shares to withdraw"
+        );
+
+        uint256 jtDepositorBalanceBeforeRedeem = USDC.balanceOf(jtDepositor);
+
+        // Claim the redeem
+        vm.prank(jtDepositor);
+        AssetClaims memory redeemResult = JT.redeem(shares, jtDepositor, jtDepositor);
+
+        // Verify that the redeem result is the correct amount
+        assertApproxEqAbs(
+            redeemResult.jtAssets, totalExpectedAssetsToWithdraw, toUint256(AAVE_MAX_ABS_TRANCH_UNIT_DELTA), "Redeem result should be the correct amount"
+        );
+        assertEq(redeemResult.stAssets, ZERO_TRANCHE_UNITS, "Redeem result should be 0 ST assets");
+        assertApproxEqAbs(redeemResult.nav, _toJTValue(totalExpectedAssetsToWithdraw), AAVE_MAX_ABS_NAV_DELTA, "Redeem result should return the correct NAV");
+
+        // Verify that the tokens were transferred to the jtDepositor
+        assertApproxEqAbs(
+            toTrancheUnits(USDC.balanceOf(jtDepositor) - jtDepositorBalanceBeforeRedeem),
+            totalExpectedAssetsToWithdraw,
+            toUint256(AAVE_MAX_ABS_TRANCH_UNIT_DELTA),
+            "Tokens should be transferred to the jtDepositor"
+        );
+
+        // Verify that the pending redeem request is equal to 0
+        assertEq(JT.pendingRedeemRequest(ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, jtDepositor), 0, "Pending redeem request should be 0");
+
+        // Verify that the claimable redeem request is equal to 0
+        assertEq(JT.claimableRedeemRequest(ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, jtDepositor), 0, "Claimable redeem request should be 0");
+    }
 }
