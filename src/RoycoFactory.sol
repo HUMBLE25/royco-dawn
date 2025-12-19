@@ -12,10 +12,12 @@ import { IRoycoKernel } from "./interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoVaultTranche } from "./interfaces/tranche/IRoycoVaultTranche.sol";
 import { DeployedContracts, MarketDeploymentParams, RolesConfiguration } from "./libraries/Types.sol";
 
-/// @title RoycoFactory
-/// @notice Factory contract for deploying Royco tranches (ST and JT) and their associated kernel using ERC1967 proxies
-/// @notice The factory also acts as the shared access manager for all the Royco market
-/// @dev This factory deploys upgradeable tranche contracts using the UUPS proxy pattern
+/**
+ * @title RoycoFactory
+ * @notice Factory contract for deploying Royco tranches (ST and JT) and their associated kernel using ERC1967 proxies
+ * @notice The factory also acts as the shared access manager for all the Royco market
+ * @dev This factory deploys upgradeable tranche contracts using the UUPS proxy pattern
+ */
 contract RoycoFactory is AccessManager, RoycoRoles, IRoycoFactory {
     /**
      * @notice Initializes the Royco Factory
@@ -137,9 +139,11 @@ contract RoycoFactory is AccessManager, RoycoRoles, IRoycoFactory {
         require(_params.accountantProxyDeploymentSalt != bytes32(0), INVALID_ACCOUNTANT_PROXY_DEPLOYMENT_SALT());
     }
 
-    /// @notice Configures the roles for the deployed contracts
-    /// @param _deployedContracts The deployed contracts to configure
-    /// @param _roles The roles to configure
+    /**
+     * @notice Configures the roles for the deployed contracts
+     * @param _deployedContracts The deployed contracts to configure
+     * @param _roles The roles to configure
+     */
     function _configureRoles(DeployedContracts memory _deployedContracts, RolesConfiguration[] calldata _roles) internal {
         for (uint256 i = 0; i < _roles.length; ++i) {
             RolesConfiguration calldata role = _roles[i];

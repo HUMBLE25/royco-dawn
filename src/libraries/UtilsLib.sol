@@ -32,6 +32,8 @@ library UtilsLib {
         pure
         returns (uint256 utilization)
     {
+        // If there is no senior capital to protect, utilization is 0
+        if (_stRawNAV == ZERO_NAV_UNITS) return 0;
         // If there is no remaining JT loss-absorption buffer, utilization is effectively infinite
         if (_jtEffectiveNAV == ZERO_NAV_UNITS) return type(uint256).max;
         // Round in favor of ensuring senior tranche protection
