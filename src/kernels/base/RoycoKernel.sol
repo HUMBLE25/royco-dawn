@@ -350,7 +350,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     {
         RedemptionRequest storage request = RoycoKernelStorageLib._getRoycoKernelStorage().jtControllerToRedemptionRequest[_controller];
         // If the redemption is canceled or the request is claimable, no shares are still in a pending state
-        if (request.isCanceled || request.claimableAtTimestamp >= block.timestamp) return 0;
+        if (request.isCanceled || request.claimableAtTimestamp <= block.timestamp) return 0;
         // The shares in the controller's redemption request are still pending
         pendingShares = request.totalJTSharesToRedeem;
     }
@@ -714,7 +714,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
      */
     function _getRedeemableSharesForRequest(RedemptionRequest storage _request) internal view returns (uint256 claimableShares) {
         // If the request is canceled or not claimable, no shares are claimable
-        if (_request.isCanceled || _request.claimableAtTimestamp < block.timestamp) return 0;
+        if (_request.isCanceled || _request.claimableAtTimestamp > block.timestamp) return 0;
         // Return the shares in the request
         claimableShares = _request.totalJTSharesToRedeem;
     }
