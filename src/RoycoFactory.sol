@@ -50,9 +50,11 @@ contract RoycoFactory is AccessManager, RoycoRoles, IRoycoFactory {
         proxy = Create2.computeAddress(_salt, keccak256(abi.encodePacked(type(ERC1967Proxy).creationCode, abi.encode(_implementation, ""))));
     }
 
-    /// @notice Deploys the contracts for a new market
-    /// @param _params The parameters for deploying a new market
-    /// @return deployedContracts The deployed contracts
+    /**
+     * @notice Deploys the contracts for a new market
+     * @param _params The parameters for deploying a new market
+     * @return deployedContracts The deployed contracts
+     */
     function _deployContracts(MarketDeploymentParams calldata _params) internal virtual returns (DeployedContracts memory deployedContracts) {
         // Deploy the kernel, accountant and tranches with empty initialization data
         // It is expected that the kernel initialization data contains the address of the accountant and vice versa
@@ -91,7 +93,7 @@ contract RoycoFactory is AccessManager, RoycoRoles, IRoycoFactory {
         require(success, FAILED_TO_INITIALIZE_KERNEL(data));
     }
 
-    /// @notice Validates the deployment
+    /// @notice Validates the deployments
     /// @param _deployedContracts The deployed contracts to validate
     function _validateDeployment(DeployedContracts memory _deployedContracts) internal view {
         // Check that the access manager is set on the contracts
@@ -159,10 +161,12 @@ contract RoycoFactory is AccessManager, RoycoRoles, IRoycoFactory {
         }
     }
 
-    /// @notice Deploys a tranche using ERC1967 proxy deterministically
-    /// @param _implementation The implementation address
-    /// @param _salt The salt for the deployment
-    /// @return proxy The deployed proxy address
+    /**
+     * @notice Deploys a tranche using ERC1967 proxy deterministically
+     * @param _implementation The implementation address
+     * @param _salt The salt for the deployment
+     *  @return proxy The deployed proxy address
+     */
     function _deployERC1967ProxyDeterministic(address _implementation, bytes32 _salt) internal returns (address proxy) {
         proxy = Create2.deploy(0, _salt, abi.encodePacked(type(ERC1967Proxy).creationCode, abi.encode(_implementation, "")));
     }
