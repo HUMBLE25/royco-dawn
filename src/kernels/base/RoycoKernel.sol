@@ -69,7 +69,6 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
 
     /**
      * @notice Initializes the base kernel state
-     * @dev Checks the initial market's configuration and initializes the base kernel state
      * @param _params The initialization parameters for the base kernel
      * @param _stAsset The address of the asset that ST is denominated in: constitutes the ST's tranche units (type and precision)
      * @param _jtAsset The address of the asset that JT is denominated in: constitutes the JT's tranche units (type and precision)

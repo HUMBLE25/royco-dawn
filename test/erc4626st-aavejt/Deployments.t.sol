@@ -117,7 +117,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         (MarketDeploymentParams memory params,,) = _buildValidMarketParams();
         params.seniorTrancheName = "";
 
-        vm.expectRevert(RoycoFactory.InvalidName.selector);
+        vm.expectRevert(RoycoFactory.INVALID_NAME.selector);
         FACTORY.deployMarket(params);
     }
 
@@ -125,7 +125,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         (MarketDeploymentParams memory params,,) = _buildValidMarketParams();
         params.seniorTrancheSymbol = "";
 
-        vm.expectRevert(RoycoFactory.InvalidSymbol.selector);
+        vm.expectRevert(RoycoFactory.INVALID_SYMBOL.selector);
         FACTORY.deployMarket(params);
     }
 
@@ -133,7 +133,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         (MarketDeploymentParams memory params,,) = _buildValidMarketParams();
         params.juniorTrancheName = "";
 
-        vm.expectRevert(RoycoFactory.InvalidName.selector);
+        vm.expectRevert(RoycoFactory.INVALID_NAME.selector);
         FACTORY.deployMarket(params);
     }
 
@@ -141,7 +141,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         (MarketDeploymentParams memory params,,) = _buildValidMarketParams();
         params.juniorTrancheSymbol = "";
 
-        vm.expectRevert(RoycoFactory.InvalidSymbol.selector);
+        vm.expectRevert(RoycoFactory.INVALID_SYMBOL.selector);
         FACTORY.deployMarket(params);
     }
 
@@ -149,7 +149,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         (MarketDeploymentParams memory params,,) = _buildValidMarketParams();
         params.seniorAsset = address(0);
 
-        vm.expectRevert(RoycoFactory.InvalidAsset.selector);
+        vm.expectRevert(RoycoFactory.INVALID_ASSET.selector);
         FACTORY.deployMarket(params);
     }
 
@@ -157,7 +157,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         (MarketDeploymentParams memory params,,) = _buildValidMarketParams();
         params.juniorAsset = address(0);
 
-        vm.expectRevert(RoycoFactory.InvalidAsset.selector);
+        vm.expectRevert(RoycoFactory.INVALID_ASSET.selector);
         FACTORY.deployMarket(params);
     }
 
@@ -165,7 +165,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         (MarketDeploymentParams memory params,,) = _buildValidMarketParams();
         params.marketId = bytes32(0);
 
-        vm.expectRevert(RoycoFactory.InvalidMarketId.selector);
+        vm.expectRevert(RoycoFactory.INVALID_MARKET_ID.selector);
         FACTORY.deployMarket(params);
     }
 
@@ -173,7 +173,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         (MarketDeploymentParams memory params,,) = _buildValidMarketParams();
         params.kernelImplementation = IRoycoKernel(address(0));
 
-        vm.expectRevert(RoycoFactory.InvalidKernelImplementation.selector);
+        vm.expectRevert(RoycoFactory.INVALID_KERNEL_IMPLEMENTATION.selector);
         FACTORY.deployMarket(params);
     }
 
@@ -181,7 +181,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         (MarketDeploymentParams memory params,,) = _buildValidMarketParams();
         params.accountantImplementation = IRoycoAccountant(address(0));
 
-        vm.expectRevert(RoycoFactory.InvalidAccountantImplementation.selector);
+        vm.expectRevert(RoycoFactory.INVALID_ACCOUNTANT_IMPLEMENTATION.selector);
         FACTORY.deployMarket(params);
     }
 
@@ -189,7 +189,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         (MarketDeploymentParams memory params,,) = _buildValidMarketParams();
         params.kernelInitializationData = "";
 
-        vm.expectRevert(RoycoFactory.InvalidKernelInitializationData.selector);
+        vm.expectRevert(RoycoFactory.INVALID_KERNEL_INITIALIZATION_DATA.selector);
         FACTORY.deployMarket(params);
     }
 
@@ -197,7 +197,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         (MarketDeploymentParams memory params,,) = _buildValidMarketParams();
         params.accountantInitializationData = "";
 
-        vm.expectRevert(RoycoFactory.InvalidAccountantInitializationData.selector);
+        vm.expectRevert(RoycoFactory.INVALID_ACCOUNTANT_INITIALIZATION_DATA.selector);
         FACTORY.deployMarket(params);
     }
 
@@ -205,7 +205,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         (MarketDeploymentParams memory params,,) = _buildValidMarketParams();
         params.seniorTrancheProxyDeploymentSalt = bytes32(0);
 
-        vm.expectRevert(RoycoFactory.InvalidSeniorTrancheProxyDeploymentSalt.selector);
+        vm.expectRevert(RoycoFactory.INVALID_SENIOR_TRANCHE_PROXY_DEPLOYMENT_SALT.selector);
         FACTORY.deployMarket(params);
     }
 
@@ -213,7 +213,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         (MarketDeploymentParams memory params,,) = _buildValidMarketParams();
         params.juniorTrancheProxyDeploymentSalt = bytes32(0);
 
-        vm.expectRevert(RoycoFactory.InvalidJuniorTrancheProxyDeploymentSalt.selector);
+        vm.expectRevert(RoycoFactory.INVALID_JUNIOR_TRANCHE_PROXY_DEPLOYMENT_SALT.selector);
         FACTORY.deployMarket(params);
     }
 
@@ -221,7 +221,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         (MarketDeploymentParams memory params,,) = _buildValidMarketParams();
         params.kernelProxyDeploymentSalt = bytes32(0);
 
-        vm.expectRevert(RoycoFactory.InvalidKernelProxyDeploymentSalt.selector);
+        vm.expectRevert(RoycoFactory.INVALID_KERNEL_PROXY_DEPLOYMENT_SALT.selector);
         FACTORY.deployMarket(params);
     }
 
@@ -229,7 +229,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         (MarketDeploymentParams memory params,,) = _buildValidMarketParams();
         params.accountantProxyDeploymentSalt = bytes32(0);
 
-        vm.expectRevert(RoycoFactory.InvalidAccountantProxyDeploymentSalt.selector);
+        vm.expectRevert(RoycoFactory.INVALID_ACCOUNTANT_PROXY_DEPLOYMENT_SALT.selector);
         FACTORY.deployMarket(params);
     }
 
@@ -240,7 +240,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         // Provide non-empty but invalid initialization data so the call to the senior tranche fails
         params.seniorTrancheInitializationData = abi.encodeWithSignature("nonExistentFunction(address)", address(this));
 
-        vm.expectRevert(abi.encodeWithSelector(RoycoFactory.FailedToInitializeSeniorTranche.selector, ""));
+        vm.expectRevert(abi.encodeWithSelector(RoycoFactory.FAILED_TO_INITIALIZE_SENIOR_TRANCHE.selector, ""));
         FACTORY.deployMarket(params);
     }
 
@@ -251,7 +251,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         // Provide non-empty but invalid initialization data so the call to the junior tranche fails
         params.juniorTrancheInitializationData = abi.encodeWithSignature("nonExistentFunction(address)", address(this));
 
-        vm.expectRevert(abi.encodeWithSelector(RoycoFactory.FailedToInitializeJuniorTranche.selector, ""));
+        vm.expectRevert(abi.encodeWithSelector(RoycoFactory.FAILED_TO_INITIALIZE_JUNIOR_TRANCHE.selector, ""));
         FACTORY.deployMarket(params);
     }
 
@@ -262,7 +262,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         // Provide invalid (but non-empty) initialization data so the call to the accountant fails
         params.accountantInitializationData = abi.encodeWithSignature("nonExistentFunction(address)", address(this));
 
-        vm.expectRevert(abi.encodeWithSelector(RoycoFactory.FailedToInitializeAccountant.selector, ""));
+        vm.expectRevert(abi.encodeWithSelector(RoycoFactory.FAILED_TO_INITIALIZE_ACCOUNTANT.selector, ""));
         FACTORY.deployMarket(params);
     }
 
@@ -273,7 +273,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         // Provide invalid (but non-empty) initialization data so the call to the kernel fails
         params.kernelInitializationData = abi.encodeWithSignature("nonExistentFunction(address)", address(this));
 
-        vm.expectRevert(abi.encodeWithSelector(RoycoFactory.FailedToInitializeKernel.selector, ""));
+        vm.expectRevert(abi.encodeWithSelector(RoycoFactory.FAILED_TO_INITIALIZE_KERNEL.selector, ""));
         FACTORY.deployMarket(params);
     }
 
@@ -294,7 +294,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
             )
         );
 
-        vm.expectRevert(RoycoFactory.InvalidAccessManager.selector);
+        vm.expectRevert(RoycoFactory.INVALID_ACCESS_MANAGER.selector);
         FACTORY.deployMarket(params);
     }
 
@@ -315,7 +315,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
             )
         );
 
-        vm.expectRevert(RoycoFactory.InvalidAccessManager.selector);
+        vm.expectRevert(RoycoFactory.INVALID_ACCESS_MANAGER.selector);
         FACTORY.deployMarket(params);
     }
 
@@ -344,7 +344,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
             )
         );
 
-        vm.expectRevert(RoycoFactory.InvalidAccessManager.selector);
+        vm.expectRevert(RoycoFactory.INVALID_ACCESS_MANAGER.selector);
         FACTORY.deployMarket(params);
     }
 
@@ -365,7 +365,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
             )
         );
 
-        vm.expectRevert(RoycoFactory.InvalidAccessManager.selector);
+        vm.expectRevert(RoycoFactory.INVALID_ACCESS_MANAGER.selector);
         FACTORY.deployMarket(params);
     }
 
@@ -388,7 +388,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         );
 
         // The deployment should revert due to inconsistent senior tranche kernel wiring
-        vm.expectRevert(RoycoFactory.InvalidKernelOnSeniorTranche.selector);
+        vm.expectRevert(RoycoFactory.INVALID_KERNEL_ON_SENIOR_TRANCHE.selector);
         FACTORY.deployMarket(params);
     }
 
@@ -411,7 +411,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         );
 
         // The deployment should revert due to inconsistent junior tranche kernel wiring
-        vm.expectRevert(RoycoFactory.InvalidKernelOnJuniorTranche.selector);
+        vm.expectRevert(RoycoFactory.INVALID_KERNEL_ON_JUNIOR_TRANCHE.selector);
         FACTORY.deployMarket(params);
     }
 
@@ -439,7 +439,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
             )
         );
 
-        vm.expectRevert(RoycoFactory.InvalidAccountantOnKernel.selector);
+        vm.expectRevert(RoycoFactory.INVALID_ACCOUNTANT_ON_KERNEL.selector);
         FACTORY.deployMarket(params);
     }
 
@@ -462,7 +462,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
             )
         );
 
-        vm.expectRevert(RoycoFactory.InvalidKernelOnAccountant.selector);
+        vm.expectRevert(RoycoFactory.INVALID_KERNEL_ON_ACCOUNTANT.selector);
         FACTORY.deployMarket(params);
     }
 
@@ -487,7 +487,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
 
         params.roles = roles;
 
-        vm.expectRevert(RoycoFactory.RolesConfigurationLengthMismatch.selector);
+        vm.expectRevert(RoycoFactory.ROLES_CONFIGURATION_LENGTH_MISMATCH.selector);
         FACTORY.deployMarket(params);
     }
 
@@ -511,7 +511,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
 
         params.roles = roles;
 
-        vm.expectRevert(abi.encodeWithSelector(RoycoFactory.InvalidTarget.selector, address(0xdead)));
+        vm.expectRevert(abi.encodeWithSelector(RoycoFactory.INVALID_TARGET.selector, address(0xdead)));
         FACTORY.deployMarket(params);
     }
 
@@ -536,7 +536,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
 
         params.roles = roles;
 
-        vm.expectRevert(abi.encodeWithSelector(RoycoFactory.InvalidTarget.selector, invalidTarget));
+        vm.expectRevert(abi.encodeWithSelector(RoycoFactory.INVALID_TARGET.selector, invalidTarget));
         FACTORY.deployMarket(params);
     }
 

@@ -7,6 +7,7 @@ import { ERC1967Proxy } from "../lib/openzeppelin-contracts/contracts/proxy/ERC1
 import { Create2 } from "../lib/openzeppelin-contracts/contracts/utils/Create2.sol";
 import { RoycoRoles } from "./auth/RoycoRoles.sol";
 import { IRoycoAccountant } from "./interfaces/IRoycoAccountant.sol";
+import { IRoycoFactory } from "./interfaces/IRoycoFactory.sol";
 import { IRoycoKernel } from "./interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoVaultTranche } from "./interfaces/tranche/IRoycoVaultTranche.sol";
 import { DeployedContracts, MarketDeploymentParams, RolesConfiguration } from "./libraries/Types.sol";
@@ -15,69 +16,20 @@ import { DeployedContracts, MarketDeploymentParams, RolesConfiguration } from ".
 /// @notice Factory contract for deploying Royco tranches (ST and JT) and their associated kernel using ERC1967 proxies
 /// @notice The factory also acts as the shared access manager for all the Royco market
 /// @dev This factory deploys upgradeable tranche contracts using the UUPS proxy pattern
-contract RoycoFactory is AccessManager, RoycoRoles {
-    /// @notice Thrown when an invalid name is provided
-    error InvalidName();
-    /// @notice Thrown when an invalid symbol is provided
-    error InvalidSymbol();
-    /// @notice Thrown when an invalid asset is provided
-    error InvalidAsset();
-    /// @notice Thrown when an invalid market id is provided
-    error InvalidMarketId();
-    /// @notice Thrown when an invalid kernel implementation is provided
-    error InvalidKernelImplementation();
-    /// @notice Thrown when an invalid accountant implementation is provided
-    error InvalidAccountantImplementation();
-    /// @notice Thrown when an invalid senior tranche proxy deployment salt is provided
-    error InvalidSeniorTrancheProxyDeploymentSalt();
-    /// @notice Thrown when an invalid junior tranche proxy deployment salt is provided
-    error InvalidJuniorTrancheProxyDeploymentSalt();
-    /// @notice Thrown when an invalid kernel proxy deployment salt is provided
-    error InvalidKernelProxyDeploymentSalt();
-    /// @notice Thrown when an invalid accountant proxy deployment salt is provided
-    error InvalidAccountantProxyDeploymentSalt();
-    /// @notice Thrown when an invalid senior tranche implementation is provided
-    error InvalidSeniorTrancheImplementation();
-    /// @notice Thrown when an invalid junior tranche implementation is provided
-    error InvalidJuniorTrancheImplementation();
-    /// @notice Thrown when an invalid access manager is configured on a deployed contract
-    error InvalidAccessManager();
-    /// @notice Thrown when the kernel address configured on the senior tranche is invalid
-    error InvalidKernelOnSeniorTranche();
-    /// @notice Thrown when the kernel address configured on the junior tranche is invalid
-    error InvalidKernelOnJuniorTranche();
-    /// @notice Thrown when the accountant address configured on the kernel is invalid
-    error InvalidAccountantOnKernel();
-    /// @notice Thrown when the kernel address configured on the accountant is invalid
-    error InvalidKernelOnAccountant();
-    /// @notice Thrown when kernel initialization data is invalid
-    error InvalidKernelInitializationData();
-    /// @notice Thrown when accountant initialization data is invalid
-    error InvalidAccountantInitializationData();
-    /// @notice Thrown when the kernel failed to initialize
-    error FailedToInitializeKernel(bytes data);
-    /// @notice Thrown when the accountant failed to initialize
-    error FailedToInitializeAccountant(bytes data);
-    /// @notice Thrown when the senior tranche failed to initialize
-    error FailedToInitializeSeniorTranche(bytes data);
-    /// @notice Thrown when the junior tranche failed to initialize
-    error FailedToInitializeJuniorTranche(bytes data);
-    /// @notice Thrown when the roles configuration length mismatch
-    error RolesConfigurationLengthMismatch();
-    /// @notice Thrown when the target is invalid
-    error InvalidTarget(address target);
-
-    /// @notice Emitted when a new market is deployed
-    event MarketDeployed(DeployedContracts deployedContracts, MarketDeploymentParams params);
-    /// @notice Emitted when a role delay is set
-    event RoleDelaySet(uint64 role, uint256 delay);
-
-    /// @notice Initializes the factory with tranche implementation addresses
+contract RoycoFactory is AccessManager, RoycoRoles, IRoycoFactory {
+    /**
+     * @notice Initializes the Royco Factory
+     * @param _initialAdmin The initial admin of the access manager
+     */
     constructor(address _initialAdmin) AccessManager(_initialAdmin) { }
 
-    /// @notice Deploys a new market with senior tranche, junior tranche, and kernel
-    /// @param _params The parameters for deploying a new market
-    function deployMarket(MarketDeploymentParams calldata _params) external onlyAuthorized returns (DeployedContracts memory deployedContracts) {
+    /// @inheritdoc IRoycoFactory
+    function deployMarket(MarketDeploymentParams calldata _params)
+        external
+        override(IRoycoFactory)
+        onlyAuthorized
+        returns (DeployedContracts memory deployedContracts)
+    {
         // Validate the deployment parameters
         _validateDeploymentParams(_params);
 
@@ -93,11 +45,8 @@ contract RoycoFactory is AccessManager, RoycoRoles {
         emit MarketDeployed(deployedContracts, _params);
     }
 
-    /// @notice Predicts the address of a tranche proxy
-    /// @param _implementation The implementation address
-    /// @param _salt The salt for the deployment
-    /// @return proxy The predicted proxy address
-    function predictERC1967ProxyAddress(address _implementation, bytes32 _salt) external view returns (address proxy) {
+    /// @inheritdoc IRoycoFactory
+    function predictERC1967ProxyAddress(address _implementation, bytes32 _salt) external view override(IRoycoFactory) returns (address proxy) {
         proxy = Create2.computeAddress(_salt, keccak256(abi.encodePacked(type(ERC1967Proxy).creationCode, abi.encode(_implementation, ""))));
     }
 
@@ -127,63 +76,63 @@ contract RoycoFactory is AccessManager, RoycoRoles {
 
         // Initialize the senior tranche
         (bool success, bytes memory data) = address(deployedContracts.seniorTranche).call(_params.seniorTrancheInitializationData);
-        require(success, FailedToInitializeSeniorTranche(data));
+        require(success, FAILED_TO_INITIALIZE_SENIOR_TRANCHE(data));
 
         // Initialize the junior tranche
         (success, data) = address(deployedContracts.juniorTranche).call(_params.juniorTrancheInitializationData);
-        require(success, FailedToInitializeJuniorTranche(data));
+        require(success, FAILED_TO_INITIALIZE_JUNIOR_TRANCHE(data));
 
         // Initialize the accountant
         (success, data) = address(deployedContracts.accountant).call(_params.accountantInitializationData);
-        require(success, FailedToInitializeAccountant(data));
+        require(success, FAILED_TO_INITIALIZE_ACCOUNTANT(data));
 
         // Initialize the kernel
         (success, data) = address(deployedContracts.kernel).call(_params.kernelInitializationData);
-        require(success, FailedToInitializeKernel(data));
+        require(success, FAILED_TO_INITIALIZE_KERNEL(data));
     }
 
     /// @notice Validates the deployment
     /// @param _deployedContracts The deployed contracts to validate
     function _validateDeployment(DeployedContracts memory _deployedContracts) internal view {
         // Check that the access manager is set on the contracts
-        require(AccessManagedUpgradeable(address(_deployedContracts.accountant)).authority() == address(this), InvalidAccessManager());
-        require(AccessManagedUpgradeable(address(_deployedContracts.kernel)).authority() == address(this), InvalidAccessManager());
-        require(AccessManagedUpgradeable(address(_deployedContracts.seniorTranche)).authority() == address(this), InvalidAccessManager());
-        require(AccessManagedUpgradeable(address(_deployedContracts.juniorTranche)).authority() == address(this), InvalidAccessManager());
+        require(AccessManagedUpgradeable(address(_deployedContracts.accountant)).authority() == address(this), INVALID_ACCESS_MANAGER());
+        require(AccessManagedUpgradeable(address(_deployedContracts.kernel)).authority() == address(this), INVALID_ACCESS_MANAGER());
+        require(AccessManagedUpgradeable(address(_deployedContracts.seniorTranche)).authority() == address(this), INVALID_ACCESS_MANAGER());
+        require(AccessManagedUpgradeable(address(_deployedContracts.juniorTranche)).authority() == address(this), INVALID_ACCESS_MANAGER());
 
         // Check that the kernel is set on the tranches
-        require(address(_deployedContracts.seniorTranche.kernel()) == address(_deployedContracts.kernel), InvalidKernelOnSeniorTranche());
-        require(address(_deployedContracts.juniorTranche.kernel()) == address(_deployedContracts.kernel), InvalidKernelOnJuniorTranche());
+        require(address(_deployedContracts.seniorTranche.kernel()) == address(_deployedContracts.kernel), INVALID_KERNEL_ON_SENIOR_TRANCHE());
+        require(address(_deployedContracts.juniorTranche.kernel()) == address(_deployedContracts.kernel), INVALID_KERNEL_ON_JUNIOR_TRANCHE());
 
         (,,,,, address accountant,) = _deployedContracts.kernel.getState();
         // Check that the accountant is set on the kernel
-        require(address(accountant) == address(_deployedContracts.accountant), InvalidAccountantOnKernel());
+        require(address(accountant) == address(_deployedContracts.accountant), INVALID_ACCOUNTANT_ON_KERNEL());
 
         // Check that the kernel is set on the accountant
-        require(address(_deployedContracts.accountant.getState().kernel) == address(_deployedContracts.kernel), InvalidKernelOnAccountant());
+        require(address(_deployedContracts.accountant.getState().kernel) == address(_deployedContracts.kernel), INVALID_KERNEL_ON_ACCOUNTANT());
     }
 
     /// @notice Validates the deployment parameters
     /// @param _params The parameters to validate
     function _validateDeploymentParams(MarketDeploymentParams calldata _params) internal pure {
-        require(bytes(_params.seniorTrancheName).length > 0, InvalidName());
-        require(bytes(_params.seniorTrancheSymbol).length > 0, InvalidSymbol());
-        require(bytes(_params.juniorTrancheName).length > 0, InvalidName());
-        require(bytes(_params.juniorTrancheSymbol).length > 0, InvalidSymbol());
-        require(_params.seniorAsset != address(0), InvalidAsset());
-        require(_params.juniorAsset != address(0), InvalidAsset());
-        require(_params.marketId != bytes32(0), InvalidMarketId());
+        require(bytes(_params.seniorTrancheName).length > 0, INVALID_NAME());
+        require(bytes(_params.seniorTrancheSymbol).length > 0, INVALID_SYMBOL());
+        require(bytes(_params.juniorTrancheName).length > 0, INVALID_NAME());
+        require(bytes(_params.juniorTrancheSymbol).length > 0, INVALID_SYMBOL());
+        require(_params.seniorAsset != address(0), INVALID_ASSET());
+        require(_params.juniorAsset != address(0), INVALID_ASSET());
+        require(_params.marketId != bytes32(0), INVALID_MARKET_ID());
         // Validate the implementation addresses
-        require(address(_params.kernelImplementation) != address(0), InvalidKernelImplementation());
-        require(address(_params.accountantImplementation) != address(0), InvalidAccountantImplementation());
+        require(address(_params.kernelImplementation) != address(0), INVALID_KERNEL_IMPLEMENTATION());
+        require(address(_params.accountantImplementation) != address(0), INVALID_ACCOUNTANT_IMPLEMENTATION());
         // Validate the initialization data
-        require(_params.kernelInitializationData.length > 0, InvalidKernelInitializationData());
-        require(_params.accountantInitializationData.length > 0, InvalidAccountantInitializationData());
+        require(_params.kernelInitializationData.length > 0, INVALID_KERNEL_INITIALIZATION_DATA());
+        require(_params.accountantInitializationData.length > 0, INVALID_ACCOUNTANT_INITIALIZATION_DATA());
         // Validate the deployment salts
-        require(_params.seniorTrancheProxyDeploymentSalt != bytes32(0), InvalidSeniorTrancheProxyDeploymentSalt());
-        require(_params.juniorTrancheProxyDeploymentSalt != bytes32(0), InvalidJuniorTrancheProxyDeploymentSalt());
-        require(_params.kernelProxyDeploymentSalt != bytes32(0), InvalidKernelProxyDeploymentSalt());
-        require(_params.accountantProxyDeploymentSalt != bytes32(0), InvalidAccountantProxyDeploymentSalt());
+        require(_params.seniorTrancheProxyDeploymentSalt != bytes32(0), INVALID_SENIOR_TRANCHE_PROXY_DEPLOYMENT_SALT());
+        require(_params.juniorTrancheProxyDeploymentSalt != bytes32(0), INVALID_JUNIOR_TRANCHE_PROXY_DEPLOYMENT_SALT());
+        require(_params.kernelProxyDeploymentSalt != bytes32(0), INVALID_KERNEL_PROXY_DEPLOYMENT_SALT());
+        require(_params.accountantProxyDeploymentSalt != bytes32(0), INVALID_ACCOUNTANT_PROXY_DEPLOYMENT_SALT());
     }
 
     /// @notice Configures the roles for the deployed contracts
@@ -194,14 +143,14 @@ contract RoycoFactory is AccessManager, RoycoRoles {
             RolesConfiguration calldata role = _roles[i];
 
             // Validate that the selectors and roles length match
-            require(role.selectors.length == role.roles.length, RolesConfigurationLengthMismatch());
+            require(role.selectors.length == role.roles.length, ROLES_CONFIGURATION_LENGTH_MISMATCH());
 
             // Validate that the target is one of the deployed contracts
             address target = role.target;
             require(
                 target == address(_deployedContracts.accountant) || target == address(_deployedContracts.kernel)
                     || target == address(_deployedContracts.seniorTranche) || target == address(_deployedContracts.juniorTranche),
-                InvalidTarget(target)
+                INVALID_TARGET(target)
             );
 
             for (uint256 j = 0; j < role.selectors.length; ++j) {
