@@ -39,6 +39,9 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         _verifyPreviewNAVs(stState, jtState, AAVE_MAX_ABS_TRANCH_UNIT_DELTA, AAVE_MAX_ABS_NAV_DELTA);
         _verifyFeeTaken(stState, jtState, PROTOCOL_FEE_RECIPIENT_ADDRESS);
 
+        // Preview the deposit
+        uint256 expectedShares = JT.previewDeposit(assets);
+
         // Approve the junior tranche to spend assets
         vm.prank(depositor);
         USDC.approve(address(JT), _assets);
@@ -46,6 +49,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         // Deposit into junior tranche
         vm.prank(depositor);
         uint256 shares = JT.deposit(assets, depositor, depositor);
+        assertApproxEqRel(shares, expectedShares, AAVE_PREVIEW_DEPOSIT_RELATIVE_DELTA, "Shares minted should be equal to the previewed shares");
         _updateOnDeposit(jtState, assets, _toJTValue(assets), shares, TrancheType.JUNIOR);
 
         // Verify shares were minted
@@ -97,6 +101,9 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
             uint256 initialTrancheShares = JT.balanceOf(provider.addr);
             uint256 initialATokenBalance = AUSDC.balanceOf(address(KERNEL));
 
+            // Preview the deposit
+            uint256 expectedShares = JT.previewDeposit(assets);
+
             // Approve the tranche to spend assets
             vm.prank(provider.addr);
             USDC.approve(address(JT), amount);
@@ -104,6 +111,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
             // Deposit into the tranche
             vm.prank(provider.addr);
             uint256 shares = JT.deposit(assets, provider.addr, provider.addr);
+            assertApproxEqRel(shares, expectedShares, AAVE_PREVIEW_DEPOSIT_RELATIVE_DELTA, "Shares minted should be equal to the previewed shares");
 
             // Verify that an equivalent amount of AUSDCs were minted
             assertApproxEqAbs(

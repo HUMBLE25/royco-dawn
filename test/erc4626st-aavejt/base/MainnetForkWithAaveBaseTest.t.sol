@@ -20,6 +20,7 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
     NAV_UNIT internal AAVE_MAX_ABS_NAV_DELTA = toNAVUnits(toUint256(AAVE_MAX_ABS_TRANCH_UNIT_DELTA));
     uint256 internal constant MAX_REDEEM_RELATIVE_DELTA = 1 * BPS;
     uint256 internal constant MAX_CONVERT_TO_ASSETS_RELATIVE_DELTA = 1 * BPS;
+    uint256 internal constant AAVE_PREVIEW_DEPOSIT_RELATIVE_DELTA = 1 * BPS;
     uint24 internal constant JT_REDEMPTION_DELAY_SECONDS = 100;
 
     Vm.Wallet internal RESERVE;
