@@ -536,6 +536,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         uint256 jtYieldShareWAD = IRDM($.rdm).jtYieldShare($.lastSTRawNAV, $.lastJTRawNAV, $.betaWAD, $.coverageWAD, $.lastJTEffectiveNAV);
         // Ensure that JT cannot earn more than 100% of senior appreciation
         if (jtYieldShareWAD > WAD) jtYieldShareWAD = WAD;
+
         // Accrue the time-weighted yield share accrued to JT since the last tranche interaction
         $.lastAccrualTimestamp = uint32(block.timestamp);
         /// forge-lint: disable-next-item(unsafe-typecast)
@@ -564,6 +565,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         uint256 jtYieldShareWAD = IRDM($.rdm).previewJTYieldShare($.lastSTRawNAV, $.lastJTRawNAV, $.betaWAD, $.coverageWAD, $.lastJTEffectiveNAV);
         // Ensure that JT cannot earn more than 100% of senior appreciation
         if (jtYieldShareWAD > WAD) jtYieldShareWAD = WAD;
+
         // Apply the accural of JT yield share to the accumulator, weighted by the time elapsed
         /// forge-lint: disable-next-item(unsafe-typecast)
         return ($.twJTYieldShareAccruedWAD + uint192(jtYieldShareWAD * elapsed));

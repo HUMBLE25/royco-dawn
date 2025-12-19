@@ -98,10 +98,107 @@ contract LossWaterfall is MainnetForkWithAaveTestBase {
         (SyncedAccountingState memory postGainState, AssetClaims memory postGainTotalClaims,) = KERNEL.previewSyncTrancheAccounting(TrancheType.JUNIOR);
 
         // Assert that the accounting reflects the JT gain
-        assertGt(toUint256(postGainState.jtProtocolFeeAccrued), 0, "Protocol fees accrued gain");
+        assertGt(toUint256(postGainState.jtProtocolFeeAccrued), 0, "Must accrue protocol fees on gain");
         assertGt(toUint256(postGainTotalClaims.jtAssets), toUint256(postDepositTotalClaims.jtAssets), "JT claims must reflect the gain");
         assertGt(toUint256(postGainUserClaims.jtAssets), toUint256(postDepositUserClaims.jtAssets), "JT LP claims must reflect the gain");
         assertGt(toUint256(postGainState.jtRawNAV), toUint256(postDepositState.jtRawNAV), "JT raw NAV must reflect the gain");
         assertGt(toUint256(postGainState.jtEffectiveNAV), toUint256(postDepositState.jtEffectiveNAV), "JT effective NAV must reflect the gain");
+    }
+
+    function testFuzz_stGain(uint256 _assets, uint256 _stDepositPercentage) external {
+        // Bound assets to reasonable range (avoid zero and very large amounts)
+        _assets = bound(_assets, 10e6, 1_000_000e6); // Between 1 USDC and 1M USDC (6 decimals)
+        _stDepositPercentage = bound(_stDepositPercentage, 1, 90);
+
+        // Deposit into junior tranche
+        address depositor = ALICE_ADDRESS;
+        vm.startPrank(depositor);
+        USDC.approve(address(JT), _assets);
+        JT.deposit(toTrancheUnits(_assets), depositor, depositor);
+        vm.stopPrank();
+
+        address stDepositor = BOB_ADDRESS;
+        TRANCHE_UNIT expectedMaxDeposit = toTrancheUnits(toUint256(JT.totalAssets().nav).mulDiv(WAD, COVERAGE_WAD, Math.Rounding.Floor));
+        // Deposit a percentage of the max deposit
+        TRANCHE_UNIT depositAmount = expectedMaxDeposit.mulDiv(_stDepositPercentage, 100, Math.Rounding.Floor);
+        vm.startPrank(stDepositor);
+        USDC.approve(address(ST), toUint256(depositAmount));
+        uint256 shares = ST.deposit(depositAmount, stDepositor, stDepositor);
+        vm.stopPrank();
+        AssetClaims memory postDepositSTUserClaims = ST.convertToAssets(shares);
+        (SyncedAccountingState memory postDepositState, AssetClaims memory postDepositSTTotalClaims,) = KERNEL.previewSyncTrancheAccounting(TrancheType.SENIOR);
+        (, AssetClaims memory postDepositJTTotalClaims,) = KERNEL.previewSyncTrancheAccounting(TrancheType.JUNIOR);
+
+        // Raise the NAV of ST
+        vm.startPrank(stDepositor);
+        USDC.transfer(address(MOCK_UNDERLYING_ST_VAULT), 100e6);
+        vm.stopPrank();
+
+        skip(1 days);
+
+        AssetClaims memory postGainSTUserClaims = ST.convertToAssets(shares);
+        (SyncedAccountingState memory postGainState, AssetClaims memory postGainSTTotalClaims,) = KERNEL.previewSyncTrancheAccounting(TrancheType.SENIOR);
+        (, AssetClaims memory postGainJTTotalClaims,) = KERNEL.previewSyncTrancheAccounting(TrancheType.JUNIOR);
+
+        // Assert that the accounting reflects the ST gain
+        assertGt(toUint256(postGainState.jtProtocolFeeAccrued), 0, "Must accrue JT protocol fees on gain");
+        assertGt(toUint256(postGainState.stProtocolFeeAccrued), 0, "Must accrue ST protocol fees on gain");
+
+        assertGt(toUint256(postGainSTUserClaims.stAssets), toUint256(postDepositSTUserClaims.stAssets), "ST claims must reflect the gain");
+        assertGt(toUint256(postGainSTTotalClaims.stAssets), toUint256(postDepositSTTotalClaims.stAssets), "ST LP claims must reflect the gain");
+        assertGt(toUint256(postGainJTTotalClaims.stAssets), toUint256(postDepositJTTotalClaims.stAssets), "JT LP claims must reflect the gain");
+
+        assertGt(toUint256(postGainState.jtRawNAV), toUint256(postDepositState.jtRawNAV), "JT raw NAV must reflect the gain");
+        assertGt(toUint256(postGainState.jtEffectiveNAV), toUint256(postDepositState.jtEffectiveNAV), "JT effective NAV must reflect the gain");
+        assertGt(toUint256(postGainState.stRawNAV), toUint256(postDepositState.stRawNAV), "ST raw NAV must reflect the gain");
+        assertGt(toUint256(postGainState.stEffectiveNAV), toUint256(postDepositState.stEffectiveNAV), "ST effective NAV must reflect the gain");
+    }
+
+    function testFuzz_stLoss(uint256 _assets, uint256 _stDepositPercentage) external {
+        // Bound assets to reasonable range (avoid zero and very large amounts)
+        _assets = bound(_assets, 10e6, 1_000_000e6); // Between 1 USDC and 1M USDC (6 decimals)
+        _stDepositPercentage = bound(_stDepositPercentage, 20, 90);
+
+        // Deposit into junior tranche
+        address depositor = ALICE_ADDRESS;
+        vm.startPrank(depositor);
+        USDC.approve(address(JT), _assets);
+        JT.deposit(toTrancheUnits(_assets), depositor, depositor);
+        vm.stopPrank();
+
+        address stDepositor = BOB_ADDRESS;
+        TRANCHE_UNIT expectedMaxDeposit = toTrancheUnits(toUint256(JT.totalAssets().nav).mulDiv(WAD, COVERAGE_WAD, Math.Rounding.Floor));
+        // Deposit a percentage of the max deposit
+        TRANCHE_UNIT depositAmount = expectedMaxDeposit.mulDiv(_stDepositPercentage, 100, Math.Rounding.Floor);
+        vm.startPrank(stDepositor);
+        USDC.approve(address(ST), toUint256(depositAmount));
+        uint256 shares = ST.deposit(depositAmount, stDepositor, stDepositor);
+        vm.stopPrank();
+        AssetClaims memory postDepositSTUserClaims = ST.convertToAssets(shares);
+        (SyncedAccountingState memory postDepositState, AssetClaims memory postDepositSTTotalClaims,) = KERNEL.previewSyncTrancheAccounting(TrancheType.SENIOR);
+        (, AssetClaims memory postDepositJTTotalClaims,) = KERNEL.previewSyncTrancheAccounting(TrancheType.JUNIOR);
+
+        // Lower the NAV of ST
+        vm.startPrank(address(MOCK_UNDERLYING_ST_VAULT));
+        USDC.transfer(BOB_ADDRESS, bound(toUint256(depositAmount), 1e6, toUint256(depositAmount)));
+        vm.stopPrank();
+
+        AssetClaims memory postLossSTUserClaims = ST.convertToAssets(shares);
+        (SyncedAccountingState memory postLossState, AssetClaims memory postLossSTTotalClaims,) = KERNEL.previewSyncTrancheAccounting(TrancheType.SENIOR);
+        (, AssetClaims memory postLossJTTotalClaims,) = KERNEL.previewSyncTrancheAccounting(TrancheType.JUNIOR);
+
+        // Assert that the accounting reflects the ST gain
+        assertEq(toUint256(postLossState.jtProtocolFeeAccrued), 0, "Must accrue JT protocol fees on gain");
+        assertEq(toUint256(postLossState.stProtocolFeeAccrued), 0, "Must accrue ST protocol fees on gain");
+
+        assertGt(toUint256(postLossSTUserClaims.jtAssets), toUint256(postDepositSTUserClaims.jtAssets), "ST claims must reflect the gain");
+        assertLt(toUint256(postLossSTUserClaims.stAssets), toUint256(postDepositSTUserClaims.stAssets), "ST claims must reflect the gain");
+        assertLt(toUint256(postLossSTTotalClaims.stAssets), toUint256(postDepositSTTotalClaims.stAssets), "ST LP claims must reflect the gain");
+        assertLt(toUint256(postLossJTTotalClaims.jtAssets), toUint256(postDepositJTTotalClaims.jtAssets), "JT LP claims must reflect the gain");
+
+        assertGt(toUint256(postLossState.stCoverageDebt), toUint256(postDepositState.stCoverageDebt), "JT raw NAV must reflect the gain");
+        assertGe(toUint256(postLossState.jtCoverageDebt), toUint256(postDepositState.jtCoverageDebt), "JT raw NAV must reflect the gain");
+        assertLt(toUint256(postLossState.jtEffectiveNAV), toUint256(postDepositState.jtEffectiveNAV), "JT raw NAV must reflect the gain");
+        assertLe(toUint256(postLossState.stEffectiveNAV), toUint256(postDepositState.stEffectiveNAV), "JT raw NAV must reflect the gain");
     }
 }
