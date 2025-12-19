@@ -107,13 +107,13 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
             ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel_IMPL.initialize,
             (
                 RoycoKernelInitParams({
+                    initialAuthority: address(FACTORY),
                     seniorTranche: expectedSeniorTrancheAddress,
                     juniorTranche: expectedJuniorTrancheAddress,
                     accountant: expectedAccountantAddress,
                     protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS,
                     jtRedemptionDelayInSeconds: JT_REDEMPTION_DELAY_SECONDS
                 }),
-                address(FACTORY),
                 address(MOCK_UNDERLYING_ST_VAULT),
                 ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS
             )
