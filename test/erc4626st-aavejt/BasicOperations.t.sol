@@ -40,6 +40,10 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         _verifyPreviewNAVs(stState, jtState, AAVE_MAX_ABS_TRANCH_UNIT_DELTA, AAVE_MAX_ABS_NAV_DELTA);
         _verifyFeeTaken(stState, jtState, PROTOCOL_FEE_RECIPIENT_ADDRESS);
 
+        // Fetch the max deposit for the junior tranche
+        TRANCHE_UNIT maxDeposit = JT.maxDeposit(depositor);
+        assertGt(maxDeposit, toTrancheUnits(0), "Max deposit should be greater than 0");
+
         // Preview the deposit
         uint256 expectedShares = JT.previewDeposit(assets);
 
