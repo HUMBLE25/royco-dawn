@@ -164,7 +164,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         // Get the total claims the junior tranche has on each tranche's assets
         (SyncedAccountingState memory state, AssetClaims memory jtNotionalClaims,) = previewSyncTrancheAccounting(TrancheType.JUNIOR);
 
-        // Get the max withdrawable st and jt assets in NAV units from the accountant consider coverage requirement
+        // Get the max withdrawable ST and JT assets in NAV units from the accountant consider coverage requirement
         (, NAV_UNIT stClaimableGivenCoverage, NAV_UNIT jtClaimableGivenCoverage) = _accountant()
             .maxJTWithdrawalGivenCoverage(
                 state.stRawNAV,
