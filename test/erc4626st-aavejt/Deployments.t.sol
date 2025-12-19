@@ -8,7 +8,6 @@ import { IRoycoAuth } from "../../src/interfaces/IRoycoAuth.sol";
 import { IPool } from "../../src/interfaces/aave/IPool.sol";
 import { TrancheType } from "../../src/interfaces/kernel/IRoycoKernel.sol";
 import { ZERO_NAV_UNITS, ZERO_TRANCHE_UNITS } from "../../src/libraries/Constants.sol";
-import { RoycoAccountantInitParams, RoycoAccountantState } from "../../src/libraries/RoycoAccountantStorageLib.sol";
 import { RoycoKernelInitParams } from "../../src/libraries/RoycoKernelStorageLib.sol";
 import {
     IRoycoAccountant,
@@ -92,7 +91,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         assertEq(accountant, address(ACCOUNTANT), "Kernel accountant mismatch");
         assertEq(protocolFeeRecipient, PROTOCOL_FEE_RECIPIENT_ADDRESS, "Kernel protocolFeeRecipient mismatch");
 
-        RoycoAccountantState memory accountantState = ACCOUNTANT.getState();
+        IRoycoAccountant.RoycoAccountantState memory accountantState = ACCOUNTANT.getState();
 
         // Coverage, beta, protocol fee configuration
         assertEq(accountantState.coverageWAD, COVERAGE_WAD, "Kernel coverageWAD mismatch");
@@ -283,7 +282,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         (MarketDeploymentParams memory params, bytes32 marketId) = _buildValidMarketParamsForSalt(salt);
 
         // Rebuild only the senior tranche initialization data with an invalid authority
-        address expectedKernelAddress = FACTORY.predictERC1967ProxyAddress(address(ERC4626ST_AaveV3JT_IdenticalAssets_Kernel_IMPL), salt);
+        address expectedKernelAddress = FACTORY.predictERC1967ProxyAddress(address(ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel_IMPL), salt);
 
         params.seniorTrancheInitializationData = abi.encodeCall(
             ST_IMPL.initialize,
@@ -304,12 +303,12 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         (MarketDeploymentParams memory params,) = _buildValidMarketParamsForSalt(salt);
 
         // Rebuild only the accountant initialization data with an invalid authority
-        address expectedKernelAddress = FACTORY.predictERC1967ProxyAddress(address(ERC4626ST_AaveV3JT_IdenticalAssets_Kernel_IMPL), salt);
+        address expectedKernelAddress = FACTORY.predictERC1967ProxyAddress(address(ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel_IMPL), salt);
 
         params.accountantInitializationData = abi.encodeCall(
             RoycoAccountant.initialize,
             (
-                RoycoAccountantInitParams({
+                IRoycoAccountant.RoycoAccountantInitParams({
                     kernel: expectedKernelAddress, protocolFeeWAD: PROTOCOL_FEE_WAD, coverageWAD: COVERAGE_WAD, betaWAD: BETA_WAD, rdm: address(RDM)
                 }),
                 OWNER_ADDRESS // invalid authority: should be FACTORY
@@ -330,16 +329,16 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         address expectedAccountantAddress = FACTORY.predictERC1967ProxyAddress(address(ACCOUNTANT_IMPL), salt);
 
         params.kernelInitializationData = abi.encodeCall(
-            ERC4626ST_AaveV3JT_IdenticalAssets_Kernel_IMPL.initialize,
+            ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel_IMPL.initialize,
             (
                 RoycoKernelInitParams({
+                    initialAuthority: OWNER_ADDRESS,
                     seniorTranche: expectedSeniorTrancheAddress,
                     juniorTranche: expectedJuniorTrancheAddress,
                     accountant: expectedAccountantAddress,
                     protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS,
                     jtRedemptionDelayInSeconds: JT_REDEMPTION_DELAY_SECONDS
                 }),
-                OWNER_ADDRESS, // invalid authority: should be FACTORY
                 address(MOCK_UNDERLYING_ST_VAULT),
                 ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS
             )
@@ -354,7 +353,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         (MarketDeploymentParams memory params, bytes32 marketId) = _buildValidMarketParamsForSalt(salt);
 
         // Rebuild only the junior tranche initialization data with an invalid authority
-        address expectedKernelAddress = FACTORY.predictERC1967ProxyAddress(address(ERC4626ST_AaveV3JT_IdenticalAssets_Kernel_IMPL), salt);
+        address expectedKernelAddress = FACTORY.predictERC1967ProxyAddress(address(ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel_IMPL), salt);
 
         params.juniorTrancheInitializationData = abi.encodeCall(
             JT_IMPL.initialize,
@@ -425,16 +424,16 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         address expectedJuniorTrancheAddress = FACTORY.predictERC1967ProxyAddress(address(JT_IMPL), salt);
 
         params.kernelInitializationData = abi.encodeCall(
-            ERC4626ST_AaveV3JT_IdenticalAssets_Kernel_IMPL.initialize,
+            ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel_IMPL.initialize,
             (
                 RoycoKernelInitParams({
+                    initialAuthority: address(FACTORY),
                     seniorTranche: expectedSeniorTrancheAddress,
                     juniorTranche: expectedJuniorTrancheAddress,
                     accountant: address(0xdead), // wrong accountant
                     protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS,
                     jtRedemptionDelayInSeconds: JT_REDEMPTION_DELAY_SECONDS
                 }),
-                address(FACTORY),
                 address(MOCK_UNDERLYING_ST_VAULT),
                 ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS
             )
@@ -452,7 +451,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.accountantInitializationData = abi.encodeCall(
             RoycoAccountant.initialize,
             (
-                RoycoAccountantInitParams({
+                IRoycoAccountant.RoycoAccountantInitParams({
                     kernel: address(0xdead), // wrong kernel
                     protocolFeeWAD: PROTOCOL_FEE_WAD,
                     coverageWAD: COVERAGE_WAD,
@@ -556,21 +555,21 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         // Precompute the expected addresses of the kernel and accountant
         address expectedSeniorTrancheAddress = FACTORY.predictERC1967ProxyAddress(address(ST_IMPL), salt);
         address expectedJuniorTrancheAddress = FACTORY.predictERC1967ProxyAddress(address(JT_IMPL), salt);
-        address expectedKernelAddress = FACTORY.predictERC1967ProxyAddress(address(ERC4626ST_AaveV3JT_IdenticalAssets_Kernel_IMPL), salt);
+        address expectedKernelAddress = FACTORY.predictERC1967ProxyAddress(address(ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel_IMPL), salt);
         address expectedAccountantAddress = FACTORY.predictERC1967ProxyAddress(address(ACCOUNTANT_IMPL), salt);
 
         // Create the initialization data
         bytes memory kernelInitializationData = abi.encodeCall(
-            ERC4626ST_AaveV3JT_IdenticalAssets_Kernel_IMPL.initialize,
+            ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel_IMPL.initialize,
             (
                 RoycoKernelInitParams({
+                    initialAuthority: address(FACTORY),
                     seniorTranche: expectedSeniorTrancheAddress,
                     juniorTranche: expectedJuniorTrancheAddress,
                     accountant: expectedAccountantAddress,
                     protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS,
                     jtRedemptionDelayInSeconds: JT_REDEMPTION_DELAY_SECONDS
                 }),
-                address(FACTORY),
                 address(MOCK_UNDERLYING_ST_VAULT),
                 ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS
             )
@@ -578,7 +577,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         bytes memory accountantInitializationData = abi.encodeCall(
             RoycoAccountant.initialize,
             (
-                RoycoAccountantInitParams({
+                IRoycoAccountant.RoycoAccountantInitParams({
                     kernel: expectedKernelAddress, protocolFeeWAD: PROTOCOL_FEE_WAD, coverageWAD: COVERAGE_WAD, betaWAD: BETA_WAD, rdm: address(RDM)
                 }),
                 address(FACTORY)
@@ -613,7 +612,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
             marketId: marketId,
             seniorTrancheImplementation: ST_IMPL,
             juniorTrancheImplementation: JT_IMPL,
-            kernelImplementation: IRoycoKernel(address(ERC4626ST_AaveV3JT_IdenticalAssets_Kernel_IMPL)),
+            kernelImplementation: IRoycoKernel(address(ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel_IMPL)),
             seniorTrancheInitializationData: seniorTrancheInitializationData,
             juniorTrancheInitializationData: juniorTrancheInitializationData,
             accountantImplementation: IRoycoAccountant(address(ACCOUNTANT_IMPL)),

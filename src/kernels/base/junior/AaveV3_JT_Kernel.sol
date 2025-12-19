@@ -10,12 +10,12 @@ import { MAX_TRANCHE_UNITS, ZERO_TRANCHE_UNITS } from "../../../libraries/Consta
 import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib, toTrancheUnits, toUint256 } from "../../../libraries/Units.sol";
 import { RoycoKernel, RoycoKernelStorageLib, SyncedAccountingState } from "../RoycoKernel.sol";
 
-abstract contract AaveV3JTKernel is RoycoKernel {
+abstract contract AaveV3_JT_Kernel is RoycoKernel {
     using SafeERC20 for IERC20;
     using UnitsMathLib for TRANCHE_UNIT;
 
-    /// @dev Storage slot for AaveV3JTKernelState using ERC-7201 pattern
-    // keccak256(abi.encode(uint256(keccak256("Royco.storage.AaveV3JTKernelState")) - 1)) & ~bytes32(uint256(0xff))
+    /// @dev Storage slot for AaveV3_JT_KernelState using ERC-7201 pattern
+    // keccak256(abi.encode(uint256(keccak256("Royco.storage.AaveV3_JT_KernelState")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant AAVE_V3_JT_KERNEL_STORAGE_SLOT = 0x020a998929d5f52fd2ab88c68a53f71f586f1008b18ca7e45b22d0acddbf3e00;
 
     /// @inheritdoc IRoycoKernel
@@ -23,12 +23,12 @@ abstract contract AaveV3JTKernel is RoycoKernel {
 
     /**
      * @notice Storage state for the Royco Aave V3 Kernel
-     * @custom:storage-location erc7201:Royco.storage.AaveV3JTKernelState
+     * @custom:storage-location erc7201:Royco.storage.AaveV3_JT_KernelState
      * @custom:field pool - The address of the Aave V3 pool
      * @custom:field poolAddressesProvider - The address of the Aave V3 pool addresses provider
      * @custom:field jtAssetAToken - The address of the junior tranche base asset's A Token
      */
-    struct AaveV3JTKernelState {
+    struct AaveV3_JT_KernelState {
         address pool;
         address poolAddressesProvider;
         address jtAssetAToken;
@@ -55,7 +55,7 @@ abstract contract AaveV3JTKernel is RoycoKernel {
         IERC20(_jtAsset).forceApprove(_aaveV3Pool, type(uint256).max);
 
         // Set the initial state of the Aave V3 kernel
-        AaveV3JTKernelState storage $ = _getAaveV3JTKernelStorage();
+        AaveV3_JT_KernelState storage $ = _getAaveV3_JT_KernelStorage();
         $.pool = _aaveV3Pool;
         $.poolAddressesProvider = address(IPool(_aaveV3Pool).ADDRESSES_PROVIDER());
         $.jtAssetAToken = jtAssetAToken;
@@ -78,13 +78,14 @@ abstract contract AaveV3JTKernel is RoycoKernel {
     function _getJuniorTrancheRawNAV() internal view override(RoycoKernel) returns (NAV_UNIT) {
         // The tranche's balance of the AToken is the total assets it is owed from the Aave pool
         /// @dev This does not treat illiquidity in the Aave pool as a loss: we assume that total lent will be withdrawable at some point
-        return jtConvertTrancheUnitsToNAVUnits(toTrancheUnits(IERC20(_getAaveV3JTKernelStorage().jtAssetAToken).balanceOf(address(this))));
+        return jtConvertTrancheUnitsToNAVUnits(toTrancheUnits(IERC20(_getAaveV3_JT_KernelStorage().jtAssetAToken).balanceOf(address(this))));
     }
 
     /// @inheritdoc RoycoKernel
     function _jtMaxDepositGlobally(address) internal view override(RoycoKernel) returns (TRANCHE_UNIT) {
         // Retrieve the Pool's data provider and asset
-        IPoolDataProvider poolDataProvider = IPoolDataProvider(IPoolAddressesProvider(_getAaveV3JTKernelStorage().poolAddressesProvider).getPoolDataProvider());
+        IPoolDataProvider poolDataProvider =
+            IPoolDataProvider(IPoolAddressesProvider(_getAaveV3_JT_KernelStorage().poolAddressesProvider).getPoolDataProvider());
         address asset = RoycoKernelStorageLib._getRoycoKernelStorage().jtAsset;
 
         // If the reserve asset is inactive, frozen, or paused, supplies are forbidden
@@ -143,7 +144,7 @@ abstract contract AaveV3JTKernel is RoycoKernel {
     /// @inheritdoc RoycoKernel
     function _jtMaxWithdrawableGlobally(address) internal view override(RoycoKernel) returns (TRANCHE_UNIT) {
         // Retrieve the Pool's data provider and asset
-        AaveV3JTKernelState storage $ = _getAaveV3JTKernelStorage();
+        AaveV3_JT_KernelState storage $ = _getAaveV3_JT_KernelStorage();
         IPoolDataProvider poolDataProvider = IPoolDataProvider(IPoolAddressesProvider($.poolAddressesProvider).getPoolDataProvider());
         address asset = RoycoKernelStorageLib._getRoycoKernelStorage().jtAsset;
 
@@ -156,8 +157,7 @@ abstract contract AaveV3JTKernel is RoycoKernel {
     }
 
     /// @inheritdoc RoycoKernel
-    function _jtPreviewWithdraw(TRANCHE_UNIT _jtAssets) internal view override(RoycoKernel) returns (TRANCHE_UNIT withdrawnJTAssets) {
-        // TODO: Do we want to bound this to max withdrawable?
+    function _jtPreviewWithdraw(TRANCHE_UNIT _jtAssets) internal pure override(RoycoKernel) returns (TRANCHE_UNIT withdrawnJTAssets) {
         return _jtAssets;
     }
 
@@ -165,20 +165,27 @@ abstract contract AaveV3JTKernel is RoycoKernel {
     function _jtDepositAssets(TRANCHE_UNIT _jtAssets) internal override(RoycoKernel) {
         // Supply the specified assets to the pool
         // Max approval already given to the pool on initialization
-        IPool(_getAaveV3JTKernelStorage().pool).supply(RoycoKernelStorageLib._getRoycoKernelStorage().jtAsset, toUint256(_jtAssets), address(this), 0);
+        IPool(_getAaveV3_JT_KernelStorage().pool).supply(RoycoKernelStorageLib._getRoycoKernelStorage().jtAsset, toUint256(_jtAssets), address(this), 0);
     }
 
     /// @inheritdoc RoycoKernel
     function _jtWithdrawAssets(TRANCHE_UNIT _jtAssets, address _receiver) internal override(RoycoKernel) {
-        IPool(_getAaveV3JTKernelStorage().pool).withdraw(RoycoKernelStorageLib._getRoycoKernelStorage().jtAsset, toUint256(_jtAssets), _receiver);
+        // Try and withdraw the requested assets from the Aave pool
+        AaveV3_JT_KernelState storage $ = _getAaveV3_JT_KernelStorage();
+        (bool withdrawalSucceeded,) =
+            $.pool.call(abi.encodeCall(IPool.withdraw, (RoycoKernelStorageLib._getRoycoKernelStorage().jtAsset, toUint256(_jtAssets), _receiver)));
+        if (withdrawalSucceeded) return;
+
+        // The Pool lacks the liquidity to withdraw the requested assets, transfer A Tokens instead
+        IERC20($.jtAssetAToken).safeTransfer(_receiver, toUint256(_jtAssets));
     }
 
     /**
-     * @notice Returns a storage pointer to the AaveV3JTKernelState storage
+     * @notice Returns a storage pointer to the AaveV3_JT_KernelState storage
      * @dev Uses ERC-7201 storage slot pattern for collision-resistant storage
      * @return $ Storage pointer to the Aave V3 JT kernel state
      */
-    function _getAaveV3JTKernelStorage() internal pure returns (AaveV3JTKernelState storage $) {
+    function _getAaveV3_JT_KernelStorage() internal pure returns (AaveV3_JT_KernelState storage $) {
         assembly ("memory-safe") {
             $.slot := AAVE_V3_JT_KERNEL_STORAGE_SLOT
         }

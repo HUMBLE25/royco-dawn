@@ -56,14 +56,13 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     /**
      * @notice Initializes the base kernel state
      * @dev Initializes any parent contracts and the base kernel state
-     * @param _params The initialization parameters for the Royco kernel
+     * @param _params The standard initialization parameters for the Royco kernel
      * @param _stAsset The address of the asset that ST is denominated in: constitutes the ST's tranche units (type and precision)
      * @param _jtAsset The address of the asset that JT is denominated in: constitutes the JT's tranche units (type and precision)
-     * @param _initialAuthority The initial authority for the base kernel
      */
-    function __RoycoKernel_init(RoycoKernelInitParams memory _params, address _stAsset, address _jtAsset, address _initialAuthority) internal onlyInitializing {
+    function __RoycoKernel_init(RoycoKernelInitParams memory _params, address _stAsset, address _jtAsset) internal onlyInitializing {
         // Initialize the Royco base state
-        __RoycoBase_init(_initialAuthority);
+        __RoycoBase_init(_params.initialAuthority);
         // Initialize the Royco kernel state
         __RoycoKernel_init_unchained(_params, _stAsset, _jtAsset);
     }
@@ -708,12 +707,6 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         userClaim.nav = stConvertTrancheUnitsToNAVUnits(userClaim.stAssets) + jtConvertTrancheUnitsToNAVUnits(userClaim.jtAssets);
     }
 
-    /// @notice Returns this kernel's accountant casted to the IRoycoAccountant interface
-    /// @return The Royco Accountant for this kernel
-    function _accountant() internal view returns (IRoycoAccountant) {
-        return IRoycoAccountant(RoycoKernelStorageLib._getRoycoKernelStorage().accountant);
-    }
-
     /**
      * @notice Returns the amount of JT shares redeemable from a redemption request
      * @param _request The redemption request to get redeemable shares for
@@ -726,16 +719,28 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         claimableShares = _request.totalJTSharesToRedeem;
     }
 
+    /**
+     * @notice Returns this kernel's accountant casted to the IRoycoAccountant interface
+     * @return accountant The Royco Accountant for this kernel
+     */
+    function _accountant() internal view returns (IRoycoAccountant accountant) {
+        return IRoycoAccountant(RoycoKernelStorageLib._getRoycoKernelStorage().accountant);
+    }
+
     // =============================
     // Internal NAV Retrieval Functions
     // =============================
 
-    /// @notice Returns the raw net asset value of the senior tranche denominated in the NAV units (USD, BTC, etc.) for this kernel
-    /// @return stRawNAV The pure net asset value of the senior tranche invested assets
+    /**
+     * @notice Returns the raw net asset value of the senior tranche denominated in the NAV units (USD, BTC, etc.) for this kernel
+     * @return stRawNAV The pure net asset value of the senior tranche invested assets
+     */
     function _getSeniorTrancheRawNAV() internal view virtual returns (NAV_UNIT stRawNAV);
 
-    /// @notice Returns the raw net asset value of the junior tranche denominated in the NAV units (USD, BTC, etc.) for this kernel
-    /// @return jtRawNAV The pure net asset value of the junior tranche invested assets
+    /**
+     * @notice Returns the raw net asset value of the junior tranche denominated in the NAV units (USD, BTC, etc.) for this kernel
+     * @return jtRawNAV The pure net asset value of the junior tranche invested assets
+     */
     function _getJuniorTrancheRawNAV() internal view virtual returns (NAV_UNIT jtRawNAV);
 
     // =============================
@@ -773,9 +778,9 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     /**
      * @notice Previews the amount of ST assets that would be redeemed for a given amount of ST assets
      * @param _stAssets The ST assets denominated in its tranche units to redeem
-     * @return redeemedSTAssets The amount of ST assets that would be redeemed for the given amount of ST assets
+     * @return withdrawnSTAssets The amount of ST assets that would be redeemed for the given amount of ST assets
      */
-    function _stPreviewWithdraw(TRANCHE_UNIT _stAssets) internal view virtual returns (TRANCHE_UNIT redeemedSTAssets);
+    function _stPreviewWithdraw(TRANCHE_UNIT _stAssets) internal view virtual returns (TRANCHE_UNIT withdrawnSTAssets);
 
     /**
      * @notice Previews the amount of JT assets that would be redeemed for a given amount of JT assets

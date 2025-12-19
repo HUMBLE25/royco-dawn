@@ -18,7 +18,7 @@ struct ERC4626KernelState {
 
 /**
  * @title ERC4626KernelStorageLib
- * @notice A lightweight storage library for reading a mutating state for kernels that deposit into ERC4626 vaults
+ * @notice A lightweight storage library for reading and mutating state for kernels that deposit into ERC4626 vaults
  */
 library ERC4626KernelStorageLib {
     /// @dev Storage slot for ERC4626KernelState using ERC-7201 pattern
