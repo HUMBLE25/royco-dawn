@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import { IRoycoAccountant } from "../../../src/interfaces/IRoycoAccountant.sol";
 import { RoycoFactory } from "../../src/RoycoFactory.sol";
 import { RoycoAccountant } from "../../src/accountant/RoycoAccountant.sol";
 import { RoycoRoles } from "../../src/auth/RoycoRoles.sol";
@@ -9,7 +8,7 @@ import { IRoycoAuth } from "../../src/interfaces/IRoycoAuth.sol";
 import { IPool } from "../../src/interfaces/aave/IPool.sol";
 import { TrancheType } from "../../src/interfaces/kernel/IRoycoKernel.sol";
 import { ZERO_NAV_UNITS, ZERO_TRANCHE_UNITS } from "../../src/libraries/Constants.sol";
-import { RoycoKernelInitParams, RoycoKernelState } from "../../src/libraries/RoycoKernelStorageLib.sol";
+import { RoycoKernelInitParams } from "../../src/libraries/RoycoKernelStorageLib.sol";
 import {
     IRoycoAccountant,
     IRoycoKernel,

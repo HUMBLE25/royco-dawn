@@ -4,8 +4,6 @@ pragma solidity ^0.8.28;
 import { Vm } from "../../../lib/forge-std/src/Vm.sol";
 import { IERC20 } from "../../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { RoycoAccountant } from "../../../src/accountant/RoycoAccountant.sol";
-import { IRoycoAccountant } from "../../../src/interfaces/IRoycoAccountant.sol";
-import { ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel } from "../../../src/kernels/ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel.sol";
 import { RoycoKernel } from "../../../src/kernels/base/RoycoKernel.sol";
 import { RoycoKernelInitParams } from "../../../src/libraries/RoycoKernelStorageLib.sol";
 import { DeployedContracts, IRoycoAccountant, IRoycoKernel, MarketDeploymentParams } from "../../../src/libraries/Types.sol";
@@ -21,6 +19,7 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
     NAV_UNIT internal AAVE_MAX_ABS_NAV_DELTA = toNAVUnits(toUint256(AAVE_MAX_ABS_TRANCH_UNIT_DELTA));
     uint256 internal constant MAX_REDEEM_RELATIVE_DELTA = 1 * BPS;
     uint256 internal constant MAX_CONVERT_TO_ASSETS_RELATIVE_DELTA = 1 * BPS;
+    uint256 internal constant AAVE_PREVIEW_DEPOSIT_RELATIVE_DELTA = 1 * BPS;
     uint24 internal constant JT_REDEMPTION_DELAY_SECONDS = 100;
 
     Vm.Wallet internal RESERVE;

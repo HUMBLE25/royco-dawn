@@ -3,15 +3,11 @@ pragma solidity ^0.8.28;
 
 import { IERC4626 } from "../../../../lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 import { IERC20, SafeERC20 } from "../../../../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
-import { Math } from "../../../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
-import { ExecutionModel, IRoycoKernel, SharesRedemptionModel } from "../../../interfaces/kernel/IRoycoKernel.sol";
-import { ZERO_TRANCHE_UNITS } from "../../../libraries/Constants.sol";
+import { ExecutionModel, IRoycoKernel } from "../../../interfaces/kernel/IRoycoKernel.sol";
 import { SyncedAccountingState } from "../../../libraries/Types.sol";
-import { AssetClaims } from "../../../libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib, toTrancheUnits, toUint256 } from "../../../libraries/Units.sol";
-import { UtilsLib } from "../../../libraries/UtilsLib.sol";
 import { ERC4626KernelState, ERC4626KernelStorageLib } from "../../../libraries/kernels/ERC4626KernelStorageLib.sol";
-import { Operation, RoycoKernel } from "../RoycoKernel.sol";
+import { RoycoKernel } from "../RoycoKernel.sol";
 
 abstract contract ERC4626_JT_Kernel is RoycoKernel {
     using SafeERC20 for IERC20;

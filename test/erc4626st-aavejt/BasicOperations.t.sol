@@ -2,7 +2,6 @@
 pragma solidity ^0.8.28;
 
 import { Vm } from "../../lib/forge-std/src/Vm.sol";
-import { console2 } from "../../lib/forge-std/src/console2.sol";
 import { Math } from "../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 import { IRoycoAccountant } from "../../src/interfaces/IRoycoAccountant.sol";
 import { WAD, ZERO_TRANCHE_UNITS } from "../../src/libraries/Constants.sol";
@@ -40,6 +39,9 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         _verifyPreviewNAVs(stState, jtState, AAVE_MAX_ABS_TRANCH_UNIT_DELTA, AAVE_MAX_ABS_NAV_DELTA);
         _verifyFeeTaken(stState, jtState, PROTOCOL_FEE_RECIPIENT_ADDRESS);
 
+        // Preview the deposit
+        uint256 expectedShares = JT.previewDeposit(assets);
+
         // Approve the junior tranche to spend assets
         vm.prank(depositor);
         USDC.approve(address(JT), _assets);
@@ -47,6 +49,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         // Deposit into junior tranche
         vm.prank(depositor);
         uint256 shares = JT.deposit(assets, depositor, depositor);
+        assertApproxEqRel(shares, expectedShares, AAVE_PREVIEW_DEPOSIT_RELATIVE_DELTA, "Shares minted should be equal to the previewed shares");
         _updateOnDeposit(jtState, assets, _toJTValue(assets), shares, TrancheType.JUNIOR);
 
         // Verify shares were minted
@@ -98,6 +101,9 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
             uint256 initialTrancheShares = JT.balanceOf(provider.addr);
             uint256 initialATokenBalance = AUSDC.balanceOf(address(KERNEL));
 
+            // Preview the deposit
+            uint256 expectedShares = JT.previewDeposit(assets);
+
             // Approve the tranche to spend assets
             vm.prank(provider.addr);
             USDC.approve(address(JT), amount);
@@ -105,6 +111,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
             // Deposit into the tranche
             vm.prank(provider.addr);
             uint256 shares = JT.deposit(assets, provider.addr, provider.addr);
+            assertApproxEqRel(shares, expectedShares, AAVE_PREVIEW_DEPOSIT_RELATIVE_DELTA, "Shares minted should be equal to the previewed shares");
 
             // Verify that an equivalent amount of AUSDCs were minted
             assertApproxEqAbs(
@@ -142,7 +149,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
     function testFuzz_depositIntoST_verifyCoverageRequirementEnforcement(uint256 _jtAssets, uint256 _stDepositPercentage) external {
         // Bound assets to reasonable range (avoid zero and very large amounts)
         _jtAssets = bound(_jtAssets, 1e6, 1_000_000e6); // Between 1 USDC and 1M USDC (6 decimals)
-        _stDepositPercentage = bound(_stDepositPercentage, 1, 100);
+        _stDepositPercentage = bound(_stDepositPercentage, 1, 99);
         TRANCHE_UNIT jtAssets = toTrancheUnits(_jtAssets);
 
         // There are no assets in JT initally, therefore depositing into ST should fail
@@ -168,8 +175,10 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         // Verify that ST.maxDeposit returns JTEff / coverage
         // BETA is 0
         TRANCHE_UNIT expectedMaxDeposit = toTrancheUnits(toUint256(JT.totalAssets().nav).mulDiv(WAD, COVERAGE_WAD, Math.Rounding.Floor));
-        TRANCHE_UNIT maxDeposit = ST.maxDeposit(jtDepositor);
-        assertEq(maxDeposit, expectedMaxDeposit, "Max deposit should return JTEff * coverage");
+        {
+            TRANCHE_UNIT maxDeposit = ST.maxDeposit(jtDepositor);
+            assertEq(maxDeposit, expectedMaxDeposit, "Max deposit should return JTEff * coverage");
+        }
 
         // Try to deposit more than the max deposit, it should revert
         TRANCHE_UNIT depositAmount = expectedMaxDeposit + toTrancheUnits(1);
@@ -185,17 +194,26 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
 
         // Deposit a percentage of the max deposit
         depositAmount = expectedMaxDeposit.mulDiv(_stDepositPercentage, 100, Math.Rounding.Floor);
+
+        // Preview the deposit
+        uint256 expectedSharesMinted = ST.previewDeposit(depositAmount);
+        assertTrue(expectedSharesMinted > 0, "Expected shares minted should be greater than 0");
+
+        // Perform the deposit
         vm.startPrank(stDepositor);
         USDC.approve(address(ST), toUint256(depositAmount));
-        uint256 sharesMinted = ST.deposit(depositAmount, stDepositor, stDepositor);
+        shares = ST.deposit(depositAmount, stDepositor, stDepositor);
         vm.stopPrank();
 
         // Assert that ST shares were minted to the user
-        assertGt(sharesMinted, 0, "Shares should be greater than 0");
-        assertEq(ST.balanceOf(stDepositor), sharesMinted, "User should receive shares");
+        assertGt(shares, 0, "Shares should be greater than 0");
+        assertEq(ST.balanceOf(stDepositor), shares, "User should receive shares");
+
+        // Verify that the shares minted are equal to the previewed shares
+        assertEq(shares, expectedSharesMinted, "Shares minted should be equal to the previewed shares");
 
         // Update the tranche state
-        _updateOnDeposit(stState, depositAmount, _toSTValue(depositAmount), sharesMinted, TrancheType.SENIOR);
+        _updateOnDeposit(stState, depositAmount, _toSTValue(depositAmount), shares, TrancheType.SENIOR);
 
         // Verify that the tranche state has been updated
         _verifyPreviewNAVs(stState, jtState, AAVE_MAX_ABS_TRANCH_UNIT_DELTA, AAVE_MAX_ABS_NAV_DELTA);
@@ -208,23 +226,105 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         assertEq(MOCK_UNDERLYING_ST_VAULT.balanceOf(address(KERNEL)), toUint256(depositAmount), "Underlying shares should be minted to the kernel");
 
         // Verify that ST.maxDeposit went down
-        expectedMaxDeposit = expectedMaxDeposit - depositAmount;
-        assertEq(ST.maxDeposit(stDepositor), expectedMaxDeposit, "Max deposit should go down expected amount");
+        assertEq(ST.maxDeposit(stDepositor), expectedMaxDeposit - depositAmount, "Max deposit should go down expected amount");
+
+        // Verify that JT.maxRedeem went down
+        assertApproxEqRel(
+            JT.maxRedeem(jtDepositor),
+            JT.totalSupply() * (100 - _stDepositPercentage) / 100,
+            MAX_REDEEM_RELATIVE_DELTA,
+            "Max redeem should go down expected amount"
+        );
+        {
+
+            // Verify that ST.convertToAssets returns the correct amount
+            AssetClaims memory convertToAssetsResult = ST.convertToAssets(shares);
+            assertApproxEqAbs(
+                convertToAssetsResult.stAssets, depositAmount, AAVE_MAX_ABS_TRANCH_UNIT_DELTA, "Convert to assets should return the correct amount"
+            );
+            assertEq(convertToAssetsResult.jtAssets, ZERO_TRANCHE_UNITS, "Convert to assets should return 0 JT assets");
+            assertApproxEqAbs(convertToAssetsResult.nav, _toSTValue(depositAmount), AAVE_MAX_ABS_NAV_DELTA, "Convert to assets should return the correct NAV");
+
+            // Verify that ST.previewRedeem returns the correct amount
+            AssetClaims memory previewRedeemResult = ST.previewRedeem(shares);
+            assertApproxEqAbs(previewRedeemResult.stAssets, depositAmount, AAVE_MAX_ABS_TRANCH_UNIT_DELTA, "Preview redeem should return the correct amount");
+            assertEq(previewRedeemResult.jtAssets, ZERO_TRANCHE_UNITS, "Preview redeem should return 0 JT assets");
+            assertApproxEqAbs(previewRedeemResult.nav, _toSTValue(depositAmount), AAVE_MAX_ABS_NAV_DELTA, "Preview redeem should return the correct NAV");
+
+            // Verify that ST.maxRedeem returns the correct amount
+            uint256 maxRedeem = ST.maxRedeem(stDepositor);
+            assertEq(maxRedeem, shares, "Max redeem should return the correct amount");
+        }
+
+        ////////////////////////////////////////////////////////////////////
+        /// Deposit rest of the deposit into ST, driving utilization to 100%
+        ////////////////////////////////////////////////////////////////////
+
+        // Preview the deposit
+        depositAmount = expectedMaxDeposit - depositAmount;
+        expectedSharesMinted = ST.previewDeposit(depositAmount);
+        assertTrue(expectedSharesMinted > 0, "Expected shares minted should be greater than 0");
+
+        uint256 stDepositorSharesBeforeDeposit = ST.balanceOf(stDepositor);
+        uint256 underlyingVaultSharesBalanceOfKernelBeforeDeposit = MOCK_UNDERLYING_ST_VAULT.balanceOf(address(KERNEL));
+        uint256 usdcBalanceOfMockUnderlyingVaultBeforeDeposit = USDC.balanceOf(address(MOCK_UNDERLYING_ST_VAULT));
+
+        // Perform the deposit
+        vm.startPrank(stDepositor);
+        USDC.approve(address(ST), toUint256(depositAmount));
+        shares = ST.deposit(depositAmount, stDepositor, stDepositor);
+        vm.stopPrank();
+
+        // Assert that ST shares were minted to the user
+        assertGt(shares, 0, "Shares should be greater than 0");
+        assertEq(ST.balanceOf(stDepositor), stDepositorSharesBeforeDeposit + shares, "User should receive shares");
+
+        // Verify that the shares minted are equal to the previewed shares
+        assertEq(shares, expectedSharesMinted, "Shares minted should be equal to the previewed shares");
+
+        // Update the tranche state
+        _updateOnDeposit(stState, depositAmount, _toSTValue(depositAmount), shares, TrancheType.SENIOR);
+
+        // Verify that the tranche state has been updated
+        _verifyPreviewNAVs(stState, jtState, AAVE_MAX_ABS_TRANCH_UNIT_DELTA, AAVE_MAX_ABS_NAV_DELTA);
+        _verifyFeeTaken(stState, jtState, PROTOCOL_FEE_RECIPIENT_ADDRESS);
+
+        // Verify that the amount was transferred to the underlying vault
+        assertEq(
+            USDC.balanceOf(address(MOCK_UNDERLYING_ST_VAULT)),
+            toUint256(depositAmount) + usdcBalanceOfMockUnderlyingVaultBeforeDeposit,
+            "Amount should be transferred to the underlying vault"
+        );
+
+        // Verify that underlying shares were minted to the kernel
+        assertEq(
+            MOCK_UNDERLYING_ST_VAULT.balanceOf(address(KERNEL)),
+            toUint256(depositAmount) + underlyingVaultSharesBalanceOfKernelBeforeDeposit,
+            "Underlying shares should be minted to the kernel"
+        );
+
+        // Verify that ST.maxDeposit went down to 0
+        assertEq(ST.maxDeposit(stDepositor), ZERO_TRANCHE_UNITS, "Max deposit should go down to 0");
+
+        // Verify that JT.maxRedeem went down to 0
+        assertEq(JT.maxRedeem(jtDepositor), 0, "Max redeem should go down to 0");
 
         // Verify that ST.convertToAssets returns the correct amount
-        AssetClaims memory convertToAssetsResult = ST.convertToAssets(sharesMinted);
-        assertApproxEqAbs(convertToAssetsResult.stAssets, depositAmount, AAVE_MAX_ABS_TRANCH_UNIT_DELTA, "Convert to assets should return the correct amount");
+        AssetClaims memory convertToAssetsResult = ST.convertToAssets(shares + stDepositorSharesBeforeDeposit);
+        assertApproxEqAbs(
+            convertToAssetsResult.stAssets, expectedMaxDeposit, AAVE_MAX_ABS_TRANCH_UNIT_DELTA, "Convert to assets should return the correct amount"
+        );
         assertEq(convertToAssetsResult.jtAssets, ZERO_TRANCHE_UNITS, "Convert to assets should return 0 JT assets");
-        assertApproxEqAbs(convertToAssetsResult.nav, _toSTValue(depositAmount), AAVE_MAX_ABS_NAV_DELTA, "Convert to assets should return the correct NAV");
+        assertApproxEqAbs(convertToAssetsResult.nav, _toSTValue(expectedMaxDeposit), AAVE_MAX_ABS_NAV_DELTA, "Convert to assets should return the correct NAV");
 
         // Verify that ST.previewRedeem returns the correct amount
-        AssetClaims memory previewRedeemResult = ST.previewRedeem(sharesMinted);
-        assertApproxEqAbs(previewRedeemResult.stAssets, depositAmount, AAVE_MAX_ABS_TRANCH_UNIT_DELTA, "Preview redeem should return the correct amount");
+        AssetClaims memory previewRedeemResult = ST.previewRedeem(shares + stDepositorSharesBeforeDeposit);
+        assertApproxEqAbs(previewRedeemResult.stAssets, expectedMaxDeposit, AAVE_MAX_ABS_TRANCH_UNIT_DELTA, "Preview redeem should return the correct amount");
         assertEq(previewRedeemResult.jtAssets, ZERO_TRANCHE_UNITS, "Preview redeem should return 0 JT assets");
-        assertApproxEqAbs(previewRedeemResult.nav, _toSTValue(depositAmount), AAVE_MAX_ABS_NAV_DELTA, "Preview redeem should return the correct NAV");
+        assertApproxEqAbs(previewRedeemResult.nav, _toSTValue(expectedMaxDeposit), AAVE_MAX_ABS_NAV_DELTA, "Preview redeem should return the correct NAV");
 
         // Verify that ST.maxRedeem returns the correct amount
         uint256 maxRedeem = ST.maxRedeem(stDepositor);
-        assertEq(maxRedeem, sharesMinted, "Max redeem should return the correct amount");
+        assertEq(maxRedeem, shares + stDepositorSharesBeforeDeposit, "Max redeem should return the correct amount");
     }
 }
