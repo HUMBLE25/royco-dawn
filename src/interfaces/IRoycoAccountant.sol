@@ -19,6 +19,8 @@ interface IRoycoAccountant {
      *                         For example, beta is 0 when JT is in the RFR and 1 when JT is in the same opportunity as senior
      * @custom:field ydm - The market's Yield Distribution Model (YDM), responsible for determining the ST's yield split between ST and JT
      * @custom:field ydmInitializationData - The data used to initialize the YDM for this market
+     * @custom:field fixedTermDurationSeconds - The duration of a fixed term for this market in seconds
+     * @custom:field lltvWAD - The liquidation loan to value (LLTV) for this market, scaled to WAD precision
      */
     struct RoycoAccountantInitParams {
         address kernel;
@@ -28,17 +30,22 @@ interface IRoycoAccountant {
         uint96 betaWAD;
         address ydm;
         bytes ydmInitializationData;
+        uint24 fixedTermDurationSeconds;
+        uint64 lltvWAD;
     }
 
     /**
      * @notice Storage state for the Royco Accountant
      * @custom:storage-location erc7201:Royco.storage.RoycoAccountantState
      * @custom:field kernel - The kernel that this accountant maintains NAV, impermanent loss, and fee accounting for
+     * @custom:field fixedTermEndTimestamp - The end timestamp of the currently ongoing fixed term (set to 0 if the market is in a perpetual state)
+     * @custom:field lltvWAD - The liquidation loan to value (LLTV) for this market, scaled to WAD precision
+     * @custom:field fixedTermDurationSeconds - The duration of a fixed term for this market in seconds
      * @custom:field coverageWAD - The coverage percentage that the senior tranche is expected to be protected by, scaled to WAD precision
-     * @custom:field betaWAD - JT's percentage sensitivity to the same downside stress that affects ST, scaled to WAD precision
-     *                         For example, beta is 0 when JT is in the RFR and 1e18 (100%) when JT is in the same opportunity as senior
      * @custom:field stProtocolFeeWAD - The market's configured protocol fee percentage taken from yield earned by the senior tranche, scaled to WAD precision
      * @custom:field jtProtocolFeeWAD - The market's configured protocol fee percentage taken from yield earned by the junior tranche, scaled to WAD precision
+     * @custom:field betaWAD - JT's percentage sensitivity to the same downside stress that affects ST, scaled to WAD precision
+     *                         For example, beta is 0 when JT is in the RFR and 1e18 (100%) when JT is in the same opportunity as senior
      * @custom:field ydm - The market's Yield Distribution Model (YDM), responsible for determining the ST's yield split between ST and JT
      * @custom:field lastSTRawNAV - The last recorded pure NAV (excluding any coverage taken and yield shared) of the senior tranche
      * @custom:field lastJTRawNAV - The last recorded pure NAV (excluding any coverage given and yield shared) of the junior tranche
@@ -54,9 +61,12 @@ interface IRoycoAccountant {
      */
     struct RoycoAccountantState {
         address kernel;
+        uint32 fixedTermEndTimestamp;
+        uint64 lltvWAD;
+        uint24 fixedTermDurationSeconds;
+        uint64 coverageWAD;
         uint64 stProtocolFeeWAD;
         uint64 jtProtocolFeeWAD;
-        uint64 coverageWAD;
         uint96 betaWAD;
         address ydm;
         NAV_UNIT lastSTRawNAV;
@@ -91,20 +101,23 @@ interface IRoycoAccountant {
      */
     event PostOpTrancheAccountingSynced(Operation op, SyncedAccountingState resultingState);
 
+    /// @notice Thrown when the accountant's coverage config is invalid
+    error INVALID_COVERAGE_CONFIG();
+
+    /// @notice Thrown when the configured protocol fee exceeds the maximum
+    error MAX_PROTOCOL_FEE_EXCEEDED();
+
+    /// @notice Thrown when the YDM address being set is null
+    error NULL_YDM_ADDRESS();
+
+    /// @notice Thrown when the market's LLTV being set is an invalid value in the context of the market's coverage
+    error INVALID_LLTV();
+
     /// @notice Thrown when the YDM failed to initialize
     error FAILED_TO_INITIALIZE_YDM(bytes data);
 
     /// @notice Thrown when the caller of the function is not the accountant's configured Royco Kernel
     error ONLY_ROYCO_KERNEL();
-
-    /// @notice Thrown when the accountant's coverage config is invalid
-    error INVALID_COVERAGE_CONFIG();
-
-    /// @notice Thrown when the YDM address is null on initialization
-    error NULL_YDM_ADDRESS();
-
-    /// @notice Thrown when the configured protocol fee exceeds the maximum
-    error MAX_PROTOCOL_FEE_EXCEEDED();
 
     /// @notice Thrown when the sum of the raw NAVs don't equal the sum of the effective NAVs of both tranches
     error NAV_CONSERVATION_VIOLATION();
@@ -199,39 +212,47 @@ interface IRoycoAccountant {
         returns (NAV_UNIT totalNAVClaimable, NAV_UNIT stClaimable, NAV_UNIT jtClaimable);
 
     /**
-     * @notice Updates the YDM (Yield Distribution Model) address
+     * @notice Updates the YDM (Yield Distribution Model) address for this market
      * @dev Only callable by a designated admin
      * @param _ydm The new YDM address to set
+     * @param _ydmInitializationData The data used to initialize the new YDM for this market
      */
-    function setYDM(address _ydm) external;
+    function setYDM(address _ydm, bytes calldata _ydmInitializationData) external;
 
     /**
-     * @notice Updates the senior tranche protocol fee percentage
+     * @notice Updates the senior tranche protocol fee percentage for this market
      * @dev Only callable by a designated admin
      * @param _stProtocolFeeWAD The new protocol fee percentage charged on senior tranche yield, scaled to WAD precision
      */
     function setSeniorTrancheProtocolFee(uint64 _stProtocolFeeWAD) external;
 
     /**
-     * @notice Updates the junior tranche protocol fee percentage
+     * @notice Updates the junior tranche protocol fee percentage for this market
      * @dev Only callable by a designated admin
      * @param _jtProtocolFeeWAD The new protocol fee percentage charged on junior tranche yield, scaled to WAD precision
      */
     function setJuniorTrancheProtocolFee(uint64 _jtProtocolFeeWAD) external;
 
     /**
-     * @notice Updates the coverage percentage requirement
+     * @notice Updates the coverage percentage requirement for this market
      * @dev Only callable by a designated admin
-     * @param _coverageWAD The new coverage percentage in WAD format
+     * @param _coverageWAD The new coverage percentage, scaled to WAD precision
      */
     function setCoverage(uint64 _coverageWAD) external;
 
     /**
-     * @notice Updates the beta sensitivity parameter
+     * @notice Updates the beta sensitivity parameter for this market
      * @dev Only callable by a designated admin
-     * @param _betaWAD The new beta parameter in WAD format representing JT's sensitivity to downside stress
+     * @param _betaWAD The new beta parameter representing JT's sensitivity to downside stress, scaled to WAD precision
      */
     function setBeta(uint96 _betaWAD) external;
+
+    /**
+     * @notice Updates the LLTV for this market
+     * @dev Only callable by a designated admin
+     * @param _lltvWAD The new liquidation loan to value (LLTV) for this market, scaled to WAD precision
+     */
+    function setLLTV(uint64 _lltvWAD) external;
 
     /**
      * @notice Returns the state of the accountant

@@ -13,7 +13,7 @@ import { NAV_UNIT, TRANCHE_UNIT } from "./Units.sol";
  * @custom:type FIXED_TERM_HEALTHY - There was a drawdown in the senior NAV and the market is in a fixed term regime
  *              ST withdrawals and JT deposits are blocked, and the LTV is healthy as per the market's configured LLTV
  * @custom:field FIXED_TERM_UNHEALTHY - There was a drawdown in the senior NAV and the market is in a fixed term regime
- *               The market is fully liquid however since the LTV is unhealthy as per the market's configured LLTV
+ *               The market is fully liquid since the LTV is unhealthy as per the market's configured LLTV
  */
 enum MarketState {
     PERPETUAL,
@@ -90,12 +90,12 @@ enum Action {
 /**
  * @title TrancheType
  * @dev Defines the two types of Royco tranches deployed per market.
- * @custom:type JUNIOR The identifier for the junior tranche (first-loss capital)
  * @custom:type SENIOR The identifier for the senior tranche (second-loss capital)
+ * @custom:type JUNIOR The identifier for the junior tranche (first-loss capital)
  */
 enum TrancheType {
-    JUNIOR,
-    SENIOR
+    SENIOR,
+    JUNIOR
 }
 
 /**

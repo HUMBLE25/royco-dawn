@@ -222,7 +222,7 @@ contract AdaptiveCurveYDM is IYDM {
          *          ((S - 1) * Δ + 1) * Y_T     if U >= 0.9  (at or above target)
          *
          * Y(U) → Percentage of ST yield paid to the junior tranche
-         * U    → Utilization = ((ST_RAW_NAV + (JT_RAW_NAV * BETA_%)) * COV_%) / JT_EFFECTIVE_NAV
+         * U    → Utilization = ((ST_RAW_NAV + (JT_RAW_NAV * β)) * COV) / JT_EFFECTIVE_NAV
          * S    → Steepness of the curve for this market (ratio of yield share at 100% utilization to yield share at target)
          * Δ    → Normalized delta from target utilization: Δ ∈ [-1, 1]
          *        Above target: Δ = (U - 0.9) / 0.1

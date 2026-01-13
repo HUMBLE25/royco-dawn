@@ -121,7 +121,7 @@ contract StaticCurveYDM is IYDM {
          *        = Y_T + S_gte * (U - 0.9)       if U >= 0.9 (at or above target)
          *
          * Y(U)  → Percentage of ST yield paid to the junior tranche
-         * U     → Utilization = ((ST_RAW_NAV + (JT_RAW_NAV * BETA_%)) * COV_%) / JT_EFFECTIVE_NAV
+         * U     → Utilization = ((ST_RAW_NAV + (JT_RAW_NAV * β)) * COV) / JT_EFFECTIVE_NAV
          * Y_0   → JT yield share at zero utilization
          * Y_T   → JT yield share at target (90%) utilization
          * S_lt  → Slope below target utilization: (Y_T - Y_0) / 0.9

@@ -38,25 +38,21 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
      * @param _initialAuthority The initial authority for the Royco accountant
      */
     function initialize(RoycoAccountantInitParams calldata _params, address _initialAuthority) external initializer {
-        // Validate the inital coverage requirement
-        _validateCoverageRequirement(_params.coverageWAD, _params.betaWAD);
-        // Ensure that the YDM is not null
-        require(_params.ydm != address(0), NULL_YDM_ADDRESS());
-        // Ensure that the protocol fee percentage is valid
-        require(_params.stProtocolFeeWAD <= MAX_PROTOCOL_FEE_WAD && _params.jtProtocolFeeWAD <= MAX_PROTOCOL_FEE_WAD, MAX_PROTOCOL_FEE_EXCEEDED());
-
         // Initialize the base state of the accountant
         __RoycoBase_init(_initialAuthority);
 
-        // Initialize the YDM if required
-        if (_params.ydmInitializationData.length != 0) {
-            (bool success, bytes memory data) = _params.ydm.call(_params.ydmInitializationData);
-            require(success, FAILED_TO_INITIALIZE_YDM(data));
-        }
+        // Ensure that the protocol fee percentage is valid
+        require(_params.stProtocolFeeWAD <= MAX_PROTOCOL_FEE_WAD && _params.jtProtocolFeeWAD <= MAX_PROTOCOL_FEE_WAD, MAX_PROTOCOL_FEE_EXCEEDED());
+        // Validate the market's inital coverage configuration
+        _validateCoverageConfig(_params.coverageWAD, _params.betaWAD, _params.lltvWAD);
+        // Initialize the YDM for this market
+        _initializeYDM(_params.ydm, _params.ydmInitializationData);
 
         // Initialize the state of the accountant
         RoycoAccountantState storage $ = _getRoycoAccountantStorage();
         $.kernel = _params.kernel;
+        $.lltvWAD = _params.lltvWAD;
+        $.fixedTermDurationSeconds = _params.fixedTermDurationSeconds;
         $.stProtocolFeeWAD = _params.stProtocolFeeWAD;
         $.jtProtocolFeeWAD = _params.jtProtocolFeeWAD;
         $.coverageWAD = _params.coverageWAD;
@@ -215,12 +211,12 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
      * @inheritdoc IRoycoAccountant
      * @dev Junior capital must be sufficient to absorb losses to the senior exposure up to the coverage ratio
      * @dev Informally: junior loss absorbtion buffer >= total covered exposure
-     * @dev Formally: JT_EFFECTIVE_NAV >= (ST_RAW_NAV + (JT_RAW_NAV * BETA_%)) * COV_%
+     * @dev Formally: JT_EFFECTIVE_NAV >= (ST_RAW_NAV + (JT_RAW_NAV * β)) * COV
      *      JT_EFFECTIVE_NAV is JT's current loss absorbtion buffer after applying all prior JT yield accrual and coverage adjustments
      *      ST_RAW_NAV and JT_RAW_NAV are the mark-to-market NAVs of the tranches
-     *      BETA_% is the JT's sensitivity to the same downside stress that affects ST (eg. 0 if JT is in RFR and 1 if JT and ST are in the same opportunity)
+     *      β is the JT's sensitivity to the same downside stress that affects ST (eg. 0 if JT is in RFR and 1 if JT and ST are in the same opportunity)
      * @dev If we rearrange the coverage requirement, we get:
-     *      1 >= ((ST_RAW_NAV + (JT_RAW_NAV * BETA_%)) * COV_%) / JT_EFFECTIVE_NAV
+     *      1 >= ((ST_RAW_NAV + (JT_RAW_NAV * β)) * COV) / JT_EFFECTIVE_NAV
      *      Notice that the RHS is identical to how we define utilization
      *      Hence, the coverage requirement can be written as 1 >= Utilization, or equivalently, Utilization <= 1
      */
@@ -234,9 +230,9 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
 
     /**
      * @inheritdoc IRoycoAccountant
-     * @dev Coverage Invariant: JT_EFFECTIVE_NAV >= (ST_RAW_NAV + (JT_RAW_NAV * BETA_%)) * COV_%
-     * @dev Max assets depositable into ST, x: JT_EFFECTIVE_NAV = ((ST_RAW_NAV + x) + (JT_RAW_NAV * BETA_%)) * COV_%
-     *      Isolate x: x = (JT_EFFECTIVE_NAV / COV_%) - (JT_RAW_NAV * BETA_%) - ST_RAW_NAV
+     * @dev Coverage Invariant: JT_EFFECTIVE_NAV >= (ST_RAW_NAV + (JT_RAW_NAV * β)) * COV
+     * @dev Max assets depositable into ST, x: JT_EFFECTIVE_NAV = ((ST_RAW_NAV + x) + (JT_RAW_NAV * β)) * COV
+     *      Isolate x: x = (JT_EFFECTIVE_NAV / COV) - (JT_RAW_NAV * β) - ST_RAW_NAV
      */
     function maxSTDepositGivenCoverage(NAV_UNIT _stRawNAV, NAV_UNIT _jtRawNAV) external view override(IRoycoAccountant) returns (NAV_UNIT maxSTDeposit) {
         // Get the storage pointer to the base kernel state
@@ -256,13 +252,13 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
 
     /**
      * @inheritdoc IRoycoAccountant
-     * @dev Coverage Invariant: JT_EFFECTIVE_NAV >= (ST_RAW_NAV + (JT_RAW_NAV * BETA_%)) * COV_%
+     * @dev Coverage Invariant: JT_EFFECTIVE_NAV >= (ST_RAW_NAV + (JT_RAW_NAV * β)) * COV
      * @dev When assets are claimed from the JT, they are always liquidated in the same proportion as the tranche's total claims on the ST and JT assets
      * @dev Let S be the JT's total claims on ST assets and J be the JT's total claims on JT assets, in NAV Units. The total claims on the ST and JT assets are S + J NAV Units
      * @dev Let K_S be S / (S + J) and K_J be J / (S + J)
      * @dev Therefore, if a total NAV of y is claimed from the JT, K_S * y will be claimed from the ST_RAW_NAV and K_J * y will be claimed from the JT_RAW_NAV
-     * @dev Max assets withdrawable from JT, y: (JT_EFFECTIVE_NAV - y) = ((ST_RAW_NAV - K_S * y) + ((JT_RAW_NAV - K_J * y) * BETA_%)) * COV_%
-     *      Isolate y: y = (JT_EFFECTIVE_NAV - (COV_% * (ST_RAW_NAV + (JT_RAW_NAV * BETA_%)))) / (1 - (COV_% * (K_S + BETA_% * K_J)))
+     * @dev Max assets withdrawable from JT, y: (JT_EFFECTIVE_NAV - y) = ((ST_RAW_NAV - K_S * y) + ((JT_RAW_NAV - K_J * y) * β)) * COV
+     *      Isolate y: y = (JT_EFFECTIVE_NAV - (COV * (ST_RAW_NAV + (JT_RAW_NAV * β)))) / (1 - (COV * (K_S + β * K_J)))
      */
     function maxJTWithdrawalGivenCoverage(
         NAV_UNIT _stRawNAV,
@@ -537,10 +533,9 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
     }
 
     /// @inheritdoc IRoycoAccountant
-    function setYDM(address _ydm) external override(IRoycoAccountant) restricted withSyncedAccounting {
-        // Ensure that the YDM is not null
-        require(_ydm != address(0), NULL_YDM_ADDRESS());
-        // Set the new YDM
+    function setYDM(address _ydm, bytes calldata _ydmInitializationData) external override(IRoycoAccountant) restricted withSyncedAccounting {
+        // Initialize and set the new YDM for this market
+        _initializeYDM(_ydm, _ydmInitializationData);
         _getRoycoAccountantStorage().ydm = _ydm;
     }
 
@@ -563,8 +558,8 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
     /// @inheritdoc IRoycoAccountant
     function setCoverage(uint64 _coverageWAD) external override(IRoycoAccountant) restricted withSyncedAccounting {
         RoycoAccountantState storage $ = _getRoycoAccountantStorage();
-        // Validate the new coverage requirement
-        _validateCoverageRequirement(_coverageWAD, $.betaWAD);
+        // Validate the new coverage configuration
+        _validateCoverageConfig(_coverageWAD, $.betaWAD, $.lltvWAD);
         // Set the new coverage percentage
         $.coverageWAD = _coverageWAD;
     }
@@ -572,10 +567,19 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
     /// @inheritdoc IRoycoAccountant
     function setBeta(uint96 _betaWAD) external override(IRoycoAccountant) restricted withSyncedAccounting {
         RoycoAccountantState storage $ = _getRoycoAccountantStorage();
-        // Validate the new coverage requirement
-        _validateCoverageRequirement($.coverageWAD, _betaWAD);
+        // Validate the new coverage configuration
+        _validateCoverageConfig($.coverageWAD, _betaWAD, $.lltvWAD);
         // Set the new beta parameter
         $.betaWAD = _betaWAD;
+    }
+
+    /// @inheritdoc IRoycoAccountant
+    function setLLTV(uint64 _lltvWAD) external override(IRoycoAccountant) restricted withSyncedAccounting {
+        RoycoAccountantState storage $ = _getRoycoAccountantStorage();
+        // Validate the new coverage configuration
+        _validateCoverageConfig($.coverageWAD, $.betaWAD, _lltvWAD);
+        // Set the new LLTV parameter
+        $.lltvWAD = _lltvWAD;
     }
 
     /// @inheritdoc IRoycoAccountant
@@ -586,13 +590,61 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
     /**
      * @notice Validates the coverage requirement parameters of the market
      * @param _coverageWAD The coverage ratio that the senior tranche is expected to be protected by, scaled to WAD precision
-     * @param _betaWAD The JT's sensitivity to the same downside stress that affects ST, scaled to WAD precisiong
+     * @param _betaWAD The JT's sensitivity to the same downside stress that affects ST, scaled to WAD precision
+     * @param _lltvWAD The liquidation loan to value (LLTV) for this market, scaled to WAD precision
      */
-    function _validateCoverageRequirement(uint64 _coverageWAD, uint96 _betaWAD) internal pure {
+    function _validateCoverageConfig(uint64 _coverageWAD, uint96 _betaWAD, uint64 _lltvWAD) internal pure {
         // Ensure that the coverage requirement is valid
         require((_coverageWAD >= MIN_COVERAGE_WAD) && (_coverageWAD < WAD), INVALID_COVERAGE_CONFIG());
         // Ensure that JT withdrawals are not permanently bricked
         require(uint256(_coverageWAD).mulDiv(_betaWAD, WAD, Math.Rounding.Ceil) < WAD, INVALID_COVERAGE_CONFIG());
+        /**
+         * Ensure that the LLTV is set correctly (between the max allowed initial LTV and 100%)
+         * Maximum Initial LTV Derivation:
+         * Given:
+         *   LTV = ST_EFFECTIVE_NAV / (ST_EFFECTIVE_NAV + JT_EFFECTIVE_NAV)
+         *   Initial Utilization = ((ST_EFFECTIVE_NAV + JT_RAW_NAV * β) * COV) / JT_EFFECTIVE_NAV
+         *   Note: JT_RAW_NAV == JT_EFFECTIVE_NAV initially since no losses have been incurred by ST
+         *   Initial Utilization = ((ST_EFFECTIVE_NAV + JT_EFFECTIVE_NAV * β) * COV) / JT_EFFECTIVE_NAV
+         *
+         * At Utilization = 1 (boundary of proper collateralization), solving for JT_EFFECTIVE_NAV:
+         *   1 = ((ST_EFFECTIVE_NAV + JT_EFFECTIVE_NAV * β) * COV) / JT_EFFECTIVE_NAV
+         *   JT_EFFECTIVE_NAV = (ST_EFFECTIVE_NAV + JT_EFFECTIVE_NAV * β) * COV
+         *   JT_EFFECTIVE_NAV = ST_EFFECTIVE_NAV * COV + JT_EFFECTIVE_NAV * β * COV
+         *   JT_EFFECTIVE_NAV - JT_EFFECTIVE_NAV * β * COV = ST_EFFECTIVE_NAV * COV
+         *   JT_EFFECTIVE_NAV * (1 - β * COV) = ST_EFFECTIVE_NAV * COV
+         *   JT_EFFECTIVE_NAV = ST_EFFECTIVE_NAV * COV / (1 - β * COV)
+         *
+         * Substituting JT_EFFECTIVE_NAV into LTV:
+         *   LTV = ST_EFFECTIVE_NAV / (ST_EFFECTIVE_NAV + ST_EFFECTIVE_NAV * COV / (1 - β * COV))
+         *       = 1 / (1 + COV / (1 - β * COV))
+         *       = (1 - β * COV) / (1 - β * COV + COV)
+         *       = (1 - β * COV) / (1 + COV - β * COV)
+         *       = (1 - β * COV) / (1 + COV * (1 - β))
+         *
+         * This represents the maximum initial LTV when the market is exactly at Utilization = 1
+         * LLTV must be strictly greater than this value to ensure it can only be breached after JT capital has started absorbing ST losses
+         */
+        uint256 betaCov = uint256(_betaWAD).mulDiv(_coverageWAD, WAD, Math.Rounding.Floor);
+        uint256 numerator = WAD - betaCov;
+        uint256 denominator = WAD + uint256(_coverageWAD).mulDiv(WAD - _betaWAD, WAD, Math.Rounding.Floor);
+        uint256 maxLTV = numerator.mulDiv(WAD, denominator, Math.Rounding.Ceil);
+        require(maxLTV < _lltvWAD && _lltvWAD < WAD, INVALID_LLTV());
+    }
+
+    /**
+     * @notice Initializes the YDM (Yield Distribution Model) if required for this market
+     * @param _ydm The new YDM address to set
+     * @param _ydmInitializationData The data used to initialize the new YDM for this market
+     */
+    function _initializeYDM(address _ydm, bytes calldata _ydmInitializationData) internal {
+        // Ensure that the YDM is not null
+        require(_ydm != address(0), NULL_YDM_ADDRESS());
+        // Initialize the YDM if required
+        if (_ydmInitializationData.length != 0) {
+            (bool success, bytes memory data) = _ydm.call(_ydmInitializationData);
+            require(success, FAILED_TO_INITIALIZE_YDM(data));
+        }
     }
 
     /**
