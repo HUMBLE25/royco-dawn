@@ -38,7 +38,7 @@ contract LossWaterfall is MainnetForkWithAaveTestBase {
 
         // Deposit into junior tranche
         vm.prank(depositor);
-        uint256 shares = JT.deposit(toTrancheUnits(_assets), depositor, depositor);
+        (uint256 shares,) = JT.deposit(toTrancheUnits(_assets), depositor, depositor);
         AssetClaims memory postDepositUserClaims = JT.convertToAssets(shares);
         (SyncedAccountingState memory postDepositState, AssetClaims memory postDepositTotalClaims,) = KERNEL.previewSyncTrancheAccounting(TrancheType.JUNIOR);
 
@@ -86,7 +86,7 @@ contract LossWaterfall is MainnetForkWithAaveTestBase {
 
         // Deposit into junior tranche
         vm.prank(depositor);
-        uint256 shares = JT.deposit(toTrancheUnits(_assets), depositor, depositor);
+        (uint256 shares,) = JT.deposit(toTrancheUnits(_assets), depositor, depositor);
         AssetClaims memory postDepositUserClaims = JT.convertToAssets(shares);
         (SyncedAccountingState memory postDepositState, AssetClaims memory postDepositTotalClaims,) = KERNEL.previewSyncTrancheAccounting(TrancheType.JUNIOR);
 
@@ -123,7 +123,7 @@ contract LossWaterfall is MainnetForkWithAaveTestBase {
         TRANCHE_UNIT depositAmount = expectedMaxDeposit.mulDiv(_stDepositPercentage, 100, Math.Rounding.Floor);
         vm.startPrank(stDepositor);
         USDC.approve(address(ST), toUint256(depositAmount));
-        uint256 shares = ST.deposit(depositAmount, stDepositor, stDepositor);
+        (uint256 shares,) = ST.deposit(depositAmount, stDepositor, stDepositor);
         vm.stopPrank();
         AssetClaims memory postDepositSTUserClaims = ST.convertToAssets(shares);
         (SyncedAccountingState memory postDepositState, AssetClaims memory postDepositSTTotalClaims,) = KERNEL.previewSyncTrancheAccounting(TrancheType.SENIOR);
@@ -172,7 +172,7 @@ contract LossWaterfall is MainnetForkWithAaveTestBase {
         TRANCHE_UNIT depositAmount = expectedMaxDeposit.mulDiv(_stDepositPercentage, 100, Math.Rounding.Floor);
         vm.startPrank(stDepositor);
         USDC.approve(address(ST), toUint256(depositAmount));
-        uint256 shares = ST.deposit(depositAmount, stDepositor, stDepositor);
+        (uint256 shares,) = ST.deposit(depositAmount, stDepositor, stDepositor);
         vm.stopPrank();
         AssetClaims memory postDepositSTUserClaims = ST.convertToAssets(shares);
         (SyncedAccountingState memory postDepositState, AssetClaims memory postDepositSTTotalClaims,) = KERNEL.previewSyncTrancheAccounting(TrancheType.SENIOR);
@@ -196,8 +196,8 @@ contract LossWaterfall is MainnetForkWithAaveTestBase {
         assertLt(toUint256(postLossSTTotalClaims.stAssets), toUint256(postDepositSTTotalClaims.stAssets), "ST LP claims must reflect the gain");
         assertLt(toUint256(postLossJTTotalClaims.jtAssets), toUint256(postDepositJTTotalClaims.jtAssets), "JT LP claims must reflect the gain");
 
-        assertGt(toUint256(postLossState.stCoverageDebt), toUint256(postDepositState.stCoverageDebt), "JT raw NAV must reflect the gain");
-        assertGe(toUint256(postLossState.jtCoverageDebt), toUint256(postDepositState.jtCoverageDebt), "JT raw NAV must reflect the gain");
+        assertGt(toUint256(postLossState.jtImpermanentLoss), toUint256(postDepositState.jtImpermanentLoss), "JT raw NAV must reflect the gain");
+        assertGe(toUint256(postLossState.stImpermanentLoss), toUint256(postDepositState.stImpermanentLoss), "JT raw NAV must reflect the gain");
         assertLt(toUint256(postLossState.jtEffectiveNAV), toUint256(postDepositState.jtEffectiveNAV), "JT raw NAV must reflect the gain");
         assertLe(toUint256(postLossState.stEffectiveNAV), toUint256(postDepositState.stEffectiveNAV), "JT raw NAV must reflect the gain");
     }

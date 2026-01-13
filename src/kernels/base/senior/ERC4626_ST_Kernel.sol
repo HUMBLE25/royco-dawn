@@ -4,8 +4,7 @@ pragma solidity ^0.8.28;
 import { IERC4626 } from "../../../../lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 import { IERC20, SafeERC20 } from "../../../../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import { ExecutionModel, IRoycoKernel, SharesRedemptionModel } from "../../../interfaces/kernel/IRoycoKernel.sol";
-import { AssetClaims } from "../../../libraries/Types.sol";
-import { SyncedAccountingState } from "../../../libraries/Types.sol";
+import { AssetClaims, SyncedAccountingState } from "../../../libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib, toTrancheUnits, toUint256 } from "../../../libraries/Units.sol";
 import { ERC4626KernelState, ERC4626KernelStorageLib } from "../../../libraries/kernels/ERC4626KernelStorageLib.sol";
 import { RoycoKernel, TrancheType } from "../RoycoKernel.sol";
@@ -111,7 +110,8 @@ abstract contract ERC4626_ST_Kernel is RoycoKernel {
             // If the vault has insufficient liquidity to withdraw the specified assets, transfer the equivalent number of shares to the receiver
         } else {
             // Transfer the assets equivalent of shares to the receiver
-            uint256 sharesEquivalentToWithdraw = ($.stOwnedShares -= stVault.convertToShares(toUint256(_stAssets)));
+            uint256 sharesEquivalentToWithdraw = stVault.convertToShares(toUint256(_stAssets));
+            $.stOwnedShares -= sharesEquivalentToWithdraw;
             IERC20(address(stVault)).safeTransfer(_receiver, sharesEquivalentToWithdraw);
         }
     }

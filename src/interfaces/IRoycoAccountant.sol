@@ -11,57 +11,88 @@ import { NAV_UNIT } from "../libraries/Units.sol";
 interface IRoycoAccountant {
     /**
      * @notice Initialization parameters for the Royco Accountant
-     * @custom:field kernel - The kernel that this accountant maintains NAV, debt, and fee accounting for
-     * @custom:field protocolFeeWAD - The market's configured protocol fee percentage taken from yield earned by senior and junior tranches, scaled to WAD precision
+     * @custom:field kernel - The kernel that this accountant maintains NAV, impermanent loss, and fee accounting for
+     * @custom:field stProtocolFeeWAD - The market's configured protocol fee percentage taken from yield earned by the senior tranche, scaled to WAD precision
+     * @custom:field jtProtocolFeeWAD - The market's configured protocol fee percentage taken from yield earned by the junior tranche, scaled to WAD precision
      * @custom:field coverageWAD - The coverage ratio that the senior tranche is expected to be protected by, scaled to WAD precision
      * @custom:field betaWAD - The junior tranche's sensitivity to the same downside stress that affects the senior tranche, scaled to WAD precision
      *                         For example, beta is 0 when JT is in the RFR and 1 when JT is in the same opportunity as senior
-     * @custom:field rdm - The market's Reward Distribution Model (RDM), responsible for determining the ST's yield split between ST and JT
-     * @custom:field protocolFeeRecipient - The market's configured protocol fee recipient
+     * @custom:field ydm - The market's Yield Distribution Model (YDM), responsible for determining the ST's yield split between ST and JT
+     * @custom:field ydmInitializationData - The data used to initialize the YDM for this market
      */
     struct RoycoAccountantInitParams {
         address kernel;
-        uint64 protocolFeeWAD;
+        uint64 stProtocolFeeWAD;
+        uint64 jtProtocolFeeWAD;
         uint64 coverageWAD;
         uint96 betaWAD;
-        address rdm;
+        address ydm;
+        bytes ydmInitializationData;
     }
 
     /**
      * @notice Storage state for the Royco Accountant
      * @custom:storage-location erc7201:Royco.storage.RoycoAccountantState
-     * @custom:field kernel - The kernel that this accountant maintains NAV, debt, and fee accounting for
+     * @custom:field kernel - The kernel that this accountant maintains NAV, impermanent loss, and fee accounting for
      * @custom:field coverageWAD - The coverage percentage that the senior tranche is expected to be protected by, scaled to WAD precision
      * @custom:field betaWAD - JT's percentage sensitivity to the same downside stress that affects ST, scaled to WAD precision
      *                         For example, beta is 0 when JT is in the RFR and 1e18 (100%) when JT is in the same opportunity as senior
-     * @custom:field protocolFeeWAD - The market's configured protocol fee percentage taken from yield earned by senior and junior tranches, scaled to WAD precision
-     * @custom:field rdm - The market's Reward Distribution Model (RDM), responsible for determining the ST's yield split between ST and JT
+     * @custom:field stProtocolFeeWAD - The market's configured protocol fee percentage taken from yield earned by the senior tranche, scaled to WAD precision
+     * @custom:field jtProtocolFeeWAD - The market's configured protocol fee percentage taken from yield earned by the junior tranche, scaled to WAD precision
+     * @custom:field ydm - The market's Yield Distribution Model (YDM), responsible for determining the ST's yield split between ST and JT
      * @custom:field lastSTRawNAV - The last recorded pure NAV (excluding any coverage taken and yield shared) of the senior tranche
      * @custom:field lastJTRawNAV - The last recorded pure NAV (excluding any coverage given and yield shared) of the junior tranche
      * @custom:field lastSTEffectiveNAV - The last recorded effective NAV (including any prior applied coverage, ST yield distribution, and uncovered losses) of the senior tranche
      * @custom:field lastJTEffectiveNAV - The last recorded effective NAV (including any prior provided coverage, JT yield, ST yield distribution, and JT losses) of the junior tranche
-     * @custom:field lastJTCoverageDebt - The losses that ST incurred after exhausting the JT loss-absorption buffer: represents the first claim on capital the senior tranche has on future recoveries
-     * @custom:field lastSTCoverageDebt - The coverage that has been applied to ST from the JT loss-absorption buffer : represents the second claim on capital the junior tranche has on future recoveries
-     * @custom:field twJTYieldShareAccruedWAD - The time-weighted junior tranche yield share (RDM output) since the last yield distribution, scaled to WAD precision
-     * @custom:field lastAccrualTimestamp - The last time the time-weighted JT yield share accumulator was updated
-     * @custom:field lastDistributionTimestamp - The last time a yield distribution occurred
+     * @custom:field lastSTImpermanentLoss - The impermanent loss that ST has suffered after exhausting JT's loss-absorption buffer
+     *                                       This represents the first claim on capital that the senior tranche has on future recoveries
+     * @custom:field lastJTImpermanentLoss - The impermanent loss that JT has suffered after providing coverage for ST losses
+     *                                       This represents the second claim on capital that the junior tranche has on future recoveries
+     * @custom:field twJTYieldShareAccruedWAD - The time-weighted junior tranche yield share (YDM output) since the last yield distribution, scaled to WAD precision
+     * @custom:field lastAccrualTimestamp - The timestamp at which the time-weighted JT yield share accumulator was last updated
+     * @custom:field lastDistributionTimestamp - The timestamp at which the last ST yield distribution occurred
      */
     struct RoycoAccountantState {
         address kernel;
-        uint64 protocolFeeWAD;
+        uint64 stProtocolFeeWAD;
+        uint64 jtProtocolFeeWAD;
         uint64 coverageWAD;
         uint96 betaWAD;
-        address rdm;
+        address ydm;
         NAV_UNIT lastSTRawNAV;
         NAV_UNIT lastJTRawNAV;
         NAV_UNIT lastSTEffectiveNAV;
         NAV_UNIT lastJTEffectiveNAV;
-        NAV_UNIT lastJTCoverageDebt;
-        NAV_UNIT lastSTCoverageDebt;
+        NAV_UNIT lastSTImpermanentLoss;
+        NAV_UNIT lastJTImpermanentLoss;
         uint192 twJTYieldShareAccruedWAD;
         uint32 lastAccrualTimestamp;
         uint32 lastDistributionTimestamp;
     }
+
+    /**
+     * @notice Emitted when JT's share of ST yield is accrued based on the market's utilization since the last accrual
+     * @param jtYieldShareWAD JT's instantaneous yield share (YDM output) based on utilization since the last accrual
+     * @param twJTYieldShareAccruedWAD The time-weighted JT yield share accrued since the last yield distribution
+     * @param accrualTimestamp The timestamp of this JT yield share accrual
+     */
+    event JuniorTrancheYieldShareAccrued(uint256 jtYieldShareWAD, uint256 twJTYieldShareAccruedWAD, uint32 accrualTimestamp);
+
+    /**
+     * @notice Emitted when a pre-operation tranche accounting synchronization is executed
+     * @param resultingState The resulting market state after synchronizing the tranche accounting
+     */
+    event PreOpTrancheAccountingSynced(SyncedAccountingState resultingState);
+
+    /**
+     * @notice Emitted when a post-operation tranche accounting synchronization is executed
+     * @param op The operation executed right before this accounting synchronization
+     * @param resultingState The resulting market state after synchronizing the tranche accounting
+     */
+    event PostOpTrancheAccountingSynced(Operation op, SyncedAccountingState resultingState);
+
+    /// @notice Thrown when the YDM failed to initialize
+    error FAILED_TO_INITIALIZE_YDM(bytes data);
 
     /// @notice Thrown when the caller of the function is not the accountant's configured Royco Kernel
     error ONLY_ROYCO_KERNEL();
@@ -69,8 +100,8 @@ interface IRoycoAccountant {
     /// @notice Thrown when the accountant's coverage config is invalid
     error INVALID_COVERAGE_CONFIG();
 
-    /// @notice Thrown when the RDM address is null on initialization
-    error NULL_RDM_ADDRESS();
+    /// @notice Thrown when the YDM address is null on initialization
+    error NULL_YDM_ADDRESS();
 
     /// @notice Thrown when the configured protocol fee exceeds the maximum
     error MAX_PROTOCOL_FEE_EXCEEDED();
@@ -85,13 +116,13 @@ interface IRoycoAccountant {
     error COVERAGE_REQUIREMENT_UNSATISFIED();
 
     /**
-     * @notice Synchronizes the effective NAVs and debt obligations of both tranches before any tranche operation (deposit or withdrawal)
-     * @dev Accrues JT yield share over time based on the market's RDM output
+     * @notice Synchronizes the effective NAVs and impermanent losses of both tranches before any tranche operation (deposit or withdrawal)
+     * @dev Accrues JT yield share over time based on the market's YDM output
      * @dev Applies unrealized PnL and yield distribution
-     * @dev Persists updated NAV and debt checkpoints for the next sync to use as reference
+     * @dev Persists updated NAV and impermanent loss checkpoints for the next sync to use as reference
      * @param _stRawNAV The senior tranche's current raw NAV: the pure value of its invested assets
      * @param _jtRawNAV The junior tranche's current raw NAV: the pure value of its invested assets
-     * @return state The synced NAV, debt, and fee accounting containing all mark to market accounting data
+     * @return state The synced NAV, impermanent loss, and fee accounting containing all mark to market accounting data
      */
     function preOpSyncTrancheAccounting(NAV_UNIT _stRawNAV, NAV_UNIT _jtRawNAV) external returns (SyncedAccountingState memory state);
 
@@ -99,7 +130,7 @@ interface IRoycoAccountant {
      * @notice Previews a synchronization of tranche NAVs based on the underlying PNL(s) and their effects on the current state of the loss waterfall
      * @param _stRawNAV The senior tranche's current raw NAV: the pure value of its invested assets
      * @param _jtRawNAV The junior tranche's current raw NAV: the pure value of its invested assets
-     * @return state The synced NAV, debt, and fee accounting containing all mark to market accounting data
+     * @return state The synced NAV, impermanent loss, and fee accounting containing all mark to market accounting data
      */
     function previewSyncTrancheAccounting(NAV_UNIT _stRawNAV, NAV_UNIT _jtRawNAV) external view returns (SyncedAccountingState memory state);
 
@@ -109,7 +140,7 @@ interface IRoycoAccountant {
      * @param _stRawNAV The senior tranche's current raw NAV: the pure value of its invested assets
      * @param _jtRawNAV The junior tranche's current raw NAV: the pure value of its invested assets
      * @param _op The operation being executed in between the pre and post synchronizations
-     * @return state The synced NAV, debt, and fee accounting containing all mark to market accounting data
+     * @return state The synced NAV, impermanent loss, and fee accounting containing all mark to market accounting data
      */
     function postOpSyncTrancheAccounting(NAV_UNIT _stRawNAV, NAV_UNIT _jtRawNAV, Operation _op) external returns (SyncedAccountingState memory state);
 
@@ -120,7 +151,7 @@ interface IRoycoAccountant {
      * @param _stRawNAV The senior tranche's current raw NAV: the pure value of its invested assets
      * @param _jtRawNAV The junior tranche's current raw NAV: the pure value of its invested assets
      * @param _op The operation being executed in between the pre and post synchronizations
-     * @return state The synced NAV, debt, and fee accounting containing all mark to market accounting data
+     * @return state The synced NAV, impermanent loss, and fee accounting containing all mark to market accounting data
      */
     function postOpSyncTrancheAccountingAndEnforceCoverage(
         NAV_UNIT _stRawNAV,
@@ -168,18 +199,25 @@ interface IRoycoAccountant {
         returns (NAV_UNIT totalNAVClaimable, NAV_UNIT stClaimable, NAV_UNIT jtClaimable);
 
     /**
-     * @notice Updates the RDM (Reward Distribution Model) address
+     * @notice Updates the YDM (Yield Distribution Model) address
      * @dev Only callable by a designated admin
-     * @param _rdm The new RDM address to set
+     * @param _ydm The new YDM address to set
      */
-    function setRDM(address _rdm) external;
+    function setYDM(address _ydm) external;
 
     /**
-     * @notice Updates the protocol fee percentage
+     * @notice Updates the senior tranche protocol fee percentage
      * @dev Only callable by a designated admin
-     * @param _protocolFeeWAD The new protocol fee percentage in WAD format
+     * @param _stProtocolFeeWAD The new protocol fee percentage charged on senior tranche yield, scaled to WAD precision
      */
-    function setProtocolFee(uint64 _protocolFeeWAD) external;
+    function setSeniorTrancheProtocolFee(uint64 _stProtocolFeeWAD) external;
+
+    /**
+     * @notice Updates the junior tranche protocol fee percentage
+     * @dev Only callable by a designated admin
+     * @param _jtProtocolFeeWAD The new protocol fee percentage charged on junior tranche yield, scaled to WAD precision
+     */
+    function setJuniorTrancheProtocolFee(uint64 _jtProtocolFeeWAD) external;
 
     /**
      * @notice Updates the coverage percentage requirement

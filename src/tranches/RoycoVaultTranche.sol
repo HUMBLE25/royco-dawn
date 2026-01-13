@@ -9,7 +9,6 @@ import { SafeERC20 } from "../../lib/openzeppelin-contracts/contracts/token/ERC2
 import { Math } from "../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 import { RoycoBase } from "../base/RoycoBase.sol";
 import { IAsyncJTDepositKernel } from "../interfaces/kernel/IAsyncJTDepositKernel.sol";
-
 import { IAsyncSTDepositKernel } from "../interfaces/kernel/IAsyncSTDepositKernel.sol";
 import { IAsyncSTWithdrawalKernel } from "../interfaces/kernel/IAsyncSTWithdrawalKernel.sol";
 import { IRoycoKernel } from "../interfaces/kernel/IRoycoKernel.sol";
@@ -17,8 +16,7 @@ import { ExecutionModel, IRoycoKernel, SharesRedemptionModel } from "../interfac
 import { IERC165, IRoycoAsyncCancellableVault, IRoycoAsyncVault, IRoycoVaultTranche } from "../interfaces/tranche/IRoycoVaultTranche.sol";
 import { ZERO_NAV_UNITS } from "../libraries/Constants.sol";
 import { RoycoTrancheStorageLib } from "../libraries/RoycoTrancheStorageLib.sol";
-import { AssetClaims, TrancheType } from "../libraries/Types.sol";
-import { Action, SyncedAccountingState, TrancheDeploymentParams } from "../libraries/Types.sol";
+import { Action, AssetClaims, SyncedAccountingState, TrancheDeploymentParams, TrancheType } from "../libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, toNAVUnits, toTrancheUnits, toUint256 } from "../libraries/Units.sol";
 import { UnitsMathLib } from "../libraries/Units.sol";
 import { UtilsLib } from "../libraries/UtilsLib.sol";
@@ -158,7 +156,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
     /**
      * @inheritdoc IRoycoVaultTranche
      * @dev Returns the maximum amount of shares that can be redeemed from the tranche
-     * @dev We query the kernel for (a) N_s and N_j - the notional claim of the tranch on the ST and JT assets respectively in NAV units, and
+     * @dev We query the kernel for (a) N_s and N_j - the notional claim of the tranche on the ST and JT assets respectively in NAV units, and
      *                              (b) L_s and L_j - the amount that can be withdrawn from the senior and junior tranches globally in NAV units, respectively
      *      When shares are redeemed, assets from the senior and junior tranches are withdrawn proportionally to the notional claims of the tranche on the respective assets.
      *      But, the global max withdrawable assets for each tranche are also considered. These are inclusive of any coverage requirements, as well as liquidity constraints.
@@ -230,18 +228,24 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
     }
 
     /// @inheritdoc IRoycoAsyncVault
+    function deposit(TRANCHE_UNIT _assets, address _receiver, address _controller) external virtual override returns (uint256 shares, bytes memory metadata) {
+        (shares, metadata) = deposit(_assets, _receiver, _controller, 0);
+    }
+
+    /// @inheritdoc IRoycoAsyncVault
     function deposit(
         TRANCHE_UNIT _assets,
         address _receiver,
-        address _controller
+        address _controller,
+        uint256 _depositRequestId
     )
-        external
+        public
         virtual
         override
         restricted
         whenNotPaused
         onlyCallerOrOperator(_controller)
-        returns (uint256 shares)
+        returns (uint256 shares, bytes memory metadata)
     {
         require(_assets != toTrancheUnits(0), MUST_DEPOSIT_NON_ZERO_ASSETS());
 
@@ -250,12 +254,14 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         // Transfer the assets from the receiver to the kernel, if the deposit is synchronous
         // If the deposit is asynchronous, the assets were transferred in during requestDeposit
         if (_isSync(Action.DEPOSIT)) {
-            IERC20(asset()).safeTransferFrom(_receiver, address(kernel_), toUint256(_assets));
+            IERC20(asset()).safeTransferFrom(msg.sender, address(kernel_), toUint256(_assets));
         }
 
         // Deposit the assets into the underlying investment opportunity and get the fraction of total assets allocated
-        (NAV_UNIT valueAllocated, NAV_UNIT effectiveNAVToMintAt) =
-            (TRANCHE_TYPE() == TrancheType.SENIOR ? kernel_.stDeposit(_assets, _controller, _receiver) : kernel_.jtDeposit(_assets, _controller, _receiver));
+        (NAV_UNIT valueAllocated, NAV_UNIT effectiveNAVToMintAt, bytes memory _metadata) = (TRANCHE_TYPE() == TrancheType.SENIOR
+                ? kernel_.stDeposit(_assets, _controller, _receiver, _depositRequestId)
+                : kernel_.jtDeposit(_assets, _controller, _receiver, _depositRequestId));
+        metadata = _metadata;
 
         // effectiveNAVToMint at can be zero initially when the tranche is deployed
         require(valueAllocated != ZERO_NAV_UNITS, INVALID_VALUE_ALLOCATED());
@@ -268,7 +274,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         // Mint the shares to the receiver
         _mint(_receiver, shares);
 
-        emit Deposit(msg.sender, _receiver, _assets, shares);
+        emit Deposit(msg.sender, _receiver, _assets, shares, metadata);
     }
 
     /// @inheritdoc IRoycoAsyncVault
@@ -280,25 +286,40 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         external
         virtual
         override
+        returns (AssetClaims memory claims, bytes memory metadata)
+    {
+        (claims, metadata) = redeem(_shares, _receiver, _controller, 0);
+    }
+
+    /// @inheritdoc IRoycoAsyncVault
+    function redeem(
+        uint256 _shares,
+        address _receiver,
+        address _controller,
+        uint256 _redemptionRequestId
+    )
+        public
+        virtual
+        override
         restricted
         onlyCallerOrOperator(_controller)
         whenNotPaused
-        returns (AssetClaims memory claims)
+        returns (AssetClaims memory claims, bytes memory metadata)
     {
         require(_shares != 0, MUST_REQUEST_NON_ZERO_SHARES());
 
         // Process the withdrawal from the underlying investment opportunity
         // It is expected that the kernel transfers the assets directly to the receiver
-        claims =
+        (claims, metadata) =
         (TRANCHE_TYPE() == TrancheType.SENIOR
-                ? IRoycoKernel(kernel()).stRedeem(_shares, _controller, _receiver)
-                : IRoycoKernel(kernel()).jtRedeem(_shares, _controller, _receiver));
+                ? IRoycoKernel(kernel()).stRedeem(_shares, _controller, _receiver, _redemptionRequestId)
+                : IRoycoKernel(kernel()).jtRedeem(_shares, _controller, _receiver, _redemptionRequestId));
 
         // Account for the redemption
         // Shares must be burned after the kernel processes the redemption since the kernel has a causal dependency on the pre-burn and post-sync total share supply
         _redeem(msg.sender, _controller, _shares);
 
-        emit Redeem(msg.sender, _receiver, claims, _shares);
+        emit Redeem(msg.sender, _receiver, claims, _shares, metadata);
     }
 
     // =============================
@@ -334,7 +355,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         whenNotPaused
         onlyCallerOrOperator(_owner)
         executionIsAsync(Action.DEPOSIT)
-        returns (uint256 requestId)
+        returns (uint256 requestId, bytes memory metadata)
     {
         address kernel_ = kernel();
 
@@ -342,12 +363,12 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         IERC20(asset()).safeTransferFrom(_owner, kernel_, toUint256(_assets));
 
         // Queue the deposit request and get the request ID from the kernel
-        requestId =
+        (requestId, metadata) =
         (TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTDepositKernel(kernel_).stRequestDeposit(msg.sender, _assets, _controller)
                 : IAsyncJTDepositKernel(kernel_).jtRequestDeposit(msg.sender, _assets, _controller));
 
-        emit DepositRequest(_controller, _owner, requestId, msg.sender, _assets);
+        emit DepositRequest(_controller, _owner, requestId, msg.sender, _assets, metadata);
     }
 
     /// @inheritdoc IRoycoAsyncVault
@@ -401,7 +422,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         restricted
         whenNotPaused
         executionIsAsync(Action.WITHDRAW)
-        returns (uint256 requestId)
+        returns (uint256 requestId, bytes memory metadata)
     {
         // Must be requesting to redeem a non-zero number of shares
         require(_shares != 0, MUST_REQUEST_NON_ZERO_SHARES());
@@ -412,7 +433,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         }
 
         // Queue the redemption request and get the request ID from the kernel
-        requestId =
+        (requestId, metadata) =
         (TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTWithdrawalKernel(kernel()).stRequestRedeem(msg.sender, _shares, _controller)
                 : IRoycoKernel(kernel()).jtRequestRedeem(msg.sender, _shares, _controller));
@@ -426,7 +447,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
             _burn(_owner, _shares);
         }
 
-        emit RedeemRequest(_controller, _owner, requestId, msg.sender, _shares);
+        emit RedeemRequest(_controller, _owner, requestId, msg.sender, _shares, metadata);
     }
 
     /// @inheritdoc IRoycoAsyncVault
@@ -753,7 +774,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
      * @return shares The number of shares that have a claim on the specified amount of tranche controlled assets
      */
     function _convertToShares(NAV_UNIT _assets, uint256 _totalSupply, NAV_UNIT _totalAssets, Math.Rounding _rounding) internal view returns (uint256 shares) {
-        return toUint256(_assets).mulDiv(_withVirtualShares(_totalSupply), toUint256(_withVirtualAssets(_totalAssets)), _rounding);
+        return _withVirtualShares(_totalSupply).mulDiv(_assets, _withVirtualAssets(_totalAssets), _rounding);
     }
 
     /// @dev Returns the vault share's decimal offset

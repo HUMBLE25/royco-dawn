@@ -32,7 +32,7 @@ struct RoycoKernelInitParams {
  * @custom:field protocolFeeRecipient - The market's configured protocol fee recipient
  * @custom:field accountant - The address of the Royco accountant used to perform per operation accounting for this kernel
  * @custom:field jtRedemptionDelayInSeconds - The redemption delay in seconds that a JT LP has to wait between requesting and executing a redemption
- * @custom:field jtControllerToRedemptionRequest - A mapping between a controller and their redemption request state for the junior tranche
+ * @custom:field jtControllerToIdToRedemptionRequest - A mapping from a controller to a redemption request ID to its state for a junior tranche LP
  */
 struct RoycoKernelState {
     address seniorTranche;
@@ -42,7 +42,8 @@ struct RoycoKernelState {
     address protocolFeeRecipient;
     address accountant;
     uint24 jtRedemptionDelayInSeconds;
-    mapping(address controller => RedemptionRequest request) jtControllerToRedemptionRequest;
+    uint40 nextJTRedemptionRequestId;
+    mapping(address controller => mapping(uint256 requestId => RedemptionRequest request)) jtControllerToIdToRedemptionRequest;
 }
 
 /**
@@ -78,6 +79,7 @@ library RoycoKernelStorageLib {
         $.protocolFeeRecipient = _params.protocolFeeRecipient;
         $.accountant = _params.accountant;
         $.jtRedemptionDelayInSeconds = _params.jtRedemptionDelayInSeconds;
+        $.nextJTRedemptionRequestId = 1; // Start at 1 to avoid 0 being a valid request ID
     }
 
     /**

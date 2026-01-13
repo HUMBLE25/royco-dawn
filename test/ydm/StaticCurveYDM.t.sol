@@ -8,14 +8,14 @@ import { NAV_UNIT, toNAVUnits } from "../../src/libraries/Units.sol";
 import { UtilsLib } from "../../src/libraries/UtilsLib.sol";
 import { BaseTest } from "../base/BaseTest.t.sol";
 
-contract StaticCurveRDMTest is BaseTest {
+contract StaticCurveYDMTest is BaseTest {
     using Math for uint256;
 
-    // Constants from StaticCurveRDM
+    // Constants from StaticCurveYDM
     uint256 public constant TARGET_UTILIZATION = 0.9e18;
     uint256 public constant SLOPE_LT_TARGET_UTIL = 0.25e18;
     uint256 public constant SLOPE_GTE_TARGET_UTIL = 7.75e18;
-    uint256 public constant BASE_RATE_GTE_TARGET_UTIL = 0.225e18;
+    uint256 public constant JT_YIELD_SHARE_AT_TARGET_UTIL = 0.225e18;
 
     // Test parameters
     uint256 public constant BETA_100_PCT = WAD; // 100% beta
@@ -23,6 +23,8 @@ contract StaticCurveRDMTest is BaseTest {
 
     function setUp() public {
         _setUpRoyco();
+
+        YDM.initializeYDMForMarket(0, JT_YIELD_SHARE_AT_TARGET_UTIL, WAD);
     }
 
     // ============================================
@@ -38,7 +40,7 @@ contract StaticCurveRDMTest is BaseTest {
         uint256 coverageWAD = COVERAGE_100_PCT;
         NAV_UNIT jtEffectiveNAV = toNAVUnits(uint256(1e18)); // Non-zero to avoid infinite utilization
 
-        uint256 result = RDM.previewJTYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
+        uint256 result = YDM.previewJTYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
         assertEq(result, 0, "At U=0, yield share should be 0");
     }
 
@@ -53,9 +55,9 @@ contract StaticCurveRDMTest is BaseTest {
         uint256 betaWAD = BETA_100_PCT;
         uint256 coverageWAD = COVERAGE_100_PCT;
 
-        uint256 result = RDM.previewJTYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
-        // At U = 0.9, R(U) = BASE_RATE_GTE_TARGET_UTIL = 0.225e18
-        assertEq(result, BASE_RATE_GTE_TARGET_UTIL, "At U=0.9, yield share should equal BASE_RATE_GTE_TARGET_UTIL");
+        uint256 result = YDM.previewJTYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
+        // At U = 0.9, R(U) = JT_YIELD_SHARE_AT_TARGET_UTIL = 0.225e18
+        assertEq(result, JT_YIELD_SHARE_AT_TARGET_UTIL, "At U=0.9, yield share should equal JT_YIELD_SHARE_AT_TARGET_UTIL");
     }
 
     /// @notice Test utilization exactly at 1.0 (100%)
@@ -67,7 +69,7 @@ contract StaticCurveRDMTest is BaseTest {
         uint256 betaWAD = BETA_100_PCT;
         uint256 coverageWAD = COVERAGE_100_PCT;
 
-        uint256 result = RDM.previewJTYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
+        uint256 result = YDM.previewJTYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
         // At U = 1.0, R(U) = 1.0
         assertEq(result, WAD, "At U=1.0, yield share should be 1.0 (100%)");
     }
@@ -81,7 +83,7 @@ contract StaticCurveRDMTest is BaseTest {
         uint256 betaWAD = BETA_100_PCT;
         uint256 coverageWAD = COVERAGE_100_PCT;
 
-        uint256 result = RDM.previewJTYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
+        uint256 result = YDM.previewJTYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
         // At U >= 1.0, R(U) = 1.0
         assertEq(result, WAD, "At U>1.0, yield share should be 1.0 (100%)");
     }
@@ -97,13 +99,13 @@ contract StaticCurveRDMTest is BaseTest {
         uint256 betaWAD = BETA_100_PCT;
         uint256 coverageWAD = COVERAGE_100_PCT;
 
-        uint256 result = RDM.previewJTYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
+        uint256 result = YDM.previewJTYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
         // Should use first leg: R(U) = 0.25 * U
         // Expected: 0.25 * 0.899999999999999999 = 0.22499999999999999975
         // With Floor rounding: 0.224999999999999999e18
         uint256 expected = SLOPE_LT_TARGET_UTIL.mulDiv(899_999_999_999_999_999, WAD, Math.Rounding.Floor);
         assertEq(result, expected, "Just below target should use first leg formula");
-        assertLt(result, BASE_RATE_GTE_TARGET_UTIL, "Result should be less than BASE_RATE_GTE_TARGET_UTIL");
+        assertLt(result, JT_YIELD_SHARE_AT_TARGET_UTIL, "Result should be less than JT_YIELD_SHARE_AT_TARGET_UTIL");
     }
 
     /// @notice Test utilization just above target (0.9 + epsilon)
@@ -115,12 +117,12 @@ contract StaticCurveRDMTest is BaseTest {
         uint256 betaWAD = BETA_100_PCT;
         uint256 coverageWAD = COVERAGE_100_PCT;
 
-        uint256 result = RDM.previewJTYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
+        uint256 result = YDM.previewJTYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
         // Should use second leg: R(U) = 7.75 * (U - 0.9) + 0.225
         // Expected: 7.75 * (0.900000000000000001 - 0.9) + 0.225 = 7.75 * 0.000000000000000001 + 0.225
         // = 0.00000000000000000775 + 0.225 = 0.22500000000000000775
-        // With Floor rounding, this should be very close to BASE_RATE_GTE_TARGET_UTIL
-        assertGe(result, BASE_RATE_GTE_TARGET_UTIL, "Just above target should use second leg formula");
+        // With Floor rounding, this should be very close to JT_YIELD_SHARE_AT_TARGET_UTIL
+        assertGe(result, JT_YIELD_SHARE_AT_TARGET_UTIL, "Just above target should use second leg formula");
     }
 
     /// @notice Test utilization just below 1.0
@@ -132,14 +134,14 @@ contract StaticCurveRDMTest is BaseTest {
         uint256 betaWAD = BETA_100_PCT;
         uint256 coverageWAD = COVERAGE_100_PCT;
 
-        uint256 result = RDM.previewJTYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
+        uint256 result = YDM.previewJTYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
         // Should use second leg: R(U) = 7.75 * (U - 0.9) + 0.225
         // Expected: 7.75 * (0.999999999999999999 - 0.9) + 0.225
         // = 7.75 * 0.099999999999999999 + 0.225
         // = 0.77499999999999999225 + 0.225 = 0.99999999999999999225
         // With Floor rounding, should be less than 1.0
         assertLt(result, WAD, "Just below 1.0 should be less than 1.0");
-        assertGt(result, BASE_RATE_GTE_TARGET_UTIL, "Should be greater than BASE_RATE_GTE_TARGET_UTIL");
+        assertGt(result, JT_YIELD_SHARE_AT_TARGET_UTIL, "Should be greater than JT_YIELD_SHARE_AT_TARGET_UTIL");
     }
 
     /// @notice Test with very small utilization
@@ -151,7 +153,7 @@ contract StaticCurveRDMTest is BaseTest {
         uint256 betaWAD = BETA_100_PCT;
         uint256 coverageWAD = COVERAGE_100_PCT;
 
-        uint256 result = RDM.previewJTYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
+        uint256 result = YDM.previewJTYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
         // Expected: 0.25 * 0.01 = 0.0025e18
         uint256 expected = 0.0025e18;
         assertEq(result, expected, "Should handle very small utilization correctly");
@@ -180,7 +182,7 @@ contract StaticCurveRDMTest is BaseTest {
             uint256 betaWAD = BETA_100_PCT;
             uint256 coverageWAD = COVERAGE_100_PCT;
 
-            uint256 result = RDM.previewJTYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
+            uint256 result = YDM.previewJTYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
 
             assertGe(result, 0, "Result should be >= 0");
             assertLe(result, WAD, "Result should be <= 1.0");
@@ -200,7 +202,7 @@ contract StaticCurveRDMTest is BaseTest {
         uint256 betaWAD = BETA_100_PCT;
         uint256 coverageWAD = COVERAGE_100_PCT;
 
-        uint256 result = RDM.previewJTYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
+        uint256 result = YDM.previewJTYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
         // Expected: 0.25 * 0.45 = 0.1125e18
         uint256 expected = 0.1125e18;
         assertEq(result, expected, "At U=0.45, yield share should be 0.1125");
@@ -215,7 +217,7 @@ contract StaticCurveRDMTest is BaseTest {
         uint256 betaWAD = BETA_100_PCT;
         uint256 coverageWAD = COVERAGE_100_PCT;
 
-        uint256 result = RDM.previewJTYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
+        uint256 result = YDM.previewJTYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
         // Expected: 0.25 * 0.5 = 0.125e18
         uint256 expected = 0.125e18;
         assertEq(result, expected, "At U=0.5, yield share should be 0.125");
@@ -230,7 +232,7 @@ contract StaticCurveRDMTest is BaseTest {
         uint256 betaWAD = BETA_100_PCT;
         uint256 coverageWAD = COVERAGE_100_PCT;
 
-        uint256 result = RDM.previewJTYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
+        uint256 result = YDM.previewJTYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
         // Expected: 0.25 * 0.8 = 0.2e18
         uint256 expected = 0.2e18;
         assertEq(result, expected, "At U=0.8, yield share should be 0.2");
@@ -245,7 +247,7 @@ contract StaticCurveRDMTest is BaseTest {
         uint256 betaWAD = BETA_100_PCT;
         uint256 coverageWAD = COVERAGE_100_PCT;
 
-        uint256 result = RDM.previewJTYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
+        uint256 result = YDM.previewJTYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
         // Expected: 7.75 * (0.95 - 0.9) + 0.225 = 7.75 * 0.05 + 0.225 = 0.3875 + 0.225 = 0.6125e18
         uint256 expected = 0.6125e18;
         assertEq(result, expected, "At U=0.95, yield share should be 0.6125");
@@ -260,7 +262,7 @@ contract StaticCurveRDMTest is BaseTest {
         uint256 betaWAD = BETA_100_PCT;
         uint256 coverageWAD = COVERAGE_100_PCT;
 
-        uint256 result = RDM.previewJTYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
+        uint256 result = YDM.previewJTYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
         // Expected: 7.75 * (0.99 - 0.9) + 0.225 = 7.75 * 0.09 + 0.225 = 0.6975 + 0.225 = 0.9225e18
         uint256 expected = 0.9225e18;
         assertEq(result, expected, "At U=0.99, yield share should be 0.9225");
@@ -278,7 +280,7 @@ contract StaticCurveRDMTest is BaseTest {
         uint256 coverageWAD = COVERAGE_100_PCT;
         NAV_UNIT jtEffectiveNAV = toNAVUnits(uint256(0)); // Zero effective NAV
 
-        uint256 result = RDM.previewJTYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
+        uint256 result = YDM.previewJTYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
         // Infinite utilization should return 1.0 (100%)
         assertEq(result, WAD, "Infinite utilization should return 1.0");
     }
@@ -293,7 +295,7 @@ contract StaticCurveRDMTest is BaseTest {
         uint256 coverageWAD = COVERAGE_100_PCT;
 
         // Utilization = ((0.25 + 0.5 * 0.5) * 1) / 1 = (0.25 + 0.25) / 1 = 0.5
-        uint256 result = RDM.previewJTYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
+        uint256 result = YDM.previewJTYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
         uint256 expected = 0.125e18; // 0.25 * 0.5 = 0.125
         assertEq(result, expected, "Should handle different beta values correctly");
     }
@@ -308,7 +310,7 @@ contract StaticCurveRDMTest is BaseTest {
         uint256 coverageWAD = 0.5e18; // 50% coverage
 
         // Utilization = ((0.5 + 0.5 * 1) * 0.5) / 1 = (1.0 * 0.5) / 1 = 0.5
-        uint256 result = RDM.previewJTYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
+        uint256 result = YDM.previewJTYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
         uint256 expected = 0.125e18; // 0.25 * 0.5 = 0.125
         assertEq(result, expected, "Should handle different coverage values correctly");
     }
@@ -327,14 +329,14 @@ contract StaticCurveRDMTest is BaseTest {
         uint256 betaWAD = BETA_100_PCT;
         uint256 coverageWAD = COVERAGE_100_PCT;
 
-        uint256 result = RDM.previewJTYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
+        uint256 result = YDM.previewJTYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
 
         // Calculate what first leg would give
         uint256 firstLeg = SLOPE_LT_TARGET_UTIL.mulDiv(TARGET_UTILIZATION, WAD, Math.Rounding.Floor);
         // Calculate what second leg gives
-        uint256 secondLeg = BASE_RATE_GTE_TARGET_UTIL;
+        uint256 secondLeg = JT_YIELD_SHARE_AT_TARGET_UTIL;
 
-        assertEq(result, BASE_RATE_GTE_TARGET_UTIL, "At boundary, should equal BASE_RATE_GTE_TARGET_UTIL");
+        assertEq(result, JT_YIELD_SHARE_AT_TARGET_UTIL, "At boundary, should equal JT_YIELD_SHARE_AT_TARGET_UTIL");
         assertEq(firstLeg, secondLeg, "Both legs should give same result at boundary");
     }
 
@@ -360,7 +362,7 @@ contract StaticCurveRDMTest is BaseTest {
         _coverageWAD = bound(_coverageWAD, 0, WAD * 2);
         _jtEffectiveNAV = bound(_jtEffectiveNAV, 0, type(uint128).max);
 
-        uint256 result = RDM.previewJTYieldShare(
+        uint256 result = YDM.previewJTYieldShare(
             toNAVUnits(uint256(_stRawNAV)), toNAVUnits(uint256(_jtRawNAV)), _betaWAD, _coverageWAD, toNAVUnits(uint256(_jtEffectiveNAV))
         );
 
@@ -393,7 +395,7 @@ contract StaticCurveRDMTest is BaseTest {
 
         // Only test cases where utilization >= 1.0
         if (utilization >= WAD) {
-            uint256 result = RDM.previewJTYieldShare(
+            uint256 result = YDM.previewJTYieldShare(
                 toNAVUnits(uint256(_stRawNAV)), toNAVUnits(uint256(_jtRawNAV)), _betaWAD, _coverageWAD, toNAVUnits(uint256(_jtEffectiveNAV))
             );
             assertEq(result, WAD, "At U>=1.0, yield share should be 1.0 (100%)");
@@ -425,13 +427,13 @@ contract StaticCurveRDMTest is BaseTest {
 
         // Only test cases where utilization is just below target
         if (utilization < TARGET_UTILIZATION && utilization >= 0.89e18) {
-            uint256 result = RDM.previewJTYieldShare(
+            uint256 result = YDM.previewJTYieldShare(
                 toNAVUnits(uint256(_stRawNAV)), toNAVUnits(uint256(_jtRawNAV)), _betaWAD, _coverageWAD, toNAVUnits(uint256(_jtEffectiveNAV))
             );
             // Should use first leg: R(U) = 0.25 * U
             uint256 expected = SLOPE_LT_TARGET_UTIL.mulDiv(utilization, WAD, Math.Rounding.Floor);
             assertEq(result, expected, "Just below target should use first leg formula");
-            assertLt(result, BASE_RATE_GTE_TARGET_UTIL, "Result should be less than BASE_RATE_GTE_TARGET_UTIL");
+            assertLt(result, JT_YIELD_SHARE_AT_TARGET_UTIL, "Result should be less than JT_YIELD_SHARE_AT_TARGET_UTIL");
         }
     }
 
@@ -460,11 +462,11 @@ contract StaticCurveRDMTest is BaseTest {
 
         // Only test cases where utilization is just above target
         if (utilization >= TARGET_UTILIZATION && utilization <= 0.91e18 && utilization < WAD) {
-            uint256 result = RDM.previewJTYieldShare(
+            uint256 result = YDM.previewJTYieldShare(
                 toNAVUnits(uint256(_stRawNAV)), toNAVUnits(uint256(_jtRawNAV)), _betaWAD, _coverageWAD, toNAVUnits(uint256(_jtEffectiveNAV))
             );
             // Should use second leg: R(U) = 7.75 * (U - 0.9) + 0.225
-            assertGe(result, BASE_RATE_GTE_TARGET_UTIL, "Just above target should use second leg formula");
+            assertGe(result, JT_YIELD_SHARE_AT_TARGET_UTIL, "Just above target should use second leg formula");
         }
     }
 
@@ -493,11 +495,11 @@ contract StaticCurveRDMTest is BaseTest {
 
         // Only test cases where utilization is just below 1.0
         if (utilization >= 0.99e18 && utilization < WAD) {
-            uint256 result = RDM.previewJTYieldShare(
+            uint256 result = YDM.previewJTYieldShare(
                 toNAVUnits(uint256(_stRawNAV)), toNAVUnits(uint256(_jtRawNAV)), _betaWAD, _coverageWAD, toNAVUnits(uint256(_jtEffectiveNAV))
             );
             assertLt(result, WAD, "Just below 1.0 should be less than 1.0");
-            assertGt(result, BASE_RATE_GTE_TARGET_UTIL, "Should be greater than BASE_RATE_GTE_TARGET_UTIL");
+            assertGt(result, JT_YIELD_SHARE_AT_TARGET_UTIL, "Should be greater than JT_YIELD_SHARE_AT_TARGET_UTIL");
         }
     }
 
@@ -526,7 +528,7 @@ contract StaticCurveRDMTest is BaseTest {
 
         // Only test cases where utilization is very small
         if (utilization < 0.1e18 && utilization > 0) {
-            uint256 result = RDM.previewJTYieldShare(
+            uint256 result = YDM.previewJTYieldShare(
                 toNAVUnits(uint256(_stRawNAV)), toNAVUnits(uint256(_jtRawNAV)), _betaWAD, _coverageWAD, toNAVUnits(uint256(_jtEffectiveNAV))
             );
             // Should use first leg: R(U) = 0.25 * U
@@ -543,8 +545,8 @@ contract StaticCurveRDMTest is BaseTest {
         uint256 betaWAD = BETA_100_PCT;
         uint256 coverageWAD = COVERAGE_100_PCT;
 
-        uint256 preview = RDM.previewJTYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
-        uint256 actual = RDM.jtYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
+        uint256 preview = YDM.previewJTYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
+        uint256 actual = YDM.jtYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
 
         assertEq(actual, preview, "jtYieldShare should equal previewJTYieldShare");
     }
@@ -561,7 +563,7 @@ contract StaticCurveRDMTest is BaseTest {
         uint256 utilization = UtilsLib.computeUtilization(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
         assertGe(utilization, WAD, "Utilization should be >= 1.0");
 
-        uint256 result = RDM.jtYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
+        uint256 result = YDM.jtYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
         assertEq(result, WAD, "At U>=1.0, jtYieldShare should be 1.0 (100%)");
     }
 
@@ -578,10 +580,10 @@ contract StaticCurveRDMTest is BaseTest {
         assertGe(utilization, TARGET_UTILIZATION, "Utilization should be >= TARGET_UTILIZATION");
         assertLt(utilization, WAD, "Utilization should be < 1.0");
 
-        uint256 result = RDM.jtYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
+        uint256 result = YDM.jtYieldShare(stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
 
         // Second leg: R(U) = 7.75 * (U - 0.9) + 0.225
-        uint256 expected = SLOPE_GTE_TARGET_UTIL.mulDiv((utilization - TARGET_UTILIZATION), WAD, Math.Rounding.Floor) + BASE_RATE_GTE_TARGET_UTIL;
+        uint256 expected = SLOPE_GTE_TARGET_UTIL.mulDiv((utilization - TARGET_UTILIZATION), WAD, Math.Rounding.Floor) + JT_YIELD_SHARE_AT_TARGET_UTIL;
 
         assertEq(result, expected, "For TARGET_UTILIZATION <= U < 1.0, jtYieldShare should use the second leg formula");
     }

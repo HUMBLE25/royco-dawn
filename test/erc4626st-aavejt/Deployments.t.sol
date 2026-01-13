@@ -98,10 +98,11 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         // Coverage, beta, protocol fee configuration
         assertEq(accountantState.coverageWAD, COVERAGE_WAD, "Kernel coverageWAD mismatch");
         assertEq(accountantState.betaWAD, BETA_WAD, "BETA_WAD mismatch");
-        assertEq(accountantState.protocolFeeWAD, PROTOCOL_FEE_WAD, "Kernel protocolFeeWAD mismatch");
+        assertEq(accountantState.stProtocolFeeWAD, ST_PROTOCOL_FEE_WAD, "Kernel stProtocolFeeWAD mismatch");
+        assertEq(accountantState.jtProtocolFeeWAD, JT_PROTOCOL_FEE_WAD, "Kernel jtProtocolFeeWAD mismatch");
 
-        // RDM wiring
-        assertEq(accountantState.rdm, address(RDM), "Kernel RDM mismatch");
+        // YDM wiring
+        assertEq(accountantState.ydm, address(YDM), "Kernel YDM mismatch");
 
         // Initial NAV / ASSETS via KERNEL view functions
         (SyncedAccountingState memory state,,) = KERNEL.previewSyncTrancheAccounting(TrancheType.SENIOR);
@@ -311,7 +312,13 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
             RoycoAccountant.initialize,
             (
                 IRoycoAccountant.RoycoAccountantInitParams({
-                    kernel: expectedKernelAddress, protocolFeeWAD: PROTOCOL_FEE_WAD, coverageWAD: COVERAGE_WAD, betaWAD: BETA_WAD, rdm: address(RDM)
+                    kernel: expectedKernelAddress,
+                    stProtocolFeeWAD: ST_PROTOCOL_FEE_WAD,
+                    jtProtocolFeeWAD: JT_PROTOCOL_FEE_WAD,
+                    coverageWAD: COVERAGE_WAD,
+                    betaWAD: BETA_WAD,
+                    ydm: address(YDM),
+                    ydmInitializationData: abi.encodeCall(YDM.initializeYDMForMarket, (0, 0.225e18, 1e18))
                 }),
                 OWNER_ADDRESS // invalid authority: should be FACTORY
             )
@@ -455,10 +462,12 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
             (
                 IRoycoAccountant.RoycoAccountantInitParams({
                     kernel: address(0xdead), // wrong kernel
-                    protocolFeeWAD: PROTOCOL_FEE_WAD,
+                    stProtocolFeeWAD: ST_PROTOCOL_FEE_WAD,
+                    jtProtocolFeeWAD: JT_PROTOCOL_FEE_WAD,
                     coverageWAD: COVERAGE_WAD,
                     betaWAD: BETA_WAD,
-                    rdm: address(RDM)
+                    ydm: address(YDM),
+                    ydmInitializationData: abi.encodeCall(YDM.initializeYDMForMarket, (0, 0.225e18, 1e18))
                 }),
                 address(FACTORY)
             )
@@ -580,7 +589,13 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
             RoycoAccountant.initialize,
             (
                 IRoycoAccountant.RoycoAccountantInitParams({
-                    kernel: expectedKernelAddress, protocolFeeWAD: PROTOCOL_FEE_WAD, coverageWAD: COVERAGE_WAD, betaWAD: BETA_WAD, rdm: address(RDM)
+                    kernel: expectedKernelAddress,
+                    stProtocolFeeWAD: ST_PROTOCOL_FEE_WAD,
+                    jtProtocolFeeWAD: JT_PROTOCOL_FEE_WAD,
+                    coverageWAD: COVERAGE_WAD,
+                    betaWAD: BETA_WAD,
+                    ydm: address(YDM),
+                    ydmInitializationData: abi.encodeCall(YDM.initializeYDMForMarket, (0, 0.225e18, 1e18))
                 }),
                 address(FACTORY)
             )

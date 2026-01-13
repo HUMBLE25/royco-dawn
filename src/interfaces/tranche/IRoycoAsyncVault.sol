@@ -28,7 +28,8 @@ interface IRoycoAsyncVault {
     /// @param requestId The identifier for the Request (see Request Ids semantics).
     /// @param sender The caller of requestDeposit (may differ from owner).
     /// @param assets The amount of assets requested.
-    event DepositRequest(address indexed controller, address indexed owner, uint256 indexed requestId, address sender, TRANCHE_UNIT assets);
+    /// @param metadata The format prefixed metadata of the deposit request or empty bytes if no metadata is shared
+    event DepositRequest(address indexed controller, address indexed owner, uint256 indexed requestId, address sender, TRANCHE_UNIT assets, bytes metadata);
 
     /// @notice Shares locked (or assumed control of) to request an asynchronous redemption.
     /// @dev MUST be emitted by requestRedeem.
@@ -37,7 +38,8 @@ interface IRoycoAsyncVault {
     /// @param requestId The identifier for the Request (see Request Ids semantics).
     /// @param sender The caller of requestRedeem (may differ from owner).
     /// @param shares The amount of shares requested to redeem.
-    event RedeemRequest(address indexed controller, address indexed owner, uint256 indexed requestId, address sender, uint256 shares);
+    /// @param metadata The format prefixed metadata of the redemption request or empty bytes if no metadata is shared
+    event RedeemRequest(address indexed controller, address indexed owner, uint256 indexed requestId, address sender, uint256 shares, bytes metadata);
 
     /// @notice Transfer assets from owner and submit an async deposit Request.
     /// @dev MUST emit DepositRequest. MUST support ERC20 approve/transferFrom on the asset.
@@ -46,7 +48,8 @@ interface IRoycoAsyncVault {
     /// @param _controller Controller of the Request (msg.sender unless operator-approved).
     /// @param _owner Source of the assets; MUST be msg.sender unless operator-approved.
     /// @return requestId Discriminator paired with controller (see Request Ids semantics).
-    function requestDeposit(TRANCHE_UNIT _assets, address _controller, address _owner) external returns (uint256 requestId);
+    /// @return metadata The format prefixed metadata of the deposit request or empty bytes if no metadata is shared
+    function requestDeposit(TRANCHE_UNIT _assets, address _controller, address _owner) external returns (uint256 requestId, bytes memory metadata);
 
     /// @notice Amount of requested assets in Pending state for controller/requestId.
     /// @dev MUST NOT include amounts in Claimable; MUST NOT vary by caller.
@@ -63,12 +66,29 @@ interface IRoycoAsyncVault {
     function claimableDepositRequest(uint256 _requestId, address _controller) external view returns (TRANCHE_UNIT claimableAssets);
 
     /// @notice Claim an async deposit by calling ERC-4626 deposit.
-    /// @dev Overload per ERC-7540. MUST revert unless msg.sender == controller or operator.
     /// @param _assets Assets to claim.
     /// @param _receiver Recipient of shares.
     /// @param _controller Controller discriminating the claim when sender is operator.
     /// @return shares Shares minted.
-    function deposit(TRANCHE_UNIT _assets, address _receiver, address _controller) external returns (uint256 shares);
+    /// @return metadata The format prefixed metadata of the deposit or empty bytes if no metadata is shared
+    function deposit(TRANCHE_UNIT _assets, address _receiver, address _controller) external returns (uint256 shares, bytes memory metadata);
+
+    /// @notice Claim an async deposit by calling ERC-4626 deposit.
+    /// @dev Overload per ERC-7540. MUST revert unless msg.sender == controller or operator.
+    /// @param _assets Assets to claim.
+    /// @param _receiver Recipient of shares.
+    /// @param _controller Controller discriminating the claim when sender is operator.
+    /// @param _depositRequestId Deposit request identifier if the deposit is asynchronous.
+    /// @return shares Shares minted.
+    /// @return metadata The format prefixed metadata of the deposit or empty bytes if no metadata is shared
+    function deposit(
+        TRANCHE_UNIT _assets,
+        address _receiver,
+        address _controller,
+        uint256 _depositRequestId
+    )
+        external
+        returns (uint256 shares, bytes memory metadata);
 
     /// @notice Assume control of shares from owner and submit an async redeem Request.
     /// @dev MUST emit RedeemRequest. MUST revert if all shares cannot be requested.
@@ -76,7 +96,8 @@ interface IRoycoAsyncVault {
     /// @param _controller Controller of the Request (msg.sender unless operator-approved).
     /// @param _owner Owner of the shares; MUST be msg.sender unless operator-approved.
     /// @return requestId Discriminator paired with controller (see Request Ids semantics).
-    function requestRedeem(uint256 _shares, address _controller, address _owner) external returns (uint256 requestId);
+    /// @return metadata The format prefixed metadata of the redemption request or empty bytes if no metadata is shared
+    function requestRedeem(uint256 _shares, address _controller, address _owner) external returns (uint256 requestId, bytes memory metadata);
 
     /// @notice Amount of requested shares in Pending state for controller/requestId.
     /// @dev MUST NOT include amounts in Claimable; MUST NOT vary by caller.
@@ -93,12 +114,28 @@ interface IRoycoAsyncVault {
     function claimableRedeemRequest(uint256 _requestId, address _controller) external view returns (uint256 claimableShares);
 
     /// @notice Claim an async redemption by calling ERC-4626 redeem.
-    /// @dev Overload per ERC-7540. MUST revert unless msg.sender == controller or operator.
     /// @param _shares Shares to redeem.
     /// @param _receiver Recipient of assets.
     /// @param _controller Controller discriminating the claim when sender is operator.
     /// @return claims Assets returned.
-    function redeem(uint256 _shares, address _receiver, address _controller) external returns (AssetClaims memory claims);
+    /// @return metadata The format prefixed metadata of the redemption or empty bytes if no metadata is shared
+    function redeem(uint256 _shares, address _receiver, address _controller) external returns (AssetClaims memory claims, bytes memory metadata);
+
+    /// @notice Claim an async redemption by calling ERC-4626 redeem.
+    /// @param _shares Shares to redeem.
+    /// @param _receiver Recipient of assets.
+    /// @param _controller Controller discriminating the claim when sender is operator.
+    /// @param _redemptionRequestId Redemption request identifier if the redemption is asynchronous.
+    /// @return claims Assets returned.
+    /// @return metadata The format prefixed metadata of the redemption or empty bytes if no metadata is shared
+    function redeem(
+        uint256 _shares,
+        address _receiver,
+        address _controller,
+        uint256 _redemptionRequestId
+    )
+        external
+        returns (AssetClaims memory claims, bytes memory metadata);
 
     /// @notice Returns true if operator is approved for controller.
     /// @param _controller Controller address.

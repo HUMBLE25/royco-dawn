@@ -20,7 +20,7 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
     uint256 internal constant MAX_REDEEM_RELATIVE_DELTA = 1 * BPS;
     uint256 internal constant MAX_CONVERT_TO_ASSETS_RELATIVE_DELTA = 1 * BPS;
     uint256 internal constant AAVE_PREVIEW_DEPOSIT_RELATIVE_DELTA = 1 * BPS;
-    uint24 internal constant JT_REDEMPTION_DELAY_SECONDS = 100;
+    uint24 internal constant JT_REDEMPTION_DELAY_SECONDS = 1_000_000;
 
     Vm.Wallet internal RESERVE;
     address internal RESERVE_ADDRESS;
@@ -121,7 +121,13 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
             RoycoAccountant.initialize,
             (
                 IRoycoAccountant.RoycoAccountantInitParams({
-                    kernel: expectedKernelAddress, protocolFeeWAD: PROTOCOL_FEE_WAD, coverageWAD: COVERAGE_WAD, betaWAD: BETA_WAD, rdm: address(RDM)
+                    kernel: expectedKernelAddress,
+                    stProtocolFeeWAD: ST_PROTOCOL_FEE_WAD,
+                    jtProtocolFeeWAD: JT_PROTOCOL_FEE_WAD,
+                    coverageWAD: COVERAGE_WAD,
+                    betaWAD: BETA_WAD,
+                    ydm: address(YDM),
+                    ydmInitializationData: abi.encodeCall(YDM.initializeYDMForMarket, (0, 0.225e18, 1e18))
                 }),
                 address(FACTORY)
             )
