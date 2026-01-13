@@ -34,7 +34,7 @@ abstract contract YieldBearingERC20_JT_Kernel is RoycoKernel {
     }
 
     /// @inheritdoc RoycoKernel
-    function _jtMaxDepositGlobally(address) internal view override(RoycoKernel) returns (TRANCHE_UNIT) {
+    function _jtMaxDepositGlobally(address) internal pure override(RoycoKernel) returns (TRANCHE_UNIT) {
         // No limit to how many yield bearing assets can be deposited into this kernel
         return MAX_TRANCHE_UNITS;
     }
@@ -46,7 +46,7 @@ abstract contract YieldBearingERC20_JT_Kernel is RoycoKernel {
     }
 
     /// @inheritdoc RoycoKernel
-    function _jtPreviewWithdraw(TRANCHE_UNIT _jtAssets) internal view override(RoycoKernel) returns (TRANCHE_UNIT withdrawnSTAssets) {
+    function _jtPreviewWithdraw(TRANCHE_UNIT _jtAssets) internal pure override(RoycoKernel) returns (TRANCHE_UNIT withdrawnSTAssets) {
         // No conversion between the assets being withdrawn and what will be withdrawn: the kernel simply transfers them out
         return _jtAssets;
     }

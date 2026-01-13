@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import { IRoycoVaultTranche } from "../interfaces/tranche/IRoycoVaultTranche.sol";
 import { RoycoKernelInitParams } from "../libraries/RoycoKernelStorageLib.sol";
+import { MarketState } from "../libraries/Types.sol";
 import { Math, NAV_UNIT, TRANCHE_UNIT, UnitsMathLib } from "../libraries/Units.sol";
 import { ERC4626KernelState, ERC4626KernelStorageLib } from "../libraries/kernels/ERC4626KernelStorageLib.sol";
 import { AssetClaims, IRoycoKernel, RoycoKernel, SyncedAccountingState, TrancheType, ZERO_NAV_UNITS } from "./base/RoycoKernel.sol";
@@ -42,6 +43,7 @@ contract ERC4626_ST_ERC4626_JT_IdenticalAssets_Kernel is ERC4626_ST_Kernel, ERC4
 
     /// @inheritdoc IRoycoKernel
     /// @dev Override this function to prevent double counting of max withdrawable assets when both tranches deploy into the same ERC4626 vault
+    /// @dev ST Withdrawals are allowed in the following market states: PERPETUAL, FIXED_TERM_UNHEALTHY
     function stMaxWithdrawable(address _owner)
         public
         view
@@ -52,8 +54,14 @@ contract ERC4626_ST_ERC4626_JT_IdenticalAssets_Kernel is ERC4626_ST_Kernel, ERC4
         // If both tranches are in different ERC4626 vaults, double counting is not possible
         if ($.stVault != $.jtVault) return super.stMaxWithdrawable(_owner);
 
+        (SyncedAccountingState memory state, AssetClaims memory stNotionalClaims,) = previewSyncTrancheAccounting(TrancheType.SENIOR);
+
+        // If the market is in a state where ST withdrawals are not allowed, return zero claims
+        if (state.state == MarketState.FIXED_TERM_HEALTHY) {
+            return (ZERO_NAV_UNITS, ZERO_NAV_UNITS, ZERO_NAV_UNITS, ZERO_NAV_UNITS);
+        }
+
         // Get the total claims the senior tranche has on each tranche's assets
-        (, AssetClaims memory stNotionalClaims,) = previewSyncTrancheAccounting(TrancheType.SENIOR);
         NAV_UNIT stTotalClaimsNAV = stNotionalClaims.nav;
         if (stTotalClaimsNAV == ZERO_NAV_UNITS) return (ZERO_NAV_UNITS, ZERO_NAV_UNITS, ZERO_NAV_UNITS, ZERO_NAV_UNITS);
         claimOnStNAV = stConvertTrancheUnitsToNAVUnits(stNotionalClaims.stAssets);

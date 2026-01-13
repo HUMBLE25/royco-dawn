@@ -50,6 +50,9 @@ interface IRoycoKernel {
     /// @notice Thrown when trying to cancel a redemption request that has already been canceled
     error REDEMPTION_REQUEST_CANCELED();
 
+    /// @notice Thrown when the market is in a state where the operation is not allowed
+    error INVALID_MARKET_STATE();
+
     /**
      * @notice Returns the execution model for the senior tranche's increase NAV operation
      * @return The execution model for the senior tranche's increase NAV operation - SYNC or ASYNC

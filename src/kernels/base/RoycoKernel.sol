@@ -6,6 +6,7 @@ import { ExecutionModel, IRoycoKernel, SharesRedemptionModel } from "../../inter
 import { IRoycoVaultTranche } from "../../interfaces/tranche/IRoycoVaultTranche.sol";
 import { ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, ZERO_NAV_UNITS, ZERO_TRANCHE_UNITS } from "../../libraries/Constants.sol";
 import { RedemptionRequest, RoycoKernelInitParams, RoycoKernelState, RoycoKernelStorageLib } from "../../libraries/RoycoKernelStorageLib.sol";
+import { MarketState } from "../../libraries/Types.sol";
 import { ActionMetadataFormat, AssetClaims, SyncedAccountingState, TrancheType } from "../../libraries/Types.sol";
 import { Math, NAV_UNIT, TRANCHE_UNIT, UnitsMathLib } from "../../libraries/Units.sol";
 import { UtilsLib } from "../../libraries/UtilsLib.sol";
@@ -127,12 +128,15 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     // =============================
 
     /// @inheritdoc IRoycoKernel
+    /// @dev ST Deposits are allowed in the following market states: PERPETUAL, FIXED_TERM_HEALTHY, FIXED_TERM_UNHEALTHY
     function stMaxDeposit(address _receiver) public view virtual override(IRoycoKernel) returns (TRANCHE_UNIT) {
+        // Since ST deposits are unrestricted in any market state, return the global max deposit
         NAV_UNIT stMaxDepositableNAV = _accountant().maxSTDepositGivenCoverage(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV());
         return UnitsMathLib.min(_stMaxDepositGlobally(_receiver), stConvertNAVUnitsToTrancheUnits(stMaxDepositableNAV));
     }
 
     /// @inheritdoc IRoycoKernel
+    /// @dev ST Withdrawals are allowed in the following market states: PERPETUAL, FIXED_TERM_UNHEALTHY
     function stMaxWithdrawable(address _owner)
         public
         view
@@ -140,8 +144,14 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         override(IRoycoKernel)
         returns (NAV_UNIT claimOnStNAV, NAV_UNIT claimOnJtNAV, NAV_UNIT stMaxWithdrawableNAV, NAV_UNIT jtMaxWithdrawableNAV)
     {
+        (SyncedAccountingState memory state, AssetClaims memory stNotionalClaims,) = previewSyncTrancheAccounting(TrancheType.SENIOR);
+
+        // If the market is in a state where ST withdrawals are not allowed, return zero claims
+        if (state.state == MarketState.FIXED_TERM_HEALTHY) {
+            return (ZERO_NAV_UNITS, ZERO_NAV_UNITS, ZERO_NAV_UNITS, ZERO_NAV_UNITS);
+        }
+
         // Get the total claims the senior tranche has on each tranche's assets
-        (, AssetClaims memory stNotionalClaims,) = previewSyncTrancheAccounting(TrancheType.SENIOR);
         claimOnStNAV = stConvertTrancheUnitsToNAVUnits(stNotionalClaims.stAssets);
         claimOnJtNAV = jtConvertTrancheUnitsToNAVUnits(stNotionalClaims.jtAssets);
 
@@ -151,11 +161,19 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     }
 
     /// @inheritdoc IRoycoKernel
+    /// @dev JT Deposits are allowed in the following market states: PERPETUAL
     function jtMaxDeposit(address _receiver) public view virtual override(IRoycoKernel) returns (TRANCHE_UNIT) {
+        // If the market is in a state where JT deposits are not allowed, return zero tranche units
+        (SyncedAccountingState memory state,,) = previewSyncTrancheAccounting(TrancheType.JUNIOR);
+        if (state.state != MarketState.PERPETUAL) {
+            return ZERO_TRANCHE_UNITS;
+        }
+
         return _jtMaxDepositGlobally(_receiver);
     }
 
     /// @inheritdoc IRoycoKernel
+    /// @dev JT Withdrawals are allowed in the following market states: PERPETUAL, FIXED_TERM_HEALTHY, FIXED_TERM_UNHEALTHY
     function jtMaxWithdrawable(address _owner)
         public
         view
@@ -225,6 +243,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     // =============================
 
     /// @inheritdoc IRoycoKernel
+    /// @dev ST Deposits are allowed in the following market states: PERPETUAL, FIXED_TERM_HEALTHY, FIXED_TERM_UNHEALTHY
     function stDeposit(
         TRANCHE_UNIT _assets,
         address,
@@ -251,6 +270,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     }
 
     /// @inheritdoc IRoycoKernel
+    /// @dev ST Redemptions are allowed in the following market states: PERPETUAL, FIXED_TERM_UNHEALTHY
     function stRedeem(
         uint256 _shares,
         address,
@@ -266,7 +286,14 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     {
         // Execute a pre-op sync on accounting
         uint256 totalTrancheShares;
-        (, userAssetClaims, totalTrancheShares) = _preOpSyncTrancheAccounting(TrancheType.SENIOR);
+        {
+            SyncedAccountingState memory state;
+            (state, userAssetClaims, totalTrancheShares) = _preOpSyncTrancheAccounting(TrancheType.SENIOR);
+            MarketState marketState = state.state;
+
+            // Ensure that the market is in a state where ST redemptions are allowed: PERPETUAL, FIXED_TERM_UNHEALTHY
+            require(marketState == MarketState.PERPETUAL || marketState == MarketState.FIXED_TERM_UNHEALTHY, INVALID_MARKET_STATE());
+        }
 
         // Scale total tranche asset claims by the ratio of shares this user owns of the tranche vault
         // Protocol fee shares were minted in the pre-op sync, so the total tranche shares are up to date
@@ -284,6 +311,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     // =============================
 
     /// @inheritdoc IRoycoKernel
+    /// @dev JT Deposits are allowed in the following market states: PERPETUAL
     function jtDeposit(
         TRANCHE_UNIT _assets,
         address,
@@ -298,7 +326,11 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         returns (NAV_UNIT valueAllocated, NAV_UNIT navToMintAt, bytes memory)
     {
         // Execute a pre-op sync on accounting
-        navToMintAt = (_preOpSyncTrancheAccounting()).jtEffectiveNAV;
+        SyncedAccountingState memory state = _preOpSyncTrancheAccounting();
+        navToMintAt = state.jtEffectiveNAV;
+
+        // Ensure that the market is in a state where JT deposits are allowed: PERPETUAL
+        require(state.state == MarketState.PERPETUAL, INVALID_MARKET_STATE());
 
         // Deposit the assets into the underlying ST investment
         _jtDepositAssets(_assets);
@@ -315,6 +347,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     }
 
     /// @inheritdoc IRoycoKernel
+    /// @dev JT Redemptions are allowed in the following market states: PERPETUAL, FIXED_TERM_HEALTHY, FIXED_TERM_UNHEALTHY
     function jtRequestRedeem(
         address,
         uint256 _shares,
@@ -425,6 +458,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     }
 
     /// @inheritdoc IRoycoKernel
+    /// @dev JT Redemptions are allowed in the following market states: PERPETUAL, FIXED_TERM_HEALTHY, FIXED_TERM_UNHEALTHY
     function jtRedeem(
         uint256 _shares,
         address _controller,
