@@ -2,6 +2,7 @@
 pragma solidity ^0.8.28;
 
 import { RoycoBase } from "../../base/RoycoBase.sol";
+import { IRoycoAccountant } from "../../interfaces/IRoycoAccountant.sol";
 import { ExecutionModel, IRoycoKernel, SharesRedemptionModel } from "../../interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoVaultTranche } from "../../interfaces/tranche/IRoycoVaultTranche.sol";
 import { ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, ZERO_NAV_UNITS, ZERO_TRANCHE_UNITS } from "../../libraries/Constants.sol";
@@ -202,7 +203,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     }
 
     // =============================
-    // External Tranche Accounting Synchronization Functions
+    // External Tranche Accounting and Synchronization Functions
     // =============================
 
     /// @inheritdoc IRoycoKernel
@@ -236,6 +237,14 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         } else {
             (, totalTrancheShares) = IRoycoVaultTranche($.juniorTranche).previewMintProtocolFeeShares(state.jtProtocolFeeAccrued, state.jtEffectiveNAV);
         }
+    }
+
+    /// @inheritdoc IRoycoKernel
+    function currentMarketUtilization() external view override(IRoycoKernel) returns (uint256 utilization) {
+        SyncedAccountingState memory state = _previewSyncTrancheAccounting();
+        IRoycoAccountant.RoycoAccountantState memory accountantState = _accountant().getState();
+
+        utilization = UtilsLib.computeUtilization(state.stRawNAV, state.jtRawNAV, accountantState.betaWAD, accountantState.coverageWAD, state.jtEffectiveNAV);
     }
 
     // =============================
