@@ -6,7 +6,7 @@ import { IRoycoAccountant, Operation } from "../interfaces/IRoycoAccountant.sol"
 import { IYDM } from "../interfaces/IYDM.sol";
 import { IRoycoKernel } from "../interfaces/kernel/IRoycoKernel.sol";
 import { MAX_PROTOCOL_FEE_WAD, MIN_COVERAGE_WAD, WAD, ZERO_NAV_UNITS } from "../libraries/Constants.sol";
-import { NAV_UNIT, SyncedAccountingState } from "../libraries/Types.sol";
+import { MarketState, NAV_UNIT, SyncedAccountingState } from "../libraries/Types.sol";
 import { UnitsMathLib, toNAVUnits, toUint256 } from "../libraries/Units.sol";
 import { Math, UtilsLib } from "../libraries/UtilsLib.sol";
 
@@ -178,6 +178,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         // Construct the synced NAVs state to return to the caller
         // No fees are ever taken on post-op sync
         state = SyncedAccountingState({
+            state: MarketState.PERPETUAL,
             stRawNAV: _stRawNAV,
             jtRawNAV: _jtRawNAV,
             stEffectiveNAV: $.lastSTEffectiveNAV,
@@ -459,6 +460,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         require((_stRawNAV + _jtRawNAV) == (stEffectiveNAV + jtEffectiveNAV), NAV_CONSERVATION_VIOLATION());
         // Construct the synced NAVs state to return to the caller
         state = SyncedAccountingState({
+            state: MarketState.PERPETUAL,
             stRawNAV: _stRawNAV,
             jtRawNAV: _jtRawNAV,
             stEffectiveNAV: stEffectiveNAV,
