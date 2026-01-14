@@ -9,16 +9,13 @@ import { NAV_UNIT, TRANCHE_UNIT } from "./Units.sol";
 /**
  * @title MarketState
  * @dev Defines the state the market is currently in
- * @custom:type PERPETUAL - Both tranches are fully liquid and the YDM is being used to distribute yield if ST IL doesn't exist
- * @custom:type FIXED_TERM_HEALTHY - There was a drawdown in the senior NAV and the market is in a fixed term regime
+ * @custom:type PERPETUAL - Both tranches are fully liquid, JT IL does not exist the YDM is being used to distribute yield if ST IL doesn't exist
+ * @custom:type FIXED_TERM - There was a drawdown in the senior NAV and the market is in a fixed term regime
  *              ST withdrawals and JT deposits are blocked, and the LTV is healthy as per the market's configured LLTV
- * @custom:field FIXED_TERM_UNHEALTHY - There was a drawdown in the senior NAV and the market is in a fixed term regime
- *               The market is fully liquid since the LTV is unhealthy as per the market's configured LLTV
  */
 enum MarketState {
     PERPETUAL,
-    FIXED_TERM_HEALTHY,
-    FIXED_TERM_UNHEALTHY
+    FIXED_TERM
 }
 
 /**
@@ -37,7 +34,7 @@ struct AssetClaims {
 /**
  * @title SyncedAccountingState
  * @dev Contains all current mark to market NAV accounting data for the market's tranches
- * @custom:field state - The current state of the Royco market (perpetual or fixed term)
+ * @custom:field marketState - The current state of the Royco market (perpetual or fixed term)
  * @custom:field stRawNAV - The senior tranche's current raw NAV: the pure value of its invested assets
  * @custom:field jtRawNAV - The junior tranche's current raw NAV: the pure value of its invested assets
  * @custom:field stEffectiveNAV - Senior tranche effective NAV: includes applied coverage, its share of ST yield, and uncovered losses
@@ -50,7 +47,7 @@ struct AssetClaims {
  * @custom:field jtProtocolFeeAccrued - Protocol fee taken on JT yield on this sync
  */
 struct SyncedAccountingState {
-    MarketState state;
+    MarketState marketState;
     NAV_UNIT stRawNAV;
     NAV_UNIT jtRawNAV;
     NAV_UNIT stEffectiveNAV;

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import { Operation, SyncedAccountingState } from "../libraries/Types.sol";
+import { MarketState, Operation, SyncedAccountingState } from "../libraries/Types.sol";
 import { NAV_UNIT } from "../libraries/Units.sol";
 
 /**

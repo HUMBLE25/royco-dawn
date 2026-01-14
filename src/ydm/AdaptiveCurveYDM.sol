@@ -36,8 +36,8 @@ contract AdaptiveCurveYDM is IYDM {
      */
     struct AdaptiveYieldCurve {
         int64 jtYieldShareAtTargetWAD;
-        uint40 lastAdaptationTimestamp;
-        int96 steepnessAfterTargetWAD;
+        uint32 lastAdaptationTimestamp;
+        int160 steepnessAfterTargetWAD;
     }
 
     /// @dev A mapping from market accountants to its market's current YDM curve
@@ -66,7 +66,7 @@ contract AdaptiveCurveYDM is IYDM {
      * @param _jtYieldShareAtTargetUtilWAD The initial JT yield share at target utilization, scaled to WAD precision
      * @param _jtYieldShareAtFullUtilWAD The initial JT yield share at 100% utilization, scaled to WAD precision
      */
-    function initializeYDMForMarket(uint256 _jtYieldShareAtTargetUtilWAD, uint256 _jtYieldShareAtFullUtilWAD) external {
+    function initializeYDMForMarket(uint64 _jtYieldShareAtTargetUtilWAD, uint64 _jtYieldShareAtFullUtilWAD) external {
         // Ensure that the initial YDM curve is valid
         require(
             _jtYieldShareAtTargetUtilWAD >= uint256(MIN_JT_YIELD_SHARE_AT_TARGET) && _jtYieldShareAtTargetUtilWAD <= uint256(MAX_JT_YIELD_SHARE_AT_TARGET)
@@ -76,10 +76,10 @@ contract AdaptiveCurveYDM is IYDM {
 
         // Initialize the YDM curve for this market
         AdaptiveYieldCurve storage curve = accountantToCurve[msg.sender];
-        curve.jtYieldShareAtTargetWAD = int64(uint64(_jtYieldShareAtTargetUtilWAD));
-        curve.steepnessAfterTargetWAD = int96((int256(_jtYieldShareAtFullUtilWAD) * WAD_INT) / int256(_jtYieldShareAtTargetUtilWAD));
+        curve.jtYieldShareAtTargetWAD = int64(_jtYieldShareAtTargetUtilWAD);
+        curve.steepnessAfterTargetWAD = int160(int256((_jtYieldShareAtFullUtilWAD * WAD) / _jtYieldShareAtTargetUtilWAD));
 
-        emit AdaptiveCurveYdmInitialized(msg.sender, uint256(int256(curve.steepnessAfterTargetWAD)), uint256(int256(curve.jtYieldShareAtTargetWAD)));
+        emit AdaptiveCurveYdmInitialized(msg.sender, uint256(int256(curve.steepnessAfterTargetWAD)), _jtYieldShareAtTargetUtilWAD);
     }
 
     /// @inheritdoc IYDM
@@ -118,7 +118,7 @@ contract AdaptiveCurveYDM is IYDM {
         // Apply the adaptations to the curve
         AdaptiveYieldCurve storage curve = accountantToCurve[msg.sender];
         curve.jtYieldShareAtTargetWAD = int64(newJtYieldShareAtTargetWAD);
-        curve.lastAdaptationTimestamp = uint40(block.timestamp);
+        curve.lastAdaptationTimestamp = uint32(block.timestamp);
 
         emit YdmAdapted(msg.sender, jtYieldShareWAD, uint256(newJtYieldShareAtTargetWAD));
     }

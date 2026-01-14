@@ -50,7 +50,7 @@ contract StaticCurveYDM is IYDM {
      * @param _jtYieldShareAtTargetUtilWAD The JT yield share at target utilization, scaled to WAD precision
      * @param _jtYieldShareAtFullUtilWAD The JT yield share at 100% utilization, scaled to WAD precision
      */
-    function initializeYDMForMarket(uint256 _jtYieldShareAtZeroUtilWAD, uint256 _jtYieldShareAtTargetUtilWAD, uint256 _jtYieldShareAtFullUtilWAD) external {
+    function initializeYDMForMarket(uint64 _jtYieldShareAtZeroUtilWAD, uint64 _jtYieldShareAtTargetUtilWAD, uint64 _jtYieldShareAtFullUtilWAD) external {
         // Ensure that the static YDM curve is valid
         require(
             _jtYieldShareAtZeroUtilWAD <= _jtYieldShareAtTargetUtilWAD && _jtYieldShareAtTargetUtilWAD <= _jtYieldShareAtFullUtilWAD
@@ -62,10 +62,10 @@ contract StaticCurveYDM is IYDM {
         StaticYieldCurve storage curve = accountantToCurve[msg.sender];
         curve.jtYieldShareAtZeroUtilWAD = uint128(_jtYieldShareAtZeroUtilWAD);
         curve.slopeLtTargetUtilWAD =
-            uint128(((_jtYieldShareAtTargetUtilWAD - _jtYieldShareAtZeroUtilWAD).mulDiv(WAD, TARGET_UTILIZATION_WAD, Math.Rounding.Floor)));
+            uint128((uint256(_jtYieldShareAtTargetUtilWAD - _jtYieldShareAtZeroUtilWAD).mulDiv(WAD, TARGET_UTILIZATION_WAD, Math.Rounding.Floor)));
         curve.jtYieldShareAtTargetUtilWAD = uint128(_jtYieldShareAtTargetUtilWAD);
         curve.slopeGteTargetUtilWAD =
-            uint128(((_jtYieldShareAtFullUtilWAD - _jtYieldShareAtTargetUtilWAD).mulDiv(WAD, (WAD - TARGET_UTILIZATION_WAD), Math.Rounding.Floor)));
+            uint128((uint256(_jtYieldShareAtFullUtilWAD - _jtYieldShareAtTargetUtilWAD).mulDiv(WAD, (WAD - TARGET_UTILIZATION_WAD), Math.Rounding.Floor)));
 
         emit StaticCurveYdmInitialized(msg.sender, _jtYieldShareAtZeroUtilWAD, curve.slopeLtTargetUtilWAD, curve.slopeGteTargetUtilWAD);
     }
