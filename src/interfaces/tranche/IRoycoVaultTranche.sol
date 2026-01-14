@@ -36,6 +36,30 @@ interface IRoycoVaultTranche is IERC165, IRoycoAsyncVault, IRoycoAsyncCancellabl
      */
     event ProtocolFeeSharesMinted(address indexed protocolFeeRecipient, uint256 mintedProtocolFeeShares, uint256 totalTrancheShares);
 
+    /// @notice Thrown when the requested redeem amount is greater than the maximum amount of shares that can be redeemed
+    error MUST_REQUEST_WITHIN_MAX_REDEEM_AMOUNT();
+
+    /// @notice Thrown when the specified action is disabled
+    error DISABLED();
+
+    /// @notice Thrown when the caller is not the expected account or an approved operator
+    error ONLY_CALLER_OR_OPERATOR();
+
+    /// @notice Thrown when the redeem amount is zero
+    error MUST_REQUEST_NON_ZERO_SHARES();
+
+    /// @notice Thrown when the deposit amount is zero
+    error MUST_DEPOSIT_NON_ZERO_ASSETS();
+
+    /// @notice Thrown when the redeem amount is zero
+    error MUST_CLAIM_NON_ZERO_SHARES();
+
+    /// @notice Thrown when the caller isn't the kernel
+    error ONLY_KERNEL();
+
+    /// @notice Thrown when the value allocated is zero
+    error INVALID_VALUE_ALLOCATED();
+
     /**
      * @notice Returns the raw net asset value of the tranche's invested assets
      * @dev Excludes yield splits, coverage applications, etc.
