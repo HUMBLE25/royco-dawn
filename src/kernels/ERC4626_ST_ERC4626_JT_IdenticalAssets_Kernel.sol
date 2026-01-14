@@ -43,7 +43,7 @@ contract ERC4626_ST_ERC4626_JT_IdenticalAssets_Kernel is ERC4626_ST_Kernel, ERC4
 
     /// @inheritdoc IRoycoKernel
     /// @dev Override this function to prevent double counting of max withdrawable assets when both tranches deploy into the same ERC4626 vault
-    /// @dev ST Withdrawals are allowed in the following market states: PERPETUAL, FIXED_TERM_UNHEALTHY
+    /// @dev ST Withdrawals are allowed in the following market states: PERPETUAL
     function stMaxWithdrawable(address _owner)
         public
         view
@@ -57,7 +57,7 @@ contract ERC4626_ST_ERC4626_JT_IdenticalAssets_Kernel is ERC4626_ST_Kernel, ERC4
         (SyncedAccountingState memory state, AssetClaims memory stNotionalClaims,) = previewSyncTrancheAccounting(TrancheType.SENIOR);
 
         // If the market is in a state where ST withdrawals are not allowed, return zero claims
-        if (state.state == MarketState.FIXED_TERM_HEALTHY) {
+        if (state.state != MarketState.PERPETUAL) {
             return (ZERO_NAV_UNITS, ZERO_NAV_UNITS, ZERO_NAV_UNITS, ZERO_NAV_UNITS);
         }
 

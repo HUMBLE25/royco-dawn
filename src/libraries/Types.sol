@@ -10,15 +10,12 @@ import { NAV_UNIT, TRANCHE_UNIT } from "./Units.sol";
  * @title MarketState
  * @dev Defines the state the market is currently in
  * @custom:type PERPETUAL - Both tranches are fully liquid and the YDM is being used to distribute yield if ST IL doesn't exist
- * @custom:type FIXED_TERM_HEALTHY - There was a drawdown in the senior NAV and the market is in a fixed term regime
+ * @custom:type FIXED_TERM - There was a drawdown in the senior NAV and the market is in a fixed term regime
  *              ST withdrawals and JT deposits are blocked, and the LTV is healthy as per the market's configured LLTV
- * @custom:field FIXED_TERM_UNHEALTHY - There was a drawdown in the senior NAV and the market is in a fixed term regime
- *               The market is fully liquid however since the LTV is unhealthy as per the market's configured LLTV
  */
 enum MarketState {
     PERPETUAL,
-    FIXED_TERM_HEALTHY,
-    FIXED_TERM_UNHEALTHY
+    FIXED_TERM
 }
 
 /**
