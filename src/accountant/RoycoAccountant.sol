@@ -159,10 +159,6 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
             int256 deltaST = UnitsMathLib.computeNAVDelta(_stRawNAV, $.lastSTRawNAV);
             int256 deltaJT = UnitsMathLib.computeNAVDelta(_jtRawNAV, $.lastJTRawNAV);
 
-            // Update the post-operation raw NAV checkpoints
-            $.lastSTRawNAV = _stRawNAV;
-            $.lastJTRawNAV = _jtRawNAV;
-
             if (_op == Operation.ST_DECREASE_NAV) {
                 require(deltaST <= 0 && deltaJT <= 0, INVALID_POST_OP_STATE(_op));
                 // Senior withdrew: The NAV deltas include the discrete withdrawal amount in addition to any coverage pulled from JT to ST
@@ -174,6 +170,14 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
                 NAV_UNIT stImpermanentLoss = $.lastSTImpermanentLoss;
                 if (stImpermanentLoss != ZERO_NAV_UNITS) {
                     $.lastSTImpermanentLoss = stImpermanentLoss.mulDiv($.lastSTEffectiveNAV, preWithdrawalSTEffectiveNAV, Math.Rounding.Ceil);
+                }
+                // If some coverage was realized
+                if (deltaJT != 0) {
+                    // The withdrawing senior LP has realized its proportional share of past JT losses from its own deprecition and associated recovery optionality, rounding in favor of senior
+                    NAV_UNIT jtSelfImpermanentLoss = $.lastJTSelfImpermanentLoss;
+                    if (jtSelfImpermanentLoss != ZERO_NAV_UNITS) {
+                        $.lastJTSelfImpermanentLoss = jtSelfImpermanentLoss.mulDiv(deltaJT, $.lastJTRawNAV, Math.Rounding.Floor);
+                    }
                 }
             } else if (_op == Operation.JT_DECREASE_NAV) {
                 require(deltaJT <= 0 && deltaST <= 0, INVALID_POST_OP_STATE(_op));
@@ -192,6 +196,11 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
                 }
             }
         }
+
+        // Update the post-operation raw NAV checkpoints
+        $.lastSTRawNAV = _stRawNAV;
+        $.lastJTRawNAV = _jtRawNAV;
+
         // Construct the synced NAVs state
         state = SyncedAccountingState({
             // No state transition is possible in post-op syncs because there is no PNL and NAV changes enforce coverage (ensuring LLTV can't be breached)
