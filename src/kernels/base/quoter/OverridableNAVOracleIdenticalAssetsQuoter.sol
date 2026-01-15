@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
+import { IERC20Metadata } from "../../../../lib/openzeppelin-contracts/contracts/interfaces/IERC20Metadata.sol";
 import { WAD } from "../../../libraries/Constants.sol";
 import { NAV_UNIT, TRANCHE_UNIT, toNAVUnits, toTrancheUnits, toUint256 } from "../../../libraries/Units.sol";
 import { RoycoKernel } from "../RoycoKernel.sol";
@@ -26,11 +27,24 @@ abstract contract OverridableNAVOracleIdenticalAssetsQuoter is RoycoKernel {
     }
 
     /// @notice Emitted when the tranche unit to NAV unit conversion rate is set
-    event TrancheUnitToNAVUnitConversionRateSet(uint256 _ratetrancheUnitToNAVUnitConversionRateWAD);
+    event TrancheUnitToNAVUnitConversionRateSet(uint256 _trancheUnitToNAVUnitConversionRateWAD);
+
+    /// @notice Thrown when the senior and junior tranche assets have the same precision
+    error TRANCHE_ASSET_DECIMALS_MISMATCH();
 
     /// @notice Initializes the quoter for overridable oracle
     /// @param _initialConversionRateWAD The initial tranche unit to NAV unit conversion rate
-    function __OverridableNAVOracleIdenticalAssetsQuoter_init_unchained(uint256 _initialConversionRateWAD) internal onlyInitializing {
+    function __OverridableNAVOracleIdenticalAssetsQuoter_init_unchained(
+        address _stAsset,
+        address _jtAsset,
+        uint256 _initialConversionRateWAD
+    )
+        internal
+        onlyInitializing
+    {
+        // This quoter stipulates that both tranche assets have identical precision
+        require(IERC20Metadata(_stAsset).decimals() == IERC20Metadata(_jtAsset).decimals(), TRANCHE_ASSET_DECIMALS_MISMATCH());
+
         if (_initialConversionRateWAD != 0) {
             OverridableNAVOracleIdenticalAssetsQuoterState storage $ = _getOverridableNAVOracleIdenticalAssetsQuoterStorage();
             $.ratetrancheUnitToNAVUnitConversionRateWAD = _initialConversionRateWAD;
@@ -39,11 +53,11 @@ abstract contract OverridableNAVOracleIdenticalAssetsQuoter is RoycoKernel {
     }
 
     /// @notice Sets the tranche unit to NAV unit conversion rate
-    /// @param _ratetrancheUnitToNAVUnitConversionRateWAD The tranche unit to NAV unit conversion rate
-    function setTrancheUnitToNAVUnitConversionRate(uint256 _ratetrancheUnitToNAVUnitConversionRateWAD) external restricted {
+    /// @param _trancheUnitToNAVUnitConversionRateWAD The tranche unit to NAV unit conversion rate
+    function setTrancheUnitToNAVUnitConversionRate(uint256 _trancheUnitToNAVUnitConversionRateWAD) external restricted {
         OverridableNAVOracleIdenticalAssetsQuoterState storage $ = _getOverridableNAVOracleIdenticalAssetsQuoterStorage();
-        $.ratetrancheUnitToNAVUnitConversionRateWAD = _ratetrancheUnitToNAVUnitConversionRateWAD;
-        emit TrancheUnitToNAVUnitConversionRateSet(_ratetrancheUnitToNAVUnitConversionRateWAD);
+        $.ratetrancheUnitToNAVUnitConversionRateWAD = _trancheUnitToNAVUnitConversionRateWAD;
+        emit TrancheUnitToNAVUnitConversionRateSet(_trancheUnitToNAVUnitConversionRateWAD);
     }
 
     /// @inheritdoc RoycoKernel
