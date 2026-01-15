@@ -90,6 +90,12 @@ interface IRoycoAccountant {
     event JuniorTrancheYieldShareAccrued(uint256 jtYieldShareWAD, uint256 twJTYieldShareAccruedWAD, uint32 accrualTimestamp);
 
     /**
+     * @notice Emitted when a fixed term regime is commenced by this market
+     * @param fixedTermEndTimestamp The end timestamp of the new fixed term regime
+     */
+    event FixedTermCommenced(uint32 fixedTermEndTimestamp);
+
+    /**
      * @notice Emitted when a pre-operation tranche accounting synchronization is executed
      * @param resultingState The resulting market state after synchronizing the tranche accounting
      */

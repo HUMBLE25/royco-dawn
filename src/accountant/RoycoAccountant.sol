@@ -106,7 +106,9 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
 
         // If the market transitioned from a perpetual to a fixed term state, set the end timestamp of the fixed term
         if (initialMarketState == MarketState.PERPETUAL && state.marketState == MarketState.FIXED_TERM) {
-            $.fixedTermEndTimestamp = uint32(block.timestamp + $.fixedTermDurationSeconds);
+            uint32 newFixedTermEndTimestamp = uint32(block.timestamp + $.fixedTermDurationSeconds);
+            $.fixedTermEndTimestamp = newFixedTermEndTimestamp;
+            emit FixedTermCommenced(newFixedTermEndTimestamp);
         }
 
         emit PreOpTrancheAccountingSynced(state);
