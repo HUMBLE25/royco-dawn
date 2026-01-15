@@ -21,7 +21,15 @@ abstract contract ERC4626_ST_ERC4626_JT_OverridableNAVOracleIdenticalAssets_Kern
      * @param _stVault The ERC4626 compliant vault that the senior tranche will deploy into
      * @param _jtVault The ERC4626 compliant vault that the junior tranche will deploy into
      */
-    function initialize(RoycoKernelInitParams calldata _params, address _stVault, address _jtVault, uint256 _initialConversionRateWAD) external initializer {
+    function __ERC4626_ST_ERC4626_JT_OverridableNAVOracleIdenticalAssets_Kernel_init(
+        RoycoKernelInitParams calldata _params,
+        address _stVault,
+        address _jtVault,
+        uint256 _initialConversionRateWAD
+    )
+        internal
+        onlyInitializing
+    {
         // Get the base assets for both tranches and ensure that they are identical
         address stAsset = IRoycoVaultTranche(_params.seniorTranche).asset();
         address jtAsset = IRoycoVaultTranche(_params.juniorTranche).asset();

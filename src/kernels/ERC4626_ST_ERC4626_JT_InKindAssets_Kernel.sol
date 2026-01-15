@@ -7,7 +7,6 @@ import { NAV_UNIT } from "../libraries/Units.sol";
 import { RoycoKernel } from "./base/RoycoKernel.sol";
 import { InKindAssetsQuoter } from "./base/quoter/InKindAssetsQuoter.sol";
 import { ERC4626_ST_ERC4626_JT_Kernel } from "./base/recipe/ERC4626_ST_ERC4626_JT_Kernel.sol";
-import { ERC4626_ST_Kernel } from "./base/senior/ERC4626_ST_Kernel.sol";
 
 /**
  * @title ERC4626_ST_ERC4626_JT_InKindAssets_Kernel

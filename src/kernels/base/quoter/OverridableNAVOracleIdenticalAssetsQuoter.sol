@@ -16,13 +16,13 @@ import { RoycoKernel } from "../RoycoKernel.sol";
  *        - Yield Breaking ERC20 ST And JT: Tranche Unit (like NUSD, reUSD), NAV Unit (USD)
  */
 abstract contract OverridableNAVOracleIdenticalAssetsQuoter is RoycoKernel {
-    /// @dev Storage slot for OverridableNAVOracleIdenticalAssetsQuoterState using ERC-7201 pattern
-    // keccak256(abi.encode(uint256(keccak256("Royco.storage.OverridableNAVOracleIdenticalAssetsQuoterState")) - 1)) & ~bytes32(uint256(0xff))
+    /// @dev Storage slot for OverridableNavOracleIdenticalAssetsQuoterState using ERC-7201 pattern
+    // keccak256(abi.encode(uint256(keccak256("Royco.storage.OverridableNavOracleIdenticalAssetsQuoterState")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant OVERRIDABLE_NAV_ORACLE_IDENTICAL_ASSETS_QUOTER_STORAGE_SLOT = 0x0785225953a08907d128280fd0b80854efdf826a489c9eefeeec6620bb9d6600;
 
     /// @dev Storage state for the Royco overridable oracle quoter
-    /// @custom:storage-location erc7201:Royco.storage.OverridableNAVOracleIdenticalAssetsQuoterState
-    struct OverridableNAVOracleIdenticalAssetsQuoterState {
+    /// @custom:storage-location erc7201:Royco.storage.OverridableNavOracleIdenticalAssetsQuoterState
+    struct OverridableNavOracleIdenticalAssetsQuoterState {
         uint256 ratetrancheUnitToNAVUnitConversionRateWAD;
     }
 
@@ -46,7 +46,7 @@ abstract contract OverridableNAVOracleIdenticalAssetsQuoter is RoycoKernel {
         require(IERC20Metadata(_stAsset).decimals() == IERC20Metadata(_jtAsset).decimals(), TRANCHE_ASSET_DECIMALS_MISMATCH());
 
         if (_initialConversionRateWAD != 0) {
-            OverridableNAVOracleIdenticalAssetsQuoterState storage $ = _getOverridableNAVOracleIdenticalAssetsQuoterStorage();
+            OverridableNavOracleIdenticalAssetsQuoterState storage $ = _getOverridableNAVOracleIdenticalAssetsQuoterStorage();
             $.ratetrancheUnitToNAVUnitConversionRateWAD = _initialConversionRateWAD;
             emit TrancheUnitToNAVUnitConversionRateSet(_initialConversionRateWAD);
         }
@@ -55,7 +55,7 @@ abstract contract OverridableNAVOracleIdenticalAssetsQuoter is RoycoKernel {
     /// @notice Sets the tranche unit to NAV unit conversion rate
     /// @param _trancheUnitToNAVUnitConversionRateWAD The tranche unit to NAV unit conversion rate
     function setTrancheUnitToNAVUnitConversionRate(uint256 _trancheUnitToNAVUnitConversionRateWAD) external restricted {
-        OverridableNAVOracleIdenticalAssetsQuoterState storage $ = _getOverridableNAVOracleIdenticalAssetsQuoterStorage();
+        OverridableNavOracleIdenticalAssetsQuoterState storage $ = _getOverridableNAVOracleIdenticalAssetsQuoterStorage();
         $.ratetrancheUnitToNAVUnitConversionRateWAD = _trancheUnitToNAVUnitConversionRateWAD;
         emit TrancheUnitToNAVUnitConversionRateSet(_trancheUnitToNAVUnitConversionRateWAD);
     }
@@ -80,11 +80,11 @@ abstract contract OverridableNAVOracleIdenticalAssetsQuoter is RoycoKernel {
         return toTrancheUnits(toUint256(_nav) * WAD / getTrancheUnitToNAVUnitConversionRate());
     }
 
-    /// @notice Returns the tranche unit to NAV unit conversion rate
+    /// @notice Returns the value of 1 Tranche Unit in NAV Units, scaled to WAD precision
     /// @dev If the override is set, it will return the override value, otherwise it will return the value queried from the oracle
     /// @return ratetrancheUnitToNAVUnitConversionRateWAD The tranche unit to NAV unit conversion rate
     function getTrancheUnitToNAVUnitConversionRate() public view returns (uint256 ratetrancheUnitToNAVUnitConversionRateWAD) {
-        OverridableNAVOracleIdenticalAssetsQuoterState storage $ = _getOverridableNAVOracleIdenticalAssetsQuoterStorage();
+        OverridableNavOracleIdenticalAssetsQuoterState storage $ = _getOverridableNAVOracleIdenticalAssetsQuoterStorage();
         ratetrancheUnitToNAVUnitConversionRateWAD = $.ratetrancheUnitToNAVUnitConversionRateWAD;
         if (ratetrancheUnitToNAVUnitConversionRateWAD != 0) {
             return ratetrancheUnitToNAVUnitConversionRateWAD;
@@ -100,11 +100,11 @@ abstract contract OverridableNAVOracleIdenticalAssetsQuoter is RoycoKernel {
     function _getTrancheUnitToNAVUnitConversionRate() internal view virtual returns (uint256 ratetrancheUnitToNAVUnitConversionRateWAD);
 
     /**
-     * @notice Returns a storage pointer to the OverridableNAVOracleIdenticalAssetsQuoterState storage
+     * @notice Returns a storage pointer to the OverridableNavOracleIdenticalAssetsQuoterState storage
      * @dev Uses ERC-7201 storage slot pattern for collision-resistant storage
      * @return $ Storage pointer
      */
-    function _getOverridableNAVOracleIdenticalAssetsQuoterStorage() internal pure returns (OverridableNAVOracleIdenticalAssetsQuoterState storage $) {
+    function _getOverridableNAVOracleIdenticalAssetsQuoterStorage() internal pure returns (OverridableNavOracleIdenticalAssetsQuoterState storage $) {
         assembly ("memory-safe") {
             $.slot := OVERRIDABLE_NAV_ORACLE_IDENTICAL_ASSETS_QUOTER_STORAGE_SLOT
         }

@@ -7,7 +7,6 @@ import { RoycoAccountant } from "../src/accountant/RoycoAccountant.sol";
 import { RoycoRoles } from "../src/auth/RoycoRoles.sol";
 import { IRoycoAccountant } from "../src/interfaces/IRoycoAccountant.sol";
 import { IRoycoAuth } from "../src/interfaces/IRoycoAuth.sol";
-import { IRoycoFactory } from "../src/interfaces/IRoycoFactory.sol";
 import { IRoycoKernel } from "../src/interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoAsyncCancellableVault } from "../src/interfaces/tranche/IRoycoAsyncCancellableVault.sol";
 import { IRoycoAsyncVault } from "../src/interfaces/tranche/IRoycoAsyncVault.sol";
