@@ -196,7 +196,8 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
                 // The withdrawing junior LP has realized its proportional share of past losses (from its own deprecition and coverage provided) and associated recovery optionality, rounding in favor of senior
                 NAV_UNIT jtImpermanentLoss = $.lastJTSelfImpermanentLoss;
                 if (jtImpermanentLoss != ZERO_NAV_UNITS) {
-                    $.lastJTSelfImpermanentLoss = jtImpermanentLoss.mulDiv($.lastJTEffectiveNAV, preWithdrawalJTEffectiveNAV, Math.Rounding.Floor);
+                    NAV_UNIT remainingJTRawNAV = $.lastJTRawNAV - toNAVUnits(-deltaJT);
+                    $.lastJTSelfImpermanentLoss = jtImpermanentLoss.mulDiv(remainingJTRawNAV, $.lastJTRawNAV, Math.Rounding.Floor);
                 }
                 jtImpermanentLoss = $.lastJTCoverageImpermanentLoss;
                 if (jtImpermanentLoss != ZERO_NAV_UNITS) {
