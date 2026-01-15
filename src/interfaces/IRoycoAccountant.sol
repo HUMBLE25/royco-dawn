@@ -256,6 +256,14 @@ interface IRoycoAccountant {
     function setLLTV(uint64 _lltvWAD) external;
 
     /**
+     * @notice Updates the fixed term duration for this market
+     * @dev Setting the fixed term duration to 0 will force the market into an eternally perpetual state
+     * @dev Only callable by a designated admin
+     * @param _fixedTermDurationSeconds The new fixed term duration for this market in seconds
+     */
+    function setFixedTermDuration(uint24 _fixedTermDurationSeconds) external;
+
+    /**
      * @notice Returns the state of the accountant
      * @return state The state of the accountant
      */

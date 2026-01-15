@@ -75,8 +75,8 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
 
         // Get the time-weighted accrued JT yield share
         // TODO: Exclude recovery periods from elapsed time in YDM calculations. Including in the adaptive curves adaptations.
-        // 1. If the market is in a perpetual state, accrue the JT yield share
-        // 2. If the market is in a fixed term state, preview the JT yield share
+        // 1. If the market is was a perpetual state, accrue the JT yield share
+        // 2. If the market was in a fixed term state, preview the JT yield share
         MarketState initialMarketState = $.lastMarketState;
         uint192 twJTYieldShareAccruedWAD;
         if (initialMarketState == MarketState.PERPETUAL) twJTYieldShareAccruedWAD = _accrueJTYieldShare();
@@ -360,21 +360,15 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         NAV_UNIT stProtocolFeeAccrued;
         NAV_UNIT jtProtocolFeeAccrued;
 
-        // If the fixed term duration is set to zero, the market is permanently in a perpetual state, else the last state is the initial state
-        uint24 fixedTermDurationSeconds = $.fixedTermDurationSeconds;
-        if (fixedTermDurationSeconds == 0) {
+        // If the fixed term duration is set to zero, the market is permanently in a perpetual state
+        initialMarketState = $.lastMarketState;
+        // If the market was in a fixed term state that has elapsed, we must transition this market to a perpetual state
+        if (initialMarketState == MarketState.FIXED_TERM && $.fixedTermEndTimestamp <= block.timestamp) {
             initialMarketState = MarketState.PERPETUAL;
-            // Else, determine the initial state based on the last checkpointed market state
-        } else {
-            initialMarketState = $.lastMarketState;
-            // If the market was in a fixed term state that has elapsed, we must transition this market to a perpetual state
-            if (initialMarketState == MarketState.FIXED_TERM && $.fixedTermEndTimestamp <= block.timestamp) {
-                initialMarketState = MarketState.PERPETUAL;
-                // Transitioning from a fixed term to a perpetual state resets JT IL incurred during the term:
-                // 1. ST LPs can now realize JT coverage
-                // 2. New JT LPs can help reinstate the market into a fully collateralized/covered state
-                jtImpermanentLoss = ZERO_NAV_UNITS;
-            }
+            // Transitioning from a fixed term to a perpetual state resets JT IL incurred during the term:
+            // 1. ST LPs can now realize JT coverage
+            // 2. New JT LPs can help reinstate the market into a fully collateralized/covered state
+            jtImpermanentLoss = ZERO_NAV_UNITS;
         }
 
         // Compute the deltas in the raw NAVs of each tranche
@@ -495,11 +489,11 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         // 1. Perpetual: There is no existant JT IL in the system, LLTV has been breached (ST IL may exist), or the fixed term duration is set to 0
         // 2. Fixed term: There is IL in the system but LLTV has not been breached
         MarketState resultingMarketState;
-        if (jtImpermanentLoss == ZERO_NAV_UNITS || fixedTermDurationSeconds == 0) {
+        if (jtImpermanentLoss == ZERO_NAV_UNITS) {
             resultingMarketState = MarketState.PERPETUAL;
-        } else if (UtilsLib.computeLTV(stEffectiveNAV, stImpermanentLoss, jtEffectiveNAV) >= $.lltvWAD) {
+        } else if (UtilsLib.computeLTV(stEffectiveNAV, stImpermanentLoss, jtEffectiveNAV) >= $.lltvWAD || $.fixedTermDurationSeconds == 0) {
             resultingMarketState = MarketState.PERPETUAL;
-            // JT impermanent loss has to be explicitly cleared to transition the market back to a perpetual state
+            // JT impermanent loss has to be explicitly cleared to ensure that the market is in a perpetual state
             jtImpermanentLoss = ZERO_NAV_UNITS;
         } else {
             resultingMarketState = MarketState.FIXED_TERM;
@@ -594,7 +588,6 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
     function setSeniorTrancheProtocolFee(uint64 _stProtocolFeeWAD) external override(IRoycoAccountant) restricted withSyncedAccounting {
         // Ensure that the protocol fee percentage is valid
         require(_stProtocolFeeWAD <= MAX_PROTOCOL_FEE_WAD, MAX_PROTOCOL_FEE_EXCEEDED());
-        // Set the new protocol fee percentage
         _getRoycoAccountantStorage().stProtocolFeeWAD = _stProtocolFeeWAD;
     }
 
@@ -602,7 +595,6 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
     function setJuniorTrancheProtocolFee(uint64 _jtProtocolFeeWAD) external override(IRoycoAccountant) restricted withSyncedAccounting {
         // Ensure that the protocol fee percentage is valid
         require(_jtProtocolFeeWAD <= MAX_PROTOCOL_FEE_WAD, MAX_PROTOCOL_FEE_EXCEEDED());
-        // Set the new protocol fee percentage
         _getRoycoAccountantStorage().jtProtocolFeeWAD = _jtProtocolFeeWAD;
     }
 
@@ -611,7 +603,6 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         RoycoAccountantState storage $ = _getRoycoAccountantStorage();
         // Validate the new coverage configuration
         _validateCoverageConfig(_coverageWAD, $.betaWAD, $.lltvWAD);
-        // Set the new coverage percentage
         $.coverageWAD = _coverageWAD;
     }
 
@@ -620,7 +611,6 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         RoycoAccountantState storage $ = _getRoycoAccountantStorage();
         // Validate the new coverage configuration
         _validateCoverageConfig($.coverageWAD, _betaWAD, $.lltvWAD);
-        // Set the new beta parameter
         $.betaWAD = _betaWAD;
     }
 
@@ -629,8 +619,18 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         RoycoAccountantState storage $ = _getRoycoAccountantStorage();
         // Validate the new coverage configuration
         _validateCoverageConfig($.coverageWAD, $.betaWAD, _lltvWAD);
-        // Set the new LLTV parameter
         $.lltvWAD = _lltvWAD;
+    }
+
+    /// @inheritdoc IRoycoAccountant
+    function setFixedTermDuration(uint24 _fixedTermDurationSeconds) external override(IRoycoAccountant) restricted withSyncedAccounting {
+        RoycoAccountantState storage $ = _getRoycoAccountantStorage();
+        $.fixedTermDurationSeconds = _fixedTermDurationSeconds;
+        // If the specified duration is 0, the market will permanently be in a perpetual state
+        if (_fixedTermDurationSeconds == 0) {
+            $.lastJTImpermanentLoss = ZERO_NAV_UNITS;
+            $.lastMarketState = MarketState.PERPETUAL;
+        }
     }
 
     /// @inheritdoc IRoycoAccountant
