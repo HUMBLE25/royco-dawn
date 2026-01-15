@@ -74,9 +74,10 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         RoycoAccountantState storage $ = _getRoycoAccountantStorage();
 
         // Get the time-weighted accrued JT yield share
+        // TODO: Exclude recovery periods from elapsed time in YDM calculations. Including in the adaptive curves adaptations.
         // 1. If the market is in a perpetual state, accrue the JT yield share
         // 2. If the market is in a fixed term state, preview the JT yield share
-        MarketState initialMarketState;
+        MarketState initialMarketState = $.lastMarketState;
         uint192 twJTYieldShareAccruedWAD;
         if (initialMarketState == MarketState.PERPETUAL) twJTYieldShareAccruedWAD = _accrueJTYieldShare();
         else twJTYieldShareAccruedWAD = _previewJTYieldShareAccrual();
