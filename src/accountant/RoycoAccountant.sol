@@ -494,10 +494,16 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         // Determine the resulting market state:
         // 1. Perpetual: There is no existant JT IL in the system, LLTV has been breached (ST IL may exist), or the fixed term duration is set to 0
         // 2. Fixed term: There is IL in the system but LLTV has not been breached
-        MarketState resultingMarketState = jtImpermanentLoss == ZERO_NAV_UNITS
-            || UtilsLib.computeLTV(stEffectiveNAV, stImpermanentLoss, jtEffectiveNAV) >= $.lltvWAD || fixedTermDurationSeconds == 0
-            ? MarketState.PERPETUAL
-            : MarketState.FIXED_TERM;
+        MarketState resultingMarketState;
+        if (jtImpermanentLoss == ZERO_NAV_UNITS || fixedTermDurationSeconds == 0) {
+            resultingMarketState = MarketState.PERPETUAL;
+        } else if (UtilsLib.computeLTV(stEffectiveNAV, stImpermanentLoss, jtEffectiveNAV) >= $.lltvWAD) {
+            resultingMarketState = MarketState.PERPETUAL;
+            // JT impermanent loss has to be explicitly cleared to transition the market back to a perpetual state
+            jtImpermanentLoss = ZERO_NAV_UNITS;
+        } else {
+            resultingMarketState = MarketState.FIXED_TERM;
+        }
 
         // Construct the synced NAVs state to return to the caller
         state = SyncedAccountingState({
