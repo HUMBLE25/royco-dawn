@@ -5,7 +5,7 @@ import { IRoycoFactory, RoycoFactory } from "../../src/RoycoFactory.sol";
 import { RoycoAccountant } from "../../src/accountant/RoycoAccountant.sol";
 import { RoycoRoles } from "../../src/auth/RoycoRoles.sol";
 import { IRoycoAuth } from "../../src/interfaces/IRoycoAuth.sol";
-import { IPool } from "../../src/interfaces/aave/IPool.sol";
+import { IPool } from "../../src/interfaces/external/aave/IPool.sol";
 import { TrancheType } from "../../src/interfaces/kernel/IRoycoKernel.sol";
 import { ZERO_NAV_UNITS, ZERO_TRANCHE_UNITS } from "../../src/libraries/Constants.sol";
 import { RoycoKernelInitParams } from "../../src/libraries/RoycoKernelStorageLib.sol";

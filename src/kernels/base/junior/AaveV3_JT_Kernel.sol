@@ -2,9 +2,9 @@
 pragma solidity ^0.8.28;
 
 import { IERC20, SafeERC20 } from "../../../../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
-import { IPool } from "../../../interfaces/aave/IPool.sol";
-import { IPoolAddressesProvider } from "../../../interfaces/aave/IPoolAddressesProvider.sol";
-import { IPoolDataProvider } from "../../../interfaces/aave/IPoolDataProvider.sol";
+import { IPool } from "../../../interfaces/external/aave/IPool.sol";
+import { IPoolAddressesProvider } from "../../../interfaces/external/aave/IPoolAddressesProvider.sol";
+import { IPoolDataProvider } from "../../../interfaces/external/aave/IPoolDataProvider.sol";
 import { ExecutionModel, IRoycoKernel } from "../../../interfaces/kernel/IRoycoKernel.sol";
 import { MAX_TRANCHE_UNITS, ZERO_TRANCHE_UNITS } from "../../../libraries/Constants.sol";
 import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib, toTrancheUnits, toUint256 } from "../../../libraries/Units.sol";
