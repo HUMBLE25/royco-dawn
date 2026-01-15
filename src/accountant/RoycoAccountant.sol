@@ -183,8 +183,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
                     // The withdrawing senior LP has realized its proportional share of past JT losses from its own deprecition and associated recovery optionality, rounding in favor of senior
                     NAV_UNIT jtSelfImpermanentLoss = $.lastJTSelfImpermanentLoss;
                     if (jtSelfImpermanentLoss != ZERO_NAV_UNITS) {
-                        NAV_UNIT remainingJTRawNAV = $.lastJTRawNAV - toNAVUnits(-deltaJT);
-                        $.lastJTSelfImpermanentLoss = jtSelfImpermanentLoss.mulDiv(remainingJTRawNAV, $.lastJTRawNAV, Math.Rounding.Floor);
+                        $.lastJTSelfImpermanentLoss = jtSelfImpermanentLoss.mulDiv(_jtRawNAV, $.lastJTRawNAV, Math.Rounding.Floor);
                     }
                 }
             } else if (_op == Operation.JT_DECREASE_NAV) {
@@ -193,15 +192,14 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
                 NAV_UNIT preWithdrawalJTEffectiveNAV = $.lastJTEffectiveNAV;
                 // The actual amount withdrawn by JT was the delta in JT raw NAV and the assets claimed from ST
                 $.lastJTEffectiveNAV = preWithdrawalJTEffectiveNAV - (toNAVUnits(-deltaJT) + toNAVUnits(-deltaST));
-                // The withdrawing junior LP has realized its proportional share of past losses (from its own deprecition and coverage provided) and associated recovery optionality, rounding in favor of senior
-                NAV_UNIT jtImpermanentLoss = $.lastJTSelfImpermanentLoss;
-                if (jtImpermanentLoss != ZERO_NAV_UNITS) {
-                    NAV_UNIT remainingJTRawNAV = $.lastJTRawNAV - toNAVUnits(-deltaJT);
-                    $.lastJTSelfImpermanentLoss = jtImpermanentLoss.mulDiv(remainingJTRawNAV, $.lastJTRawNAV, Math.Rounding.Floor);
-                }
-                jtImpermanentLoss = $.lastJTCoverageImpermanentLoss;
+                // The withdrawing junior LP has realized its proportional share of past losses (from coverage provided and its own deprecition) and associated recovery optionality, rounding in favor of senior
+                NAV_UNIT jtImpermanentLoss = $.lastJTCoverageImpermanentLoss;
                 if (jtImpermanentLoss != ZERO_NAV_UNITS) {
                     $.lastJTCoverageImpermanentLoss = jtImpermanentLoss.mulDiv($.lastJTEffectiveNAV, preWithdrawalJTEffectiveNAV, Math.Rounding.Floor);
+                }
+                jtImpermanentLoss = $.lastJTSelfImpermanentLoss;
+                if (jtImpermanentLoss != ZERO_NAV_UNITS) {
+                    $.lastJTSelfImpermanentLoss = jtImpermanentLoss.mulDiv(_jtRawNAV, $.lastJTRawNAV, Math.Rounding.Floor);
                 }
             }
         }
