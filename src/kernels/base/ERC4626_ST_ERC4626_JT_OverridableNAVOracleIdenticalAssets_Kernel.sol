@@ -1,0 +1,122 @@
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.28;
+
+import { IRoycoVaultTranche } from "../../interfaces/tranche/IRoycoVaultTranche.sol";
+import { RoycoKernelInitParams } from "../../libraries/RoycoKernelStorageLib.sol";
+import { MarketState } from "../../libraries/Types.sol";
+import { Math, NAV_UNIT, TRANCHE_UNIT, UnitsMathLib } from "../../libraries/Units.sol";
+import { ERC4626KernelState, ERC4626KernelStorageLib } from "../../libraries/kernels/ERC4626KernelStorageLib.sol";
+import { AssetClaims, IRoycoKernel, RoycoKernel, SyncedAccountingState, TrancheType, ZERO_NAV_UNITS } from "./RoycoKernel.sol";
+import { ERC4626_JT_Kernel } from "./junior/ERC4626_JT_Kernel.sol";
+import { OverridableNAVOracleIdenticalAssetsQuoter } from "./quoter/OverridableNAVOracleIdenticalAssetsQuoter.sol";
+import { ERC4626_ST_Kernel } from "./senior/ERC4626_ST_Kernel.sol";
+
+/**
+ * @title ERC4626_ST_ERC4626_JT_OverridableNAVOracleIdenticalAssets_Kernel
+ * @notice The senior and junior tranches are deployed into a ERC4626 compliant vault
+ * @notice The two tranches can be deployed into the same ERC4626 compliant vault
+ * @notice The tranche assets are identical in value and precision (eg. USDC for both tranches, USDC and USDT, etc.)
+ * @notice Tranche and NAV units are always expressed in the tranche asset's precision. The NAV Unit factors in a conversion rate from the overridable NAV Conversion Rate oracle.
+ */
+abstract contract ERC4626_ST_ERC4626_JT_OverridableNAVOracleIdenticalAssets_Kernel is
+    ERC4626_ST_Kernel,
+    ERC4626_JT_Kernel,
+    OverridableNAVOracleIdenticalAssetsQuoter
+{
+    using UnitsMathLib for TRANCHE_UNIT;
+
+    /**
+     * @notice Initializes the Royco Kernel
+     * @param _stVault The ERC4626 compliant vault that the senior tranche will deploy into
+     * @param _jtVault The ERC4626 compliant vault that the junior tranche will deploy into
+     */
+    function initialize(RoycoKernelInitParams calldata _params, address _stVault, address _jtVault, uint256 _initialConversionRateWAD) external initializer {
+        // Get the base assets for both tranches and ensure that they are identical
+        address stAsset = IRoycoVaultTranche(_params.seniorTranche).asset();
+        address jtAsset = IRoycoVaultTranche(_params.juniorTranche).asset();
+
+        // Initialize the base kernel state
+        __RoycoKernel_init(_params, stAsset, jtAsset);
+        // Initialize the ERC4626 senior tranche state
+        __ERC4626_ST_Kernel_init_unchained(_stVault, stAsset);
+        // Initialize the ERC4626 junior tranche state
+        __ERC4626_JT_Kernel_init_unchained(_jtVault, jtAsset);
+        // Initialize the overridable NAV oracle identical assets quoter
+        __OverridableNAVOracleIdenticalAssetsQuoter_init_unchained(_initialConversionRateWAD);
+    }
+
+    /// @inheritdoc IRoycoKernel
+    /// @dev Override this function to prevent double counting of max withdrawable assets when both tranches deploy into the same ERC4626 vault
+    /// @dev ST Withdrawals are allowed in the following market states: PERPETUAL
+    function stMaxWithdrawable(address _owner)
+        public
+        view
+        override(RoycoKernel)
+        returns (NAV_UNIT claimOnStNAV, NAV_UNIT claimOnJtNAV, NAV_UNIT stMaxWithdrawableNAV, NAV_UNIT jtMaxWithdrawableNAV)
+    {
+        ERC4626KernelState storage $ = ERC4626KernelStorageLib._getERC4626KernelStorage();
+        // If both tranches are in different ERC4626 vaults, double counting is not possible
+        if ($.stVault != $.jtVault) return super.stMaxWithdrawable(_owner);
+
+        (SyncedAccountingState memory state, AssetClaims memory stNotionalClaims,) = previewSyncTrancheAccounting(TrancheType.SENIOR);
+
+        // If the market is in a state where ST withdrawals are not allowed, return zero claims
+        if (state.state != MarketState.PERPETUAL) {
+            return (ZERO_NAV_UNITS, ZERO_NAV_UNITS, ZERO_NAV_UNITS, ZERO_NAV_UNITS);
+        }
+
+        // Get the total claims the senior tranche has on each tranche's assets
+        NAV_UNIT stTotalClaimsNAV = stNotionalClaims.nav;
+        if (stTotalClaimsNAV == ZERO_NAV_UNITS) return (ZERO_NAV_UNITS, ZERO_NAV_UNITS, ZERO_NAV_UNITS, ZERO_NAV_UNITS);
+        claimOnStNAV = stConvertTrancheUnitsToNAVUnits(stNotionalClaims.stAssets);
+        claimOnJtNAV = jtConvertTrancheUnitsToNAVUnits(stNotionalClaims.jtAssets);
+
+        // Get the maximum withdrawable assets for both tranches combined
+        // Scale the max withdrawable assets by the percentage claims ST has on each tranche
+        TRANCHE_UNIT totalMaxWithdrawableAssets = _stMaxWithdrawableGlobally(_owner);
+        stMaxWithdrawableNAV = stConvertTrancheUnitsToNAVUnits(totalMaxWithdrawableAssets.mulDiv(claimOnStNAV, stTotalClaimsNAV, Math.Rounding.Floor));
+        jtMaxWithdrawableNAV = jtConvertTrancheUnitsToNAVUnits(totalMaxWithdrawableAssets.mulDiv(claimOnJtNAV, stTotalClaimsNAV, Math.Rounding.Floor));
+    }
+
+    /// @inheritdoc IRoycoKernel
+    /// @dev Override this function to prevent double counting of max withdrawable assets when both tranches deploy into the same ERC4626 vault
+    function jtMaxWithdrawable(address _owner)
+        public
+        view
+        virtual
+        override(RoycoKernel)
+        returns (NAV_UNIT claimOnStNAV, NAV_UNIT claimOnJtNAV, NAV_UNIT stMaxWithdrawableNAV, NAV_UNIT jtMaxWithdrawableNAV)
+    {
+        ERC4626KernelState storage $ = ERC4626KernelStorageLib._getERC4626KernelStorage();
+        // If both tranches are in different ERC4626 vaults, double counting is not possible
+        if ($.stVault != $.jtVault) return super.jtMaxWithdrawable(_owner);
+
+        // Get the total claims the junior tranche has on each tranche's assets
+        (SyncedAccountingState memory state, AssetClaims memory jtNotionalClaims,) = previewSyncTrancheAccounting(TrancheType.JUNIOR);
+        NAV_UNIT jtTotalClaimsNAV = jtNotionalClaims.nav;
+        if (jtTotalClaimsNAV == ZERO_NAV_UNITS) return (ZERO_NAV_UNITS, ZERO_NAV_UNITS, ZERO_NAV_UNITS, ZERO_NAV_UNITS);
+
+        // Get the max withdrawable ST and JT assets in NAV units from the accountant consider coverage requirement
+        (, NAV_UNIT stClaimableGivenCoverage, NAV_UNIT jtClaimableGivenCoverage) = _accountant()
+            .maxJTWithdrawalGivenCoverage(
+                state.stRawNAV,
+                state.jtRawNAV,
+                stConvertTrancheUnitsToNAVUnits(jtNotionalClaims.stAssets),
+                jtConvertTrancheUnitsToNAVUnits(jtNotionalClaims.jtAssets)
+            );
+
+        claimOnStNAV = stConvertTrancheUnitsToNAVUnits(jtNotionalClaims.stAssets);
+        claimOnJtNAV = jtConvertTrancheUnitsToNAVUnits(jtNotionalClaims.jtAssets);
+
+        // Get the maximum withdrawable assets for both tranches combined
+        // Scale the max withdrawable assets by the percentage claims JT has on each tranche
+        TRANCHE_UNIT totalMaxWithdrawableAssets = _jtMaxWithdrawableGlobally(_owner);
+        stMaxWithdrawableNAV = UnitsMathLib.min(
+            stConvertTrancheUnitsToNAVUnits(totalMaxWithdrawableAssets.mulDiv(claimOnStNAV, jtTotalClaimsNAV, Math.Rounding.Floor)), stClaimableGivenCoverage
+        );
+        jtMaxWithdrawableNAV = UnitsMathLib.min(
+            jtConvertTrancheUnitsToNAVUnits(totalMaxWithdrawableAssets.mulDiv(claimOnJtNAV, jtTotalClaimsNAV, Math.Rounding.Floor)), jtClaimableGivenCoverage
+        );
+    }
+}
+
