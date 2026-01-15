@@ -169,13 +169,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
                 NAV_UNIT preWithdrawalSTEffectiveNAV = $.lastSTEffectiveNAV;
                 // The actual amount withdrawn was the delta in ST raw NAV and the coverage applied from JT
                 $.lastSTEffectiveNAV = preWithdrawalSTEffectiveNAV - (toNAVUnits(-deltaST) + toNAVUnits(-deltaJT));
-                // Proportionally reduce the market's impermanent losses, rounding in favor of senior
-                // The withdrawing senior LP has realized its proportional share of past covered losses, settling the realized portion between JT and ST
-                NAV_UNIT impermanentLoss = $.lastJTImpermanentLoss;
-                if (impermanentLoss != ZERO_NAV_UNITS) {
-                    $.lastJTImpermanentLoss = impermanentLoss.mulDiv($.lastSTEffectiveNAV, preWithdrawalSTEffectiveNAV, Math.Rounding.Floor); // TODO: Do we need this now? Since, ST withdrawals are blocked when JT IL > 0
-                }
-                // The withdrawing senior LP has realized its proportional share of past uncovered losses and associated recovery optionality
+                // The withdrawing senior LP has realized its proportional share of past uncovered losses and associated recovery optionality, rounding in favor of senior
                 impermanentLoss = $.lastSTImpermanentLoss;
                 if (impermanentLoss != ZERO_NAV_UNITS) {
                     $.lastSTImpermanentLoss = impermanentLoss.mulDiv($.lastSTEffectiveNAV, preWithdrawalSTEffectiveNAV, Math.Rounding.Ceil);
@@ -186,23 +180,24 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
                 NAV_UNIT preWithdrawalJTEffectiveNAV = $.lastJTEffectiveNAV;
                 // The actual amount withdrawn by JT was the delta in JT raw NAV and the assets claimed from ST
                 $.lastJTEffectiveNAV = preWithdrawalJTEffectiveNAV - (toNAVUnits(-deltaJT) + toNAVUnits(-deltaST));
-                // The withdrawing junior LP has realized its proportional share of claims on its future recovery (JT IL), settling the realized portion between JT and ST, rounding in favor of senior
+                // The withdrawing junior LP has realized its proportional share of past uncovered losses and associated recovery optionality, rounding in favor of senior
                 NAV_UNIT jtImpermanentLoss = $.lastJTImpermanentLoss;
                 if (jtImpermanentLoss != ZERO_NAV_UNITS) {
-                    $.lastJTImpermanentLoss = jtImpermanentLoss.mulDiv($.lastJTEffectiveNAV, preWithdrawalJTEffectiveNAV, Math.Rounding.Floor); // TODO: Is this double counting/reducing JT IL?
+                    $.lastJTImpermanentLoss = jtImpermanentLoss.mulDiv($.lastJTEffectiveNAV, preWithdrawalJTEffectiveNAV, Math.Rounding.Floor)
                 }
             }
         }
-        // Construct the synced NAVs state to return to the caller
-        // No fees are ever taken on post-op sync
+        // Construct the synced NAVs state         
         state = SyncedAccountingState({
-            marketState: $.lastMarketState, // TODO: This function must never increase the LTV to the LLTV, changing the market state
+            // No state transition is possible in post-op syncs because there is no PNL and NAV changes enforce coverage (ensuring LLTV can't be breached)
+            marketState: $.lastMarketState, 
             stRawNAV: _stRawNAV,
             jtRawNAV: _jtRawNAV,
             stEffectiveNAV: $.lastSTEffectiveNAV,
             jtEffectiveNAV: $.lastJTEffectiveNAV,
             stImpermanentLoss: $.lastSTImpermanentLoss,
             jtImpermanentLoss: $.lastJTImpermanentLoss,
+            // No fees are ever taken on post-op sync
             stProtocolFeeAccrued: ZERO_NAV_UNITS,
             jtProtocolFeeAccrued: ZERO_NAV_UNITS
         });
