@@ -170,9 +170,9 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
                 // The actual amount withdrawn was the delta in ST raw NAV and the coverage applied from JT
                 $.lastSTEffectiveNAV = preWithdrawalSTEffectiveNAV - (toNAVUnits(-deltaST) + toNAVUnits(-deltaJT));
                 // The withdrawing senior LP has realized its proportional share of past uncovered losses and associated recovery optionality, rounding in favor of senior
-                impermanentLoss = $.lastSTImpermanentLoss;
-                if (impermanentLoss != ZERO_NAV_UNITS) {
-                    $.lastSTImpermanentLoss = impermanentLoss.mulDiv($.lastSTEffectiveNAV, preWithdrawalSTEffectiveNAV, Math.Rounding.Ceil);
+                NAV_UNIT stImpermanentLoss = $.lastSTImpermanentLoss;
+                if (stImpermanentLoss != ZERO_NAV_UNITS) {
+                    $.lastSTImpermanentLoss = stImpermanentLoss.mulDiv($.lastSTEffectiveNAV, preWithdrawalSTEffectiveNAV, Math.Rounding.Ceil);
                 }
             } else if (_op == Operation.JT_DECREASE_NAV) {
                 require(deltaJT <= 0 && deltaST <= 0, INVALID_POST_OP_STATE(_op));
@@ -183,14 +183,14 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
                 // The withdrawing junior LP has realized its proportional share of past uncovered losses and associated recovery optionality, rounding in favor of senior
                 NAV_UNIT jtImpermanentLoss = $.lastJTImpermanentLoss;
                 if (jtImpermanentLoss != ZERO_NAV_UNITS) {
-                    $.lastJTImpermanentLoss = jtImpermanentLoss.mulDiv($.lastJTEffectiveNAV, preWithdrawalJTEffectiveNAV, Math.Rounding.Floor)
+                    $.lastJTImpermanentLoss = jtImpermanentLoss.mulDiv($.lastJTEffectiveNAV, preWithdrawalJTEffectiveNAV, Math.Rounding.Floor);
                 }
             }
         }
-        // Construct the synced NAVs state         
+        // Construct the synced NAVs state
         state = SyncedAccountingState({
             // No state transition is possible in post-op syncs because there is no PNL and NAV changes enforce coverage (ensuring LLTV can't be breached)
-            marketState: $.lastMarketState, 
+            marketState: $.lastMarketState,
             stRawNAV: _stRawNAV,
             jtRawNAV: _jtRawNAV,
             stEffectiveNAV: $.lastSTEffectiveNAV,
@@ -290,7 +290,6 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         returns (NAV_UNIT totalNAVClaimable, NAV_UNIT stClaimable, NAV_UNIT jtClaimable)
     {
         RoycoAccountantState storage $ = _getRoycoAccountantStorage();
-
         // Get the surplus JT assets in NAV units
         NAV_UNIT surplusJTAssets = _calculateSurplusJtAssetsInNav(_stRawNAV, _jtRawNAV);
         // Calculate K_S
