@@ -14,6 +14,10 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
     using Math for uint256;
     using UnitsMathLib for NAV_UNIT;
 
+    /// @dev The sentinel value for the fixed term end timestamp, indicating that the market is in a perpetual state
+    /// @dev The sentinel value is used to avoid the higher gas cost of writing a non-zero value to a zeroed slot on marginal state transitions
+    uint32 private constant SENTINEL_FIXED_TERM_END_TIMESTAMP = 1;
+
     /// @dev Storage slot for RoycoAccountantState using ERC-7201 pattern
     // keccak256(abi.encode(uint256(keccak256("Royco.storage.RoycoAccountantState")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant ROYCO_ACCOUNTANT_STORAGE_SLOT = 0xc8240830e1172c6f1489139d8edb11776c3d3b2f893e3f4ce0fb541305a63a00;
@@ -73,28 +77,21 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         // Get the storage pointer to the base kernel state
         RoycoAccountantState storage $ = _getRoycoAccountantStorage();
 
-        // Get the initial state of the market
+        // Get the initial state of the market and transition if needed
         uint256 fixedTermEndTimestamp = $.fixedTermEndTimestamp;
-        MarketState initialMarketState = fixedTermEndTimestamp == 0 ? MarketState.PERPETUAL : MarketState.FIXED_TERM;
+        (MarketState initialMarketState, bool transitionToCurrentState) = _getCurrentMarketState();
+        if (transitionToCurrentState) _transitionToState(initialMarketState);
+
+        // Get the time-weighted accrued JT yield share
+        // 1. If the market is in a perpetual state, accrue the JT yield share
+        // 2. If the market is in a fixed term state, preview the JT yield share
         uint192 twJTYieldShareAccruedWAD;
-        // Transition the market to a perpetual state if the market is in a fixed term state that elapsed
-        if (initialMarketState == MarketState.FIXED_TERM && fixedTermEndTimestamp <= block.timestamp) {
-            initialMarketState = MarketState.PERPETUAL;
-            twJTYieldShareAccruedWAD = _transitionToState(MarketState.PERPETUAL);
-            // If the market is already in a perpetual state, accrue the JT yield share
-        } else if (initialMarketState == MarketState.PERPETUAL) {
-            twJTYieldShareAccruedWAD = _accrueJTYieldShare();
-            // If the market is already in a persistant fixed term state, don't accrue the JT yield share
-        } else {
-            twJTYieldShareAccruedWAD = _previewJTYieldShareAccrual();
-        }
+        if (initialMarketState == MarketState.PERPETUAL) twJTYieldShareAccruedWAD = _accrueJTYieldShare();
+        else twJTYieldShareAccruedWAD = _previewJTYieldShareAccrual();
 
         // Accrue the JT yield share since the last accrual and preview the tranche NAVs and impermanent loss synchronization
         bool yieldDistributed;
         (state, yieldDistributed) = _previewSyncTrancheAccounting(_stRawNAV, _jtRawNAV, twJTYieldShareAccruedWAD);
-
-        // Transition the market state if required
-        if (initialMarketState != state.marketState) _transitionToState(state.marketState);
 
         // ST yield was split between ST and JT
         if (yieldDistributed) {
@@ -113,27 +110,10 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         $.lastSTImpermanentLoss = state.stImpermanentLoss;
         $.lastJTImpermanentLoss = state.jtImpermanentLoss;
 
-        emit PreOpTrancheAccountingSynced(state);
-    }
+        // Transition the market state if required
+        if (initialMarketState != state.marketState) _transitionToState(state.marketState);
 
-    function _transitionToState(MarketState _resultingState) internal returns (uint192 twJTYieldShareAccruedWAD) {
-        // Get the storage pointer to the base kernel state
-        RoycoAccountantState storage $ = _getRoycoAccountantStorage();
-        // If the market needs to transition from a fixed term to a perpetual state
-        if (_resultingState == MarketState.PERPETUAL) {
-            // Clear the fixed term end timestamp, marking the fixed term as ended
-            delete $.fixedTermEndTimestamp;
-            // Clear any JT IL that was incurred by the market during the term:
-            // 1. ST LPs can now start to realize JT coverage
-            // 2. New JT LPs can help reinstate the market into a fully collateralized/covered state
-            $.lastJTImpermanentLoss = ZERO_NAV_UNITS;
-            // Accrue the JT yield share in the YDM since the market is back in a perpetual state
-            twJTYieldShareAccruedWAD = _accrueJTYieldShare();
-            // If the market needs to transition from a perpetual to a fixed term state
-        } else {
-            // Set the end timestamp of the fixed term
-            $.fixedTermEndTimestamp = uint32(block.timestamp);
-        }
+        emit PreOpTrancheAccountingSynced(state);
     }
 
     /// @inheritdoc IRoycoAccountant
@@ -207,9 +187,14 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
             } else if (_op == Operation.JT_DECREASE_NAV) {
                 require(deltaJT <= 0 && deltaST <= 0, INVALID_POST_OP_STATE(_op));
                 // Junior withdrew: The NAV deltas include the discrete withdrawal amount in addition to any assets (yield + impermanent loss repayments) pulled from ST to JT
-                // JT LPs cannot settle IL on withdrawal since they don't have discretion on when coverage applied to ST (jtImpermanentLoss) and uncovered ST losses (stImpermanentLoss) can be realized
+                NAV_UNIT preWithdrawalJTEffectiveNAV = $.lastJTEffectiveNAV;
                 // The actual amount withdrawn by JT was the delta in JT raw NAV and the assets claimed from ST
-                $.lastJTEffectiveNAV = $.lastJTEffectiveNAV - (toNAVUnits(-deltaJT) + toNAVUnits(-deltaST));
+                $.lastJTEffectiveNAV = preWithdrawalJTEffectiveNAV - (toNAVUnits(-deltaJT) + toNAVUnits(-deltaST));
+                // The withdrawing junior LP has realized its proportional share of claims on its future recovery (JT IL), settling the realized portion between JT and ST, rounding in favor of senior
+                NAV_UNIT jtImpermanentLoss = $.lastJTImpermanentLoss;
+                if (jtImpermanentLoss != ZERO_NAV_UNITS) {
+                    $.lastJTImpermanentLoss = jtImpermanentLoss.mulDiv($.lastJTEffectiveNAV, preWithdrawalJTEffectiveNAV, Math.Rounding.Floor);
+                }
             }
         }
         // Construct the synced NAVs state to return to the caller
@@ -413,7 +398,6 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
                 // This is equivalent to retroactively applying coverage for previously uncovered losses, since residual losses can only occur if coverage was previously applied
                 // Thus, the ST impermanent loss is now born by JT
                 stImpermanentLoss = (stImpermanentLoss - stImpermanentLossRecovery);
-                jtImpermanentLoss = (jtImpermanentLoss + stImpermanentLossRecovery);
                 // Apply the retroactive coverage to the ST
                 stEffectiveNAV = (stEffectiveNAV + stImpermanentLossRecovery);
                 jtGain = (jtGain - stImpermanentLossRecovery);
@@ -517,6 +501,45 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
             stProtocolFeeAccrued: stProtocolFeeAccrued,
             jtProtocolFeeAccrued: jtProtocolFeeAccrued
         });
+    }
+
+    function _getCurrentMarketState() internal returns (MarketState currentMarketState, bool transitionToCurrentState) {
+        // Get the storage pointer to the base kernel state
+        RoycoAccountantState storage $ = _getRoycoAccountantStorage();
+
+        // If the fixed term end timestamp is the sentinel value or 0 (new market), the market is in a perpetual state
+        uint256 fixedTermEndTimestamp = $.fixedTermEndTimestamp;
+        MarketState currentMarketState =
+            fixedTermEndTimestamp == SENTINEL_FIXED_TERM_END_TIMESTAMP || fixedTermEndTimestamp == 0 ? MarketState.PERPETUAL : MarketState.FIXED_TERM;
+
+        // If the market is in a fixed term state that has elapsed, we must transition this market to a perpetual state
+        if (currentMarketState == MarketState.FIXED_TERM && fixedTermEndTimestamp <= block.timestamp) {
+            currentMarketState = MarketState.PERPETUAL;
+            transitionToCurrentState = true;
+        }
+    }
+
+    /**
+     * @notice Transitions the market to the specified state
+     * @param _state The state to transition the market to from the alternate (current) state
+     */
+    function _transitionToState(MarketState _state) internal {
+        // Get the storage pointer to the base kernel state
+        RoycoAccountantState storage $ = _getRoycoAccountantStorage();
+        // If the market needs to transition from a fixed term to a perpetual state
+        if (_state == MarketState.PERPETUAL) {
+            // Clear the fixed term end timestamp, marking the fixed term as ended
+            // Set to sentinel (non-zero) value to avoid the higher gas cost of writing a non-zero value to a zeroed slot on marginal state transitions
+            $.fixedTermEndTimestamp = SENTINEL_FIXED_TERM_END_TIMESTAMP;
+            // Clear any JT IL that was incurred by the market during the term:
+            // 1. ST LPs can now start to realize JT coverage
+            // 2. New JT LPs can help reinstate the market into a fully collateralized/covered state
+            $.lastJTImpermanentLoss = ZERO_NAV_UNITS;
+            // If the market needs to transition from a perpetual to a fixed term state
+        } else {
+            // Set the end timestamp of the fixed term
+            $.fixedTermEndTimestamp = uint32(block.timestamp + $.fixedTermDurationSeconds);
+        }
     }
 
     /**
