@@ -52,12 +52,19 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         RoycoAccountantState storage $ = _getRoycoAccountantStorage();
         $.kernel = _params.kernel;
         $.lltvWAD = _params.lltvWAD;
+        emit LLTVUpdated(_params.lltvWAD);
         $.fixedTermDurationSeconds = _params.fixedTermDurationSeconds;
+        emit FixedTermDurationUpdated(_params.fixedTermDurationSeconds);
         $.stProtocolFeeWAD = _params.stProtocolFeeWAD;
+        emit SeniorTrancheProtocolFeeUpdated(_params.stProtocolFeeWAD);
         $.jtProtocolFeeWAD = _params.jtProtocolFeeWAD;
+        emit JuniorTrancheProtocolFeeUpdated(_params.jtProtocolFeeWAD);
         $.coverageWAD = _params.coverageWAD;
+        emit CoverageUpdated(_params.coverageWAD);
         $.betaWAD = _params.betaWAD;
+        emit BetaUpdated(_params.betaWAD);
         $.ydm = _params.ydm;
+        emit YDMUpdated(_params.ydm);
     }
 
     /// @inheritdoc IRoycoAccountant
@@ -603,6 +610,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         // Initialize and set the new YDM for this market
         _initializeYDM(_ydm, _ydmInitializationData);
         _getRoycoAccountantStorage().ydm = _ydm;
+        emit YDMUpdated(_ydm);
     }
 
     /// @inheritdoc IRoycoAccountant
@@ -610,6 +618,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         // Ensure that the protocol fee percentage is valid
         require(_stProtocolFeeWAD <= MAX_PROTOCOL_FEE_WAD, MAX_PROTOCOL_FEE_EXCEEDED());
         _getRoycoAccountantStorage().stProtocolFeeWAD = _stProtocolFeeWAD;
+        emit SeniorTrancheProtocolFeeUpdated(_stProtocolFeeWAD);
     }
 
     /// @inheritdoc IRoycoAccountant
@@ -617,6 +626,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         // Ensure that the protocol fee percentage is valid
         require(_jtProtocolFeeWAD <= MAX_PROTOCOL_FEE_WAD, MAX_PROTOCOL_FEE_EXCEEDED());
         _getRoycoAccountantStorage().jtProtocolFeeWAD = _jtProtocolFeeWAD;
+        emit JuniorTrancheProtocolFeeUpdated(_jtProtocolFeeWAD);
     }
 
     /// @inheritdoc IRoycoAccountant
@@ -625,6 +635,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         // Validate the new coverage configuration
         _validateCoverageConfig(_coverageWAD, $.betaWAD, $.lltvWAD);
         $.coverageWAD = _coverageWAD;
+        emit CoverageUpdated(_coverageWAD);
     }
 
     /// @inheritdoc IRoycoAccountant
@@ -633,6 +644,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         // Validate the new coverage configuration
         _validateCoverageConfig($.coverageWAD, _betaWAD, $.lltvWAD);
         $.betaWAD = _betaWAD;
+        emit BetaUpdated(_betaWAD);
     }
 
     /// @inheritdoc IRoycoAccountant
@@ -641,6 +653,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         // Validate the new coverage configuration
         _validateCoverageConfig($.coverageWAD, $.betaWAD, _lltvWAD);
         $.lltvWAD = _lltvWAD;
+        emit LLTVUpdated(_lltvWAD);
     }
 
     /// @inheritdoc IRoycoAccountant
@@ -652,6 +665,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
             $.lastJTCoverageImpermanentLoss = ZERO_NAV_UNITS;
             $.lastMarketState = MarketState.PERPETUAL;
         }
+        emit FixedTermDurationUpdated(_fixedTermDurationSeconds);
     }
 
     /// @inheritdoc IRoycoAccountant

@@ -112,6 +112,48 @@ interface IRoycoAccountant {
      */
     event PostOpTrancheAccountingSynced(Operation op, SyncedAccountingState resultingState);
 
+    /**
+     * @notice Emitted when the YDM (Yield Distribution Model) address is updated
+     * @param ydm The new YDM address
+     */
+    event YDMUpdated(address ydm);
+
+    /**
+     * @notice Emitted when the senior tranche protocol fee percentage is updated
+     * @param stProtocolFeeWAD The new protocol fee percentage charged on senior tranche yield, scaled to WAD precision
+     */
+    event SeniorTrancheProtocolFeeUpdated(uint64 stProtocolFeeWAD);
+
+    /**
+     * @notice Emitted when the junior tranche protocol fee percentage is updated
+     * @param jtProtocolFeeWAD The new protocol fee percentage charged on junior tranche yield, scaled to WAD precision
+     */
+    event JuniorTrancheProtocolFeeUpdated(uint64 jtProtocolFeeWAD);
+
+    /**
+     * @notice Emitted when the coverage percentage requirement is updated
+     * @param coverageWAD The new coverage percentage, scaled to WAD precision
+     */
+    event CoverageUpdated(uint64 coverageWAD);
+
+    /**
+     * @notice Emitted when the beta sensitivity parameter is updated
+     * @param betaWAD The new beta parameter representing JT's sensitivity to downside stress, scaled to WAD precision
+     */
+    event BetaUpdated(uint96 betaWAD);
+
+    /**
+     * @notice Emitted when the LLTV is updated
+     * @param lltvWAD The new liquidation loan to value (LLTV) for this market, scaled to WAD precision
+     */
+    event LLTVUpdated(uint64 lltvWAD);
+
+    /**
+     * @notice Emitted when the fixed term duration is updated
+     * @param fixedTermDurationSeconds The new fixed term duration for this market in seconds
+     */
+    event FixedTermDurationUpdated(uint24 fixedTermDurationSeconds);
+
     /// @notice Thrown when the accountant's coverage config is invalid
     error INVALID_COVERAGE_CONFIG();
 
