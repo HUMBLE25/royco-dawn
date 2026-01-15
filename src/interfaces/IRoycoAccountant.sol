@@ -61,9 +61,10 @@ interface IRoycoAccountant {
      */
     struct RoycoAccountantState {
         address kernel;
+        MarketState lastMarketState;
+        uint24 fixedTermDurationSeconds;
         uint32 fixedTermEndTimestamp;
         uint64 lltvWAD;
-        uint24 fixedTermDurationSeconds;
         uint64 coverageWAD;
         uint64 stProtocolFeeWAD;
         uint64 jtProtocolFeeWAD;
