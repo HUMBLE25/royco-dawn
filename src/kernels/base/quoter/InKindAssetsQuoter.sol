@@ -33,6 +33,8 @@ abstract contract InKindAssetsQuoter is Initializable, RoycoKernel {
     /// @notice Thrown when the senior or junior tranche asset has over WAD decimals of precision
     error UNSUPPORTED_DECIMALS();
 
+    // TODO(Optimisation): Consider setting the scale factors as immutable variables to save an sload
+
     /**
      * @notice Initializes the quoter for inkind tranche assets
      * @dev Assumes that the two assets have identical values
