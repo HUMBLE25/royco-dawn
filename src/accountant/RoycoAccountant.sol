@@ -14,10 +14,6 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
     using Math for uint256;
     using UnitsMathLib for NAV_UNIT;
 
-    /// @dev The sentinel value for the fixed term end timestamp, indicating that the market is in a perpetual state
-    /// @dev The sentinel value is used to avoid the higher gas cost of writing a non-zero value to a zeroed slot on marginal state transitions
-    uint32 private constant SENTINEL_FIXED_TERM_END_TIMESTAMP = 1;
-
     /// @dev Storage slot for RoycoAccountantState using ERC-7201 pattern
     // keccak256(abi.encode(uint256(keccak256("Royco.storage.RoycoAccountantState")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant ROYCO_ACCOUNTANT_STORAGE_SLOT = 0xc8240830e1172c6f1489139d8edb11776c3d3b2f893e3f4ce0fb541305a63a00;
