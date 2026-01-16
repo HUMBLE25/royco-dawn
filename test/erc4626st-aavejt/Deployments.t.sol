@@ -38,8 +38,8 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
 
         // Asset and metadata
         assertEq(address(ST.asset()), ETHEREUM_MAINNET_USDC_ADDRESS, "ST asset should be USDC");
-        assertEq(ST.name(), SENIOR_TRANCH_NAME, "ST name mismatch");
-        assertEq(ST.symbol(), SENIOR_TRANCH_SYMBOL, "ST symbol mismatch");
+        assertEq(ST.name(), SENIOR_TRANCHE_NAME, "ST name mismatch");
+        assertEq(ST.symbol(), SENIOR_TRANCHE_SYMBOL, "ST symbol mismatch");
         assertTrue(ST.TRANCHE_TYPE() == TrancheType.SENIOR, "ST tranche type mismatch");
 
         // Initial NAV and totals
@@ -61,8 +61,8 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
 
         // Asset and metadata
         assertEq(address(JT.asset()), ETHEREUM_MAINNET_USDC_ADDRESS, "JT asset should be USDC");
-        assertEq(JT.name(), JUNIOR_TRANCH_NAME, "JT name mismatch");
-        assertEq(JT.symbol(), JUNIOR_TRANCH_SYMBOL, "JT symbol mismatch");
+        assertEq(JT.name(), JUNIOR_TRANCHE_NAME, "JT name mismatch");
+        assertEq(JT.symbol(), JUNIOR_TRANCHE_SYMBOL, "JT symbol mismatch");
 
         // Initial NAV and totals
         assertEq(JT.totalSupply(), 0, "JT initial totalSupply should be 0");
@@ -290,7 +290,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.seniorTrancheInitializationData = abi.encodeCall(
             ST_IMPL.initialize,
             (
-                TrancheDeploymentParams({ name: SENIOR_TRANCH_NAME, symbol: SENIOR_TRANCH_SYMBOL, kernel: expectedKernelAddress }),
+                TrancheDeploymentParams({ name: SENIOR_TRANCHE_NAME, symbol: SENIOR_TRANCHE_SYMBOL, kernel: expectedKernelAddress }),
                 ETHEREUM_MAINNET_USDC_ADDRESS,
                 OWNER_ADDRESS, // invalid authority: should be FACTORY
                 marketId
@@ -318,7 +318,9 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
                     coverageWAD: COVERAGE_WAD,
                     betaWAD: BETA_WAD,
                     ydm: address(YDM),
-                    ydmInitializationData: abi.encodeCall(YDM.initializeYDMForMarket, (0, 0.225e18, 1e18))
+                    ydmInitializationData: abi.encodeCall(YDM.initializeYDMForMarket, (0, 0.225e18, 1e18)),
+                    fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
+                    lltvWAD: LLTV
                 }),
                 OWNER_ADDRESS // invalid authority: should be FACTORY
             )
@@ -367,7 +369,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.juniorTrancheInitializationData = abi.encodeCall(
             JT_IMPL.initialize,
             (
-                TrancheDeploymentParams({ name: JUNIOR_TRANCH_NAME, symbol: JUNIOR_TRANCH_SYMBOL, kernel: expectedKernelAddress }),
+                TrancheDeploymentParams({ name: JUNIOR_TRANCHE_NAME, symbol: JUNIOR_TRANCHE_SYMBOL, kernel: expectedKernelAddress }),
                 ETHEREUM_MAINNET_USDC_ADDRESS,
                 OWNER_ADDRESS, // invalid authority: should be FACTORY
                 marketId
@@ -389,7 +391,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.seniorTrancheInitializationData = abi.encodeCall(
             ST_IMPL.initialize,
             (
-                TrancheDeploymentParams({ name: SENIOR_TRANCH_NAME, symbol: SENIOR_TRANCH_SYMBOL, kernel: wrongKernelAddress }),
+                TrancheDeploymentParams({ name: SENIOR_TRANCHE_NAME, symbol: SENIOR_TRANCHE_SYMBOL, kernel: wrongKernelAddress }),
                 ETHEREUM_MAINNET_USDC_ADDRESS,
                 address(FACTORY),
                 marketId
@@ -412,7 +414,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.juniorTrancheInitializationData = abi.encodeCall(
             JT_IMPL.initialize,
             (
-                TrancheDeploymentParams({ name: JUNIOR_TRANCH_NAME, symbol: JUNIOR_TRANCH_SYMBOL, kernel: wrongKernelAddress }),
+                TrancheDeploymentParams({ name: JUNIOR_TRANCHE_NAME, symbol: JUNIOR_TRANCHE_SYMBOL, kernel: wrongKernelAddress }),
                 ETHEREUM_MAINNET_USDC_ADDRESS,
                 address(FACTORY),
                 marketId
@@ -467,7 +469,9 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
                     coverageWAD: COVERAGE_WAD,
                     betaWAD: BETA_WAD,
                     ydm: address(YDM),
-                    ydmInitializationData: abi.encodeCall(YDM.initializeYDMForMarket, (0, 0.225e18, 1e18))
+                    ydmInitializationData: abi.encodeCall(YDM.initializeYDMForMarket, (0, 0.225e18, 1e18)),
+                    fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
+                    lltvWAD: LLTV
                 }),
                 address(FACTORY)
             )
@@ -561,7 +565,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
     /// @dev Helper to construct a valid set of market deployment params for a specific salt
     /// @dev Use this when you need to actually deploy contracts (to avoid Create2 collisions)
     function _buildValidMarketParamsForSalt(bytes32 salt) internal view returns (MarketDeploymentParams memory params, bytes32 marketId) {
-        marketId = keccak256(abi.encodePacked(SENIOR_TRANCH_NAME, JUNIOR_TRANCH_NAME, block.timestamp));
+        marketId = keccak256(abi.encodePacked(SENIOR_TRANCHE_NAME, JUNIOR_TRANCHE_NAME, block.timestamp));
 
         // Precompute the expected addresses of the kernel and accountant
         address expectedSeniorTrancheAddress = FACTORY.predictERC1967ProxyAddress(address(ST_IMPL), salt);
@@ -595,7 +599,9 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
                     coverageWAD: COVERAGE_WAD,
                     betaWAD: BETA_WAD,
                     ydm: address(YDM),
-                    ydmInitializationData: abi.encodeCall(YDM.initializeYDMForMarket, (0, 0.225e18, 1e18))
+                    ydmInitializationData: abi.encodeCall(YDM.initializeYDMForMarket, (0, 0.225e18, 1e18)),
+                    fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
+                    lltvWAD: LLTV
                 }),
                 address(FACTORY)
             )
@@ -603,7 +609,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         bytes memory seniorTrancheInitializationData = abi.encodeCall(
             ST_IMPL.initialize,
             (
-                TrancheDeploymentParams({ name: SENIOR_TRANCH_NAME, symbol: SENIOR_TRANCH_SYMBOL, kernel: expectedKernelAddress }),
+                TrancheDeploymentParams({ name: SENIOR_TRANCHE_NAME, symbol: SENIOR_TRANCHE_SYMBOL, kernel: expectedKernelAddress }),
                 ETHEREUM_MAINNET_USDC_ADDRESS,
                 address(FACTORY),
                 marketId
@@ -612,7 +618,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         bytes memory juniorTrancheInitializationData = abi.encodeCall(
             JT_IMPL.initialize,
             (
-                TrancheDeploymentParams({ name: JUNIOR_TRANCH_NAME, symbol: JUNIOR_TRANCH_SYMBOL, kernel: expectedKernelAddress }),
+                TrancheDeploymentParams({ name: JUNIOR_TRANCHE_NAME, symbol: JUNIOR_TRANCHE_SYMBOL, kernel: expectedKernelAddress }),
                 ETHEREUM_MAINNET_USDC_ADDRESS,
                 address(FACTORY),
                 marketId
@@ -620,10 +626,10 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         );
 
         params = MarketDeploymentParams({
-            seniorTrancheName: SENIOR_TRANCH_NAME,
-            seniorTrancheSymbol: SENIOR_TRANCH_SYMBOL,
-            juniorTrancheName: JUNIOR_TRANCH_NAME,
-            juniorTrancheSymbol: JUNIOR_TRANCH_SYMBOL,
+            seniorTrancheName: SENIOR_TRANCHE_NAME,
+            seniorTrancheSymbol: SENIOR_TRANCHE_SYMBOL,
+            juniorTrancheName: JUNIOR_TRANCHE_NAME,
+            juniorTrancheSymbol: JUNIOR_TRANCHE_SYMBOL,
             seniorAsset: ETHEREUM_MAINNET_USDC_ADDRESS,
             juniorAsset: ETHEREUM_MAINNET_USDC_ADDRESS,
             marketId: marketId,
