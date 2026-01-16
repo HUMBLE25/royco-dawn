@@ -11,7 +11,7 @@ import { NAV_UNIT, TRANCHE_UNIT } from "./Units.sol";
  * @dev Defines the state of a Royco market
  * @custom:type PERPETUAL - JT coverage IL does not exist, the LLTV has been breached, ST IL exists, or the fixed term duration has been set to 0
  *                          Both tranches are fully liquid within the confines of the coverage requirement
- * @custom:type FIXED_TERM - There was a drawdown in the senior NAV and the LLTV has not been breached
+ * @custom:type FIXED_TERM - There was a drawdown in the senior NAV, the LLTV has not been breached, and ST IL does not exist
  *                           ST withdrawals and JT deposits are blocked to prevent JT from realizing coverage associated losses during the fixed term
  */
 enum MarketState {
