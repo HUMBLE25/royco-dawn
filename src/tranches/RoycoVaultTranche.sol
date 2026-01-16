@@ -11,7 +11,6 @@ import { RoycoBase } from "../base/RoycoBase.sol";
 import { IAsyncJTDepositKernel } from "../interfaces/kernel/IAsyncJTDepositKernel.sol";
 import { IAsyncSTDepositKernel } from "../interfaces/kernel/IAsyncSTDepositKernel.sol";
 import { IAsyncSTWithdrawalKernel } from "../interfaces/kernel/IAsyncSTWithdrawalKernel.sol";
-import { IRoycoKernel } from "../interfaces/kernel/IRoycoKernel.sol";
 import { ExecutionModel, IRoycoKernel, SharesRedemptionModel } from "../interfaces/kernel/IRoycoKernel.sol";
 import { IERC165, IRoycoAsyncCancellableVault, IRoycoAsyncVault, IRoycoVaultTranche } from "../interfaces/tranche/IRoycoVaultTranche.sol";
 import { ZERO_NAV_UNITS } from "../libraries/Constants.sol";

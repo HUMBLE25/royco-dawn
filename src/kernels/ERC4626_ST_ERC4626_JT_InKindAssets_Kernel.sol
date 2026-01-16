@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import { IRoycoVaultTranche } from "../interfaces/tranche/IRoycoVaultTranche.sol";
 import { RoycoKernelInitParams } from "../libraries/RoycoKernelStorageLib.sol";
 import { NAV_UNIT } from "../libraries/Units.sol";
-import { RoycoKernel } from "./base/RoycoKernel.sol";
 import { RoycoKernel } from "./base/RoycoKernel.sol";
 import { InKindAssetsQuoter } from "./base/quoter/InKindAssetsQuoter.sol";
 import { ERC4626_ST_ERC4626_JT_Kernel } from "./base/recipe/ERC4626_ST_ERC4626_JT_Kernel.sol";

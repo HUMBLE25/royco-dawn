@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import { RoycoBase } from "../../base/RoycoBase.sol";
-import { IRoycoAccountant } from "../../interfaces/IRoycoAccountant.sol";
+import { IRoycoAccountant, Operation } from "../../interfaces/IRoycoAccountant.sol";
 import { ExecutionModel, IRoycoKernel, SharesRedemptionModel } from "../../interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoVaultTranche } from "../../interfaces/tranche/IRoycoVaultTranche.sol";
 import { ZERO_NAV_UNITS, ZERO_TRANCHE_UNITS } from "../../libraries/Constants.sol";
@@ -11,7 +11,6 @@ import { MarketState } from "../../libraries/Types.sol";
 import { ActionMetadataFormat, AssetClaims, SyncedAccountingState, TrancheType } from "../../libraries/Types.sol";
 import { Math, NAV_UNIT, TRANCHE_UNIT, UnitsMathLib } from "../../libraries/Units.sol";
 import { UtilsLib } from "../../libraries/UtilsLib.sol";
-import { IRoycoAccountant, Operation } from "./../../interfaces/IRoycoAccountant.sol";
 
 /**
  * @title RoycoKernel
