@@ -235,6 +235,8 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
         uint64 jtProtocolFeeWAD = uint64(vm.envUint("JT_PROTOCOL_FEE_WAD"));
         uint64 coverageWAD = uint64(vm.envUint("COVERAGE_WAD"));
         uint96 betaWAD = uint96(vm.envUint("BETA_WAD"));
+        uint64 lltvWAD = uint64(vm.envUint("LLTV_WAD"));
+        uint24 fixedTermDurationSeconds = uint24(vm.envUint("FIXED_TERM_DURATION_SECONDS"));
 
         IRoycoAccountant.RoycoAccountantInitParams memory accountantParams = IRoycoAccountant.RoycoAccountantInitParams({
             kernel: expectedKernelAddress,
@@ -242,8 +244,10 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
             jtProtocolFeeWAD: jtProtocolFeeWAD,
             coverageWAD: coverageWAD,
             betaWAD: betaWAD,
+            lltvWAD: lltvWAD,
             ydm: ydmAddress,
-            ydmInitializationData: new bytes(0)
+            ydmInitializationData: abi.encodeCall(StaticCurveYDM.initializeYDMForMarket, (0, 0.225e18, 1e18)),
+            fixedTermDurationSeconds: fixedTermDurationSeconds
         });
 
         return abi.encodeCall(RoycoAccountant.initialize, (accountantParams, factoryAddress));

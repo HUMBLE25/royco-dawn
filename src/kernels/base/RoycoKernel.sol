@@ -85,6 +85,9 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         );
         // Initialize the base kernel state
         RoycoKernelStorageLib.__RoycoKernel_init(_params, _stAsset, _jtAsset);
+
+        emit JuniorTrancheRedemptionDelayUpdated(_params.jtRedemptionDelayInSeconds);
+        emit ProtocolFeeRecipientUpdated(_params.protocolFeeRecipient);
     }
 
     /// @inheritdoc IRoycoKernel

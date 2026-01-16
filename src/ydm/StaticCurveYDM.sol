@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import { Math } from "../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
-import { IYDM } from "../interfaces/IYDM.sol";
+import { IYDM, MarketState } from "../interfaces/IYDM.sol";
 import { TARGET_UTILIZATION_WAD, WAD } from "../libraries/Constants.sol";
 import { NAV_UNIT } from "../libraries/Units.sol";
 import { UtilsLib } from "../libraries/UtilsLib.sol";
@@ -24,8 +24,8 @@ contract StaticCurveYDM is IYDM {
      * @custom:field slopeGteTargetUtilWAD - The slope when the market's utilization is greater than or equal to the target utilization, scaled to WAD precision
      */
     struct StaticYieldCurve {
-        uint128 slopeLtTargetUtilWAD;
         uint128 jtYieldShareAtZeroUtilWAD;
+        uint128 slopeLtTargetUtilWAD;
         uint128 jtYieldShareAtTargetUtilWAD;
         uint128 slopeGteTargetUtilWAD;
     }
@@ -50,7 +50,7 @@ contract StaticCurveYDM is IYDM {
      * @param _jtYieldShareAtTargetUtilWAD The JT yield share at target utilization, scaled to WAD precision
      * @param _jtYieldShareAtFullUtilWAD The JT yield share at 100% utilization, scaled to WAD precision
      */
-    function initializeYDMForMarket(uint256 _jtYieldShareAtZeroUtilWAD, uint256 _jtYieldShareAtTargetUtilWAD, uint256 _jtYieldShareAtFullUtilWAD) external {
+    function initializeYDMForMarket(uint64 _jtYieldShareAtZeroUtilWAD, uint64 _jtYieldShareAtTargetUtilWAD, uint64 _jtYieldShareAtFullUtilWAD) external {
         // Ensure that the static YDM curve is valid
         require(
             _jtYieldShareAtZeroUtilWAD <= _jtYieldShareAtTargetUtilWAD && _jtYieldShareAtTargetUtilWAD <= _jtYieldShareAtFullUtilWAD
@@ -62,16 +62,17 @@ contract StaticCurveYDM is IYDM {
         StaticYieldCurve storage curve = accountantToCurve[msg.sender];
         curve.jtYieldShareAtZeroUtilWAD = uint128(_jtYieldShareAtZeroUtilWAD);
         curve.slopeLtTargetUtilWAD =
-            uint128(((_jtYieldShareAtTargetUtilWAD - _jtYieldShareAtZeroUtilWAD).mulDiv(WAD, TARGET_UTILIZATION_WAD, Math.Rounding.Floor)));
+            uint128((uint256(_jtYieldShareAtTargetUtilWAD - _jtYieldShareAtZeroUtilWAD).mulDiv(WAD, TARGET_UTILIZATION_WAD, Math.Rounding.Floor)));
         curve.jtYieldShareAtTargetUtilWAD = uint128(_jtYieldShareAtTargetUtilWAD);
         curve.slopeGteTargetUtilWAD =
-            uint128(((_jtYieldShareAtFullUtilWAD - _jtYieldShareAtTargetUtilWAD).mulDiv(WAD, (WAD - TARGET_UTILIZATION_WAD), Math.Rounding.Floor)));
+            uint128((uint256(_jtYieldShareAtFullUtilWAD - _jtYieldShareAtTargetUtilWAD).mulDiv(WAD, (WAD - TARGET_UTILIZATION_WAD), Math.Rounding.Floor)));
 
         emit StaticCurveYdmInitialized(msg.sender, _jtYieldShareAtZeroUtilWAD, curve.slopeLtTargetUtilWAD, curve.slopeGteTargetUtilWAD);
     }
 
     /// @inheritdoc IYDM
     function previewJTYieldShare(
+        MarketState,
         NAV_UNIT _stRawNAV,
         NAV_UNIT _jtRawNAV,
         uint256 _betaWAD,
@@ -88,6 +89,7 @@ contract StaticCurveYDM is IYDM {
 
     /// @inheritdoc IYDM
     function jtYieldShare(
+        MarketState,
         NAV_UNIT _stRawNAV,
         NAV_UNIT _jtRawNAV,
         uint256 _betaWAD,
@@ -121,7 +123,7 @@ contract StaticCurveYDM is IYDM {
          *        = Y_T + S_gte * (U - 0.9)       if U >= 0.9 (at or above target)
          *
          * Y(U)  → Percentage of ST yield paid to the junior tranche
-         * U     → Utilization = ((ST_RAW_NAV + (JT_RAW_NAV * BETA_%)) * COV_%) / JT_EFFECTIVE_NAV
+         * U     → Utilization = ((ST_RAW_NAV + (JT_RAW_NAV * β)) * COV) / JT_EFFECTIVE_NAV
          * Y_0   → JT yield share at zero utilization
          * Y_T   → JT yield share at target (90%) utilization
          * S_lt  → Slope below target utilization: (Y_T - Y_0) / 0.9
@@ -140,13 +142,13 @@ contract StaticCurveYDM is IYDM {
         // Retrieve the static curve for this market
         StaticYieldCurve storage curve = accountantToCurve[msg.sender];
         // Compute Y(U), rounding in favor the senior tranche
-        if (utilizationWAD >= TARGET_UTILIZATION_WAD) {
+        if (utilizationWAD < TARGET_UTILIZATION_WAD) {
+            // If utilization is below the target (kink), apply the first leg of Y(U)
+            return uint256(curve.slopeLtTargetUtilWAD).mulDiv(utilizationWAD, WAD, Math.Rounding.Floor) + curve.jtYieldShareAtZeroUtilWAD;
+        } else {
             // If utilization is at or above the target (kink), apply the second leg of Y(U)
             return uint256(curve.slopeGteTargetUtilWAD).mulDiv((utilizationWAD - TARGET_UTILIZATION_WAD), WAD, Math.Rounding.Floor)
                 + curve.jtYieldShareAtTargetUtilWAD;
-        } else {
-            // If utilization is below the target (kink), apply the first leg of Y(U)
-            return uint256(curve.slopeLtTargetUtilWAD).mulDiv(utilizationWAD, WAD, Math.Rounding.Floor) + curve.jtYieldShareAtZeroUtilWAD;
         }
     }
 }

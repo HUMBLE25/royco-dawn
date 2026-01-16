@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import { Operation, SyncedAccountingState } from "../libraries/Types.sol";
+import { MarketState, Operation, SyncedAccountingState } from "../libraries/Types.sol";
 import { NAV_UNIT } from "../libraries/Units.sol";
 
 /**
@@ -19,6 +19,8 @@ interface IRoycoAccountant {
      *                         For example, beta is 0 when JT is in the RFR and 1 when JT is in the same opportunity as senior
      * @custom:field ydm - The market's Yield Distribution Model (YDM), responsible for determining the ST's yield split between ST and JT
      * @custom:field ydmInitializationData - The data used to initialize the YDM for this market
+     * @custom:field fixedTermDurationSeconds - The duration of a fixed term for this market in seconds
+     * @custom:field lltvWAD - The liquidation loan to value (LLTV) for this market, scaled to WAD precision
      */
     struct RoycoAccountantInitParams {
         address kernel;
@@ -28,35 +30,47 @@ interface IRoycoAccountant {
         uint96 betaWAD;
         address ydm;
         bytes ydmInitializationData;
+        uint24 fixedTermDurationSeconds;
+        uint64 lltvWAD;
     }
 
     /**
      * @notice Storage state for the Royco Accountant
      * @custom:storage-location erc7201:Royco.storage.RoycoAccountantState
      * @custom:field kernel - The kernel that this accountant maintains NAV, impermanent loss, and fee accounting for
+     * @custom:field lastMarketState - The last recorded state of this market (perpetual or fixed term)
+     * @custom:field fixedTermEndTimestamp - The end timestamp of the currently ongoing fixed term (set to 0 if the market is in a perpetual state)
+     * @custom:field lltvWAD - The liquidation loan to value (LLTV) for this market, scaled to WAD precision
+     * @custom:field fixedTermDurationSeconds - The duration of a fixed term for this market in seconds
      * @custom:field coverageWAD - The coverage percentage that the senior tranche is expected to be protected by, scaled to WAD precision
-     * @custom:field betaWAD - JT's percentage sensitivity to the same downside stress that affects ST, scaled to WAD precision
-     *                         For example, beta is 0 when JT is in the RFR and 1e18 (100%) when JT is in the same opportunity as senior
      * @custom:field stProtocolFeeWAD - The market's configured protocol fee percentage taken from yield earned by the senior tranche, scaled to WAD precision
      * @custom:field jtProtocolFeeWAD - The market's configured protocol fee percentage taken from yield earned by the junior tranche, scaled to WAD precision
+     * @custom:field betaWAD - JT's percentage sensitivity to the same downside stress that affects ST, scaled to WAD precision
+     *                         For example, beta is 0 when JT is in the RFR and 1e18 (100%) when JT is in the same opportunity as senior
      * @custom:field ydm - The market's Yield Distribution Model (YDM), responsible for determining the ST's yield split between ST and JT
      * @custom:field lastSTRawNAV - The last recorded pure NAV (excluding any coverage taken and yield shared) of the senior tranche
      * @custom:field lastJTRawNAV - The last recorded pure NAV (excluding any coverage given and yield shared) of the junior tranche
      * @custom:field lastSTEffectiveNAV - The last recorded effective NAV (including any prior applied coverage, ST yield distribution, and uncovered losses) of the senior tranche
      * @custom:field lastJTEffectiveNAV - The last recorded effective NAV (including any prior provided coverage, JT yield, ST yield distribution, and JT losses) of the junior tranche
      * @custom:field lastSTImpermanentLoss - The impermanent loss that ST has suffered after exhausting JT's loss-absorption buffer
-     *                                       This represents the first claim on capital that the senior tranche has on future recoveries
-     * @custom:field lastJTImpermanentLoss - The impermanent loss that JT has suffered after providing coverage for ST losses
-     *                                       This represents the second claim on capital that the junior tranche has on future recoveries
+     *                                   This represents the first claim on capital that the senior tranche has on future ST and JT recoveries
+     * @custom:field lastJTCoverageImpermanentLoss - The impermanent loss that JT has suffered after providing coverage for ST losses
+     *                                           This represents the second claim on capital that the junior tranche has on future ST recoveries
+     * @custom:field lastJTSelfImpermanentLoss - The impermanent loss that JT has suffered from depreciaiton of its own NAV
+     *                                           This represents the first claim on capital that the junior tranche has on future JT recoveries
      * @custom:field twJTYieldShareAccruedWAD - The time-weighted junior tranche yield share (YDM output) since the last yield distribution, scaled to WAD precision
      * @custom:field lastAccrualTimestamp - The timestamp at which the time-weighted JT yield share accumulator was last updated
      * @custom:field lastDistributionTimestamp - The timestamp at which the last ST yield distribution occurred
      */
     struct RoycoAccountantState {
         address kernel;
+        MarketState lastMarketState;
+        uint24 fixedTermDurationSeconds;
+        uint32 fixedTermEndTimestamp;
+        uint64 lltvWAD;
+        uint64 coverageWAD;
         uint64 stProtocolFeeWAD;
         uint64 jtProtocolFeeWAD;
-        uint64 coverageWAD;
         uint96 betaWAD;
         address ydm;
         NAV_UNIT lastSTRawNAV;
@@ -64,7 +78,8 @@ interface IRoycoAccountant {
         NAV_UNIT lastSTEffectiveNAV;
         NAV_UNIT lastJTEffectiveNAV;
         NAV_UNIT lastSTImpermanentLoss;
-        NAV_UNIT lastJTImpermanentLoss;
+        NAV_UNIT lastJTCoverageImpermanentLoss;
+        NAV_UNIT lastJTSelfImpermanentLoss;
         uint192 twJTYieldShareAccruedWAD;
         uint32 lastAccrualTimestamp;
         uint32 lastDistributionTimestamp;
@@ -79,6 +94,12 @@ interface IRoycoAccountant {
     event JuniorTrancheYieldShareAccrued(uint256 jtYieldShareWAD, uint256 twJTYieldShareAccruedWAD, uint32 accrualTimestamp);
 
     /**
+     * @notice Emitted when a fixed term regime is commenced by this market
+     * @param fixedTermEndTimestamp The end timestamp of the new fixed term regime
+     */
+    event FixedTermCommenced(uint32 fixedTermEndTimestamp);
+
+    /**
      * @notice Emitted when a pre-operation tranche accounting synchronization is executed
      * @param resultingState The resulting market state after synchronizing the tranche accounting
      */
@@ -91,20 +112,65 @@ interface IRoycoAccountant {
      */
     event PostOpTrancheAccountingSynced(Operation op, SyncedAccountingState resultingState);
 
+    /**
+     * @notice Emitted when the YDM (Yield Distribution Model) address is updated
+     * @param ydm The new YDM address
+     */
+    event YDMUpdated(address ydm);
+
+    /**
+     * @notice Emitted when the senior tranche protocol fee percentage is updated
+     * @param stProtocolFeeWAD The new protocol fee percentage charged on senior tranche yield, scaled to WAD precision
+     */
+    event SeniorTrancheProtocolFeeUpdated(uint64 stProtocolFeeWAD);
+
+    /**
+     * @notice Emitted when the junior tranche protocol fee percentage is updated
+     * @param jtProtocolFeeWAD The new protocol fee percentage charged on junior tranche yield, scaled to WAD precision
+     */
+    event JuniorTrancheProtocolFeeUpdated(uint64 jtProtocolFeeWAD);
+
+    /**
+     * @notice Emitted when the coverage percentage requirement is updated
+     * @param coverageWAD The new coverage percentage, scaled to WAD precision
+     */
+    event CoverageUpdated(uint64 coverageWAD);
+
+    /**
+     * @notice Emitted when the beta sensitivity parameter is updated
+     * @param betaWAD The new beta parameter representing JT's sensitivity to downside stress, scaled to WAD precision
+     */
+    event BetaUpdated(uint96 betaWAD);
+
+    /**
+     * @notice Emitted when the LLTV is updated
+     * @param lltvWAD The new liquidation loan to value (LLTV) for this market, scaled to WAD precision
+     */
+    event LLTVUpdated(uint64 lltvWAD);
+
+    /**
+     * @notice Emitted when the fixed term duration is updated
+     * @param fixedTermDurationSeconds The new fixed term duration for this market in seconds
+     */
+    event FixedTermDurationUpdated(uint24 fixedTermDurationSeconds);
+
+    /// @notice Thrown when the accountant's coverage config is invalid
+    error INVALID_COVERAGE_CONFIG();
+
+    /// @notice Thrown when the configured protocol fee exceeds the maximum
+    error MAX_PROTOCOL_FEE_EXCEEDED();
+
+    /// @notice Thrown when the YDM address being set is null
+    error NULL_YDM_ADDRESS();
+
+    /// @notice Thrown when the market's LLTV being set is an invalid value in the context of the market's coverage
+    error INVALID_LLTV();
+
     /// @notice Thrown when the YDM failed to initialize
     error FAILED_TO_INITIALIZE_YDM(bytes data);
 
     /// @notice Thrown when the caller of the function is not the accountant's configured Royco Kernel
     error ONLY_ROYCO_KERNEL();
-
-    /// @notice Thrown when the accountant's coverage config is invalid
-    error INVALID_COVERAGE_CONFIG();
-
-    /// @notice Thrown when the YDM address is null on initialization
-    error NULL_YDM_ADDRESS();
-
-    /// @notice Thrown when the configured protocol fee exceeds the maximum
-    error MAX_PROTOCOL_FEE_EXCEEDED();
 
     /// @notice Thrown when the sum of the raw NAVs don't equal the sum of the effective NAVs of both tranches
     error NAV_CONSERVATION_VIOLATION();
@@ -199,39 +265,55 @@ interface IRoycoAccountant {
         returns (NAV_UNIT totalNAVClaimable, NAV_UNIT stClaimable, NAV_UNIT jtClaimable);
 
     /**
-     * @notice Updates the YDM (Yield Distribution Model) address
+     * @notice Updates the YDM (Yield Distribution Model) address for this market
      * @dev Only callable by a designated admin
      * @param _ydm The new YDM address to set
+     * @param _ydmInitializationData The data used to initialize the new YDM for this market
      */
-    function setYDM(address _ydm) external;
+    function setYDM(address _ydm, bytes calldata _ydmInitializationData) external;
 
     /**
-     * @notice Updates the senior tranche protocol fee percentage
+     * @notice Updates the senior tranche protocol fee percentage for this market
      * @dev Only callable by a designated admin
      * @param _stProtocolFeeWAD The new protocol fee percentage charged on senior tranche yield, scaled to WAD precision
      */
     function setSeniorTrancheProtocolFee(uint64 _stProtocolFeeWAD) external;
 
     /**
-     * @notice Updates the junior tranche protocol fee percentage
+     * @notice Updates the junior tranche protocol fee percentage for this market
      * @dev Only callable by a designated admin
      * @param _jtProtocolFeeWAD The new protocol fee percentage charged on junior tranche yield, scaled to WAD precision
      */
     function setJuniorTrancheProtocolFee(uint64 _jtProtocolFeeWAD) external;
 
     /**
-     * @notice Updates the coverage percentage requirement
+     * @notice Updates the coverage percentage requirement for this market
      * @dev Only callable by a designated admin
-     * @param _coverageWAD The new coverage percentage in WAD format
+     * @param _coverageWAD The new coverage percentage, scaled to WAD precision
      */
     function setCoverage(uint64 _coverageWAD) external;
 
     /**
-     * @notice Updates the beta sensitivity parameter
+     * @notice Updates the beta sensitivity parameter for this market
      * @dev Only callable by a designated admin
-     * @param _betaWAD The new beta parameter in WAD format representing JT's sensitivity to downside stress
+     * @param _betaWAD The new beta parameter representing JT's sensitivity to downside stress, scaled to WAD precision
      */
     function setBeta(uint96 _betaWAD) external;
+
+    /**
+     * @notice Updates the LLTV for this market
+     * @dev Only callable by a designated admin
+     * @param _lltvWAD The new liquidation loan to value (LLTV) for this market, scaled to WAD precision
+     */
+    function setLLTV(uint64 _lltvWAD) external;
+
+    /**
+     * @notice Updates the fixed term duration for this market
+     * @dev Setting the fixed term duration to 0 will force the market into an eternally perpetual state
+     * @dev Only callable by a designated admin
+     * @param _fixedTermDurationSeconds The new fixed term duration for this market in seconds
+     */
+    function setFixedTermDuration(uint24 _fixedTermDurationSeconds) external;
 
     /**
      * @notice Returns the state of the accountant

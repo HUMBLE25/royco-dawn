@@ -92,7 +92,7 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
     }
 
     function _deployMarketWithKernel() internal returns (DeployedContracts memory deployedContracts, bytes32 marketID) {
-        marketID = keccak256(abi.encodePacked(SENIOR_TRANCH_NAME, JUNIOR_TRANCH_NAME, block.timestamp));
+        marketID = keccak256(abi.encodePacked(SENIOR_TRANCHE_NAME, JUNIOR_TRANCHE_NAME, block.timestamp));
 
         // Precompute the expected addresses of the kernel and accountant
         bytes32 salt = keccak256(abi.encodePacked("SALT"));
@@ -127,7 +127,9 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
                     coverageWAD: COVERAGE_WAD,
                     betaWAD: BETA_WAD,
                     ydm: address(YDM),
-                    ydmInitializationData: abi.encodeCall(YDM.initializeYDMForMarket, (0, 0.225e18, 1e18))
+                    ydmInitializationData: abi.encodeCall(YDM.initializeYDMForMarket, (0, 0.225e18, 1e18)),
+                    fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
+                    lltvWAD: LLTV
                 }),
                 address(FACTORY)
             )
@@ -135,7 +137,7 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
         bytes memory seniorTrancheInitializationData = abi.encodeCall(
             ST_IMPL.initialize,
             (
-                TrancheDeploymentParams({ name: SENIOR_TRANCH_NAME, symbol: SENIOR_TRANCH_SYMBOL, kernel: expectedKernelAddress }),
+                TrancheDeploymentParams({ name: SENIOR_TRANCHE_NAME, symbol: SENIOR_TRANCHE_SYMBOL, kernel: expectedKernelAddress }),
                 ETHEREUM_MAINNET_USDC_ADDRESS,
                 address(FACTORY),
                 marketID
@@ -144,7 +146,7 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
         bytes memory juniorTrancheInitializationData = abi.encodeCall(
             JT_IMPL.initialize,
             (
-                TrancheDeploymentParams({ name: JUNIOR_TRANCH_NAME, symbol: JUNIOR_TRANCH_SYMBOL, kernel: expectedKernelAddress }),
+                TrancheDeploymentParams({ name: JUNIOR_TRANCHE_NAME, symbol: JUNIOR_TRANCHE_SYMBOL, kernel: expectedKernelAddress }),
                 ETHEREUM_MAINNET_USDC_ADDRESS,
                 address(FACTORY),
                 marketID
@@ -153,10 +155,10 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
 
         deployedContracts = FACTORY.deployMarket(
             MarketDeploymentParams({
-                seniorTrancheName: SENIOR_TRANCH_NAME,
-                seniorTrancheSymbol: SENIOR_TRANCH_SYMBOL,
-                juniorTrancheName: JUNIOR_TRANCH_SYMBOL,
-                juniorTrancheSymbol: JUNIOR_TRANCH_SYMBOL,
+                seniorTrancheName: SENIOR_TRANCHE_NAME,
+                seniorTrancheSymbol: SENIOR_TRANCHE_SYMBOL,
+                juniorTrancheName: JUNIOR_TRANCHE_SYMBOL,
+                juniorTrancheSymbol: JUNIOR_TRANCHE_SYMBOL,
                 seniorAsset: ETHEREUM_MAINNET_USDC_ADDRESS,
                 juniorAsset: ETHEREUM_MAINNET_USDC_ADDRESS,
                 marketId: marketID,

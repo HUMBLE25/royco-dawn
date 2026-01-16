@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import { NAV_UNIT } from "../libraries/Types.sol";
+import { MarketState, NAV_UNIT } from "../libraries/Types.sol";
 
 /**
  * @title IYDM - Yield Distribution Model Interface
@@ -14,6 +14,7 @@ interface IYDM {
     /**
      * @notice Previews and returns a Royco market's percentage of ST yield that should be allocated to its JT
      * @dev Does not mutate any state
+     * @param _marketState The state of this Royco market (perpetual or fixed term)
      * @param _stRawNAV The raw net asset value of the senior tranche invested assets
      * @param _jtRawNAV The raw net asset value of the junior tranche invested assets
      * @param _betaWAD The JT's sensitivity to the same downside stress that affects ST scaled to WAD precision
@@ -25,6 +26,7 @@ interface IYDM {
      *                         It is implied that (WAD - jtYieldShareWAD) will be the percentage allocated to ST, excluding any protocol fees
      */
     function previewJTYieldShare(
+        MarketState _marketState,
         NAV_UNIT _stRawNAV,
         NAV_UNIT _jtRawNAV,
         uint256 _betaWAD,
@@ -38,6 +40,7 @@ interface IYDM {
     /**
      * @notice Returns a Royco market's percentage of ST yield that should be allocated to its JT
      * @dev Can mutate state
+     * @param _marketState The state of this Royco market (perpetual or fixed term)
      * @param _stRawNAV The raw net asset value of the senior tranche invested assets
      * @param _jtRawNAV The raw net asset value of the junior tranche invested assets
      * @param _betaWAD The JT's sensitivity to the same downside stress that affects ST scaled to WAD precision
@@ -49,6 +52,7 @@ interface IYDM {
      *                         It is implied that (WAD - jtYieldShareWAD) will be the percentage allocated to ST, excluding any protocol fees
      */
     function jtYieldShare(
+        MarketState _marketState,
         NAV_UNIT _stRawNAV,
         NAV_UNIT _jtRawNAV,
         uint256 _betaWAD,

@@ -73,7 +73,10 @@ function toNAVUnits(uint256 _assets) pure returns (NAV_UNIT) {
     return NAV_UNIT.wrap(_assets);
 }
 
+error ASSETS_MUST_BE_NON_NEGATIVE();
+
 function toNAVUnits(int256 _assets) pure returns (NAV_UNIT) {
+    require(_assets >= 0, ASSETS_MUST_BE_NON_NEGATIVE());
     // forge-lint: disable-next-line(unsafe-typecast)
     return NAV_UNIT.wrap(uint256(_assets));
 }
