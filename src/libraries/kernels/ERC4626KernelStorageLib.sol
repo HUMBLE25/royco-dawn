@@ -7,6 +7,7 @@ pragma solidity ^0.8.28;
  * @custom:field stOwnedShares - The number of shares ST owns for ST's ERC4626 vault
  * @custom:field jtOwnedShares - The number of shares JT owns for JT's ERC4626 vault
  */
+// forge-lint: disable-next-item(pascal-case-struct)
 struct ERC4626KernelState {
     uint256 stOwnedShares;
     uint256 jtOwnedShares;

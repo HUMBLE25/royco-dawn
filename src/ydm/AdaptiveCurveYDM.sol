@@ -68,6 +68,7 @@ contract AdaptiveCurveYDM is IYDM {
      */
     function initializeYDMForMarket(uint64 _jtYieldShareAtTargetUtilWAD, uint64 _jtYieldShareAtFullUtilWAD) external {
         // Ensure that the initial YDM curve is valid
+        // forge-lint: disable-next-item(unsafe-typecast)
         require(
             _jtYieldShareAtTargetUtilWAD >= uint256(MIN_JT_YIELD_SHARE_AT_TARGET) && _jtYieldShareAtTargetUtilWAD <= uint256(MAX_JT_YIELD_SHARE_AT_TARGET)
                 && _jtYieldShareAtTargetUtilWAD <= _jtYieldShareAtFullUtilWAD && _jtYieldShareAtFullUtilWAD <= WAD,
@@ -76,7 +77,9 @@ contract AdaptiveCurveYDM is IYDM {
 
         // Initialize the YDM curve for this market
         AdaptiveYieldCurve storage curve = accountantToCurve[msg.sender];
+        // forge-lint: disable-next-item(unsafe-typecast)
         curve.jtYieldShareAtTargetWAD = int64(_jtYieldShareAtTargetUtilWAD);
+        // forge-lint: disable-next-item(unsafe-typecast)
         curve.steepnessAfterTargetWAD = int160(int256((_jtYieldShareAtFullUtilWAD * WAD) / _jtYieldShareAtTargetUtilWAD));
 
         emit AdaptiveCurveYdmInitialized(msg.sender, uint256(int256(curve.steepnessAfterTargetWAD)), _jtYieldShareAtTargetUtilWAD);
@@ -119,7 +122,10 @@ contract AdaptiveCurveYDM is IYDM {
 
         // Apply the adaptations to the curve
         AdaptiveYieldCurve storage curve = accountantToCurve[msg.sender];
+        // max(newJtYieldShareAtTargetWAD) = WAD
+        // forge-lint: disable-next-item(unsafe-typecast)
         curve.jtYieldShareAtTargetWAD = int64(newJtYieldShareAtTargetWAD);
+        // forge-lint: disable-next-item(unsafe-typecast)
         curve.lastAdaptationTimestamp = uint32(block.timestamp);
 
         emit YdmAdapted(msg.sender, jtYieldShareWAD, uint256(newJtYieldShareAtTargetWAD));

@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import { Math } from "../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 import { WAD, ZERO_NAV_UNITS } from "./Constants.sol";
 import { ActionMetadataFormat, AssetClaims } from "./Types.sol";
-import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib, toUint256 } from "./Units.sol";
+import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib } from "./Units.sol";
 
 library UtilsLib {
     using UnitsMathLib for NAV_UNIT;

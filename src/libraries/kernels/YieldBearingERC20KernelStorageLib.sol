@@ -9,6 +9,7 @@ import { TRANCHE_UNIT } from "../Units.sol";
  * @custom:field stOwnedYieldBearingAssets - The yield bearing assets held by the ST
  * @custom:field jtOwnedYieldBearingAssets - The yield bearing assets held by the ST
  */
+// forge-lint: disable-next-item(pascal-case-struct)
 struct YieldBearingERC20KernelState {
     TRANCHE_UNIT stOwnedYieldBearingAssets;
     TRANCHE_UNIT jtOwnedYieldBearingAssets;

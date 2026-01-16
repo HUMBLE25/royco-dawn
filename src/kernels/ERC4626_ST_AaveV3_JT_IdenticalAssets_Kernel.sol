@@ -23,7 +23,6 @@ contract ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel is ERC4626_ST_Kernel, AaveV
     )
         ERC4626_ST_Kernel(_stVault)
         AaveV3_JT_Kernel(_aaveV3Pool)
-        IdenticalAssetsQuoter()
         RoycoKernel(_seniorTranche, IRoycoVaultTranche(_seniorTranche).asset(), _juniorTranche, IRoycoVaultTranche(_juniorTranche).asset())
     { }
 
