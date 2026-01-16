@@ -16,8 +16,6 @@ import {
  * @notice Tranche and NAV units are always expressed in the tranche asset's precision. The NAV Unit factors in a conversion rate from the overridable NAV Conversion Rate oracle.
  */
 contract NeutrlSNUSD_ST_NeutrlSNUSD_JT_OverridableNAVKernel is ERC4626_ST_ERC4626_JT_OverridableNAVOracleIdenticalAssets_Kernel {
-    /// @notice The address of the sNUSD ERC4626 vault
-    address public immutable SNUSD_VAULT;
     /// @notice The address of the token in which the NAV is expressed.
     /// @dev The NAV of an amount a of sNUSD is defined as sNUSD.convertSharesToAssets(a) * (value of 1 NUSD in NUSD_USD_QUOTE_TOKEN)
     /// @dev NUSD_USD_QUOTE_TOKEN is typically USDC.
@@ -26,12 +24,21 @@ contract NeutrlSNUSD_ST_NeutrlSNUSD_JT_OverridableNAVKernel is ERC4626_ST_ERC462
     address public immutable NEUTRL_ROUTER;
 
     /// @notice Constructor
+    /// @param _seniorTranche The address of the senior tranche
+    /// @param _juniorTranche The address of the junior tranche
     /// @param _snUSDVault The address of the SNUSD vault
     /// @param _nusdUsdQuoteToken The address of the token in which the NAV is expressed.
+    /// @param _neutrlRouter The address of the Neutrl Router
     /// @dev NUSD_USD_QUOTE_TOKEN is typically USDC.
-    /// @dev We enable the tranche unit to NAV unit conversion rate cache to reduce the number of calls to the Neutrl Router during the same call.
-    constructor(address _snUSDVault, address _nusdUsdQuoteToken, address _neutrlRouter) {
-        SNUSD_VAULT = _snUSDVault;
+    constructor(
+        address _seniorTranche,
+        address _juniorTranche,
+        address _snUSDVault,
+        address _nusdUsdQuoteToken,
+        address _neutrlRouter
+    )
+        ERC4626_ST_ERC4626_JT_OverridableNAVOracleIdenticalAssets_Kernel(_seniorTranche, _juniorTranche, _snUSDVault, _snUSDVault)
+    {
         NUSD_USD_QUOTE_TOKEN = _nusdUsdQuoteToken;
         NEUTRL_ROUTER = _neutrlRouter;
     }
@@ -40,7 +47,7 @@ contract NeutrlSNUSD_ST_NeutrlSNUSD_JT_OverridableNAVKernel is ERC4626_ST_ERC462
     /// @param _params The standard initialization parameters for the Royco Kernel
     function initialize(RoycoKernelInitParams calldata _params) external initializer {
         // We set the price override to 0, so that the NUSD -> NUSD_USD_QUOTE_TOKEN conversion rate is queried from the Neutrl Router
-        __ERC4626_ST_ERC4626_JT_OverridableNAVOracleIdenticalAssets_Kernel_init(_params, SNUSD_VAULT, SNUSD_VAULT, 0);
+        __ERC4626_ST_ERC4626_JT_OverridableNAVOracleIdenticalAssets_Kernel_init(_params, 0);
     }
 
     /// @inheritdoc OverridableNAVOracleIdenticalAssetsQuoter

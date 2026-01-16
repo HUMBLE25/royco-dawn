@@ -5,6 +5,7 @@ import { IRoycoVaultTranche } from "../interfaces/tranche/IRoycoVaultTranche.sol
 import { RoycoKernelInitParams } from "../libraries/RoycoKernelStorageLib.sol";
 import { NAV_UNIT } from "../libraries/Units.sol";
 import { RoycoKernel } from "./base/RoycoKernel.sol";
+import { RoycoKernel } from "./base/RoycoKernel.sol";
 import { InKindAssetsQuoter } from "./base/quoter/InKindAssetsQuoter.sol";
 import { ERC4626_ST_ERC4626_JT_Kernel } from "./base/recipe/ERC4626_ST_ERC4626_JT_Kernel.sol";
 
@@ -16,20 +17,23 @@ import { ERC4626_ST_ERC4626_JT_Kernel } from "./base/recipe/ERC4626_ST_ERC4626_J
  * @notice NAV units are always expressed in tranche units scaled to WAD (18 decimals) precision
  */
 contract ERC4626_ST_ERC4626_JT_InKindAssets_Kernel is ERC4626_ST_ERC4626_JT_Kernel, InKindAssetsQuoter {
+    constructor(
+        address _seniorTranche,
+        address _juniorTranche,
+        address _stVault,
+        address _jtVault
+    )
+        ERC4626_ST_ERC4626_JT_Kernel(_seniorTranche, _juniorTranche, _stVault, _jtVault)
+        InKindAssetsQuoter()
+    { }
+
     /**
      * @notice Initializes the Royco Kernel
-     * @param _stVault The ERC4626 compliant vault that the senior tranche will deploy into
-     * @param _jtVault The ERC4626 compliant vault that the junior tranche will deploy into
+     * @param _params The standard initialization parameters for the Royco Kernel
      */
-    function initialize(RoycoKernelInitParams calldata _params, address _stVault, address _jtVault) external initializer {
-        // Get the base assets for both tranches and ensure that they are identical
-        address stAsset = IRoycoVaultTranche(_params.seniorTranche).asset();
-        address jtAsset = IRoycoVaultTranche(_params.juniorTranche).asset();
-
+    function initialize(RoycoKernelInitParams calldata _params) external initializer {
         // Initialize the base kernel state
-        __ERC4626_ST_ERC4626_JT_Kernel_init(_params, _stVault, _jtVault);
-        // Initialize the in kind assets quoter
-        __InKindAssetsQuoter_init_unchained(stAsset, jtAsset);
+        __ERC4626_ST_ERC4626_JT_Kernel_init(_params);
     }
 
     /// @inheritdoc ERC4626_ST_ERC4626_JT_Kernel

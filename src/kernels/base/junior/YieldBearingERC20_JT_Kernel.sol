@@ -16,10 +16,6 @@ abstract contract YieldBearingERC20_JT_Kernel is RoycoKernel {
     /// @inheritdoc IRoycoKernel
     ExecutionModel public constant JT_DEPOSIT_EXECUTION_MODEL = ExecutionModel.SYNC;
 
-    /// @notice Initializes a kernel where the junior tranche vault's deposit asset is a yield bearing ERC20 asset
-    /// @dev The yield bearing asset must be rebasing in terms of price, not quantity
-    function __YieldBearingERC20_JT_Kernel_init_unchained() internal onlyInitializing { }
-
     /// @inheritdoc IRoycoKernel
     function jtPreviewDeposit(TRANCHE_UNIT _assets) external view override returns (SyncedAccountingState memory stateBeforeDeposit, NAV_UNIT valueAllocated) {
         // Convert the yield bearing assets deposited to NAV units and preview a sync to get the current NAV to mint shares at for the junior tranche
@@ -65,7 +61,6 @@ abstract contract YieldBearingERC20_JT_Kernel is RoycoKernel {
         $.jtOwnedYieldBearingAssets = $.jtOwnedYieldBearingAssets - _jtAssets;
 
         // Transfer the yield bearing assets being withdrawn to the receiver
-        address jtYieldBearingAsset = RoycoKernelStorageLib._getRoycoKernelStorage().jtAsset;
-        IERC20(jtYieldBearingAsset).safeTransfer(_receiver, toUint256(_jtAssets));
+        IERC20(JT_ASSET).safeTransfer(_receiver, toUint256(_jtAssets));
     }
 }

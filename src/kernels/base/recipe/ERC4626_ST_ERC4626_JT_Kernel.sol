@@ -17,23 +17,31 @@ import { ERC4626_ST_Kernel } from "../senior/ERC4626_ST_Kernel.sol";
 abstract contract ERC4626_ST_ERC4626_JT_Kernel is ERC4626_ST_Kernel, ERC4626_JT_Kernel {
     using UnitsMathLib for TRANCHE_UNIT;
 
+    /// @notice Constructor for the ERC4626_ST_ERC4626_JT_Kernel
+    /// @param _stVault The address of the ERC4626 compliant vault that the senior tranche will deploy into
+    /// @param _jtVault The address of the ERC4626 compliant vault that the junior tranche will deploy into
+    constructor(
+        address _seniorTranche,
+        address _juniorTranche,
+        address _stVault,
+        address _jtVault
+    )
+        RoycoKernel(_seniorTranche, IRoycoVaultTranche(_seniorTranche).asset(), _juniorTranche, IRoycoVaultTranche(_juniorTranche).asset())
+        ERC4626_ST_Kernel(_stVault)
+        ERC4626_JT_Kernel(_jtVault)
+    { }
+
     /**
      * @notice Initializes the Royco Kernel
      * @param _params The standard initialization parameters for the Royco Kernel
-     * @param _stVault The ERC4626 compliant vault that the senior tranche will deploy into
-     * @param _jtVault The ERC4626 compliant vault that the junior tranche will deploy into
      */
-    function __ERC4626_ST_ERC4626_JT_Kernel_init(RoycoKernelInitParams calldata _params, address _stVault, address _jtVault) internal onlyInitializing {
-        // Get the base assets for both tranches and ensure that they are identical
-        address stAsset = IRoycoVaultTranche(_params.seniorTranche).asset();
-        address jtAsset = IRoycoVaultTranche(_params.juniorTranche).asset();
-
+    function __ERC4626_ST_ERC4626_JT_Kernel_init(RoycoKernelInitParams calldata _params) internal onlyInitializing {
         // Initialize the base kernel state
-        __RoycoKernel_init(_params, stAsset, jtAsset);
+        __RoycoKernel_init(_params);
         // Initialize the ERC4626 senior tranche state
-        __ERC4626_ST_Kernel_init_unchained(_stVault, stAsset);
+        __ERC4626_ST_Kernel_init_unchained();
         // Initialize the ERC4626 junior tranche state
-        __ERC4626_JT_Kernel_init_unchained(_jtVault, jtAsset);
+        __ERC4626_JT_Kernel_init_unchained();
     }
 
     /// @inheritdoc IRoycoKernel
@@ -46,9 +54,8 @@ abstract contract ERC4626_ST_ERC4626_JT_Kernel is ERC4626_ST_Kernel, ERC4626_JT_
         override(RoycoKernel)
         returns (NAV_UNIT claimOnStNAV, NAV_UNIT claimOnJtNAV, NAV_UNIT stMaxWithdrawableNAV, NAV_UNIT jtMaxWithdrawableNAV)
     {
-        ERC4626KernelState storage $ = ERC4626KernelStorageLib._getERC4626KernelStorage();
         // If both tranches are in different ERC4626 vaults, double counting is not possible
-        if ($.stVault != $.jtVault) return super.stMaxWithdrawable(_owner);
+        if (ST_VAULT != JT_VAULT) return super.stMaxWithdrawable(_owner);
 
         (SyncedAccountingState memory state, AssetClaims memory stNotionalClaims,) = previewSyncTrancheAccounting(TrancheType.SENIOR);
 
@@ -79,9 +86,8 @@ abstract contract ERC4626_ST_ERC4626_JT_Kernel is ERC4626_ST_Kernel, ERC4626_JT_
         override(RoycoKernel)
         returns (NAV_UNIT claimOnStNAV, NAV_UNIT claimOnJtNAV, NAV_UNIT stMaxWithdrawableNAV, NAV_UNIT jtMaxWithdrawableNAV)
     {
-        ERC4626KernelState storage $ = ERC4626KernelStorageLib._getERC4626KernelStorage();
         // If both tranches are in different ERC4626 vaults, double counting is not possible
-        if ($.stVault != $.jtVault) return super.jtMaxWithdrawable(_owner);
+        if (ST_VAULT != JT_VAULT) return super.jtMaxWithdrawable(_owner);
 
         // Get the total claims the junior tranche has on each tranche's assets
         (SyncedAccountingState memory state, AssetClaims memory jtNotionalClaims,) = previewSyncTrancheAccounting(TrancheType.JUNIOR);

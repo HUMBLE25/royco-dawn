@@ -24,7 +24,7 @@ abstract contract OverridableNAVOracleIdenticalAssetsQuoter is RoycoKernel {
     /// @dev Storage state for the Royco overridable oracle quoter
     /// @custom:storage-location erc7201:Royco.storage.OverridableNavOracleIdenticalAssetsQuoterState
     struct OverridableNavOracleIdenticalAssetsQuoterState {
-        uint256 ratetrancheUnitToNAVUnitConversionRateWAD;
+        uint256 trancheUnitToNAVUnitConversionRateWAD;
     }
 
     /// @notice Emitted when the tranche unit to NAV unit conversion rate is set
@@ -33,31 +33,28 @@ abstract contract OverridableNAVOracleIdenticalAssetsQuoter is RoycoKernel {
     /// @notice Thrown when the senior and junior tranche assets have the same precision
     error TRANCHE_ASSET_DECIMALS_MISMATCH();
 
+    constructor() {
+        // This quoter stipulates that both tranche assets have identical precision
+        require(IERC20Metadata(ST_ASSET).decimals() == IERC20Metadata(JT_ASSET).decimals(), TRANCHE_ASSET_DECIMALS_MISMATCH());
+    }
+
     /// @notice Initializes the quoter for overridable oracle
     /// @param _initialConversionRateWAD The initial tranche unit to NAV unit conversion rate
-    function __OverridableNAVOracleIdenticalAssetsQuoter_init_unchained(
-        address _stAsset,
-        address _jtAsset,
-        uint256 _initialConversionRateWAD
-    )
-        internal
-        onlyInitializing
-    {
-        // This quoter stipulates that both tranche assets have identical precision
-        require(IERC20Metadata(_stAsset).decimals() == IERC20Metadata(_jtAsset).decimals(), TRANCHE_ASSET_DECIMALS_MISMATCH());
-
-        if (_initialConversionRateWAD != 0) {
-            OverridableNavOracleIdenticalAssetsQuoterState storage $ = _getOverridableNAVOracleIdenticalAssetsQuoterStorage();
-            $.ratetrancheUnitToNAVUnitConversionRateWAD = _initialConversionRateWAD;
-            emit TrancheUnitToNAVUnitConversionRateSet(_initialConversionRateWAD);
+    function __OverridableNAVOracleIdenticalAssetsQuoter_init_unchained(uint256 _initialConversionRateWAD) internal onlyInitializing {
+        if (_initialConversionRateWAD == 0) {
+            return;
         }
+
+        OverridableNavOracleIdenticalAssetsQuoterState storage $ = _getOverridableNAVOracleIdenticalAssetsQuoterStorage();
+        $.trancheUnitToNAVUnitConversionRateWAD = _initialConversionRateWAD;
+        emit TrancheUnitToNAVUnitConversionRateSet(_initialConversionRateWAD);
     }
 
     /// @notice Sets the tranche unit to NAV unit conversion rate
     /// @param _trancheUnitToNAVUnitConversionRateWAD The tranche unit to NAV unit conversion rate
     function setTrancheUnitToNAVUnitConversionRate(uint256 _trancheUnitToNAVUnitConversionRateWAD) external restricted {
         OverridableNavOracleIdenticalAssetsQuoterState storage $ = _getOverridableNAVOracleIdenticalAssetsQuoterStorage();
-        $.ratetrancheUnitToNAVUnitConversionRateWAD = _trancheUnitToNAVUnitConversionRateWAD;
+        $.trancheUnitToNAVUnitConversionRateWAD = _trancheUnitToNAVUnitConversionRateWAD;
         emit TrancheUnitToNAVUnitConversionRateSet(_trancheUnitToNAVUnitConversionRateWAD);
     }
 
@@ -83,12 +80,12 @@ abstract contract OverridableNAVOracleIdenticalAssetsQuoter is RoycoKernel {
 
     /// @notice Returns the value of 1 Tranche Unit in NAV Units, scaled to WAD precision
     /// @dev If the override is set, it will return the override value, otherwise it will return the value queried from the oracle
-    /// @return ratetrancheUnitToNAVUnitConversionRateWAD The tranche unit to NAV unit conversion rate
-    function getTrancheUnitToNAVUnitConversionRate() public view returns (uint256 ratetrancheUnitToNAVUnitConversionRateWAD) {
+    /// @return trancheUnitToNAVUnitConversionRateWAD The tranche unit to NAV unit conversion rate
+    function getTrancheUnitToNAVUnitConversionRate() public view returns (uint256 trancheUnitToNAVUnitConversionRateWAD) {
         OverridableNavOracleIdenticalAssetsQuoterState storage $ = _getOverridableNAVOracleIdenticalAssetsQuoterStorage();
-        ratetrancheUnitToNAVUnitConversionRateWAD = $.ratetrancheUnitToNAVUnitConversionRateWAD;
-        if (ratetrancheUnitToNAVUnitConversionRateWAD != 0) {
-            return ratetrancheUnitToNAVUnitConversionRateWAD;
+        trancheUnitToNAVUnitConversionRateWAD = $.trancheUnitToNAVUnitConversionRateWAD;
+        if (trancheUnitToNAVUnitConversionRateWAD != 0) {
+            return trancheUnitToNAVUnitConversionRateWAD;
         }
 
         return _getTrancheUnitToNAVUnitConversionRateFromOracle();
@@ -96,9 +93,9 @@ abstract contract OverridableNAVOracleIdenticalAssetsQuoter is RoycoKernel {
 
     /// @notice Returns the tranche unit to NAV unit conversion rate
     /// @dev This function is overridden by the child contract to return the value queried from the oracle
-    /// @dev This must have the same precision as $.ratetrancheUnitToNAVUnitConversionRateWAD, which is WAD precision
-    /// @return ratetrancheUnitToNAVUnitConversionRateWAD The tranche unit to NAV unit conversion rate
-    function _getTrancheUnitToNAVUnitConversionRateFromOracle() internal view virtual returns (uint256 ratetrancheUnitToNAVUnitConversionRateWAD);
+    /// @dev This must have the same precision as $.trancheUnitToNAVUnitConversionRateWAD, which is WAD precision
+    /// @return trancheUnitToNAVUnitConversionRateWAD The tranche unit to NAV unit conversion rate
+    function _getTrancheUnitToNAVUnitConversionRateFromOracle() internal view virtual returns (uint256 trancheUnitToNAVUnitConversionRateWAD);
 
     /**
      * @notice Returns a storage pointer to the OverridableNavOracleIdenticalAssetsQuoterState storage

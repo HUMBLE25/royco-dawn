@@ -15,8 +15,6 @@ import { NAV_UNIT } from "./Units.sol";
  */
 struct RoycoKernelInitParams {
     address initialAuthority;
-    address seniorTranche;
-    address juniorTranche;
     address accountant;
     address protocolFeeRecipient;
     uint24 jtRedemptionDelayInSeconds;
@@ -25,20 +23,12 @@ struct RoycoKernelInitParams {
 /**
  * @notice Storage state for the Royco Kernel
  * @custom:storage-location erc7201:Royco.storage.RoycoKernelState
- * @custom:field seniorTranche - The address of the Royco senior tranche associated with this kernel
- * @custom:field stAsset - The address of the asset that ST is denominated in: constitutes the ST's tranche units (type and precision)
- * @custom:field juniorTranche - The address of the Royco junior tranche associated with this kernel
- * @custom:field jtAsset - The address of the asset that JT is denominated in: constitutes the ST's tranche units (type and precision)
  * @custom:field protocolFeeRecipient - The market's configured protocol fee recipient
  * @custom:field accountant - The address of the Royco accountant used to perform per operation accounting for this kernel
  * @custom:field jtRedemptionDelayInSeconds - The redemption delay in seconds that a JT LP has to wait between requesting and executing a redemption
  * @custom:field jtControllerToIdToRedemptionRequest - A mapping from a controller to a redemption request ID to its state for a junior tranche LP
  */
 struct RoycoKernelState {
-    address seniorTranche;
-    address stAsset;
-    address juniorTranche;
-    address jtAsset;
     address protocolFeeRecipient;
     address accountant;
     uint24 jtRedemptionDelayInSeconds;
@@ -69,13 +59,9 @@ library RoycoKernelStorageLib {
 
     /// @notice Initializes the Royco kernel state
     /// @param _params The initialization parameters for the kernel
-    function __RoycoKernel_init(RoycoKernelInitParams memory _params, address _stAsset, address _jtAsset) internal {
+    function __RoycoKernel_init(RoycoKernelInitParams memory _params) internal {
         // Set the initial state of the kernel
         RoycoKernelState storage $ = _getRoycoKernelStorage();
-        $.seniorTranche = _params.seniorTranche;
-        $.stAsset = _stAsset;
-        $.juniorTranche = _params.juniorTranche;
-        $.jtAsset = _jtAsset;
         $.protocolFeeRecipient = _params.protocolFeeRecipient;
         $.accountant = _params.accountant;
         $.jtRedemptionDelayInSeconds = _params.jtRedemptionDelayInSeconds;

@@ -31,11 +31,17 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     /// @inheritdoc IRoycoKernel
     SharesRedemptionModel public constant JT_REQUEST_REDEEM_SHARES_BEHAVIOR = SharesRedemptionModel.BURN_ON_CLAIM_REDEEM;
 
+    /// @notice Immutable addresses for the senior tranche, ST asset, junior tranche, and JT asset
+    address internal immutable SENIOR_TRANCHE;
+    address internal immutable ST_ASSET;
+    address internal immutable JUNIOR_TRANCHE;
+    address internal immutable JT_ASSET;
+
     /// @dev Permissions the function to only the market's senior tranche
     /// @dev Should be placed on all ST deposit and withdraw functions
     // forge-lint: disable-next-line(unwrapped-modifier-logic)
     modifier onlySeniorTranche() {
-        require(msg.sender == RoycoKernelStorageLib._getRoycoKernelStorage().seniorTranche, ONLY_SENIOR_TRANCHE());
+        require(msg.sender == SENIOR_TRANCHE, ONLY_SENIOR_TRANCHE());
         _;
     }
 
@@ -43,7 +49,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     /// @dev Should be placed on all JT deposit and withdraw functions
     // forge-lint: disable-next-line(unwrapped-modifier-logic)
     modifier onlyJuniorTranche() {
-        require(msg.sender == RoycoKernelStorageLib._getRoycoKernelStorage().juniorTranche, ONLY_JUNIOR_TRANCHE());
+        require(msg.sender == JUNIOR_TRANCHE, ONLY_JUNIOR_TRANCHE());
         _;
     }
 
@@ -61,35 +67,36 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     // Initializer and State Accessor Functions
     // =============================
 
-    /**
-     * @notice Initializes the base kernel state
-     * @dev Initializes any parent contracts and the base kernel state
-     * @param _params The standard initialization parameters for the Royco kernel
-     * @param _stAsset The address of the asset that ST is denominated in: constitutes the ST's tranche units (type and precision)
-     * @param _jtAsset The address of the asset that JT is denominated in: constitutes the JT's tranche units (type and precision)
-     */
-    function __RoycoKernel_init(RoycoKernelInitParams memory _params, address _stAsset, address _jtAsset) internal onlyInitializing {
-        // Initialize the Royco base state
-        __RoycoBase_init(_params.initialAuthority);
-        // Initialize the Royco kernel state
-        __RoycoKernel_init_unchained(_params, _stAsset, _jtAsset);
+    /// @notice Constructor for the Royco kernel
+    /// @param _seniorTranche The address of the senior tranche
+    /// @param _stAsset The address of the ST asset
+    /// @param _juniorTranche The address of the junior tranche
+    /// @param _jtAsset The address of the JT asset
+    constructor(address _seniorTranche, address _stAsset, address _juniorTranche, address _jtAsset) {
+        // Ensure that the tranche addresses are not null
+        require(_seniorTranche != address(0) && _stAsset != address(0) && _juniorTranche != address(0) && _jtAsset != address(0), NULL_ADDRESS());
+
+        // Set the immutable addresses
+        SENIOR_TRANCHE = _seniorTranche;
+        ST_ASSET = _stAsset;
+        JUNIOR_TRANCHE = _juniorTranche;
+        JT_ASSET = _jtAsset;
     }
 
     /**
      * @notice Initializes the base kernel state
-     * @param _params The initialization parameters for the base kernel
-     * @param _stAsset The address of the asset that ST is denominated in: constitutes the ST's tranche units (type and precision)
-     * @param _jtAsset The address of the asset that JT is denominated in: constitutes the JT's tranche units (type and precision)
+     * @dev Initializes any parent contracts and the base kernel state
+     * @param _params The standard initialization parameters for the Royco kernel
      */
-    function __RoycoKernel_init_unchained(RoycoKernelInitParams memory _params, address _stAsset, address _jtAsset) internal onlyInitializing {
+    function __RoycoKernel_init(RoycoKernelInitParams memory _params) internal onlyInitializing {
+        // Initialize the Royco base state
+        __RoycoBase_init(_params.initialAuthority);
+
+        // Initialize the Royco kernel state
         // Ensure that the tranche addresses, accountant, and protocol fee recipient are not null
-        require(
-            _params.seniorTranche != address(0) && _params.juniorTranche != address(0) && _params.accountant != address(0)
-                && _params.protocolFeeRecipient != address(0),
-            NULL_ADDRESS()
-        );
+        require(_params.accountant != address(0) && _params.protocolFeeRecipient != address(0), NULL_ADDRESS());
         // Initialize the base kernel state
-        RoycoKernelStorageLib.__RoycoKernel_init(_params, _stAsset, _jtAsset);
+        RoycoKernelStorageLib.__RoycoKernel_init(_params);
     }
 
     /// @inheritdoc IRoycoKernel
@@ -108,7 +115,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         )
     {
         RoycoKernelState storage $ = RoycoKernelStorageLib._getRoycoKernelStorage();
-        return ($.seniorTranche, $.stAsset, $.juniorTranche, $.jtAsset, $.protocolFeeRecipient, $.accountant, $.jtRedemptionDelayInSeconds);
+        return (SENIOR_TRANCHE, ST_ASSET, JUNIOR_TRANCHE, JT_ASSET, $.protocolFeeRecipient, $.accountant, $.jtRedemptionDelayInSeconds);
     }
 
     // =============================
@@ -236,9 +243,9 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         // Preview the total tranche shares after minting any protocol fee shares post-sync
         RoycoKernelState storage $ = RoycoKernelStorageLib._getRoycoKernelStorage();
         if (_trancheType == TrancheType.SENIOR) {
-            (, totalTrancheShares) = IRoycoVaultTranche($.seniorTranche).previewMintProtocolFeeShares(state.stProtocolFeeAccrued, state.stEffectiveNAV);
+            (, totalTrancheShares) = IRoycoVaultTranche(SENIOR_TRANCHE).previewMintProtocolFeeShares(state.stProtocolFeeAccrued, state.stEffectiveNAV);
         } else {
-            (, totalTrancheShares) = IRoycoVaultTranche($.juniorTranche).previewMintProtocolFeeShares(state.jtProtocolFeeAccrued, state.jtEffectiveNAV);
+            (, totalTrancheShares) = IRoycoVaultTranche(JUNIOR_TRANCHE).previewMintProtocolFeeShares(state.jtProtocolFeeAccrued, state.jtEffectiveNAV);
         }
     }
 
@@ -582,12 +589,12 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         // If ST fees were accrued or we need to get total shares for ST, mint ST protocol fee shares to the protocol fee recipient
         if (state.stProtocolFeeAccrued != ZERO_NAV_UNITS || _trancheType == TrancheType.SENIOR) {
             (, stTotalTrancheSharesAfterMintingFees) =
-                IRoycoVaultTranche($.seniorTranche).mintProtocolFeeShares(state.stProtocolFeeAccrued, state.stEffectiveNAV, protocolFeeRecipient);
+                IRoycoVaultTranche(SENIOR_TRANCHE).mintProtocolFeeShares(state.stProtocolFeeAccrued, state.stEffectiveNAV, protocolFeeRecipient);
         }
         // If JT fees were accrued or we need to get total shares for JT, mint JT protocol fee shares to the protocol fee recipient
         if (state.jtProtocolFeeAccrued != ZERO_NAV_UNITS || _trancheType == TrancheType.JUNIOR) {
             (, jtTotalTrancheSharesAfterMintingFees) =
-                IRoycoVaultTranche($.juniorTranche).mintProtocolFeeShares(state.jtProtocolFeeAccrued, state.jtEffectiveNAV, protocolFeeRecipient);
+                IRoycoVaultTranche(JUNIOR_TRANCHE).mintProtocolFeeShares(state.jtProtocolFeeAccrued, state.jtEffectiveNAV, protocolFeeRecipient);
         }
 
         // Set the total tranche shares to the specified tranche's shares after minting fees
@@ -616,11 +623,11 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
             address protocolFeeRecipient = $.protocolFeeRecipient;
             // If ST fees were accrued or we need to get total shares for ST, mint ST protocol fee shares to the protocol fee recipient
             if (state.stProtocolFeeAccrued != ZERO_NAV_UNITS) {
-                IRoycoVaultTranche($.seniorTranche).mintProtocolFeeShares(state.stProtocolFeeAccrued, state.stEffectiveNAV, protocolFeeRecipient);
+                IRoycoVaultTranche(SENIOR_TRANCHE).mintProtocolFeeShares(state.stProtocolFeeAccrued, state.stEffectiveNAV, protocolFeeRecipient);
             }
             // If JT fees were accrued or we need to get total shares for JT, mint JT protocol fee shares to the protocol fee recipient
             if (state.jtProtocolFeeAccrued != ZERO_NAV_UNITS) {
-                IRoycoVaultTranche($.juniorTranche).mintProtocolFeeShares(state.jtProtocolFeeAccrued, state.jtEffectiveNAV, protocolFeeRecipient);
+                IRoycoVaultTranche(JUNIOR_TRANCHE).mintProtocolFeeShares(state.jtProtocolFeeAccrued, state.jtEffectiveNAV, protocolFeeRecipient);
             }
         }
     }

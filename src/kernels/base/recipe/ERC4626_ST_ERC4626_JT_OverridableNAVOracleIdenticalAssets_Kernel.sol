@@ -17,27 +17,37 @@ import { ERC4626_ST_ERC4626_JT_Kernel } from "./ERC4626_ST_ERC4626_JT_Kernel.sol
  */
 abstract contract ERC4626_ST_ERC4626_JT_OverridableNAVOracleIdenticalAssets_Kernel is ERC4626_ST_ERC4626_JT_Kernel, OverridableNAVOracleIdenticalAssetsQuoter {
     /**
+     *@notice Constructor for the ERC4626_ST_ERC4626_JT_OverridableNAVOracleIdenticalAssets_Kernel
+     * @param _seniorTranche The address of the senior tranche
+     * @param _juniorTranche The address of the junior tranche
+     * @param _stVault The address of the ERC4626 compliant vault that the senior tranche will deploy into
+     * @param _jtVault The address of the ERC4626 compliant vault that the junior tranche will deploy into
+     */
+    constructor(
+        address _seniorTranche,
+        address _juniorTranche,
+        address _stVault,
+        address _jtVault
+    )
+        ERC4626_ST_ERC4626_JT_Kernel(_seniorTranche, _juniorTranche, _stVault, _jtVault)
+    { }
+
+    /**
      * @notice Initializes the Royco Kernel
-     * @param _stVault The ERC4626 compliant vault that the senior tranche will deploy into
-     * @param _jtVault The ERC4626 compliant vault that the junior tranche will deploy into
+     * @param _params The standard initialization parameters for the Royco Kernel
+     * @param _initialConversionRateWAD The initial tranche unit to NAV unit conversion rate
      */
     function __ERC4626_ST_ERC4626_JT_OverridableNAVOracleIdenticalAssets_Kernel_init(
         RoycoKernelInitParams calldata _params,
-        address _stVault,
-        address _jtVault,
         uint256 _initialConversionRateWAD
     )
         internal
         onlyInitializing
     {
-        // Get the base assets for both tranches and ensure that they are identical
-        address stAsset = IRoycoVaultTranche(_params.seniorTranche).asset();
-        address jtAsset = IRoycoVaultTranche(_params.juniorTranche).asset();
-
         // Initialize the base kernel state
-        __ERC4626_ST_ERC4626_JT_Kernel_init(_params, _stVault, _jtVault);
+        __ERC4626_ST_ERC4626_JT_Kernel_init(_params);
         // Initialize the overridable NAV oracle identical assets quoter
-        __OverridableNAVOracleIdenticalAssetsQuoter_init_unchained(stAsset, jtAsset, _initialConversionRateWAD);
+        __OverridableNAVOracleIdenticalAssetsQuoter_init_unchained(_initialConversionRateWAD);
     }
 
     /// @inheritdoc ERC4626_ST_ERC4626_JT_Kernel

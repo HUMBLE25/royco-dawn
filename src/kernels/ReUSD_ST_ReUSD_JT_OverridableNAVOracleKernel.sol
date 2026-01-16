@@ -29,7 +29,15 @@ contract ReUSD_ST_ReUSD_JT_OverridableNAVOracleKernel is YieldBearingERC20_ST_Yi
     /// @param _reusdUsdQuoteToken The address of the token in which the NAV is expressed.
     /// @param _insuranceCapitalLayer The address of the reUSD insurance capital layer
     /// @dev We enable the tranche unit to NAV unit conversion rate cache to reduce the number of calls to the insurance capital layer during the same call.
-    constructor(address _reusd, address _reusdUsdQuoteToken, address _insuranceCapitalLayer) {
+    constructor(
+        address _seniorTranche,
+        address _juniorTranche,
+        address _reusd,
+        address _reusdUsdQuoteToken,
+        address _insuranceCapitalLayer
+    )
+        YieldBearingERC20_ST_YieldBearingERC20_JT_OverridableNAVOracleIdenticalAssets_Kernel(_seniorTranche, _juniorTranche, _reusd)
+    {
         REUSD = _reusd;
         REUSD_USD_QUOTE_TOKEN = _reusdUsdQuoteToken;
         INSURANCE_CAPITAL_LAYER = _insuranceCapitalLayer;
@@ -39,7 +47,7 @@ contract ReUSD_ST_ReUSD_JT_OverridableNAVOracleKernel is YieldBearingERC20_ST_Yi
     /// @param _params The standard initialization parameters for the Royco Kernel
     function initialize(RoycoKernelInitParams calldata _params) external initializer {
         // We set the price override to 0, so that the reUSD -> REUSD_USD_QUOTE_TOKEN conversion rate is queried from the insurance capital layer
-        __YieldBearingERC20_ST_YieldBearingERC20_JT_OverridableNAVOracleIdenticalAssets_Kernel_init_unchained(_params, REUSD, 0);
+        __YieldBearingERC20_ST_YieldBearingERC20_JT_OverridableNAVOracleIdenticalAssets_Kernel_init_unchained(_params, 0);
     }
 
     /// @inheritdoc OverridableNAVOracleIdenticalAssetsQuoter

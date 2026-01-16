@@ -22,10 +22,6 @@ abstract contract YieldBearingERC20_ST_Kernel is RoycoKernel {
     /// @inheritdoc IRoycoKernel
     SharesRedemptionModel public constant ST_REQUEST_REDEEM_SHARES_BEHAVIOR = SharesRedemptionModel.BURN_ON_CLAIM_REDEEM;
 
-    /// @notice Initializes a kernel where the senior tranche vault's deposit asset is a yield bearing ERC20 asset
-    /// @dev The yield bearing asset must be rebasing in terms of price, not quantity
-    function __YieldBearingERC20_ST_Kernel_init_unchained() internal onlyInitializing { }
-
     /// @inheritdoc IRoycoKernel
     function stPreviewDeposit(TRANCHE_UNIT _assets) external view override returns (SyncedAccountingState memory stateBeforeDeposit, NAV_UNIT valueAllocated) {
         // Convert the yield bearing assets deposited to NAV units and preview a sync to get the current NAV to mint shares at for the senior tranche
@@ -76,7 +72,6 @@ abstract contract YieldBearingERC20_ST_Kernel is RoycoKernel {
         $.stOwnedYieldBearingAssets = $.stOwnedYieldBearingAssets - _stAssets;
 
         // Transfer the yield bearing assets being withdrawn to the receiver
-        address stYieldBearingAsset = RoycoKernelStorageLib._getRoycoKernelStorage().stAsset;
-        IERC20(stYieldBearingAsset).safeTransfer(_receiver, toUint256(_stAssets));
+        IERC20(ST_ASSET).safeTransfer(_receiver, toUint256(_stAssets));
     }
 }

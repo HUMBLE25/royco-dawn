@@ -17,19 +17,29 @@ import { ERC4626_ST_ERC4626_JT_Kernel } from "./base/recipe/ERC4626_ST_ERC4626_J
  */
 contract ERC4626_ST_ERC4626_JT_IdenticalAssets_Kernel is ERC4626_ST_ERC4626_JT_Kernel, IdenticalAssetsQuoter {
     /**
-     * @notice Initializes the Royco Kernel
-     * @param _stVault The ERC4626 compliant vault that the senior tranche will deploy into
-     * @param _jtVault The ERC4626 compliant vault that the junior tranche will deploy into
+     * @notice Constructor for the ERC4626_ST_ERC4626_JT_IdenticalAssets_Kernel
+     * @param _seniorTranche The address of the senior tranche
+     * @param _juniorTranche The address of the junior tranche
+     * @param _stVault The address of the ERC4626 compliant vault that the senior tranche will deploy into
+     * @param _jtVault The address of the ERC4626 compliant vault that the junior tranche will deploy into
      */
-    function initialize(RoycoKernelInitParams calldata _params, address _stVault, address _jtVault) external initializer {
-        // Initialize the base kernel state
-        __ERC4626_ST_ERC4626_JT_Kernel_init(_params, _stVault, _jtVault);
+    constructor(
+        address _seniorTranche,
+        address _juniorTranche,
+        address _stVault,
+        address _jtVault
+    )
+        ERC4626_ST_ERC4626_JT_Kernel(_seniorTranche, _juniorTranche, _stVault, _jtVault)
+        IdenticalAssetsQuoter()
+    { }
 
-        // Initialize the identical assets quoter
-        // Get the base assets for both tranches and ensure that they are identical
-        address stAsset = IRoycoVaultTranche(_params.seniorTranche).asset();
-        address jtAsset = IRoycoVaultTranche(_params.juniorTranche).asset();
-        __IdenticalAssetsQuoter_init_unchained(stAsset, jtAsset);
+    /**
+     * @notice Initializes the Royco Kernel
+     * @param _params The standard initialization parameters for the Royco Kernel
+     */
+    function initialize(RoycoKernelInitParams calldata _params) external initializer {
+        // Initialize the base kernel state
+        __ERC4626_ST_ERC4626_JT_Kernel_init(_params);
     }
 
     /// @inheritdoc ERC4626_ST_ERC4626_JT_Kernel
