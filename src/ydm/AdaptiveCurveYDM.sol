@@ -23,10 +23,10 @@ contract AdaptiveCurveYDM is IYDM {
     int256 public constant MAX_ADAPTATION_SPEED_WAD = 50e18 / int256(365 days);
 
     /// @dev The minimum JT yield share at target utilization
-    int256 public constant MIN_JT_YIELD_SHARE_AT_TARGET = 0.01e18;
+    uint256 public constant MIN_JT_YIELD_SHARE_AT_TARGET = 0.01e18;
 
     /// @dev The maximum JT yield share at target utilization
-    int256 public constant MAX_JT_YIELD_SHARE_AT_TARGET = WAD_INT;
+    uint256 public constant MAX_JT_YIELD_SHARE_AT_TARGET = WAD;
 
     /**
      * @notice Represents the state of a market's YDM
@@ -35,7 +35,7 @@ contract AdaptiveCurveYDM is IYDM {
      * @custom:field steepnessAfterTargetWAD - The steepness of the curve for this market: ratio of yield share at 100% utilization to yield share at target
      */
     struct AdaptiveYieldCurve {
-        int64 jtYieldShareAtTargetWAD;
+        uint64 jtYieldShareAtTargetWAD;
         uint32 lastAdaptationTimestamp;
         int160 steepnessAfterTargetWAD;
     }
@@ -77,8 +77,7 @@ contract AdaptiveCurveYDM is IYDM {
 
         // Initialize the YDM curve for this market
         AdaptiveYieldCurve storage curve = accountantToCurve[msg.sender];
-        // forge-lint: disable-next-item(unsafe-typecast)
-        curve.jtYieldShareAtTargetWAD = int64(_jtYieldShareAtTargetUtilWAD);
+        curve.jtYieldShareAtTargetWAD = _jtYieldShareAtTargetUtilWAD;
         // forge-lint: disable-next-item(unsafe-typecast)
         curve.steepnessAfterTargetWAD = int160(int256((_jtYieldShareAtFullUtilWAD * WAD) / _jtYieldShareAtTargetUtilWAD));
 
@@ -117,14 +116,14 @@ contract AdaptiveCurveYDM is IYDM {
         returns (uint256 jtYieldShareWAD)
     {
         // Compute the current JT yield share and the new position of the curve and post-adaptation
-        int256 newJtYieldShareAtTargetWAD;
+        uint256 newJtYieldShareAtTargetWAD;
         (jtYieldShareWAD, newJtYieldShareAtTargetWAD) = _jtYieldShare(_marketState, _stRawNAV, _jtRawNAV, _betaWAD, _coverageWAD, _jtEffectiveNAV);
 
         // Apply the adaptations to the curve
         AdaptiveYieldCurve storage curve = accountantToCurve[msg.sender];
         // max(newJtYieldShareAtTargetWAD) = WAD
         // forge-lint: disable-next-item(unsafe-typecast)
-        curve.jtYieldShareAtTargetWAD = int64(newJtYieldShareAtTargetWAD);
+        curve.jtYieldShareAtTargetWAD = uint64(newJtYieldShareAtTargetWAD);
         // forge-lint: disable-next-item(unsafe-typecast)
         curve.lastAdaptationTimestamp = uint32(block.timestamp);
 
@@ -156,10 +155,11 @@ contract AdaptiveCurveYDM is IYDM {
     )
         internal
         view
-        returns (uint256 jtYieldShareWAD, int256 newJtYieldShareAtTargetWAD)
+        returns (uint256 jtYieldShareWAD, uint256 newJtYieldShareAtTargetWAD)
     {
         // Compute the utilization of the market and bound it to 100%
         uint256 unboundedUtilizationWAD = UtilsLib.computeUtilization(_stRawNAV, _jtRawNAV, _betaWAD, _coverageWAD, _jtEffectiveNAV);
+        // forge-lint: disable-next-item(unsafe-typecast)
         int256 utilizationWAD = unboundedUtilizationWAD > WAD ? WAD_INT : int256(unboundedUtilizationWAD);
 
         // Compute the max delta from the target utilization in the region of the curve that the market is currently in (above or below the kink)
@@ -170,20 +170,21 @@ contract AdaptiveCurveYDM is IYDM {
         // Retrieve the current YDM curve for the market
         // Only adapt the curve if the market is in a perpetual state and market forces are enabled to affect utilization
         AdaptiveYieldCurve memory curve = accountantToCurve[msg.sender];
-        int256 avgJtYieldShareAtTargetWAD;
+        uint256 avgJtYieldShareAtTargetWAD;
         if (_marketState == MarketState.PERPETUAL) {
             // Compute the adaptation speed based on the normalized delta: scale the max adaptation speed by the relative delta from the target based on the region
             int256 currentAdaptationSpeedWAD = (MAX_ADAPTATION_SPEED_WAD * normalizedDeltaFromTargetWAD) / WAD_INT;
             // Compute the linear adaptation that will be applied to the curve based on the speed
             uint256 elapsed = curve.lastAdaptationTimestamp == 0 ? 0 : block.timestamp - curve.lastAdaptationTimestamp;
+            // forge-lint: disable-next-item(unsafe-typecast)
             int256 linearAdaptationWAD = currentAdaptationSpeedWAD * int256(elapsed);
 
             // Compute the new JT yield share at target utilization
-            int256 initialJtYieldShareAtTargetWAD = curve.jtYieldShareAtTargetWAD;
+            uint256 initialJtYieldShareAtTargetWAD = curve.jtYieldShareAtTargetWAD;
             newJtYieldShareAtTargetWAD = _computeJtYieldShareAtTarget(initialJtYieldShareAtTargetWAD, linearAdaptationWAD);
 
             // Compute the average JT yield share at target utilization
-            int256 midJtYieldShareAtTargetWAD = _computeJtYieldShareAtTarget(initialJtYieldShareAtTargetWAD, linearAdaptationWAD / 2);
+            uint256 midJtYieldShareAtTargetWAD = _computeJtYieldShareAtTarget(initialJtYieldShareAtTargetWAD, linearAdaptationWAD / 2);
             avgJtYieldShareAtTargetWAD = (initialJtYieldShareAtTargetWAD + newJtYieldShareAtTargetWAD + 2 * midJtYieldShareAtTargetWAD) / 4;
         } else {
             avgJtYieldShareAtTargetWAD = curve.jtYieldShareAtTargetWAD;
@@ -200,16 +201,17 @@ contract AdaptiveCurveYDM is IYDM {
      * @return jtYieldShareAtTargetWAD The JT yield share at target utilization after applying the adaptation
      */
     function _computeJtYieldShareAtTarget(
-        int256 _lastJtYieldShareAtTargetWAD,
+        uint256 _lastJtYieldShareAtTargetWAD,
         int256 _linearAdaptationWAD
     )
         internal
         pure
-        returns (int256 jtYieldShareAtTargetWAD)
+        returns (uint256 jtYieldShareAtTargetWAD)
     {
         // Compute the new JT yield share at the target by applying the exponentiated linear adaptation to the previous yield share
         // Exponentiation ensures that the JT yield share is always non-negative
-        jtYieldShareAtTargetWAD = (_lastJtYieldShareAtTargetWAD * FixedPointMathLib.expWad(_linearAdaptationWAD)) / WAD_INT;
+        // forge-lint: disable-next-item(unsafe-typecast)
+        jtYieldShareAtTargetWAD = uint256((int256(_lastJtYieldShareAtTargetWAD) * FixedPointMathLib.expWad(_linearAdaptationWAD)) / WAD_INT);
         // Clamp the JT yield share to the market defined bounds
         if (jtYieldShareAtTargetWAD < MIN_JT_YIELD_SHARE_AT_TARGET) return MIN_JT_YIELD_SHARE_AT_TARGET;
         if (jtYieldShareAtTargetWAD > MAX_JT_YIELD_SHARE_AT_TARGET) return MAX_JT_YIELD_SHARE_AT_TARGET;
@@ -225,7 +227,7 @@ contract AdaptiveCurveYDM is IYDM {
     function _computeCurrentJtYieldShare(
         int256 _steepnessWAD,
         int256 _normalizedDeltaFromTargetWAD,
-        int256 _jtYieldShareAtTargetWAD
+        uint256 _jtYieldShareAtTargetWAD
     )
         internal
         pure
@@ -263,7 +265,8 @@ contract AdaptiveCurveYDM is IYDM {
             ? WAD_INT - ((WAD_INT * WAD_INT) / _steepnessWAD)  // 1 - 1/S if below the kink
             : _steepnessWAD - WAD_INT; // S - 1 if at or above the kink
 
-        jtYieldShareWAD = uint256((((coefficient * _normalizedDeltaFromTargetWAD / WAD_INT) + WAD_INT) * _jtYieldShareAtTargetWAD) / WAD_INT);
+        // forge-lint: disable-next-item(unsafe-typecast)
+        jtYieldShareWAD = uint256((((coefficient * _normalizedDeltaFromTargetWAD / WAD_INT) + WAD_INT) * int256(_jtYieldShareAtTargetWAD)) / WAD_INT);
         jtYieldShareWAD = jtYieldShareWAD > WAD ? WAD : jtYieldShareWAD;
     }
 }
