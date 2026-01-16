@@ -5,7 +5,7 @@ import { IRoycoVaultTranche } from "../../../interfaces/tranche/IRoycoVaultTranc
 import { RoycoKernelInitParams } from "../../../libraries/RoycoKernelStorageLib.sol";
 import { RoycoKernel } from "../RoycoKernel.sol";
 import { YieldBearingERC20_JT_Kernel } from "../junior/YieldBearingERC20_JT_Kernel.sol";
-import { OverridableNAVOracleIdenticalAssetsQuoter } from "../quoter/OverridableNAVOracleIdenticalAssetsQuoter.sol";
+import { IdenticalAssetsOracleQuoter } from "../quoter/IdenticalAssetsOracleQuoter.sol";
 import { YieldBearingERC20_ST_Kernel } from "../senior/YieldBearingERC20_ST_Kernel.sol";
 
 /**
@@ -16,7 +16,7 @@ import { YieldBearingERC20_ST_Kernel } from "../senior/YieldBearingERC20_ST_Kern
 abstract contract YieldBearingERC20_ST_YieldBearingERC20_JT_OverridableNAVOracleIdenticalAssets_Kernel is
     YieldBearingERC20_ST_Kernel,
     YieldBearingERC20_JT_Kernel,
-    OverridableNAVOracleIdenticalAssetsQuoter
+    IdenticalAssetsOracleQuoter
 {
     /// @notice Thrown when the senior and junior tranche assets are different
     error ASSET_MISMATCH();
@@ -49,6 +49,6 @@ abstract contract YieldBearingERC20_ST_YieldBearingERC20_JT_OverridableNAVOracle
         // Initialize the base kernel state
         __RoycoKernel_init(_params);
         // Initialize the overridable NAV oracle identical assets quoter
-        __OverridableNAVOracleIdenticalAssetsQuoter_init_unchained(_initialConversionRateWAD);
+        __IdenticalAssetsOracleQuoter_init_unchained(_initialConversionRateWAD);
     }
 }

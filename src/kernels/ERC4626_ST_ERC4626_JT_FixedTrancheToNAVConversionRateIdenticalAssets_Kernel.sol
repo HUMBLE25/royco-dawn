@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import { IRouter } from "../interfaces/external/neutrl/IRouter.sol";
 import { WAD } from "../libraries/Constants.sol";
 import { RoycoKernelInitParams } from "../libraries/RoycoKernelStorageLib.sol";
-import { OverridableNAVOracleIdenticalAssetsQuoter } from "./base/quoter/OverridableNAVOracleIdenticalAssetsQuoter.sol";
+import { IdenticalAssetsOracleQuoter } from "./base/quoter/IdenticalAssetsOracleQuoter.sol";
 import {
     ERC4626_ST_ERC4626_JT_OverridableNAVOracleIdenticalAssets_Kernel
 } from "./base/recipe/ERC4626_ST_ERC4626_JT_OverridableNAVOracleIdenticalAssets_Kernel.sol";
@@ -38,7 +37,7 @@ contract ERC4626_ST_ERC4626_JT_FixedTrancheToNAVConversionRateIdenticalAssets_Ke
         __ERC4626_ST_ERC4626_JT_OverridableNAVOracleIdenticalAssets_Kernel_init(_params, _initialConversionRateWAD);
     }
 
-    /// @inheritdoc OverridableNAVOracleIdenticalAssetsQuoter
+    /// @inheritdoc IdenticalAssetsOracleQuoter
     function _getTrancheUnitToNAVUnitConversionRateFromOracle() internal pure override returns (uint256) {
         revert NOT_IMPLEMENTED();
     }

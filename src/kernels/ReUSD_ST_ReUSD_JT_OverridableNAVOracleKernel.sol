@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import { IInsuranceCapitalLayer } from "../interfaces/external/reUSD/IInsuranceCapitalLayer.sol";
 import { WAD } from "../libraries/Constants.sol";
 import { RoycoKernelInitParams } from "../libraries/RoycoKernelStorageLib.sol";
-import { OverridableNAVOracleIdenticalAssetsQuoter } from "./base/quoter/OverridableNAVOracleIdenticalAssetsQuoter.sol";
+import { IdenticalAssetsOracleQuoter } from "./base/quoter/IdenticalAssetsOracleQuoter.sol";
 import {
     YieldBearingERC20_ST_YieldBearingERC20_JT_OverridableNAVOracleIdenticalAssets_Kernel
 } from "./base/recipe/YieldBearingERC20_ST_YieldBearingERC20_JT_OverridableNAVOracleIdenticalAssets_Kernel.sol";
@@ -18,9 +18,11 @@ import {
 contract ReUSD_ST_ReUSD_JT_OverridableNAVOracleKernel is YieldBearingERC20_ST_YieldBearingERC20_JT_OverridableNAVOracleIdenticalAssets_Kernel {
     /// @notice The address of the sNUSD ERC4626 vault
     address public immutable REUSD;
+
     /// @notice The address of the token in which the NAV is expressed.
     /// @dev REUSD_USD_QUOTE_TOKEN is typically USDC.
     address public immutable REUSD_USD_QUOTE_TOKEN;
+
     /// @notice The address of the reUSD insurance capital layer
     address public immutable INSURANCE_CAPITAL_LAYER;
 
@@ -50,7 +52,7 @@ contract ReUSD_ST_ReUSD_JT_OverridableNAVOracleKernel is YieldBearingERC20_ST_Yi
         __YieldBearingERC20_ST_YieldBearingERC20_JT_OverridableNAVOracleIdenticalAssets_Kernel_init(_params, 0);
     }
 
-    /// @inheritdoc OverridableNAVOracleIdenticalAssetsQuoter
+    /// @inheritdoc IdenticalAssetsOracleQuoter
     function _getTrancheUnitToNAVUnitConversionRateFromOracle() internal view override returns (uint256 trancheUnitToNAVUnitConversionRateWAD) {
         return IInsuranceCapitalLayer(INSURANCE_CAPITAL_LAYER).convertFromShares(REUSD_USD_QUOTE_TOKEN, WAD);
     }

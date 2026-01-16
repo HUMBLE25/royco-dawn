@@ -5,7 +5,7 @@ import { IERC4626 } from "../../../../lib/openzeppelin-contracts/contracts/inter
 import { RoycoKernelInitParams } from "../../../libraries/RoycoKernelStorageLib.sol";
 import { NAV_UNIT } from "../../../libraries/Units.sol";
 import { RoycoKernel } from "../RoycoKernel.sol";
-import { OverridableNAVOracleIdenticalAssetsQuoter } from "../quoter/OverridableNAVOracleIdenticalAssetsQuoter.sol";
+import { IdenticalAssetsOracleQuoter } from "../quoter/IdenticalAssetsOracleQuoter.sol";
 import { ERC4626_ST_ERC4626_JT_Kernel } from "./ERC4626_ST_ERC4626_JT_Kernel.sol";
 
 /**
@@ -15,7 +15,7 @@ import { ERC4626_ST_ERC4626_JT_Kernel } from "./ERC4626_ST_ERC4626_JT_Kernel.sol
  * @notice The tranche assets are identical in value and precision (eg. USDC for both tranches, USDC and USDT, etc.)
  * @notice Tranche and NAV units are always expressed in the tranche asset's precision. The NAV Unit factors in a conversion rate from the overridable NAV Conversion Rate oracle.
  */
-abstract contract ERC4626_ST_ERC4626_JT_OverridableNAVOracleIdenticalAssets_Kernel is ERC4626_ST_ERC4626_JT_Kernel, OverridableNAVOracleIdenticalAssetsQuoter {
+abstract contract ERC4626_ST_ERC4626_JT_OverridableNAVOracleIdenticalAssets_Kernel is ERC4626_ST_ERC4626_JT_Kernel, IdenticalAssetsOracleQuoter {
     /**
      *@notice Constructor for the ERC4626_ST_ERC4626_JT_OverridableNAVOracleIdenticalAssets_Kernel
      * @param _seniorTranche The address of the senior tranche
@@ -47,7 +47,7 @@ abstract contract ERC4626_ST_ERC4626_JT_OverridableNAVOracleIdenticalAssets_Kern
         // Initialize the base kernel state
         __ERC4626_ST_ERC4626_JT_Kernel_init(_params);
         // Initialize the overridable NAV oracle identical assets quoter
-        __OverridableNAVOracleIdenticalAssetsQuoter_init_unchained(_initialConversionRateWAD);
+        __IdenticalAssetsOracleQuoter_init_unchained(_initialConversionRateWAD);
     }
 
     /// @inheritdoc ERC4626_ST_ERC4626_JT_Kernel
