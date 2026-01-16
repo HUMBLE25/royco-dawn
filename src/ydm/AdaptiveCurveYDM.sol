@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import { FixedPointMathLib } from "../../lib/solady/src/utils/FixedPointMathLib.sol";
-import { IYDM } from "../interfaces/IYDM.sol";
+import { IYDM, MarketState } from "../interfaces/IYDM.sol";
 import { TARGET_UTILIZATION_WAD_INT, WAD, WAD_INT } from "../libraries/Constants.sol";
 import { NAV_UNIT } from "../libraries/Units.sol";
 import { UtilsLib } from "../libraries/UtilsLib.sol";
@@ -36,8 +36,8 @@ contract AdaptiveCurveYDM is IYDM {
      */
     struct AdaptiveYieldCurve {
         int64 jtYieldShareAtTargetWAD;
-        uint40 lastAdaptationTimestamp;
-        int96 steepnessAfterTargetWAD;
+        uint32 lastAdaptationTimestamp;
+        int160 steepnessAfterTargetWAD;
     }
 
     /// @dev A mapping from market accountants to its market's current YDM curve
@@ -66,7 +66,7 @@ contract AdaptiveCurveYDM is IYDM {
      * @param _jtYieldShareAtTargetUtilWAD The initial JT yield share at target utilization, scaled to WAD precision
      * @param _jtYieldShareAtFullUtilWAD The initial JT yield share at 100% utilization, scaled to WAD precision
      */
-    function initializeYDMForMarket(uint256 _jtYieldShareAtTargetUtilWAD, uint256 _jtYieldShareAtFullUtilWAD) external {
+    function initializeYDMForMarket(uint64 _jtYieldShareAtTargetUtilWAD, uint64 _jtYieldShareAtFullUtilWAD) external {
         // Ensure that the initial YDM curve is valid
         require(
             _jtYieldShareAtTargetUtilWAD >= uint256(MIN_JT_YIELD_SHARE_AT_TARGET) && _jtYieldShareAtTargetUtilWAD <= uint256(MAX_JT_YIELD_SHARE_AT_TARGET)
@@ -76,14 +76,15 @@ contract AdaptiveCurveYDM is IYDM {
 
         // Initialize the YDM curve for this market
         AdaptiveYieldCurve storage curve = accountantToCurve[msg.sender];
-        curve.jtYieldShareAtTargetWAD = int64(uint64(_jtYieldShareAtTargetUtilWAD));
-        curve.steepnessAfterTargetWAD = int96((int256(_jtYieldShareAtFullUtilWAD) * WAD_INT) / int256(_jtYieldShareAtTargetUtilWAD));
+        curve.jtYieldShareAtTargetWAD = int64(_jtYieldShareAtTargetUtilWAD);
+        curve.steepnessAfterTargetWAD = int160(int256((_jtYieldShareAtFullUtilWAD * WAD) / _jtYieldShareAtTargetUtilWAD));
 
-        emit AdaptiveCurveYdmInitialized(msg.sender, uint256(int256(curve.steepnessAfterTargetWAD)), uint256(int256(curve.jtYieldShareAtTargetWAD)));
+        emit AdaptiveCurveYdmInitialized(msg.sender, uint256(int256(curve.steepnessAfterTargetWAD)), _jtYieldShareAtTargetUtilWAD);
     }
 
     /// @inheritdoc IYDM
     function previewJTYieldShare(
+        MarketState _marketState,
         NAV_UNIT _stRawNAV,
         NAV_UNIT _jtRawNAV,
         uint256 _betaWAD,
@@ -96,11 +97,12 @@ contract AdaptiveCurveYDM is IYDM {
         returns (uint256 jtYieldShareWAD)
     {
         // Compute and return the current JT yield share post-adaptation
-        (jtYieldShareWAD,) = _jtYieldShare(_stRawNAV, _jtRawNAV, _betaWAD, _coverageWAD, _jtEffectiveNAV);
+        (jtYieldShareWAD,) = _jtYieldShare(_marketState, _stRawNAV, _jtRawNAV, _betaWAD, _coverageWAD, _jtEffectiveNAV);
     }
 
     /// @inheritdoc IYDM
     function jtYieldShare(
+        MarketState _marketState,
         NAV_UNIT _stRawNAV,
         NAV_UNIT _jtRawNAV,
         uint256 _betaWAD,
@@ -113,12 +115,12 @@ contract AdaptiveCurveYDM is IYDM {
     {
         // Compute the current JT yield share and the new position of the curve and post-adaptation
         int256 newJtYieldShareAtTargetWAD;
-        (jtYieldShareWAD, newJtYieldShareAtTargetWAD) = _jtYieldShare(_stRawNAV, _jtRawNAV, _betaWAD, _coverageWAD, _jtEffectiveNAV);
+        (jtYieldShareWAD, newJtYieldShareAtTargetWAD) = _jtYieldShare(_marketState, _stRawNAV, _jtRawNAV, _betaWAD, _coverageWAD, _jtEffectiveNAV);
 
         // Apply the adaptations to the curve
         AdaptiveYieldCurve storage curve = accountantToCurve[msg.sender];
         curve.jtYieldShareAtTargetWAD = int64(newJtYieldShareAtTargetWAD);
-        curve.lastAdaptationTimestamp = uint40(block.timestamp);
+        curve.lastAdaptationTimestamp = uint32(block.timestamp);
 
         emit YdmAdapted(msg.sender, jtYieldShareWAD, uint256(newJtYieldShareAtTargetWAD));
     }
@@ -126,6 +128,7 @@ contract AdaptiveCurveYDM is IYDM {
     /**
      * @notice Computes the JT yield share for a market, applying any pending adaptation
      * @dev Uses trapezoidal approximation to compute the average continuously adapting yield share for more accurate time-weighted results
+     * @param _marketState The state of this Royco market (perpetual or fixed term)
      * @param _stRawNAV The raw net asset value of the senior tranche invested assets
      * @param _jtRawNAV The raw net asset value of the junior tranche invested assets
      * @param _betaWAD The JT's sensitivity to the same downside stress that affects ST scaled to WAD precision
@@ -138,6 +141,7 @@ contract AdaptiveCurveYDM is IYDM {
      * @return newJtYieldShareAtTargetWAD The updated yield share at target utilization after adaptation, scaled to WAD
      */
     function _jtYieldShare(
+        MarketState _marketState,
         NAV_UNIT _stRawNAV,
         NAV_UNIT _jtRawNAV,
         uint256 _betaWAD,
@@ -158,20 +162,26 @@ contract AdaptiveCurveYDM is IYDM {
         int256 normalizedDeltaFromTargetWAD = ((utilizationWAD - TARGET_UTILIZATION_WAD_INT) * WAD_INT) / maxDeltaFromTargetInRegionWAD;
 
         // Retrieve the current YDM curve for the market
+        // Only adapt the curve if the market is in a perpetual state and market forces are enabled to affect utilization
         AdaptiveYieldCurve memory curve = accountantToCurve[msg.sender];
-        // Compute the adaptation speed based on the normalized delta: scale the max adaptation speed by the relative delta from the target based on the region
-        int256 currentAdaptationSpeedWAD = (MAX_ADAPTATION_SPEED_WAD * normalizedDeltaFromTargetWAD) / WAD_INT;
-        // Compute the linear adaptation that will be applied to the curve based on the speed
-        uint256 elapsed = curve.lastAdaptationTimestamp == 0 ? 0 : block.timestamp - curve.lastAdaptationTimestamp;
-        int256 linearAdaptationWAD = currentAdaptationSpeedWAD * int256(elapsed);
+        int256 avgJtYieldShareAtTargetWAD;
+        if (_marketState == MarketState.PERPETUAL) {
+            // Compute the adaptation speed based on the normalized delta: scale the max adaptation speed by the relative delta from the target based on the region
+            int256 currentAdaptationSpeedWAD = (MAX_ADAPTATION_SPEED_WAD * normalizedDeltaFromTargetWAD) / WAD_INT;
+            // Compute the linear adaptation that will be applied to the curve based on the speed
+            uint256 elapsed = curve.lastAdaptationTimestamp == 0 ? 0 : block.timestamp - curve.lastAdaptationTimestamp;
+            int256 linearAdaptationWAD = currentAdaptationSpeedWAD * int256(elapsed);
 
-        // Compute the new JT yield share at target utilization
-        int256 initialJtYieldShareAtTargetWAD = curve.jtYieldShareAtTargetWAD;
-        newJtYieldShareAtTargetWAD = _computeJtYieldShareAtTarget(initialJtYieldShareAtTargetWAD, linearAdaptationWAD);
+            // Compute the new JT yield share at target utilization
+            int256 initialJtYieldShareAtTargetWAD = curve.jtYieldShareAtTargetWAD;
+            newJtYieldShareAtTargetWAD = _computeJtYieldShareAtTarget(initialJtYieldShareAtTargetWAD, linearAdaptationWAD);
 
-        // Compute the average JT yield share at target utilization
-        int256 midJtYieldShareAtTargetWAD = _computeJtYieldShareAtTarget(initialJtYieldShareAtTargetWAD, linearAdaptationWAD / 2);
-        int256 avgJtYieldShareAtTargetWAD = (initialJtYieldShareAtTargetWAD + newJtYieldShareAtTargetWAD + 2 * midJtYieldShareAtTargetWAD) / 4;
+            // Compute the average JT yield share at target utilization
+            int256 midJtYieldShareAtTargetWAD = _computeJtYieldShareAtTarget(initialJtYieldShareAtTargetWAD, linearAdaptationWAD / 2);
+            avgJtYieldShareAtTargetWAD = (initialJtYieldShareAtTargetWAD + newJtYieldShareAtTargetWAD + 2 * midJtYieldShareAtTargetWAD) / 4;
+        } else {
+            avgJtYieldShareAtTargetWAD = curve.jtYieldShareAtTargetWAD;
+        }
 
         // Compute the YDM curve's output with the continuously adapting JT yield share since the last adaptation
         jtYieldShareWAD = _computeCurrentJtYieldShare(curve.steepnessAfterTargetWAD, normalizedDeltaFromTargetWAD, avgJtYieldShareAtTargetWAD);
@@ -222,7 +232,7 @@ contract AdaptiveCurveYDM is IYDM {
          *          ((S - 1) * Δ + 1) * Y_T     if U >= 0.9  (at or above target)
          *
          * Y(U) → Percentage of ST yield paid to the junior tranche
-         * U    → Utilization = ((ST_RAW_NAV + (JT_RAW_NAV * BETA_%)) * COV_%) / JT_EFFECTIVE_NAV
+         * U    → Utilization = ((ST_RAW_NAV + (JT_RAW_NAV * β)) * COV) / JT_EFFECTIVE_NAV
          * S    → Steepness of the curve for this market (ratio of yield share at 100% utilization to yield share at target)
          * Δ    → Normalized delta from target utilization: Δ ∈ [-1, 1]
          *        Above target: Δ = (U - 0.9) / 0.1

@@ -4,7 +4,6 @@ pragma solidity ^0.8.28;
 import { IERC20, SafeERC20 } from "../../../../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import { ExecutionModel, IRoycoKernel, SharesRedemptionModel } from "../../../interfaces/kernel/IRoycoKernel.sol";
 import { MAX_TRANCHE_UNITS } from "../../../libraries/Constants.sol";
-import { RoycoKernelStorageLib } from "../../../libraries/RoycoKernelStorageLib.sol";
 import { AssetClaims, SyncedAccountingState } from "../../../libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, toUint256 } from "../../../libraries/Units.sol";
 import { YieldBearingERC20KernelState, YieldBearingERC20KernelStorageLib } from "../../../libraries/kernels/YieldBearingERC20KernelStorageLib.sol";

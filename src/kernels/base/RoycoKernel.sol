@@ -96,6 +96,9 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         require(_params.accountant != address(0) && _params.protocolFeeRecipient != address(0), NULL_ADDRESS());
         // Initialize the base kernel state
         RoycoKernelStorageLib.__RoycoKernel_init(_params);
+
+        emit JuniorTrancheRedemptionDelayUpdated(_params.jtRedemptionDelayInSeconds);
+        emit ProtocolFeeRecipientUpdated(_params.protocolFeeRecipient);
     }
 
     /// @inheritdoc IRoycoKernel
@@ -157,7 +160,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         (SyncedAccountingState memory state, AssetClaims memory stNotionalClaims,) = previewSyncTrancheAccounting(TrancheType.SENIOR);
 
         // If the market is in a state where ST withdrawals are not allowed, return zero claims
-        if (state.state != MarketState.PERPETUAL) {
+        if (state.marketState != MarketState.PERPETUAL) {
             return (ZERO_NAV_UNITS, ZERO_NAV_UNITS, ZERO_NAV_UNITS, ZERO_NAV_UNITS);
         }
 
@@ -175,7 +178,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     function jtMaxDeposit(address _receiver) public view virtual override(IRoycoKernel) returns (TRANCHE_UNIT) {
         // If the market is in a state where JT deposits are not allowed, return zero tranche units
         (SyncedAccountingState memory state,,) = previewSyncTrancheAccounting(TrancheType.JUNIOR);
-        if (state.state != MarketState.PERPETUAL) {
+        if (state.marketState != MarketState.PERPETUAL) {
             return ZERO_TRANCHE_UNITS;
         }
 
@@ -307,7 +310,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         {
             SyncedAccountingState memory state;
             (state, userAssetClaims, totalTrancheShares) = _preOpSyncTrancheAccounting(TrancheType.SENIOR);
-            MarketState marketState = state.state;
+            MarketState marketState = state.marketState;
 
             // Ensure that the market is in a state where ST redemptions are allowed: PERPETUAL
             require(marketState == MarketState.PERPETUAL, INVALID_MARKET_STATE());
@@ -348,7 +351,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         navToMintAt = state.jtEffectiveNAV;
 
         // Ensure that the market is in a state where JT deposits are allowed: PERPETUAL
-        require(state.state == MarketState.PERPETUAL, INVALID_MARKET_STATE());
+        require(state.marketState == MarketState.PERPETUAL, INVALID_MARKET_STATE());
 
         // Deposit the assets into the underlying ST investment
         _jtDepositAssets(_assets);

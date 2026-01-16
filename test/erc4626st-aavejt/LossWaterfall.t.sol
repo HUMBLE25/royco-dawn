@@ -7,6 +7,7 @@ import { AssetClaims, TrancheType } from "../../src/libraries/Types.sol";
 import { SyncedAccountingState } from "../../src/libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, toTrancheUnits, toUint256 } from "../../src/libraries/Units.sol";
 import { UnitsMathLib } from "../../src/libraries/Units.sol";
+import { UtilsLib } from "../../src/libraries/UtilsLib.sol";
 import { MainnetForkWithAaveTestBase } from "./base/MainnetForkWithAaveBaseTest.t.sol";
 
 contract LossWaterfall is MainnetForkWithAaveTestBase {
@@ -193,7 +194,13 @@ contract LossWaterfall is MainnetForkWithAaveTestBase {
         assertLt(toUint256(postLossSTTotalClaims.stAssets), toUint256(postDepositSTTotalClaims.stAssets), "ST LP claims must reflect the gain");
         assertLt(toUint256(postLossJTTotalClaims.jtAssets), toUint256(postDepositJTTotalClaims.jtAssets), "JT LP claims must reflect the gain");
 
-        assertGt(toUint256(postLossState.jtImpermanentLoss), toUint256(postDepositState.jtImpermanentLoss), "JT raw NAV must reflect the gain");
+        if (UtilsLib.computeLTV(postLossState.stEffectiveNAV, postLossState.stImpermanentLoss, postLossState.jtEffectiveNAV) < LLTV) {
+            assertGt(
+                toUint256(postLossState.jtCoverageImpermanentLoss), toUint256(postDepositState.jtCoverageImpermanentLoss), "JT raw NAV must reflect the gain"
+            );
+        } else {
+            assertEq(toUint256(postLossState.jtCoverageImpermanentLoss), 0, "JT raw NAV must reflect the gain");
+        }
         assertGe(toUint256(postLossState.stImpermanentLoss), toUint256(postDepositState.stImpermanentLoss), "JT raw NAV must reflect the gain");
         assertLt(toUint256(postLossState.jtEffectiveNAV), toUint256(postDepositState.jtEffectiveNAV), "JT raw NAV must reflect the gain");
         assertLe(toUint256(postLossState.stEffectiveNAV), toUint256(postDepositState.stEffectiveNAV), "JT raw NAV must reflect the gain");

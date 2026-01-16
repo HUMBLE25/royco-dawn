@@ -8,10 +8,11 @@ import { NAV_UNIT, TRANCHE_UNIT } from "./Units.sol";
 
 /**
  * @title MarketState
- * @dev Defines the state the market is currently in
- * @custom:type PERPETUAL - Both tranches are fully liquid and the YDM is being used to distribute yield if ST IL doesn't exist
- * @custom:type FIXED_TERM - There was a drawdown in the senior NAV and the market is in a fixed term regime
- *              ST withdrawals and JT deposits are blocked, and the LTV is healthy as per the market's configured LLTV
+ * @dev Defines the state of a Royco market
+ * @custom:type PERPETUAL - JT coverage IL does not exist, the LLTV has been breached, ST IL exists, or the fixed term duration has been set to 0
+ *                          Both tranches are fully liquid within the confines of the coverage requirement
+ * @custom:type FIXED_TERM - There was a drawdown in the senior NAV, the LLTV has not been breached, and ST IL does not exist
+ *                           ST withdrawals and JT deposits are blocked to prevent JT from realizing coverage associated losses during the fixed term
  */
 enum MarketState {
     PERPETUAL,
@@ -34,26 +35,29 @@ struct AssetClaims {
 /**
  * @title SyncedAccountingState
  * @dev Contains all current mark to market NAV accounting data for the market's tranches
- * @custom:field state - The current state of the Royco market (perpetual or fixed term)
+ * @custom:field marketState - The current state of the Royco market (perpetual or fixed term)
  * @custom:field stRawNAV - The senior tranche's current raw NAV: the pure value of its invested assets
  * @custom:field jtRawNAV - The junior tranche's current raw NAV: the pure value of its invested assets
  * @custom:field stEffectiveNAV - Senior tranche effective NAV: includes applied coverage, its share of ST yield, and uncovered losses
  * @custom:field jtEffectiveNAV - Junior tranche effective NAV: includes provided coverage, JT yield, its share of ST yield, and JT losses
  * @custom:field stImpermanentLoss - The impermanent loss that ST has suffered after exhausting JT's loss-absorption buffer
- *                                   This represents the first claim on capital that the senior tranche has on future recoveries
- * @custom:field jtImpermanentLoss - The impermanent loss that JT has suffered after providing coverage for ST losses
- *                                   This represents the second claim on capital that the junior tranche has on future recoveries
+ *                                   This represents the first claim on capital that the senior tranche has on future ST and JT recoveries
+ * @custom:field jtCoverageImpermanentLoss - The impermanent loss that JT has suffered after providing coverage for ST losses
+ *                                           This represents the second claim on capital that the junior tranche has on future ST recoveries
+ * @custom:field jtSelfImpermanentLoss - The impermanent loss that JT has suffered from depreciaiton of its own NAV
+ *                                       This represents the first claim on capital that the junior tranche has on future JT recoveries
  * @custom:field stProtocolFeeAccrued - Protocol fee taken on ST yield on this sync
  * @custom:field jtProtocolFeeAccrued - Protocol fee taken on JT yield on this sync
  */
 struct SyncedAccountingState {
-    MarketState state;
+    MarketState marketState;
     NAV_UNIT stRawNAV;
     NAV_UNIT jtRawNAV;
     NAV_UNIT stEffectiveNAV;
     NAV_UNIT jtEffectiveNAV;
     NAV_UNIT stImpermanentLoss;
-    NAV_UNIT jtImpermanentLoss;
+    NAV_UNIT jtCoverageImpermanentLoss;
+    NAV_UNIT jtSelfImpermanentLoss;
     NAV_UNIT stProtocolFeeAccrued;
     NAV_UNIT jtProtocolFeeAccrued;
 }
@@ -87,12 +91,12 @@ enum Action {
 /**
  * @title TrancheType
  * @dev Defines the two types of Royco tranches deployed per market.
- * @custom:type JUNIOR The identifier for the junior tranche (first-loss capital)
  * @custom:type SENIOR The identifier for the senior tranche (second-loss capital)
+ * @custom:type JUNIOR The identifier for the junior tranche (first-loss capital)
  */
 enum TrancheType {
-    JUNIOR,
-    SENIOR
+    SENIOR,
+    JUNIOR
 }
 
 /**
@@ -109,8 +113,8 @@ enum SharesRedemptionModel {
 /**
  * @title ExecutionModel
  * @dev Defines the execution semantics for the deposit or withdrawal flow of a vault
- * @custom:type SYNC Refers to the flow being synchronous (the vault uses ERC4626 for this flow)
- * @custom:type ASYNC Refers to the flow being asynchronous (the vault uses ERC7540 for this flow)
+ * @custom:type SYNC Refers to the flow being synchronous
+ * @custom:type ASYNC Refers to the flow being asynchronous
  */
 enum ExecutionModel {
     SYNC,

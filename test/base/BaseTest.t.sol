@@ -16,12 +16,12 @@ import { IRoycoAsyncVault } from "../../src/interfaces/tranche/IRoycoAsyncVault.
 import { IRoycoVaultTranche } from "../../src/interfaces/tranche/IRoycoVaultTranche.sol";
 import { ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel } from "../../src/kernels/ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel.sol";
 import { RoycoKernel } from "../../src/kernels/base/RoycoKernel.sol";
-import { AssetClaims, RolesConfiguration, TrancheType } from "../../src/libraries/Types.sol";
+import { AssetClaims, MarketState, RolesConfiguration, TrancheType } from "../../src/libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, toUint256 } from "../../src/libraries/Units.sol";
 import { RoycoJT } from "../../src/tranches/RoycoJT.sol";
 import { RoycoST } from "../../src/tranches/RoycoST.sol";
 import { RoycoVaultTranche } from "../../src/tranches/RoycoVaultTranche.sol";
-import { StaticCurveYDM } from "../../src/ydm/StaticCurveYDM.sol";
+import { IYDM, StaticCurveYDM } from "../../src/ydm/StaticCurveYDM.sol";
 import { Assertions } from "./Assertions.t.sol";
 
 abstract contract BaseTest is Test, RoycoRoles, Assertions {
@@ -96,14 +96,16 @@ abstract contract BaseTest is Test, RoycoRoles, Assertions {
     // -----------------------------------------
 
     uint256 internal SEED_AMOUNT;
-    string internal SENIOR_TRANCH_NAME = "Royco Senior Tranche";
-    string internal SENIOR_TRANCH_SYMBOL = "RST";
-    string internal JUNIOR_TRANCH_NAME = "Royco Junior Tranche";
-    string internal JUNIOR_TRANCH_SYMBOL = "RJT";
+    string internal SENIOR_TRANCHE_NAME = "Royco Senior Tranche";
+    string internal SENIOR_TRANCHE_SYMBOL = "RST";
+    string internal JUNIOR_TRANCHE_NAME = "Royco Junior Tranche";
+    string internal JUNIOR_TRANCHE_SYMBOL = "RJT";
     uint64 internal COVERAGE_WAD = 0.2e18; // 20% coverage
     uint96 internal BETA_WAD = 0; // Different opportunities
     uint64 internal ST_PROTOCOL_FEE_WAD = 0.1e18; // 10% protocol fee
     uint64 internal JT_PROTOCOL_FEE_WAD = 0.1e18; // 10% protocol fee
+    uint64 internal LLTV = 0.97e18; // 95% LLTV
+    uint24 internal FIXED_TERM_DURATION_SECONDS = 2 weeks; // 2 weeks in seconds
 
     /// -----------------------------------------
     /// Mainnet Fork Addresses

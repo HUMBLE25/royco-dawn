@@ -8,7 +8,7 @@ import { IPoolDataProvider } from "../../../interfaces/external/aave/IPoolDataPr
 import { ExecutionModel, IRoycoKernel } from "../../../interfaces/kernel/IRoycoKernel.sol";
 import { MAX_TRANCHE_UNITS, ZERO_TRANCHE_UNITS } from "../../../libraries/Constants.sol";
 import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib, toTrancheUnits, toUint256 } from "../../../libraries/Units.sol";
-import { RoycoKernel, RoycoKernelStorageLib, SyncedAccountingState } from "../RoycoKernel.sol";
+import { RoycoKernel, SyncedAccountingState } from "../RoycoKernel.sol";
 
 abstract contract AaveV3_JT_Kernel is RoycoKernel {
     using SafeERC20 for IERC20;

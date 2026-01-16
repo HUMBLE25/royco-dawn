@@ -5,7 +5,6 @@ import { IRoycoVaultTranche } from "../../../interfaces/tranche/IRoycoVaultTranc
 import { RoycoKernelInitParams } from "../../../libraries/RoycoKernelStorageLib.sol";
 import { MarketState } from "../../../libraries/Types.sol";
 import { Math, NAV_UNIT, TRANCHE_UNIT, UnitsMathLib } from "../../../libraries/Units.sol";
-import { ERC4626KernelState, ERC4626KernelStorageLib } from "../../../libraries/kernels/ERC4626KernelStorageLib.sol";
 import { AssetClaims, IRoycoKernel, RoycoKernel, SyncedAccountingState, TrancheType, ZERO_NAV_UNITS } from "../RoycoKernel.sol";
 import { ERC4626_JT_Kernel } from "../junior/ERC4626_JT_Kernel.sol";
 import { ERC4626_ST_Kernel } from "../senior/ERC4626_ST_Kernel.sol";
@@ -60,7 +59,7 @@ abstract contract ERC4626_ST_ERC4626_JT_Kernel is ERC4626_ST_Kernel, ERC4626_JT_
         (SyncedAccountingState memory state, AssetClaims memory stNotionalClaims,) = previewSyncTrancheAccounting(TrancheType.SENIOR);
 
         // If the market is in a state where ST withdrawals are not allowed, return zero claims
-        if (state.state != MarketState.PERPETUAL) {
+        if (state.marketState != MarketState.PERPETUAL) {
             return (ZERO_NAV_UNITS, ZERO_NAV_UNITS, ZERO_NAV_UNITS, ZERO_NAV_UNITS);
         }
 
