@@ -12,7 +12,7 @@ import { NAV_UNIT, TRANCHE_UNIT } from "./Units.sol";
  * @custom:type PERPETUAL - JT coverage IL does not exist, the LLTV has been breached, or the fixed term duration has been set to 0
  *                          Both tranches are fully liquid within the confines of the coverage requirement
  * @custom:type FIXED_TERM - There was a drawdown in the senior NAV and the LLTV has not been breached
- *                           ST withdrawals and JT deposits are blocked to prevent JT from realizing coverage associated losses
+ *                           ST withdrawals and JT deposits are blocked to prevent JT from realizing coverage associated losses during the fixed term
  */
 enum MarketState {
     PERPETUAL,
