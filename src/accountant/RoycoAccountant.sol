@@ -143,14 +143,12 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
             int256 deltaST = UnitsMathLib.computeNAVDelta(_stRawNAV, $.lastSTRawNAV);
             require(deltaST >= 0, INVALID_POST_OP_STATE(_op));
             // New ST deposits are treated as an addition to the future ST exposure
-            $.lastSTRawNAV = _stRawNAV;
             $.lastSTEffectiveNAV = $.lastSTEffectiveNAV + toNAVUnits(deltaST);
         } else if (_op == Operation.JT_INCREASE_NAV) {
             // Compute the delta in the raw NAV of the junior tranche
             int256 deltaJT = UnitsMathLib.computeNAVDelta(_jtRawNAV, $.lastJTRawNAV);
             require(deltaJT >= 0, INVALID_POST_OP_STATE(_op));
             // New JT deposits are treated as an addition to the future loss-absorption buffer
-            $.lastJTRawNAV = _jtRawNAV;
             $.lastJTEffectiveNAV = $.lastJTEffectiveNAV + toNAVUnits(deltaJT);
         } else {
             // Compute the deltas in the raw NAVs of each tranche after an operation's execution and cache the raw NAVs
