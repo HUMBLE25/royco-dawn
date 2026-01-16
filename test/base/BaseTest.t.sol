@@ -14,14 +14,13 @@ import { IRoycoKernel } from "../../src/interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoAsyncCancellableVault } from "../../src/interfaces/tranche/IRoycoAsyncCancellableVault.sol";
 import { IRoycoAsyncVault } from "../../src/interfaces/tranche/IRoycoAsyncVault.sol";
 import { IRoycoVaultTranche } from "../../src/interfaces/tranche/IRoycoVaultTranche.sol";
-import { ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel } from "../../src/kernels/ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel.sol";
 import { RoycoKernel } from "../../src/kernels/base/RoycoKernel.sol";
 import { AssetClaims, MarketState, RolesConfiguration, TrancheType } from "../../src/libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, toUint256 } from "../../src/libraries/Units.sol";
 import { RoycoJT } from "../../src/tranches/RoycoJT.sol";
 import { RoycoST } from "../../src/tranches/RoycoST.sol";
 import { RoycoVaultTranche } from "../../src/tranches/RoycoVaultTranche.sol";
-import { IYDM, StaticCurveYDM } from "../../src/ydm/StaticCurveYDM.sol";
+import { StaticCurveYDM } from "../../src/ydm/StaticCurveYDM.sol";
 import { Assertions } from "./Assertions.t.sol";
 
 abstract contract BaseTest is Test, RoycoRoles, Assertions {
