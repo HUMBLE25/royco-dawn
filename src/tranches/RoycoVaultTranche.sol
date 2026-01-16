@@ -11,7 +11,6 @@ import { RoycoBase } from "../base/RoycoBase.sol";
 import { IAsyncJTDepositKernel } from "../interfaces/kernel/IAsyncJTDepositKernel.sol";
 import { IAsyncSTDepositKernel } from "../interfaces/kernel/IAsyncSTDepositKernel.sol";
 import { IAsyncSTWithdrawalKernel } from "../interfaces/kernel/IAsyncSTWithdrawalKernel.sol";
-import { IRoycoKernel } from "../interfaces/kernel/IRoycoKernel.sol";
 import { ExecutionModel, IRoycoKernel, SharesRedemptionModel } from "../interfaces/kernel/IRoycoKernel.sol";
 import { IERC165, IRoycoAsyncCancellableVault, IRoycoAsyncVault, IRoycoVaultTranche } from "../interfaces/tranche/IRoycoVaultTranche.sol";
 import { ZERO_NAV_UNITS } from "../libraries/Constants.sol";
@@ -29,27 +28,6 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
     using Math for uint256;
     using UnitsMathLib for uint256;
     using SafeERC20 for IERC20;
-
-    /// @notice Thrown when the specified action is disabled
-    error DISABLED();
-
-    /// @notice Thrown when the caller is not the expected account or an approved operator
-    error ONLY_CALLER_OR_OPERATOR();
-
-    /// @notice Thrown when the redeem amount is zero
-    error MUST_REQUEST_NON_ZERO_SHARES();
-
-    /// @notice Thrown when the deposit amount is zero
-    error MUST_DEPOSIT_NON_ZERO_ASSETS();
-
-    /// @notice Thrown when the redeem amount is zero
-    error MUST_CLAIM_NON_ZERO_SHARES();
-
-    /// @notice Thrown when the caller isn't the kernel
-    error ONLY_KERNEL();
-
-    /// @notice Thrown when the value allocated is zero
-    error INVALID_VALUE_ALLOCATED();
 
     /**
      * @notice Modifier to ensure the specified action uses a synchronous execution model
@@ -153,33 +131,9 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         assets = (TRANCHE_TYPE() == TrancheType.SENIOR ? IRoycoKernel(kernel()).stMaxDeposit(_receiver) : IRoycoKernel(kernel()).jtMaxDeposit(_receiver));
     }
 
-    /**
-     * @inheritdoc IRoycoVaultTranche
-     * @dev Returns the maximum amount of shares that can be redeemed from the tranche
-     * @dev We query the kernel for (a) N_s and N_j - the notional claim of the tranche on the ST and JT assets respectively in NAV units, and
-     *                              (b) L_s and L_j - the amount that can be withdrawn from the senior and junior tranches globally in NAV units, respectively
-     *      When shares are redeemed, assets from the senior and junior tranches are withdrawn proportionally to the notional claims of the tranche on the respective assets.
-     *      But, the global max withdrawable assets for each tranche are also considered. These are inclusive of any coverage requirements, as well as liquidity constraints.
-     *      If T respresents the total shares in the tranche, s the total shares owned by the owner, then the maximum amount of shares that can be redeemed s' is subject to:
-     *      (a) s' * N_s / T  <= min(s * N_s / T, L_s) => s' <= min(s, T * L_s / N_s)
-     *      (b) s' * N_j / T  <= min(s * N_j / T, L_j) => s' <= min(s, T * L_j / N_j)
-     *      Therefore, the maximum amount of shares that can be redeemed is:
-     *      s' = min(s, T * L_s / N_s, T * L_j / N_j)
-     */
-    function maxRedeem(address _owner) external view virtual override(IRoycoVaultTranche) returns (uint256 shares) {
-        // Get the notional claims and the max withdrawable assets for the tranche
-        (NAV_UNIT claimOnStNAV, NAV_UNIT claimOnJtNAV, NAV_UNIT stMaxWithdrawableNAV, NAV_UNIT jtMaxWithdrawableNAV) =
-            (TRANCHE_TYPE() == TrancheType.SENIOR ? IRoycoKernel(kernel()).stMaxWithdrawable(_owner) : IRoycoKernel(kernel()).jtMaxWithdrawable(_owner));
-        uint256 ownerShares = balanceOf(_owner);
-        uint256 totalShares = _withVirtualShares(totalSupply());
-
-        // Calculate the maximum amount of shares that can be redeemed based on the senior and junior constraints
-        // If the notional claim of the tranche on the ST or JT assets is zero, ignore the constraints since the tranche has no claims on the assets
-        uint256 sharesWithdrawableBasedOnSeniorConstraints =
-            claimOnStNAV == ZERO_NAV_UNITS ? ownerShares : totalShares.mulDiv(stMaxWithdrawableNAV, claimOnStNAV, Math.Rounding.Floor);
-        uint256 sharesWithdrawableBasedOnJuniorConstraints =
-            claimOnJtNAV == ZERO_NAV_UNITS ? ownerShares : totalShares.mulDiv(jtMaxWithdrawableNAV, claimOnJtNAV, Math.Rounding.Floor);
-        shares = Math.min(ownerShares, Math.min(sharesWithdrawableBasedOnSeniorConstraints, sharesWithdrawableBasedOnJuniorConstraints));
+    /// @inheritdoc IRoycoVaultTranche
+    function maxRedeem(address _owner) public view virtual override(IRoycoVaultTranche) returns (uint256 shares) {
+        shares = _maxRedeem(_owner, balanceOf(_owner));
     }
 
     /// @inheritdoc IRoycoVaultTranche
@@ -274,7 +228,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         // Mint the shares to the receiver
         _mint(_receiver, shares);
 
-        emit Deposit(msg.sender, _receiver, _assets, shares, metadata);
+        emit Deposit(msg.sender, _receiver, _assets, shares, _depositRequestId, metadata);
     }
 
     /// @inheritdoc IRoycoAsyncVault
@@ -319,7 +273,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         // Shares must be burned after the kernel processes the redemption since the kernel has a causal dependency on the pre-burn and post-sync total share supply
         _redeem(msg.sender, _controller, _shares);
 
-        emit Redeem(msg.sender, _receiver, claims, _shares, metadata);
+        emit Redeem(msg.sender, _receiver, claims, _shares, _redemptionRequestId, metadata);
     }
 
     // =============================
@@ -427,6 +381,9 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         // Must be requesting to redeem a non-zero number of shares
         require(_shares != 0, MUST_REQUEST_NON_ZERO_SHARES());
 
+        // Must be requesting to redeem a number of shares that is less than or equal to the maximum amount of shares that can be redeemed
+        require(_shares <= maxRedeem(_owner), MUST_REQUEST_WITHIN_MAX_REDEEM_AMOUNT());
+
         // Spend the caller's share allowance if the caller isn't the owner or an approved operator
         if (!_isCallerOrOperator(_owner)) {
             _spendAllowance(_owner, msg.sender, _shares);
@@ -463,10 +420,20 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         executionIsAsync(Action.WITHDRAW)
         returns (uint256 pendingShares)
     {
-        pendingShares =
-        (TRANCHE_TYPE() == TrancheType.SENIOR
+        // Get the number of shares pending from the request
+        uint256 pendingSharesFromRequest =
+            (TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTWithdrawalKernel(kernel()).stPendingRedeemRequest(_requestId, _controller)
                 : IRoycoKernel(kernel()).jtPendingRedeemRequest(_requestId, _controller));
+
+        // If the request is claimable from underlying, some shares may still be locked due to the coverage condition
+        uint256 claimableSharesFromRequest =
+            (TRANCHE_TYPE() == TrancheType.SENIOR
+                ? IAsyncSTWithdrawalKernel(kernel()).stClaimableRedeemRequest(_requestId, _controller)
+                : IRoycoKernel(kernel()).jtClaimableRedeemRequest(_requestId, _controller));
+        uint256 lockedClaimableSharesDueToCoverageCondition = _maxRedeem(_controller, claimableSharesFromRequest) - claimableSharesFromRequest;
+
+        pendingShares = pendingSharesFromRequest + lockedClaimableSharesDueToCoverageCondition;
     }
 
     /// @inheritdoc IRoycoAsyncVault
@@ -486,6 +453,8 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         (TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTWithdrawalKernel(kernel()).stClaimableRedeemRequest(_requestId, _controller)
                 : IRoycoKernel(kernel()).jtClaimableRedeemRequest(_requestId, _controller));
+
+        claimableShares = _maxRedeem(_controller, claimableShares);
     }
 
     // ===========================================
@@ -730,6 +699,33 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         return _interfaceId == type(IERC165).interfaceId || _interfaceId == type(IRoycoAsyncVault).interfaceId
             || _interfaceId == type(IRoycoAsyncCancellableVault).interfaceId || _interfaceId == type(IRoycoVaultTranche).interfaceId
             || _interfaceId == type(IAccessControlEnumerable).interfaceId;
+    }
+
+    /**
+     * @dev Returns the maximum amount of shares that can be redeemed from the tranche
+     * @dev We query the kernel for (a) N_s and N_j - the notional claim of the tranche on the ST and JT assets respectively in NAV units, and
+     *                              (b) L_s and L_j - the amount that can be withdrawn from the senior and junior tranches globally in NAV units, respectively
+     *      When shares are redeemed, assets from the senior and junior tranches are withdrawn proportionally to the notional claims of the tranche on the respective assets.
+     *      But, the global max withdrawable assets for each tranche are also considered. These are inclusive of any coverage requirements, as well as liquidity constraints.
+     *      If T respresents the total shares in the tranche, s the total shares owned by the owner, then the maximum amount of shares that can be redeemed s' is subject to:
+     *      (a) s' * N_s / T  <= min(s * N_s / T, L_s) => s' <= min(s, T * L_s / N_s)
+     *      (b) s' * N_j / T  <= min(s * N_j / T, L_j) => s' <= min(s, T * L_j / N_j)
+     *      Therefore, the maximum amount of shares that can be redeemed is:
+     *      s' = min(s, T * L_s / N_s, T * L_j / N_j)
+     */
+    function _maxRedeem(address _owner, uint256 _sharesOwned) internal view returns (uint256 shares) {
+        // Get the notional claims and the max withdrawable assets for the tranche
+        (NAV_UNIT claimOnStNAV, NAV_UNIT claimOnJtNAV, NAV_UNIT stMaxWithdrawableNAV, NAV_UNIT jtMaxWithdrawableNAV) =
+            (TRANCHE_TYPE() == TrancheType.SENIOR ? IRoycoKernel(kernel()).stMaxWithdrawable(_owner) : IRoycoKernel(kernel()).jtMaxWithdrawable(_owner));
+        uint256 totalShares = _withVirtualShares(totalSupply());
+
+        // Calculate the maximum amount of shares that can be redeemed based on the senior and junior constraints
+        // If the notional claim of the tranche on the ST or JT assets is zero, ignore the constraints since the tranche has no claims on the assets
+        uint256 sharesWithdrawableBasedOnSeniorConstraints =
+            claimOnStNAV == ZERO_NAV_UNITS ? _sharesOwned : totalShares.mulDiv(stMaxWithdrawableNAV, claimOnStNAV, Math.Rounding.Floor);
+        uint256 sharesWithdrawableBasedOnJuniorConstraints =
+            claimOnJtNAV == ZERO_NAV_UNITS ? _sharesOwned : totalShares.mulDiv(jtMaxWithdrawableNAV, claimOnJtNAV, Math.Rounding.Floor);
+        shares = Math.min(_sharesOwned, Math.min(sharesWithdrawableBasedOnSeniorConstraints, sharesWithdrawableBasedOnJuniorConstraints));
     }
 
     /**

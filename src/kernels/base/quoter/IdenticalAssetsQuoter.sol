@@ -18,15 +18,13 @@ abstract contract IdenticalAssetsQuoter is RoycoKernel {
     error TRANCHE_ASSET_DECIMALS_MISMATCH();
 
     /**
-     * @notice Initializes the quoter for identical tranche assets
+     * @notice Constructs the quoter for identical tranche assets
      * @dev Assumes that the two assets have identical values
      * @dev Reverts if the two assets don't have identical precision
-     * @param _stAsset The address of the base asset of the senior tranche
-     * @param _jtAsset The address of the base asset of the junior tranche
      */
-    function __IdenticalAssetsQuoter_init_unchained(address _stAsset, address _jtAsset) internal view onlyInitializing {
+    constructor() {
         // This quoter stipulates that both tranche assets have identical precision
-        require(IERC20Metadata(_stAsset).decimals() == IERC20Metadata(_jtAsset).decimals(), TRANCHE_ASSET_DECIMALS_MISMATCH());
+        require(IERC20Metadata(ST_ASSET).decimals() == IERC20Metadata(JT_ASSET).decimals(), TRANCHE_ASSET_DECIMALS_MISMATCH());
     }
 
     /// @inheritdoc RoycoKernel

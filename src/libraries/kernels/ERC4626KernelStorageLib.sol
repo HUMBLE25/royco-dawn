@@ -4,15 +4,12 @@ pragma solidity ^0.8.28;
 /**
  * @notice Storage state for kernels that deposit into ERC4626 vaults
  * @custom:storage-location erc7201:Royco.storage.ERC4626KernelState
- * @custom:field stVault - The address of the ERC4626 vault for the ST
  * @custom:field stOwnedShares - The number of shares ST owns for ST's ERC4626 vault
- * @custom:field jtVault - The address of the ERC4626 vault for the JT
  * @custom:field jtOwnedShares - The number of shares JT owns for JT's ERC4626 vault
  */
+// forge-lint: disable-next-item(pascal-case-struct)
 struct ERC4626KernelState {
-    address stVault;
     uint256 stOwnedShares;
-    address jtVault;
     uint256 jtOwnedShares;
 }
 

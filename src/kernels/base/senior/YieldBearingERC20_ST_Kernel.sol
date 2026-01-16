@@ -4,7 +4,6 @@ pragma solidity ^0.8.28;
 import { IERC20, SafeERC20 } from "../../../../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import { ExecutionModel, IRoycoKernel, SharesRedemptionModel } from "../../../interfaces/kernel/IRoycoKernel.sol";
 import { MAX_TRANCHE_UNITS } from "../../../libraries/Constants.sol";
-import { RoycoKernelState, RoycoKernelStorageLib } from "../../../libraries/RoycoKernelStorageLib.sol";
 import { AssetClaims, SyncedAccountingState } from "../../../libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, toUint256 } from "../../../libraries/Units.sol";
 import { YieldBearingERC20KernelState, YieldBearingERC20KernelStorageLib } from "../../../libraries/kernels/YieldBearingERC20KernelStorageLib.sol";
@@ -21,10 +20,6 @@ abstract contract YieldBearingERC20_ST_Kernel is RoycoKernel {
 
     /// @inheritdoc IRoycoKernel
     SharesRedemptionModel public constant ST_REQUEST_REDEEM_SHARES_BEHAVIOR = SharesRedemptionModel.BURN_ON_CLAIM_REDEEM;
-
-    /// @notice Initializes a kernel where the senior tranche vault's deposit asset is a yield bearing ERC20 asset
-    /// @dev The yield bearing asset must be rebasing in terms of price, not quantity
-    function __YieldBearingERC20_ST_Kernel_init_unchained() internal onlyInitializing { }
 
     /// @inheritdoc IRoycoKernel
     function stPreviewDeposit(TRANCHE_UNIT _assets) external view override returns (SyncedAccountingState memory stateBeforeDeposit, NAV_UNIT valueAllocated) {
@@ -45,7 +40,7 @@ abstract contract YieldBearingERC20_ST_Kernel is RoycoKernel {
     }
 
     /// @inheritdoc RoycoKernel
-    function _stMaxDepositGlobally(address) internal view override(RoycoKernel) returns (TRANCHE_UNIT) {
+    function _stMaxDepositGlobally(address) internal pure override(RoycoKernel) returns (TRANCHE_UNIT) {
         // No limit to how many yield bearing assets can be deposited into this kernel
         return MAX_TRANCHE_UNITS;
     }
@@ -57,7 +52,7 @@ abstract contract YieldBearingERC20_ST_Kernel is RoycoKernel {
     }
 
     /// @inheritdoc RoycoKernel
-    function _stPreviewWithdraw(TRANCHE_UNIT _stAssets) internal view override(RoycoKernel) returns (TRANCHE_UNIT withdrawnSTAssets) {
+    function _stPreviewWithdraw(TRANCHE_UNIT _stAssets) internal pure override(RoycoKernel) returns (TRANCHE_UNIT withdrawnSTAssets) {
         // No conversion between the assets being withdrawn and what will be withdrawn: the kernel simply transfers them out
         return _stAssets;
     }
@@ -76,7 +71,6 @@ abstract contract YieldBearingERC20_ST_Kernel is RoycoKernel {
         $.stOwnedYieldBearingAssets = $.stOwnedYieldBearingAssets - _stAssets;
 
         // Transfer the yield bearing assets being withdrawn to the receiver
-        address stYieldBearingAsset = RoycoKernelStorageLib._getRoycoKernelStorage().stAsset;
-        IERC20(stYieldBearingAsset).safeTransfer(_receiver, toUint256(_stAssets));
+        IERC20(ST_ASSET).safeTransfer(_receiver, toUint256(_stAssets));
     }
 }

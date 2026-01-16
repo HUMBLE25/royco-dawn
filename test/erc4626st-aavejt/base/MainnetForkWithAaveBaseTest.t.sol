@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import { Vm } from "../../../lib/forge-std/src/Vm.sol";
 import { IERC20 } from "../../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { RoycoAccountant } from "../../../src/accountant/RoycoAccountant.sol";
+import { ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel } from "../../../src/kernels/ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel.sol";
 import { RoycoKernel } from "../../../src/kernels/base/RoycoKernel.sol";
 import { RoycoKernelInitParams } from "../../../src/libraries/RoycoKernelStorageLib.sol";
 import { DeployedContracts, IRoycoAccountant, IRoycoKernel, MarketDeploymentParams } from "../../../src/libraries/Types.sol";
@@ -27,6 +28,7 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
 
     // Deployed contracts
     ERC4626Mock internal MOCK_UNDERLYING_ST_VAULT;
+    address internal ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel_IMPL;
 
     // External Contracts
     IERC20 internal USDC;
@@ -98,24 +100,23 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
         bytes32 salt = keccak256(abi.encodePacked("SALT"));
         address expectedSeniorTrancheAddress = FACTORY.predictERC1967ProxyAddress(address(ST_IMPL), salt);
         address expectedJuniorTrancheAddress = FACTORY.predictERC1967ProxyAddress(address(JT_IMPL), salt);
-        address expectedKernelAddress = FACTORY.predictERC1967ProxyAddress(address(ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel_IMPL), salt);
+        ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel_IMPL = address(
+            new ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel(
+                expectedSeniorTrancheAddress, expectedJuniorTrancheAddress, address(MOCK_UNDERLYING_ST_VAULT), ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS
+            )
+        );
+        address expectedKernelAddress = FACTORY.predictERC1967ProxyAddress(ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel_IMPL, salt);
         address expectedAccountantAddress = FACTORY.predictERC1967ProxyAddress(address(ACCOUNTANT_IMPL), salt);
 
         // Create the initialization data
         bytes memory kernelInitializationData = abi.encodeCall(
-            ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel_IMPL.initialize,
-            (
-                RoycoKernelInitParams({
+            ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel.initialize,
+            (RoycoKernelInitParams({
                     initialAuthority: address(FACTORY),
-                    seniorTranche: expectedSeniorTrancheAddress,
-                    juniorTranche: expectedJuniorTrancheAddress,
                     accountant: expectedAccountantAddress,
                     protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS,
                     jtRedemptionDelayInSeconds: JT_REDEMPTION_DELAY_SECONDS
-                }),
-                address(MOCK_UNDERLYING_ST_VAULT),
-                ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS
-            )
+                }))
         );
         bytes memory accountantInitializationData = abi.encodeCall(
             RoycoAccountant.initialize,

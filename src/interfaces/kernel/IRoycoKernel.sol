@@ -50,6 +50,9 @@ interface IRoycoKernel {
     /// @notice Thrown when trying to cancel a redemption request that has already been canceled
     error REDEMPTION_REQUEST_CANCELED();
 
+    /// @notice Thrown when the market is in a state where the operation is not allowed
+    error INVALID_MARKET_STATE();
+
     /**
      * @notice Returns the execution model for the senior tranche's increase NAV operation
      * @return The execution model for the senior tranche's increase NAV operation - SYNC or ASYNC
@@ -133,6 +136,12 @@ interface IRoycoKernel {
         external
         view
         returns (SyncedAccountingState memory state, AssetClaims memory claims, uint256 totalTrancheShares);
+
+    /**
+     * @notice Returns the current market utilization
+     * @return utilization The current market utilization as a percentage
+     */
+    function currentMarketUtilization() external view returns (uint256 utilization);
 
     /**
      * @notice Returns the maximum amount of assets that can be deposited into the senior tranche

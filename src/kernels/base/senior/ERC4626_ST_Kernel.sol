@@ -13,6 +13,9 @@ abstract contract ERC4626_ST_Kernel is RoycoKernel {
     using SafeERC20 for IERC20;
     using UnitsMathLib for TRANCHE_UNIT;
 
+    /// @notice Thrown when the ST base asset is different the the ERC4626 vault's base asset
+    error SENIOR_TRANCHE_AND_VAULT_ASSET_MISMATCH();
+
     /// @inheritdoc IRoycoKernel
     ExecutionModel public constant ST_DEPOSIT_EXECUTION_MODEL = ExecutionModel.SYNC;
 
@@ -22,34 +25,30 @@ abstract contract ERC4626_ST_Kernel is RoycoKernel {
     /// @inheritdoc IRoycoKernel
     SharesRedemptionModel public constant ST_REQUEST_REDEEM_SHARES_BEHAVIOR = SharesRedemptionModel.BURN_ON_CLAIM_REDEEM;
 
-    /// @notice Thrown when the ST base asset is different the the ERC4626 vault's base asset
-    error SENIOR_TRANCHE_AND_VAULT_ASSET_MISMATCH();
+    /// @notice Immutable address for the ST ERC4626 vault
+    address internal immutable ST_VAULT;
 
-    /**
-     * @notice Initializes a kernel where the senior tranche is deployed into an ERC4626 vault
-     * @param _stVault The address of the ERC4626 compliant vault the senior tranche will deploy into
-     * @param _stAsset The address of the base asset of the senior tranche
-     */
-    function __ERC4626_ST_Kernel_init_unchained(address _stVault, address _stAsset) internal onlyInitializing {
+    constructor(address _stVault) {
         // Ensure that the ST base asset is identical to the ERC4626 vault's base asset
-        require(IERC4626(_stVault).asset() == _stAsset, SENIOR_TRANCHE_AND_VAULT_ASSET_MISMATCH());
+        require(IERC4626(_stVault).asset() == ST_ASSET, SENIOR_TRANCHE_AND_VAULT_ASSET_MISMATCH());
 
+        // Set the immutable address for the ST ERC4626 vault
+        ST_VAULT = _stVault;
+    }
+
+    /// @notice Initializes a kernel where the senior tranche is deployed into an ERC4626 vault
+    function __ERC4626_ST_Kernel_init_unchained() internal onlyInitializing {
         // Extend a one time max approval to the ERC4626 vault for the ST's base asset
-        IERC20(_stAsset).forceApprove(address(_stVault), type(uint256).max);
-
-        // Initialize the ERC4626 ST kernel storage
-        ERC4626KernelStorageLib._getERC4626KernelStorage().stVault = _stVault;
+        IERC20(ST_ASSET).forceApprove(ST_VAULT, type(uint256).max);
     }
 
     /// @inheritdoc IRoycoKernel
     function stPreviewDeposit(TRANCHE_UNIT _assets) external view override returns (SyncedAccountingState memory stateBeforeDeposit, NAV_UNIT valueAllocated) {
-        IERC4626 stVault = IERC4626(ERC4626KernelStorageLib._getERC4626KernelStorage().stVault);
-
         // Simulate the deposit of the assets into the underlying investment vault
-        uint256 stVaultSharesMinted = stVault.previewDeposit(toUint256(_assets));
+        uint256 stVaultSharesMinted = IERC4626(ST_VAULT).previewDeposit(toUint256(_assets));
 
         // Convert the underlying vault shares to tranche units. This value may differ from _assets if a fee or slippage is incurred to the deposit.
-        TRANCHE_UNIT stAssetsAllocated = toTrancheUnits(stVault.convertToAssets(stVaultSharesMinted));
+        TRANCHE_UNIT stAssetsAllocated = toTrancheUnits(IERC4626(ST_VAULT).convertToAssets(stVaultSharesMinted));
 
         // Convert the assets allocated to NAV units and preview a sync to get the current NAV to mint shares at for the senior tranche
         valueAllocated = stConvertTrancheUnitsToNAVUnits(stAssetsAllocated);
@@ -66,53 +65,51 @@ abstract contract ERC4626_ST_Kernel is RoycoKernel {
         ERC4626KernelState storage $ = ERC4626KernelStorageLib._getERC4626KernelStorage();
         // Must use convert to assets for the tranche owned shares in order to be exlusive of any fixed fees on withdrawal
         // Cannot use max withdraw since it will treat illiquidity as a NAV loss
-        TRANCHE_UNIT stOwnedAssets = toTrancheUnits(IERC4626($.stVault).convertToAssets($.stOwnedShares));
+        TRANCHE_UNIT stOwnedAssets = toTrancheUnits(IERC4626(ST_VAULT).convertToAssets($.stOwnedShares));
         return stConvertTrancheUnitsToNAVUnits(stOwnedAssets);
     }
 
     /// @inheritdoc RoycoKernel
     function _stMaxDepositGlobally(address) internal view override(RoycoKernel) returns (TRANCHE_UNIT) {
         // Max deposit takes global withdrawal limits into account
-        return toTrancheUnits(IERC4626(ERC4626KernelStorageLib._getERC4626KernelStorage().stVault).maxDeposit(address(this)));
+        return toTrancheUnits(IERC4626(ST_VAULT).maxDeposit(address(this)));
     }
 
     /// @inheritdoc RoycoKernel
     function _stMaxWithdrawableGlobally(address) internal view override(RoycoKernel) returns (TRANCHE_UNIT) {
         // Max withdraw takes global withdrawal limits into account
-        return toTrancheUnits(IERC4626(ERC4626KernelStorageLib._getERC4626KernelStorage().stVault).maxWithdraw(address(this)));
+        return toTrancheUnits(IERC4626(ST_VAULT).maxWithdraw(address(this)));
     }
 
     /// @inheritdoc RoycoKernel
     function _stPreviewWithdraw(TRANCHE_UNIT _stAssets) internal view override(RoycoKernel) returns (TRANCHE_UNIT withdrawnSTAssets) {
-        IERC4626 stVault = IERC4626(ERC4626KernelStorageLib._getERC4626KernelStorage().stVault);
         // Convert the ST assets to underlying shares
-        uint256 stVaultShares = stVault.convertToShares(toUint256(_stAssets));
+        uint256 stVaultShares = IERC4626(ST_VAULT).convertToShares(toUint256(_stAssets));
         // Preview the amount of ST assets that would be redeemed for the given amount of underlying shares
-        withdrawnSTAssets = toTrancheUnits(stVault.previewRedeem(stVaultShares));
+        withdrawnSTAssets = toTrancheUnits(IERC4626(ST_VAULT).previewRedeem(stVaultShares));
     }
 
     /// @inheritdoc RoycoKernel
     function _stDepositAssets(TRANCHE_UNIT _stAssets) internal override(RoycoKernel) {
         // Deposit the assets into the underlying investment vault and add to the number of ST controlled shares for this vault
         ERC4626KernelState storage $ = ERC4626KernelStorageLib._getERC4626KernelStorage();
-        $.stOwnedShares += IERC4626($.stVault).deposit(toUint256(_stAssets), address(this));
+        $.stOwnedShares += IERC4626(ST_VAULT).deposit(toUint256(_stAssets), address(this));
     }
 
     /// @inheritdoc RoycoKernel
     function _stWithdrawAssets(TRANCHE_UNIT _stAssets, address _receiver) internal override(RoycoKernel) {
         ERC4626KernelState storage $ = ERC4626KernelStorageLib._getERC4626KernelStorage();
-        IERC4626 stVault = IERC4626($.stVault);
         // Get the currently withdrawable liquidity from the vault
-        TRANCHE_UNIT maxWithdrawableAssets = toTrancheUnits(stVault.maxWithdraw(address(this)));
+        TRANCHE_UNIT maxWithdrawableAssets = toTrancheUnits(IERC4626(ST_VAULT).maxWithdraw(address(this)));
         // If the vault has sufficient liquidity to withdraw the specified assets, do so
         if (maxWithdrawableAssets >= _stAssets) {
-            $.stOwnedShares -= stVault.withdraw(toUint256(_stAssets), _receiver, address(this));
+            $.stOwnedShares -= IERC4626(ST_VAULT).withdraw(toUint256(_stAssets), _receiver, address(this));
             // If the vault has insufficient liquidity to withdraw the specified assets, transfer the equivalent number of shares to the receiver
         } else {
             // Transfer the assets equivalent of shares to the receiver
-            uint256 sharesEquivalentToWithdraw = stVault.convertToShares(toUint256(_stAssets));
+            uint256 sharesEquivalentToWithdraw = IERC4626(ST_VAULT).convertToShares(toUint256(_stAssets));
             $.stOwnedShares -= sharesEquivalentToWithdraw;
-            IERC20(address(stVault)).safeTransfer(_receiver, sharesEquivalentToWithdraw);
+            IERC20(address(ST_VAULT)).safeTransfer(_receiver, sharesEquivalentToWithdraw);
         }
     }
 }

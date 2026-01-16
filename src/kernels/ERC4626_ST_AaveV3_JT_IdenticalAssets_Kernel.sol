@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import { IRoycoVaultTranche } from "../interfaces/tranche/IRoycoVaultTranche.sol";
+import { IERC4626 } from "../../lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 import { RoycoKernelInitParams } from "../libraries/RoycoKernelStorageLib.sol";
+import { RoycoKernel } from "./base/RoycoKernel.sol";
 import { AaveV3_JT_Kernel } from "./base/junior/AaveV3_JT_Kernel.sol";
 import { IdenticalAssetsQuoter } from "./base/quoter/IdenticalAssetsQuoter.sol";
 import { ERC4626_ST_Kernel } from "./base/senior/ERC4626_ST_Kernel.sol";
@@ -14,24 +15,27 @@ import { ERC4626_ST_Kernel } from "./base/senior/ERC4626_ST_Kernel.sol";
  * @notice Tranche and NAV units are always expressed in the tranche asset's precision
  */
 contract ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel is ERC4626_ST_Kernel, AaveV3_JT_Kernel, IdenticalAssetsQuoter {
+    constructor(
+        address _seniorTranche,
+        address _juniorTranche,
+        address _stVault,
+        address _aaveV3Pool
+    )
+        ERC4626_ST_Kernel(_stVault)
+        AaveV3_JT_Kernel(_aaveV3Pool)
+        RoycoKernel(_seniorTranche, IERC4626(_stVault).asset(), _juniorTranche, IERC4626(_stVault).asset())
+    { }
+
     /**
      * @notice Initializes the Royco Kernel
      * @param _params The standard initialization parameters for the Royco Kernel
-     * @param _stVault The ERC4626 compliant vault that the senior tranche will deploy into
-     * @param _aaveV3Pool The Aave V3 Pool that the junior tranche will deploy into
      */
-    function initialize(RoycoKernelInitParams calldata _params, address _stVault, address _aaveV3Pool) external initializer {
-        // Get the base assets for both tranches and ensure that they are identical
-        address stAsset = IRoycoVaultTranche(_params.seniorTranche).asset();
-        address jtAsset = IRoycoVaultTranche(_params.juniorTranche).asset();
-
+    function initialize(RoycoKernelInitParams calldata _params) external initializer {
         // Initialize the base kernel state
-        __RoycoKernel_init(_params, stAsset, jtAsset);
+        __RoycoKernel_init(_params);
         // Initialize the ERC4626 senior tranche state
-        __ERC4626_ST_Kernel_init_unchained(_stVault, stAsset);
+        __ERC4626_ST_Kernel_init_unchained();
         // Initialize the Aave V3 junior tranche state
-        __AaveV3_JT_Kernel_init_unchained(_aaveV3Pool, jtAsset);
-        // Initialize the identical assets quoter
-        __IdenticalAssetsQuoter_init_unchained(stAsset, jtAsset);
+        __AaveV3_JT_Kernel_init_unchained();
     }
 }

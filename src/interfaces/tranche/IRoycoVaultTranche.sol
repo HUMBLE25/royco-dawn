@@ -14,9 +14,10 @@ interface IRoycoVaultTranche is IERC165, IRoycoAsyncVault, IRoycoAsyncCancellabl
      * @param owner The address that owns the shares
      * @param assets The amount of assets deposited
      * @param shares The amount of shares minted
+     * @param depositRequestId The deposit request identifier if the deposit is asynchronous. Ignore if the deposit is synchronous.
      * @param metadata The format prefixed metadata of the deposit or empty bytes if no metadata is shared
      */
-    event Deposit(address indexed sender, address indexed owner, TRANCHE_UNIT assets, uint256 shares, bytes metadata);
+    event Deposit(address indexed sender, address indexed owner, TRANCHE_UNIT assets, uint256 shares, uint256 depositRequestId, bytes metadata);
 
     /**
      * @notice Emitted when a redemption is made
@@ -24,9 +25,10 @@ interface IRoycoVaultTranche is IERC165, IRoycoAsyncVault, IRoycoAsyncCancellabl
      * @param receiver The address of the receiver of the redeemed assets
      * @param claims A struct representing the assets received on redemption and their value at the time of redemption in NAV units
      * @param shares The total amount of shares redeemed
+     * @param redemptionRequestId The redemption request identifier if the redemption is asynchronous. Ignore if the redemption is synchronous.
      * @param metadata The format prefixed metadata of the redemption or empty bytes if no metadata is shared
      */
-    event Redeem(address indexed sender, address indexed receiver, AssetClaims claims, uint256 shares, bytes metadata);
+    event Redeem(address indexed sender, address indexed receiver, AssetClaims claims, uint256 shares, uint256 redemptionRequestId, bytes metadata);
 
     /**
      * @notice Emitted when protocol fee shares are minted to the protocol fee recipient
@@ -35,6 +37,30 @@ interface IRoycoVaultTranche is IERC165, IRoycoAsyncVault, IRoycoAsyncCancellabl
      * @param totalTrancheShares The total number of shares that exist in the tranche after minting any protocol fee shares post-sync
      */
     event ProtocolFeeSharesMinted(address indexed protocolFeeRecipient, uint256 mintedProtocolFeeShares, uint256 totalTrancheShares);
+
+    /// @notice Thrown when the requested redeem amount is greater than the maximum amount of shares that can be redeemed
+    error MUST_REQUEST_WITHIN_MAX_REDEEM_AMOUNT();
+
+    /// @notice Thrown when the specified action is disabled
+    error DISABLED();
+
+    /// @notice Thrown when the caller is not the expected account or an approved operator
+    error ONLY_CALLER_OR_OPERATOR();
+
+    /// @notice Thrown when the redeem amount is zero
+    error MUST_REQUEST_NON_ZERO_SHARES();
+
+    /// @notice Thrown when the deposit amount is zero
+    error MUST_DEPOSIT_NON_ZERO_ASSETS();
+
+    /// @notice Thrown when the redeem amount is zero
+    error MUST_CLAIM_NON_ZERO_SHARES();
+
+    /// @notice Thrown when the caller isn't the kernel
+    error ONLY_KERNEL();
+
+    /// @notice Thrown when the value allocated is zero
+    error INVALID_VALUE_ALLOCATED();
 
     /**
      * @notice Returns the raw net asset value of the tranche's invested assets

@@ -26,6 +26,7 @@ contract RoycoFactory is AccessManager, RoycoRoles, IRoycoFactory {
     constructor(address _initialAdmin) AccessManager(_initialAdmin) { }
 
     /// @inheritdoc IRoycoFactory
+    // TODO: Test if this can be role gated
     function deployMarket(MarketDeploymentParams calldata _params)
         external
         override(IRoycoFactory)
