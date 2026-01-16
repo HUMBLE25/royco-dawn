@@ -51,7 +51,7 @@ contract ReUSD_ST_ReUSD_JT_OverridableNAVOracleKernel is YieldBearingERC20_ST_Yi
     }
 
     /// @inheritdoc OverridableNAVOracleIdenticalAssetsQuoter
-    function _getTrancheUnitToNAVUnitConversionRateFromOracle() internal view override returns (uint256 ratetrancheUnitToNAVUnitConversionRateWAD) {
+    function _getTrancheUnitToNAVUnitConversionRateFromOracle() internal view override returns (uint256 trancheUnitToNAVUnitConversionRateWAD) {
         return IInsuranceCapitalLayer(INSURANCE_CAPITAL_LAYER).convertFromShares(REUSD_USD_QUOTE_TOKEN, WAD);
     }
 }
