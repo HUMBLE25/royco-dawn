@@ -9,15 +9,15 @@ import { IdenticalAssetsOracleQuoter } from "../quoter/IdenticalAssetsOracleQuot
 import { ERC4626_ST_ERC4626_JT_Kernel } from "./ERC4626_ST_ERC4626_JT_Kernel.sol";
 
 /**
- * @title ERC4626_ST_ERC4626_JT_OverridableNAVOracleIdenticalAssets_Kernel
+ * @title ERC4626_ST_ERC4626_JT_IdenticalAssetsOracleQuoter_Kernel
  * @notice The senior and junior tranches are deployed into a ERC4626 compliant vault
  * @notice The two tranches can be deployed into the same ERC4626 compliant vault
  * @notice The tranche assets are identical in value and precision (eg. USDC for both tranches, USDC and USDT, etc.)
  * @notice Tranche and NAV units are always expressed in the tranche asset's precision. The NAV Unit factors in a conversion rate from the overridable NAV Conversion Rate oracle.
  */
-abstract contract ERC4626_ST_ERC4626_JT_OverridableNAVOracleIdenticalAssets_Kernel is ERC4626_ST_ERC4626_JT_Kernel, IdenticalAssetsOracleQuoter {
+abstract contract ERC4626_ST_ERC4626_JT_IdenticalAssetsOracleQuoter_Kernel is ERC4626_ST_ERC4626_JT_Kernel, IdenticalAssetsOracleQuoter {
     /**
-     *@notice Constructor for the ERC4626_ST_ERC4626_JT_OverridableNAVOracleIdenticalAssets_Kernel
+     *@notice Constructor for the ERC4626_ST_ERC4626_JT_IdenticalAssetsOracleQuoter_Kernel
      * @param _seniorTranche The address of the senior tranche
      * @param _juniorTranche The address of the junior tranche
      * @param _stVault The address of the ERC4626 compliant vault that the senior tranche will deploy into
@@ -37,7 +37,7 @@ abstract contract ERC4626_ST_ERC4626_JT_OverridableNAVOracleIdenticalAssets_Kern
      * @param _params The standard initialization parameters for the Royco Kernel
      * @param _initialConversionRateWAD The initial tranche unit to NAV unit conversion rate
      */
-    function __ERC4626_ST_ERC4626_JT_OverridableNAVOracleIdenticalAssets_Kernel_init(
+    function __ERC4626_ST_ERC4626_JT_IdenticalAssetsOracleQuoter_Kernel_init(
         RoycoKernelInitParams calldata _params,
         uint256 _initialConversionRateWAD
     )

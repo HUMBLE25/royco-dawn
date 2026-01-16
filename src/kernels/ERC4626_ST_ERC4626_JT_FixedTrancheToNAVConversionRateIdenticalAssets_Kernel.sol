@@ -4,9 +4,7 @@ pragma solidity ^0.8.28;
 import { WAD } from "../libraries/Constants.sol";
 import { RoycoKernelInitParams } from "../libraries/RoycoKernelStorageLib.sol";
 import { IdenticalAssetsOracleQuoter } from "./base/quoter/IdenticalAssetsOracleQuoter.sol";
-import {
-    ERC4626_ST_ERC4626_JT_OverridableNAVOracleIdenticalAssets_Kernel
-} from "./base/recipe/ERC4626_ST_ERC4626_JT_OverridableNAVOracleIdenticalAssets_Kernel.sol";
+import { ERC4626_ST_ERC4626_JT_IdenticalAssetsOracleQuoter_Kernel } from "./base/recipe/ERC4626_ST_ERC4626_JT_IdenticalAssetsOracleQuoter_Kernel.sol";
 
 /**
  * @title ERC4626_ST_ERC4626_JT_FixedTrancheToNAVConversionRateIdenticalAssets_Kernel
@@ -14,7 +12,7 @@ import {
  * @notice The two tranches can be deployed into the same ERC4626 compliant vault
  * @notice Tranche and NAV units are always expressed in the tranche asset's precision. The NAV Unit factors in a conversion rate from the overridable NAV Conversion Rate oracle.
  */
-contract ERC4626_ST_ERC4626_JT_FixedTrancheToNAVConversionRateIdenticalAssets_Kernel is ERC4626_ST_ERC4626_JT_OverridableNAVOracleIdenticalAssets_Kernel {
+contract ERC4626_ST_ERC4626_JT_FixedTrancheToNAVConversionRateIdenticalAssets_Kernel is ERC4626_ST_ERC4626_JT_IdenticalAssetsOracleQuoter_Kernel {
     /// @notice Thrown when the function is not implemented
     error NOT_IMPLEMENTED();
 
@@ -27,14 +25,14 @@ contract ERC4626_ST_ERC4626_JT_FixedTrancheToNAVConversionRateIdenticalAssets_Ke
         address _juniorTranche,
         address _snUSDVault
     )
-        ERC4626_ST_ERC4626_JT_OverridableNAVOracleIdenticalAssets_Kernel(_seniorTranche, _juniorTranche, _snUSDVault, _snUSDVault)
+        ERC4626_ST_ERC4626_JT_IdenticalAssetsOracleQuoter_Kernel(_seniorTranche, _juniorTranche, _snUSDVault, _snUSDVault)
     { }
 
     /// @notice Initializes the kernel
     /// @param _params The standard initialization parameters for the Royco Kernel
     /// @param _initialConversionRateWAD The initial tranche unit to NAV unit conversion rate
     function initialize(RoycoKernelInitParams calldata _params, uint256 _initialConversionRateWAD) external initializer {
-        __ERC4626_ST_ERC4626_JT_OverridableNAVOracleIdenticalAssets_Kernel_init(_params, _initialConversionRateWAD);
+        __ERC4626_ST_ERC4626_JT_IdenticalAssetsOracleQuoter_Kernel_init(_params, _initialConversionRateWAD);
     }
 
     /// @inheritdoc IdenticalAssetsOracleQuoter

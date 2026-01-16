@@ -6,8 +6,8 @@ import { WAD } from "../libraries/Constants.sol";
 import { RoycoKernelInitParams } from "../libraries/RoycoKernelStorageLib.sol";
 import { IdenticalAssetsOracleQuoter } from "./base/quoter/IdenticalAssetsOracleQuoter.sol";
 import {
-    YieldBearingERC20_ST_YieldBearingERC20_JT_OverridableNAVOracleIdenticalAssets_Kernel
-} from "./base/recipe/YieldBearingERC20_ST_YieldBearingERC20_JT_OverridableNAVOracleIdenticalAssets_Kernel.sol";
+    YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsOracleQuoter_Kernel
+} from "./base/recipe/YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsOracleQuoter_Kernel.sol";
 
 /**
  * @title ReUSD_ST_ReUSD_JT_OverridableNAVOracleKernel
@@ -15,7 +15,7 @@ import {
  * @dev https://docs.re.xyz/insurance-capital-layers/what-is-reusd
  * @notice Tranche and NAV units are always expressed in the tranche asset's precision. The NAV Unit factors in a conversion rate from the overridable NAV Conversion Rate oracle.
  */
-contract ReUSD_ST_ReUSD_JT_OverridableNAVOracleKernel is YieldBearingERC20_ST_YieldBearingERC20_JT_OverridableNAVOracleIdenticalAssets_Kernel {
+contract ReUSD_ST_ReUSD_JT_OverridableNAVOracleKernel is YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsOracleQuoter_Kernel {
     /// @notice The address of the sNUSD ERC4626 vault
     address public immutable REUSD;
 
@@ -38,7 +38,7 @@ contract ReUSD_ST_ReUSD_JT_OverridableNAVOracleKernel is YieldBearingERC20_ST_Yi
         address _reusdUsdQuoteToken,
         address _insuranceCapitalLayer
     )
-        YieldBearingERC20_ST_YieldBearingERC20_JT_OverridableNAVOracleIdenticalAssets_Kernel(_seniorTranche, _juniorTranche, _reusd)
+        YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsOracleQuoter_Kernel(_seniorTranche, _juniorTranche, _reusd)
     {
         REUSD = _reusd;
         REUSD_USD_QUOTE_TOKEN = _reusdUsdQuoteToken;
@@ -49,7 +49,7 @@ contract ReUSD_ST_ReUSD_JT_OverridableNAVOracleKernel is YieldBearingERC20_ST_Yi
     /// @param _params The standard initialization parameters for the Royco Kernel
     function initialize(RoycoKernelInitParams calldata _params) external initializer {
         // We set the price override to 0, so that the reUSD -> REUSD_USD_QUOTE_TOKEN conversion rate is queried from the insurance capital layer
-        __YieldBearingERC20_ST_YieldBearingERC20_JT_OverridableNAVOracleIdenticalAssets_Kernel_init(_params, 0);
+        __YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsOracleQuoter_Kernel_init(_params, 0);
     }
 
     /// @inheritdoc IdenticalAssetsOracleQuoter

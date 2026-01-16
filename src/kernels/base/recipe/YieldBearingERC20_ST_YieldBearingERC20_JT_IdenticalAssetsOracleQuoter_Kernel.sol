@@ -9,11 +9,11 @@ import { IdenticalAssetsOracleQuoter } from "../quoter/IdenticalAssetsOracleQuot
 import { YieldBearingERC20_ST_Kernel } from "../senior/YieldBearingERC20_ST_Kernel.sol";
 
 /**
- * @title YieldBearingERC20_ST_YieldBearingERC20_JT_OverridableNAVOracleIdenticalAssets_Kernel
+ * @title YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsOracleQuoter_Kernel
  * @notice The senior and junior tranches transfer in the same yield breaking ERC20 assets.
  * @notice The kernel uses an overridable NAV Conversion Rate oracle to convert the Tranche Units to NAV Units.
  */
-abstract contract YieldBearingERC20_ST_YieldBearingERC20_JT_OverridableNAVOracleIdenticalAssets_Kernel is
+abstract contract YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsOracleQuoter_Kernel is
     YieldBearingERC20_ST_Kernel,
     YieldBearingERC20_JT_Kernel,
     IdenticalAssetsOracleQuoter
@@ -22,7 +22,7 @@ abstract contract YieldBearingERC20_ST_YieldBearingERC20_JT_OverridableNAVOracle
     error ASSET_MISMATCH();
 
     /**
-     * @notice Constructor for the YieldBearingERC20_ST_YieldBearingERC20_JT_OverridableNAVOracleIdenticalAssets_Kernel
+     * @notice Constructor for the YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsOracleQuoter_Kernel
      * @param _seniorTranche The address of the senior tranche
      * @param _juniorTranche The address of the junior tranche
      * @param _asset The address of the yield breaking ERC20 asset that the senior and junior tranches will transfer in
@@ -34,7 +34,7 @@ abstract contract YieldBearingERC20_ST_YieldBearingERC20_JT_OverridableNAVOracle
      * @param _params The standard initialization parameters for the Royco Kernel
      * @param _initialConversionRateWAD The initial tranche unit to NAV unit conversion rate
      */
-    function __YieldBearingERC20_ST_YieldBearingERC20_JT_OverridableNAVOracleIdenticalAssets_Kernel_init(
+    function __YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsOracleQuoter_Kernel_init(
         RoycoKernelInitParams calldata _params,
         uint256 _initialConversionRateWAD
     )
