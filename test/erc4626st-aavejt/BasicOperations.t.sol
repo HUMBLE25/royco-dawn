@@ -5,6 +5,7 @@ import { Vm } from "../../lib/forge-std/src/Vm.sol";
 import { Math } from "../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 import { IRoycoAccountant } from "../../src/interfaces/IRoycoAccountant.sol";
 import { IRoycoKernel } from "../../src/interfaces/kernel/IRoycoKernel.sol";
+import { IRoycoVaultTranche } from "../../src/interfaces/tranche/IRoycoVaultTranche.sol";
 import { ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, WAD, ZERO_TRANCHE_UNITS } from "../../src/libraries/Constants.sol";
 import { AssetClaims, TrancheType } from "../../src/libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, toTrancheUnits, toUint256 } from "../../src/libraries/Units.sol";
@@ -661,10 +662,8 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
             uint256 snapshot = vm.snapshotState();
 
             vm.startPrank(jtDepositor);
+            vm.expectRevert(abi.encodeWithSelector(IRoycoVaultTranche.MUST_REQUEST_WITHIN_MAX_REDEEM_AMOUNT.selector));
             (uint256 requestId,) = JT.requestRedeem(jtShares, jtDepositor, jtDepositor);
-            vm.warp(vm.getBlockTimestamp() + JT_REDEMPTION_DELAY_SECONDS);
-            vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.COVERAGE_REQUIREMENT_UNSATISFIED.selector));
-            JT.redeem(jtShares, jtDepositor, jtDepositor, requestId);
             vm.stopPrank();
 
             vm.revertToState(snapshot);

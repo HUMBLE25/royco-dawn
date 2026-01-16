@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import { IRoycoVaultTranche } from "../interfaces/tranche/IRoycoVaultTranche.sol";
+import { IERC4626 } from "../../lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 import { RoycoKernelInitParams } from "../libraries/RoycoKernelStorageLib.sol";
 import { RoycoKernel } from "./base/RoycoKernel.sol";
 import { AaveV3_JT_Kernel } from "./base/junior/AaveV3_JT_Kernel.sol";
@@ -23,7 +23,7 @@ contract ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel is ERC4626_ST_Kernel, AaveV
     )
         ERC4626_ST_Kernel(_stVault)
         AaveV3_JT_Kernel(_aaveV3Pool)
-        RoycoKernel(_seniorTranche, IRoycoVaultTranche(_seniorTranche).asset(), _juniorTranche, IRoycoVaultTranche(_juniorTranche).asset())
+        RoycoKernel(_seniorTranche, IERC4626(_stVault).asset(), _juniorTranche, IERC4626(_stVault).asset())
     { }
 
     /**

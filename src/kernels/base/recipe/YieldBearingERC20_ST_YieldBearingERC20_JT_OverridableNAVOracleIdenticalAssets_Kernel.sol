@@ -27,22 +27,25 @@ abstract contract YieldBearingERC20_ST_YieldBearingERC20_JT_OverridableNAVOracle
      * @param _juniorTranche The address of the junior tranche
      * @param _asset The address of the yield breaking ERC20 asset that the senior and junior tranches will transfer in
      */
-    constructor(address _seniorTranche, address _juniorTranche, address _asset) RoycoKernel(_seniorTranche, _asset, _juniorTranche, _asset) {
-        require(IRoycoVaultTranche(_seniorTranche).asset() == _asset && IRoycoVaultTranche(_juniorTranche).asset() == _asset, ASSET_MISMATCH());
-    }
+    constructor(address _seniorTranche, address _juniorTranche, address _asset) RoycoKernel(_seniorTranche, _asset, _juniorTranche, _asset) { }
 
     /**
      * @notice Initializes the Royco Kernel
      * @param _params The standard initialization parameters for the Royco Kernel
      * @param _initialConversionRateWAD The initial tranche unit to NAV unit conversion rate
      */
-    function __YieldBearingERC20_ST_YieldBearingERC20_JT_OverridableNAVOracleIdenticalAssets_Kernel_init_unchained(
+    function __YieldBearingERC20_ST_YieldBearingERC20_JT_OverridableNAVOracleIdenticalAssets_Kernel_init(
         RoycoKernelInitParams calldata _params,
         uint256 _initialConversionRateWAD
     )
         internal
         onlyInitializing
     {
+        require(
+            IRoycoVaultTranche(SENIOR_TRANCHE).asset() == ST_ASSET && IRoycoVaultTranche(JUNIOR_TRANCHE).asset() == JT_ASSET && ST_ASSET == JT_ASSET,
+            ASSET_MISMATCH()
+        );
+
         // Initialize the base kernel state
         __RoycoKernel_init(_params);
         // Initialize the overridable NAV oracle identical assets quoter

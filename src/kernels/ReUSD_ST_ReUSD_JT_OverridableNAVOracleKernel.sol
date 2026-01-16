@@ -47,7 +47,7 @@ contract ReUSD_ST_ReUSD_JT_OverridableNAVOracleKernel is YieldBearingERC20_ST_Yi
     /// @param _params The standard initialization parameters for the Royco Kernel
     function initialize(RoycoKernelInitParams calldata _params) external initializer {
         // We set the price override to 0, so that the reUSD -> REUSD_USD_QUOTE_TOKEN conversion rate is queried from the insurance capital layer
-        __YieldBearingERC20_ST_YieldBearingERC20_JT_OverridableNAVOracleIdenticalAssets_Kernel_init_unchained(_params, 0);
+        __YieldBearingERC20_ST_YieldBearingERC20_JT_OverridableNAVOracleIdenticalAssets_Kernel_init(_params, 0);
     }
 
     /// @inheritdoc OverridableNAVOracleIdenticalAssetsQuoter

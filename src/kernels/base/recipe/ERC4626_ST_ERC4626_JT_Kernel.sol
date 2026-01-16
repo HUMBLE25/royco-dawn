@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import { IRoycoVaultTranche } from "../../../interfaces/tranche/IRoycoVaultTranche.sol";
 import { RoycoKernelInitParams } from "../../../libraries/RoycoKernelStorageLib.sol";
 import { MarketState } from "../../../libraries/Types.sol";
 import { Math, NAV_UNIT, TRANCHE_UNIT, UnitsMathLib } from "../../../libraries/Units.sol";
@@ -18,14 +17,19 @@ abstract contract ERC4626_ST_ERC4626_JT_Kernel is ERC4626_ST_Kernel, ERC4626_JT_
 
     /// @notice Constructor for the ERC4626_ST_ERC4626_JT_Kernel
     /// @param _stVault The address of the ERC4626 compliant vault that the senior tranche will deploy into
+    /// @param _stAsset The address of the asset that the senior tranche will deploy into
+    /// @param _juniorTranche The address of the junior tranche
+    /// @param _jtAsset The address of the asset that the junior tranche will deploy into
     /// @param _jtVault The address of the ERC4626 compliant vault that the junior tranche will deploy into
     constructor(
         address _seniorTranche,
+        address _stAsset,
         address _juniorTranche,
+        address _jtAsset,
         address _stVault,
         address _jtVault
     )
-        RoycoKernel(_seniorTranche, IRoycoVaultTranche(_seniorTranche).asset(), _juniorTranche, IRoycoVaultTranche(_juniorTranche).asset())
+        RoycoKernel(_seniorTranche, _stAsset, _juniorTranche, _jtAsset)
         ERC4626_ST_Kernel(_stVault)
         ERC4626_JT_Kernel(_jtVault)
     { }

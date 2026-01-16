@@ -18,14 +18,16 @@ import { ERC4626_ST_Kernel } from "./base/senior/ERC4626_ST_Kernel.sol";
 contract ERC4626_ST_AaveV3_JT_InKindAssets_Kernel is ERC4626_ST_Kernel, AaveV3_JT_Kernel, InKindAssetsQuoter {
     constructor(
         address _seniorTranche,
+        address _stAsset,
         address _juniorTranche,
+        address _jtAsset,
         address _stVault,
         address _aaveV3Pool
     )
         ERC4626_ST_Kernel(_stVault)
         AaveV3_JT_Kernel(_aaveV3Pool)
         InKindAssetsQuoter()
-        RoycoKernel(_seniorTranche, IRoycoVaultTranche(_seniorTranche).asset(), _juniorTranche, IRoycoVaultTranche(_juniorTranche).asset())
+        RoycoKernel(_seniorTranche, _stAsset, _juniorTranche, _jtAsset)
     { }
 
     /**

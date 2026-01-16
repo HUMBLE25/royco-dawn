@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
+import { IERC4626 } from "../../lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 import { RoycoKernelInitParams } from "../libraries/RoycoKernelStorageLib.sol";
 import { NAV_UNIT } from "../libraries/Units.sol";
 import { RoycoKernel } from "./base/RoycoKernel.sol";
@@ -28,7 +29,7 @@ contract ERC4626_ST_ERC4626_JT_IdenticalAssets_Kernel is ERC4626_ST_ERC4626_JT_K
         address _stVault,
         address _jtVault
     )
-        ERC4626_ST_ERC4626_JT_Kernel(_seniorTranche, _juniorTranche, _stVault, _jtVault)
+        ERC4626_ST_ERC4626_JT_Kernel(_seniorTranche, IERC4626(_stVault).asset(), _juniorTranche, IERC4626(_jtVault).asset(), _stVault, _jtVault)
         IdenticalAssetsQuoter()
     { }
 
