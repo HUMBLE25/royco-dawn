@@ -306,10 +306,13 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         RoycoAccountantState storage $ = _getRoycoAccountantStorage();
         // Get the surplus JT assets in NAV units
         NAV_UNIT surplusJTAssets = _calculateSurplusJtAssetsInNav(_stRawNAV, _jtRawNAV);
+        // Compute the total JT claim on NAV and preemptively return if zero
+        NAV_UNIT totalJTClaims = _jtClaimOnStUnits + _jtClaimOnJtUnits;
+        if (totalJTClaims == ZERO_NAV_UNITS) return (ZERO_NAV_UNITS, ZERO_NAV_UNITS, ZERO_NAV_UNITS);
         // Calculate K_S
-        uint256 kS_WAD = toUint256(_jtClaimOnStUnits.mulDiv(WAD, _jtClaimOnStUnits + _jtClaimOnJtUnits, Math.Rounding.Floor));
+        uint256 kS_WAD = toUint256(_jtClaimOnStUnits.mulDiv(WAD, totalJTClaims, Math.Rounding.Floor));
         // Calculate K_J
-        uint256 kJ_WAD = toUint256(_jtClaimOnJtUnits.mulDiv(WAD, _jtClaimOnStUnits + _jtClaimOnJtUnits, Math.Rounding.Floor));
+        uint256 kJ_WAD = toUint256(_jtClaimOnJtUnits.mulDiv(WAD, totalJTClaims, Math.Rounding.Floor));
         // Compute how much coverage the system retains per 1 nav unit of JT assets withdrawn scaled to WAD precision
         uint256 coverageRetentionWAD =
             (WAD - uint256($.coverageWAD).mulDiv(kS_WAD + uint256($.betaWAD).mulDiv(kJ_WAD, WAD, Math.Rounding.Floor), WAD, Math.Rounding.Floor));
