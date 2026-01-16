@@ -81,7 +81,6 @@ abstract contract BaseTest is Test, RoycoRoles, Assertions {
     StaticCurveYDM internal YDM;
     RoycoST public ST_IMPL;
     RoycoJT internal JT_IMPL;
-    ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel internal ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel_IMPL;
     RoycoAccountant internal ACCOUNTANT_IMPL;
 
     // Deployed Later in the concrete tests
@@ -143,10 +142,6 @@ abstract contract BaseTest is Test, RoycoRoles, Assertions {
         // Deploy accountant implementation
         ACCOUNTANT_IMPL = new RoycoAccountant();
         vm.label(address(ACCOUNTANT_IMPL), "AccountantImpl");
-
-        // Deploy KERNEL implementation
-        ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel_IMPL = new ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel();
-        vm.label(address(ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel_IMPL), "KernelImpl");
 
         // Deploy FACTORY
         FACTORY = new RoycoFactory(OWNER_ADDRESS);

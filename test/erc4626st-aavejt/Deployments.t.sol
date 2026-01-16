@@ -7,6 +7,7 @@ import { RoycoRoles } from "../../src/auth/RoycoRoles.sol";
 import { IRoycoAuth } from "../../src/interfaces/IRoycoAuth.sol";
 import { IPool } from "../../src/interfaces/external/aave/IPool.sol";
 import { TrancheType } from "../../src/interfaces/kernel/IRoycoKernel.sol";
+import { ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel } from "../../src/kernels/ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel.sol";
 import { ZERO_NAV_UNITS, ZERO_TRANCHE_UNITS } from "../../src/libraries/Constants.sol";
 import { RoycoKernelInitParams } from "../../src/libraries/RoycoKernelStorageLib.sol";
 import {
@@ -340,19 +341,13 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         address expectedAccountantAddress = FACTORY.predictERC1967ProxyAddress(address(ACCOUNTANT_IMPL), salt);
 
         params.kernelInitializationData = abi.encodeCall(
-            ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel_IMPL.initialize,
-            (
-                RoycoKernelInitParams({
+            ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel.initialize,
+            (RoycoKernelInitParams({
                     initialAuthority: OWNER_ADDRESS,
-                    seniorTranche: expectedSeniorTrancheAddress,
-                    juniorTranche: expectedJuniorTrancheAddress,
                     accountant: expectedAccountantAddress,
                     protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS,
                     jtRedemptionDelayInSeconds: JT_REDEMPTION_DELAY_SECONDS
-                }),
-                address(MOCK_UNDERLYING_ST_VAULT),
-                ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS
-            )
+                }))
         );
 
         vm.expectRevert(IRoycoFactory.INVALID_ACCESS_MANAGER.selector);
@@ -435,19 +430,13 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         address expectedJuniorTrancheAddress = FACTORY.predictERC1967ProxyAddress(address(JT_IMPL), salt);
 
         params.kernelInitializationData = abi.encodeCall(
-            ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel_IMPL.initialize,
-            (
-                RoycoKernelInitParams({
+            ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel.initialize,
+            (RoycoKernelInitParams({
                     initialAuthority: address(FACTORY),
-                    seniorTranche: expectedSeniorTrancheAddress,
-                    juniorTranche: expectedJuniorTrancheAddress,
                     accountant: address(0xdead), // wrong accountant
                     protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS,
                     jtRedemptionDelayInSeconds: JT_REDEMPTION_DELAY_SECONDS
-                }),
-                address(MOCK_UNDERLYING_ST_VAULT),
-                ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS
-            )
+                }))
         );
 
         vm.expectRevert(IRoycoFactory.INVALID_ACCOUNTANT_ON_KERNEL.selector);
@@ -575,19 +564,13 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
 
         // Create the initialization data
         bytes memory kernelInitializationData = abi.encodeCall(
-            ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel_IMPL.initialize,
-            (
-                RoycoKernelInitParams({
+            ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel.initialize,
+            (RoycoKernelInitParams({
                     initialAuthority: address(FACTORY),
-                    seniorTranche: expectedSeniorTrancheAddress,
-                    juniorTranche: expectedJuniorTrancheAddress,
                     accountant: expectedAccountantAddress,
                     protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS,
                     jtRedemptionDelayInSeconds: JT_REDEMPTION_DELAY_SECONDS
-                }),
-                address(MOCK_UNDERLYING_ST_VAULT),
-                ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS
-            )
+                }))
         );
         bytes memory accountantInitializationData = abi.encodeCall(
             RoycoAccountant.initialize,
