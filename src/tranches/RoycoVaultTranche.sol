@@ -229,7 +229,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         // Mint the shares to the receiver
         _mint(_receiver, shares);
 
-        emit Deposit(msg.sender, _receiver, _assets, shares, metadata);
+        emit Deposit(msg.sender, _receiver, _assets, shares, _depositRequestId, metadata);
     }
 
     /// @inheritdoc IRoycoAsyncVault
@@ -274,7 +274,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         // Shares must be burned after the kernel processes the redemption since the kernel has a causal dependency on the pre-burn and post-sync total share supply
         _redeem(msg.sender, _controller, _shares);
 
-        emit Redeem(msg.sender, _receiver, claims, _shares, metadata);
+        emit Redeem(msg.sender, _receiver, claims, _shares, _redemptionRequestId, metadata);
     }
 
     // =============================

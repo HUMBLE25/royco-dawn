@@ -33,6 +33,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
 
     /// @dev Permissions the function to only the market's senior tranche
     /// @dev Should be placed on all ST deposit and withdraw functions
+    // forge-lint: disable-next-line(unwrapped-modifier-logic)
     modifier onlySeniorTranche() {
         require(msg.sender == RoycoKernelStorageLib._getRoycoKernelStorage().seniorTranche, ONLY_SENIOR_TRANCHE());
         _;
@@ -40,6 +41,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
 
     /// @dev Permissions the function to only the market's junior tranche
     /// @dev Should be placed on all JT deposit and withdraw functions
+    // forge-lint: disable-next-line(unwrapped-modifier-logic)
     modifier onlyJuniorTranche() {
         require(msg.sender == RoycoKernelStorageLib._getRoycoKernelStorage().juniorTranche, ONLY_JUNIOR_TRANCHE());
         _;
@@ -48,6 +50,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     /// @notice Modifer to check that the provided JT redemption request ID is valid for the given controller
     /// @param _controller The controller to check the redemption request ID for
     /// @param _requestId The JT redemption request ID to validate
+    // forge-lint: disable-next-line(unwrapped-modifier-logic)
     modifier checkJTRedemptionRequestId(address _controller, uint256 _requestId) {
         RoycoKernelState storage $ = RoycoKernelStorageLib._getRoycoKernelStorage();
         require($.jtControllerToIdToRedemptionRequest[_controller][_requestId].totalJTSharesToRedeem != 0, INVALID_REQUEST_ID(_requestId));

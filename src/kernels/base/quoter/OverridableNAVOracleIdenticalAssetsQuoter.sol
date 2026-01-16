@@ -15,6 +15,7 @@ import { RoycoKernel } from "../RoycoKernel.sol";
  *      - Allocating ST and JT accepting the ERC4626 Vault Share, but the NAV units differ from the tranche units. For example:
  *        - Yield Breaking ERC20 ST And JT: Tranche Unit (like NUSD, reUSD), NAV Unit (USD)
  */
+// TODO: Cache conversion rate initially
 abstract contract OverridableNAVOracleIdenticalAssetsQuoter is RoycoKernel {
     /// @dev Storage slot for OverridableNavOracleIdenticalAssetsQuoterState using ERC-7201 pattern
     // keccak256(abi.encode(uint256(keccak256("Royco.storage.OverridableNavOracleIdenticalAssetsQuoterState")) - 1)) & ~bytes32(uint256(0xff))
@@ -90,14 +91,14 @@ abstract contract OverridableNAVOracleIdenticalAssetsQuoter is RoycoKernel {
             return ratetrancheUnitToNAVUnitConversionRateWAD;
         }
 
-        return _getTrancheUnitToNAVUnitConversionRate();
+        return _getTrancheUnitToNAVUnitConversionRateFromOracle();
     }
 
     /// @notice Returns the tranche unit to NAV unit conversion rate
     /// @dev This function is overridden by the child contract to return the value queried from the oracle
     /// @dev This must have the same precision as $.ratetrancheUnitToNAVUnitConversionRateWAD, which is WAD precision
     /// @return ratetrancheUnitToNAVUnitConversionRateWAD The tranche unit to NAV unit conversion rate
-    function _getTrancheUnitToNAVUnitConversionRate() internal view virtual returns (uint256 ratetrancheUnitToNAVUnitConversionRateWAD);
+    function _getTrancheUnitToNAVUnitConversionRateFromOracle() internal view virtual returns (uint256 ratetrancheUnitToNAVUnitConversionRateWAD);
 
     /**
      * @notice Returns a storage pointer to the OverridableNavOracleIdenticalAssetsQuoterState storage

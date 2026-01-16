@@ -14,9 +14,10 @@ interface IRoycoVaultTranche is IERC165, IRoycoAsyncVault, IRoycoAsyncCancellabl
      * @param owner The address that owns the shares
      * @param assets The amount of assets deposited
      * @param shares The amount of shares minted
+     * @param depositRequestId The deposit request identifier if the deposit is asynchronous. Ignore if the deposit is synchronous.
      * @param metadata The format prefixed metadata of the deposit or empty bytes if no metadata is shared
      */
-    event Deposit(address indexed sender, address indexed owner, TRANCHE_UNIT assets, uint256 shares, bytes metadata);
+    event Deposit(address indexed sender, address indexed owner, TRANCHE_UNIT assets, uint256 shares, uint256 depositRequestId, bytes metadata);
 
     /**
      * @notice Emitted when a redemption is made
@@ -24,9 +25,10 @@ interface IRoycoVaultTranche is IERC165, IRoycoAsyncVault, IRoycoAsyncCancellabl
      * @param receiver The address of the receiver of the redeemed assets
      * @param claims A struct representing the assets received on redemption and their value at the time of redemption in NAV units
      * @param shares The total amount of shares redeemed
+     * @param redemptionRequestId The redemption request identifier if the redemption is asynchronous. Ignore if the redemption is synchronous.
      * @param metadata The format prefixed metadata of the redemption or empty bytes if no metadata is shared
      */
-    event Redeem(address indexed sender, address indexed receiver, AssetClaims claims, uint256 shares, bytes metadata);
+    event Redeem(address indexed sender, address indexed receiver, AssetClaims claims, uint256 shares, uint256 redemptionRequestId, bytes metadata);
 
     /**
      * @notice Emitted when protocol fee shares are minted to the protocol fee recipient
