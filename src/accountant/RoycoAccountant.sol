@@ -80,18 +80,10 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         // Get the storage pointer to the base kernel state
         RoycoAccountantState storage $ = _getRoycoAccountantStorage();
 
-        // Get the time-weighted accrued JT yield share
-        // TODO: Exclude recovery periods from elapsed time in YDM calculations. Including in the adaptive curves adaptations.
-        // 1. If the market is was a perpetual state, accrue the JT yield share
-        // 2. If the market was in a fixed term state, preview the JT yield share
-        MarketState initialMarketState = $.lastMarketState;
-        uint192 twJTYieldShareAccruedWAD;
-        if (initialMarketState == MarketState.PERPETUAL) twJTYieldShareAccruedWAD = _accrueJTYieldShare();
-        else twJTYieldShareAccruedWAD = _previewJTYieldShareAccrual();
-
         // Preview synchronization of the tranche NAVs and impermanent losses
+        MarketState initialMarketState;
         bool yieldDistributed;
-        (state, initialMarketState, yieldDistributed) = _previewSyncTrancheAccounting(_stRawNAV, _jtRawNAV, twJTYieldShareAccruedWAD);
+        (state, initialMarketState, yieldDistributed) = _previewSyncTrancheAccounting(_stRawNAV, _jtRawNAV, _accrueJTYieldShare());
 
         // ST yield was split between ST and JT
         if (yieldDistributed) {
@@ -178,7 +170,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
                 if (stImpermanentLoss != ZERO_NAV_UNITS) {
                     $.lastSTImpermanentLoss = stImpermanentLoss.mulDiv($.lastSTEffectiveNAV, preWithdrawalSTEffectiveNAV, Math.Rounding.Ceil);
                 }
-                // If some coverage was realized
+                // If some coverage was realized by this ST LP
                 if (deltaJT != 0) {
                     // The withdrawing senior LP has realized its proportional share of past JT losses from its own deprecition and associated recovery optionality, rounding in favor of senior
                     NAV_UNIT jtSelfImpermanentLoss = $.lastJTSelfImpermanentLoss;
@@ -564,7 +556,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         if (elapsed == 0) return $.twJTYieldShareAccruedWAD;
 
         // Get the instantaneous JT yield share, scaled to WAD precision
-        uint256 jtYieldShareWAD = IYDM($.ydm).jtYieldShare($.lastSTRawNAV, $.lastJTRawNAV, $.betaWAD, $.coverageWAD, $.lastJTEffectiveNAV);
+        uint256 jtYieldShareWAD = IYDM($.ydm).jtYieldShare($.lastMarketState, $.lastSTRawNAV, $.lastJTRawNAV, $.betaWAD, $.coverageWAD, $.lastJTEffectiveNAV);
         // Ensure that JT cannot earn more than 100% of senior appreciation
         if (jtYieldShareWAD > WAD) jtYieldShareWAD = WAD;
 
@@ -595,7 +587,8 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         if (elapsed == 0) return $.twJTYieldShareAccruedWAD;
 
         // Get the instantaneous JT yield share, scaled to WAD precision
-        uint256 jtYieldShareWAD = IYDM($.ydm).previewJTYieldShare($.lastSTRawNAV, $.lastJTRawNAV, $.betaWAD, $.coverageWAD, $.lastJTEffectiveNAV);
+        uint256 jtYieldShareWAD =
+            IYDM($.ydm).previewJTYieldShare($.lastMarketState, $.lastSTRawNAV, $.lastJTRawNAV, $.betaWAD, $.coverageWAD, $.lastJTEffectiveNAV);
         // Ensure that JT cannot earn more than 100% of senior appreciation
         if (jtYieldShareWAD > WAD) jtYieldShareWAD = WAD;
 

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import { Math } from "../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
-import { IYDM } from "../interfaces/IYDM.sol";
+import { IYDM, MarketState } from "../interfaces/IYDM.sol";
 import { TARGET_UTILIZATION_WAD, WAD } from "../libraries/Constants.sol";
 import { NAV_UNIT } from "../libraries/Units.sol";
 import { UtilsLib } from "../libraries/UtilsLib.sol";
@@ -72,6 +72,7 @@ contract StaticCurveYDM is IYDM {
 
     /// @inheritdoc IYDM
     function previewJTYieldShare(
+        MarketState,
         NAV_UNIT _stRawNAV,
         NAV_UNIT _jtRawNAV,
         uint256 _betaWAD,
@@ -88,6 +89,7 @@ contract StaticCurveYDM is IYDM {
 
     /// @inheritdoc IYDM
     function jtYieldShare(
+        MarketState,
         NAV_UNIT _stRawNAV,
         NAV_UNIT _jtRawNAV,
         uint256 _betaWAD,
