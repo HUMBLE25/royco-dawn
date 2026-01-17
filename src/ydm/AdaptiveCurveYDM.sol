@@ -187,7 +187,7 @@ contract AdaptiveCurveYDM is IYDM {
             uint256 midJtYieldShareAtTargetWAD = _computeJtYieldShareAtTarget(initialJtYieldShareAtTargetWAD, linearAdaptationWAD / 2);
             avgJtYieldShareAtTargetWAD = (initialJtYieldShareAtTargetWAD + newJtYieldShareAtTargetWAD + 2 * midJtYieldShareAtTargetWAD) / 4;
         } else {
-            avgJtYieldShareAtTargetWAD = curve.jtYieldShareAtTargetWAD;
+            newJtYieldShareAtTargetWAD = avgJtYieldShareAtTargetWAD = curve.jtYieldShareAtTargetWAD;
         }
 
         // Compute the YDM curve's output with the continuously adapting JT yield share since the last adaptation
