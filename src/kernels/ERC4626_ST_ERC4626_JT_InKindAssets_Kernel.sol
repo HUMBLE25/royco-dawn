@@ -22,14 +22,7 @@ contract ERC4626_ST_ERC4626_JT_InKindAssets_Kernel is ERC4626_ST_ERC4626_JT_Kern
      * @param _stVault The address of the ERC4626 compliant vault that the senior tranche will deploy into
      * @param _jtVault The address of the ERC4626 compliant vault that the junior tranche will deploy into
      */
-    constructor(
-        RoycoKernelConstructionParams memory _params,
-        address _stVault,
-        address _jtVault
-    )
-        ERC4626_ST_ERC4626_JT_Kernel(_params, _stVault, _jtVault)
-        InKindAssetsQuoter()
-    { }
+    constructor(RoycoKernelConstructionParams memory _params, address _stVault, address _jtVault) ERC4626_ST_ERC4626_JT_Kernel(_params, _stVault, _jtVault) { }
 
     /**
      * @notice Initializes the Royco Kernel
