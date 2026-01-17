@@ -200,7 +200,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
 
         // Construct the synced NAVs state
         state = SyncedAccountingState({
-            // No state transition is possible in post-op syncs because there is no PNL and NAV changes enforce coverage (ensuring LLTV can't be breached)
+            // No state transition is possible in post-op syncs because there is no PNL and NAV changes enforce coverage (ensuring LLTV can't be breached if it wasn't already in pre-op sync)
             marketState: $.lastMarketState,
             stRawNAV: _stRawNAV,
             jtRawNAV: _jtRawNAV,

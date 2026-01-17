@@ -30,7 +30,6 @@ contract ERC4626_ST_AaveV3_JT_InKindAssets_Kernel is ERC4626_ST_Kernel, AaveV3_J
         RoycoKernel(_params)
         ERC4626_ST_Kernel(_stVault)
         AaveV3_JT_Kernel(_aaveV3Pool)
-        InKindAssetsQuoter()
     { }
 
     /**
