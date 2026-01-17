@@ -27,19 +27,25 @@ contract YBERC4626_ST_YBERC4626_JT_IdenticalAssetsChainlinkOracleQuoter_Kernel i
     /**
      * @notice Initializes the Royco Kernel
      * @param _params The standard initialization parameters for the Royco Kernel
+     * @param _trancheAssetToReferenceAssetOracle The tranche asset to reference asset oracle
+     * @param _stalenessThresholdSeconds The staleness threshold seconds
      * @param _initialConversionRateWAD The initial tranche unit to NAV unit conversion rate
      */
-    function __YBERC4626_ST_YBERC4626_JT_IdenticalAssetsChainlinkOracleQuoter_Kernel_init(
+    function initialize(
         RoycoKernelInitParams calldata _params,
+        address _trancheAssetToReferenceAssetOracle,
+        uint48 _stalenessThresholdSeconds,
         uint256 _initialConversionRateWAD
     )
-        internal
-        onlyInitializing
+        external
+        initializer
     {
         // Initialize the base kernel state
         __RoycoKernel_init(_params);
         // Initialize the overridable NAV oracle identical assets quoter
         __IdenticalAssetsOracleQuoter_init_unchained(_initialConversionRateWAD);
+        // Initialize the identical assets chainlink oracle quoter
+        __IdenticalAssetsChainlinkOracleQuoter_init(_trancheAssetToReferenceAssetOracle, _stalenessThresholdSeconds);
     }
 
     function _getConversionRateFromOracle() internal view override returns (uint256) {
