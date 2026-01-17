@@ -28,28 +28,28 @@ abstract contract IdenticalAssetsOracleQuoter is RoycoKernel {
     /// @dev Storage state for the Royco identical assets overridable oracle quoter
     /// @custom:storage-location erc7201:Royco.storage.IdenticalAssetsOracleQuoterState
     struct IdenticalAssetsOracleQuoterState {
-        uint256 trancheToNAVUnitConversionRateRAY;
+        uint256 conversionRateRAY;
     }
 
     /// @notice Emitted when the tranche unit to NAV unit conversion rate is updated
-    /// @param _trancheToNAVUnitConversionRateRAY The updated tranche unit to NAV unit conversion rate, scaled to RAY precision
-    event TrancheUnitToNAVUnitConversionRateUpdated(uint256 _trancheToNAVUnitConversionRateRAY);
+    /// @param _conversionRateRAY The updated conversion rate as defined by the oracle, scaled to RAY precision
+    event ConversionRateUpdated(uint256 _conversionRateRAY);
 
     /// @notice Thrown when the senior and junior tranche assets are not identical
     error TRANCHE_ASSETS_MUST_BE_IDENTICAL();
 
     /**
      * @notice Initializes the identical assets oracle quoter
-     * @param _initialTrancheToNAVUnitConversionRateRAY The initial tranche unit to NAV unit conversion rate, scaled to RAY precision
+     * @param _initialConversionRateRAY The initial conversion rate as defined by the oracle, scaled to RAY precision
      */
-    function __IdenticalAssetsOracleQuoter_init_unchained(uint256 _initialTrancheToNAVUnitConversionRateRAY) internal onlyInitializing {
+    function __IdenticalAssetsOracleQuoter_init_unchained(uint256 _initialConversionRateRAY) internal onlyInitializing {
         // The tranche units must be identical for both tranches since their is a single conversion rate
         require(ST_ASSET == JT_ASSET, TRANCHE_ASSETS_MUST_BE_IDENTICAL());
 
         // Premptively return if this quoter is reliant on an oracle instead of an admin set conversion rate
-        if (_initialTrancheToNAVUnitConversionRateRAY == SENTINEL_TRANCHE_TO_NAV_UNIT_CONVERSION_RATE) return;
-        _getIdenticalAssetsOracleQuoterStorage().trancheToNAVUnitConversionRateRAY = _initialTrancheToNAVUnitConversionRateRAY;
-        emit TrancheUnitToNAVUnitConversionRateUpdated(_initialTrancheToNAVUnitConversionRateRAY);
+        if (_initialConversionRateRAY == SENTINEL_TRANCHE_TO_NAV_UNIT_CONVERSION_RATE) return;
+        _getIdenticalAssetsOracleQuoterStorage().conversionRateRAY = _initialConversionRateRAY;
+        emit ConversionRateUpdated(_initialConversionRateRAY);
     }
 
     /// @inheritdoc RoycoKernel
@@ -76,29 +76,35 @@ abstract contract IdenticalAssetsOracleQuoter is RoycoKernel {
      * @notice Sets the tranche unit to NAV unit conversion rate
      * @dev Once this is set, the quoter will rely solely on this value instead of
      * @dev Only callable by a designated admin
-     * @param _trancheToNAVUnitConversionRateRAY The tranche unit to NAV unit conversion rate, scaled to RAY precision
+     * @param _conversionRateRAY The conversion rate as defined by the oracle, scaled to RAY precision
      */
-    function setTrancheUnitToNAVUnitConversionRate(uint256 _trancheToNAVUnitConversionRateRAY) public virtual restricted {
-        _getIdenticalAssetsOracleQuoterStorage().trancheToNAVUnitConversionRateRAY = _trancheToNAVUnitConversionRateRAY;
-        emit TrancheUnitToNAVUnitConversionRateUpdated(_trancheToNAVUnitConversionRateRAY);
+    function setConversionRate(uint256 _conversionRateRAY) public virtual restricted {
+        _getIdenticalAssetsOracleQuoterStorage().conversionRateRAY = _conversionRateRAY;
+        emit ConversionRateUpdated(_conversionRateRAY);
     }
 
     /// @notice Returns the value of 1 Tranche Unit in NAV Units, scaled to RAY precision
     /// @dev If the override is set, it will return the override value, otherwise it will return the value queried from the oracle
     /// @return trancheToNAVUnitConversionRateRAY The tranche unit to NAV unit conversion rate
-    function getTrancheUnitToNAVUnitConversionRate() public view returns (uint256 trancheToNAVUnitConversionRateRAY) {
+    function getTrancheUnitToNAVUnitConversionRate() public view virtual returns (uint256 trancheToNAVUnitConversionRateRAY) {
         // If there is an admin set conversion rate, use that, else query the oracle for the rate
-        trancheToNAVUnitConversionRateRAY = _getIdenticalAssetsOracleQuoterStorage().trancheToNAVUnitConversionRateRAY;
-        if (trancheToNAVUnitConversionRateRAY != 0) return trancheToNAVUnitConversionRateRAY;
-        else return _getTrancheUnitToNAVUnitConversionRateFromOracle();
+        trancheToNAVUnitConversionRateRAY = getStoredConversionRateRAY();
+        if (trancheToNAVUnitConversionRateRAY != SENTINEL_TRANCHE_TO_NAV_UNIT_CONVERSION_RATE) return trancheToNAVUnitConversionRateRAY;
+        return _getConversionRateFromOracle();
+    }
+
+    /// @notice Returns the stored conversion rate, scaled to RAY precision
+    /// @return conversionRateRAY The stored conversion rate, scaled to RAY precision
+    function getStoredConversionRateRAY() public view returns (uint256) {
+        return _getIdenticalAssetsOracleQuoterStorage().conversionRateRAY;
     }
 
     /**
      * @notice Returns the tranche unit to NAV unit conversion rate, scaled to RAY precision
      * @dev This function should be overridden if the conversion rate needs to be fetched from an oracle
-     * @return trancheToNAVUnitConversionRateRAY The tranche unit to NAV unit conversion rate, scaled to RAY precision
+     * @return conversionRateRAY The conversion rate from tranche units to NAV units, scaled to RAY precision
      */
-    function _getTrancheUnitToNAVUnitConversionRateFromOracle() internal view virtual returns (uint256 trancheToNAVUnitConversionRateRAY);
+    function _getConversionRateFromOracle() internal view virtual returns (uint256 conversionRateRAY);
 
     /// @dev Converts tranche units to NAV units for both tranches since they use identical assets
     function _convertTrancheUnitsToNAVUnits(TRANCHE_UNIT _assets) internal view returns (NAV_UNIT) {
@@ -115,7 +121,7 @@ abstract contract IdenticalAssetsOracleQuoter is RoycoKernel {
      * @dev Uses ERC-7201 storage slot pattern for collision-resistant storage
      * @return $ Storage pointer
      */
-    function _getIdenticalAssetsOracleQuoterStorage() internal pure returns (IdenticalAssetsOracleQuoterState storage $) {
+    function _getIdenticalAssetsOracleQuoterStorage() private pure returns (IdenticalAssetsOracleQuoterState storage $) {
         assembly ("memory-safe") {
             $.slot := IDENTICAL_ASSETS_ORACLE_QUOTER_STORAGE_SLOT
         }

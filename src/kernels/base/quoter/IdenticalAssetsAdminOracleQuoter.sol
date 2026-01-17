@@ -30,16 +30,16 @@ abstract contract IdenticalAssetsAdminOracleQuoter is IdenticalAssetsOracleQuote
 
     /// @inheritdoc IdenticalAssetsOracleQuoter
     /// @dev The conversion rate cannot be set to the sentinel value (0)
-    function setTrancheUnitToNAVUnitConversionRate(uint256 _trancheToNAVUnitConversionRateRAY) public override(IdenticalAssetsOracleQuoter) restricted {
+    function setConversionRate(uint256 _conversionRateRAY) public override(IdenticalAssetsOracleQuoter) restricted {
         // Validate the conversion rate
-        require(_trancheToNAVUnitConversionRateRAY != SENTINEL_TRANCHE_TO_NAV_UNIT_CONVERSION_RATE, INVALID_CONVERSION_RATE());
+        require(_conversionRateRAY != SENTINEL_TRANCHE_TO_NAV_UNIT_CONVERSION_RATE, INVALID_CONVERSION_RATE());
 
         // Update the oracle quoter with the initial admin set rate
-        super.setTrancheUnitToNAVUnitConversionRate(_trancheToNAVUnitConversionRateRAY);
+        super.setConversionRate(_conversionRateRAY);
     }
 
     /// @inheritdoc IdenticalAssetsOracleQuoter
-    function _getTrancheUnitToNAVUnitConversionRateFromOracle() internal pure override(IdenticalAssetsOracleQuoter) returns (uint256) {
+    function _getConversionRateFromOracle() internal pure override(IdenticalAssetsOracleQuoter) returns (uint256) {
         revert MUST_USE_ADMIN_ORACLE_INPUT();
     }
 }

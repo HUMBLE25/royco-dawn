@@ -57,7 +57,7 @@ contract ReUSD_ST_ReUSD_JT_Kernel is YieldBearingERC20_ST_YieldBearingERC20_JT_I
     }
 
     /// @inheritdoc IdenticalAssetsOracleQuoter
-    function _getTrancheUnitToNAVUnitConversionRateFromOracle() internal view override returns (uint256 trancheUnitToNAVUnitConversionRateWAD) {
+    function _getConversionRateFromOracle() internal view override returns (uint256) {
         // Convert 1e9 reUSD (reUSD has 18 decimals of precision) to the quote token (NAV units)
         // This ensures we maximize the precision of the NAV as compared to converting 1 reUSD to NAV units and scaling to RAY precision
         return IInsuranceCapitalLayer(INSURANCE_CAPITAL_LAYER).convertFromShares(REUSD_USD_QUOTE_TOKEN, RAY);
