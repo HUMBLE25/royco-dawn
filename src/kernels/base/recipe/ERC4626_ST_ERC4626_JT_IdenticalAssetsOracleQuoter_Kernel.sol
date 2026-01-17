@@ -5,7 +5,7 @@ import { IERC4626 } from "../../../../lib/openzeppelin-contracts/contracts/inter
 import { RoycoKernelInitParams } from "../../../libraries/RoycoKernelStorageLib.sol";
 import { NAV_UNIT } from "../../../libraries/Units.sol";
 import { RoycoKernel } from "../RoycoKernel.sol";
-import { IdenticalAssetsOracleQuoter } from "../quoter/IdenticalAssetsOracleQuoter.sol";
+import { IdenticalAssetsOracleQuoter } from "../quoter/base/IdenticalAssetsOracleQuoter.sol";
 import { ERC4626_ST_ERC4626_JT_Kernel } from "./ERC4626_ST_ERC4626_JT_Kernel.sol";
 
 /**
@@ -17,20 +17,12 @@ import { ERC4626_ST_ERC4626_JT_Kernel } from "./ERC4626_ST_ERC4626_JT_Kernel.sol
  */
 abstract contract ERC4626_ST_ERC4626_JT_IdenticalAssetsOracleQuoter_Kernel is ERC4626_ST_ERC4626_JT_Kernel, IdenticalAssetsOracleQuoter {
     /**
-     *@notice Constructor for the ERC4626_ST_ERC4626_JT_IdenticalAssetsOracleQuoter_Kernel
-     * @param _seniorTranche The address of the senior tranche
-     * @param _juniorTranche The address of the junior tranche
+     * @notice Constructs the Royco kernel
+     * @param _params The standard construction parameters for the Royco kernel
      * @param _stVault The address of the ERC4626 compliant vault that the senior tranche will deploy into
      * @param _jtVault The address of the ERC4626 compliant vault that the junior tranche will deploy into
      */
-    constructor(
-        address _seniorTranche,
-        address _juniorTranche,
-        address _stVault,
-        address _jtVault
-    )
-        ERC4626_ST_ERC4626_JT_Kernel(_seniorTranche, IERC4626(_stVault).asset(), _juniorTranche, IERC4626(_jtVault).asset(), _stVault, _jtVault)
-    { }
+    constructor(RoycoKernelConstructionParams memory _params, address _stVault, address _jtVault) ERC4626_ST_ERC4626_JT_Kernel(_params, _stVault, _jtVault) { }
 
     /**
      * @notice Initializes the Royco Kernel

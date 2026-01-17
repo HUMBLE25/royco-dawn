@@ -8,31 +8,33 @@ import { RoycoKernel } from "../RoycoKernel.sol";
 
 /**
  * @title InKindAssetsQuoter
- * @notice Quoter for markets where both tranches use the different unit precision and the NAV is expressed in tranche units with WAD (18 decimals) precision
+ * @notice Quoter for markets where both tranche assets are in-kind in value (can have identical or different precisions)
+ * @dev The NAV is expressed in tranche units with WAD (18 decimals) precision
  * @dev Supported use-cases include:
- *      - ST and JT use in kind assets that have different precisions
- *        For example, USDC and USDS (USD pegged assets with 6 and 18 decimals of precision respectively)
+ *      1. Both tranches in the same assets (eg USDC)
+ *      2. Tranches in USDC and USDT (USD pegged assets with 6 decimals of precision)
+ *      3. Tranches in USDC and USDS (USD pegged assets with 6 and 18 decimals of precision respectively)
  */
 abstract contract InKindAssetsQuoter is RoycoKernel {
-    /// @notice Immutable addresses for the ST and JT assets
+    /// @notice The scaling factor to convert ST tranche units to and from WAD precision
     uint256 internal immutable ST_SCALE_FACTOR_TO_WAD;
+
+    /// @notice The scaling factor to convert JT tranche units to and from WAD precision
     uint256 internal immutable JT_SCALE_FACTOR_TO_WAD;
 
     /// @notice Thrown when the senior or junior tranche asset has over WAD decimals of precision
     error UNSUPPORTED_DECIMALS();
 
-    /**
-     * @notice Initializes the quoter for inkind tranche assets
-     * @dev Assumes that the two assets have identical values
-     */
+    /// @notice Constructs the quoter for in-kind tranche assets
+    /// @dev Assumes that the two assets are pegged to the same asset, currency, commodity, etc.
     constructor() {
         // Get the decimals for each tranche's base asset and ensure they are less than or equal to WAD decimals of precision
         uint8 stDecimals = IERC20Metadata(ST_ASSET).decimals();
         uint8 jtDecimals = IERC20Metadata(JT_ASSET).decimals();
         require(stDecimals <= WAD_DECIMALS && jtDecimals <= WAD_DECIMALS, UNSUPPORTED_DECIMALS());
 
-        // Compute the scaling factor that will scale each tranche's asset quantities to WAD precision
-        // The NAV unit of this quoter is the tranche
+        // Compute the scaling factor that will scale each tranche's asset quantities to and from WAD precision
+        // The NAV unit of this quoter is the tranche asset (the same for both tranches)
         ST_SCALE_FACTOR_TO_WAD = 10 ** (WAD_DECIMALS - stDecimals);
         JT_SCALE_FACTOR_TO_WAD = 10 ** (WAD_DECIMALS - jtDecimals);
     }

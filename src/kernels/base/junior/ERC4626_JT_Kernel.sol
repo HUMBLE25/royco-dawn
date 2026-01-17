@@ -19,14 +19,13 @@ abstract contract ERC4626_JT_Kernel is RoycoKernel {
     /// @inheritdoc IRoycoKernel
     ExecutionModel public constant JT_DEPOSIT_EXECUTION_MODEL = ExecutionModel.SYNC;
 
-    /// @notice Immutable addresses for the JT ERC4626 vault
+    /// @notice Immutable addresses for the underlying JT ERC4626 vault
     address internal immutable JT_VAULT;
 
-    /// @notice Constructor for the ERC4626 junior tranche kernel
+    /// @notice Constructs the ERC4626 junior tranche kernel
     /// @param _jtVault The address of the ERC4626 compliant vault the junior tranche will deploy into
     constructor(address _jtVault) {
-        // Ensure that the JT ERC4626 vault is not null
-        require(_jtVault != address(0), NULL_ADDRESS());
+        // Ensure that the JT base asset is identical to the ERC4626 vault's base asset
         require(IERC4626(_jtVault).asset() == JT_ASSET, JUNIOR_TRANCHE_AND_VAULT_ASSET_MISMATCH());
 
         // Set the immutable address for the JT ERC4626 vault

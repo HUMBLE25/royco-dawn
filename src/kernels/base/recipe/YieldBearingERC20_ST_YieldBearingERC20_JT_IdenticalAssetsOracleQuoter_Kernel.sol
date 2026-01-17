@@ -5,29 +5,22 @@ import { IRoycoVaultTranche } from "../../../interfaces/tranche/IRoycoVaultTranc
 import { RoycoKernelInitParams } from "../../../libraries/RoycoKernelStorageLib.sol";
 import { RoycoKernel } from "../RoycoKernel.sol";
 import { YieldBearingERC20_JT_Kernel } from "../junior/YieldBearingERC20_JT_Kernel.sol";
-import { IdenticalAssetsOracleQuoter } from "../quoter/IdenticalAssetsOracleQuoter.sol";
+import { IdenticalAssetsOracleQuoter } from "../quoter/base/IdenticalAssetsOracleQuoter.sol";
 import { YieldBearingERC20_ST_Kernel } from "../senior/YieldBearingERC20_ST_Kernel.sol";
 
 /**
  * @title YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsOracleQuoter_Kernel
- * @notice The senior and junior tranches transfer in the same yield breaking ERC20 assets.
- * @notice The kernel uses an overridable NAV Conversion Rate oracle to convert the Tranche Units to NAV Units.
+ * @notice The senior and junior tranches transfer in the same yield bearing ERC20 assets (sACRED, mF-ONE, reUSD, etc.)
+ * @notice The kernel uses an overridable oracle to convert tranche units to NAV units, allowing NAVs to sync based on underlying PNL
  */
 abstract contract YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsOracleQuoter_Kernel is
     YieldBearingERC20_ST_Kernel,
     YieldBearingERC20_JT_Kernel,
     IdenticalAssetsOracleQuoter
 {
-    /// @notice Thrown when the senior and junior tranche assets are different
-    error ASSET_MISMATCH();
-
-    /**
-     * @notice Constructor for the YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsOracleQuoter_Kernel
-     * @param _seniorTranche The address of the senior tranche
-     * @param _juniorTranche The address of the junior tranche
-     * @param _asset The address of the yield breaking ERC20 asset that the senior and junior tranches will transfer in
-     */
-    constructor(address _seniorTranche, address _juniorTranche, address _asset) RoycoKernel(_seniorTranche, _asset, _juniorTranche, _asset) { }
+    /// @notice Constructs the kernel state
+    /// @param _params The standard construction parameters for the Royco kernel
+    constructor(RoycoKernelConstructionParams memory _params) RoycoKernel(_params) { }
 
     /**
      * @notice Initializes the Royco Kernel
@@ -41,11 +34,6 @@ abstract contract YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsOracl
         internal
         onlyInitializing
     {
-        require(
-            IRoycoVaultTranche(SENIOR_TRANCHE).asset() == ST_ASSET && IRoycoVaultTranche(JUNIOR_TRANCHE).asset() == JT_ASSET && ST_ASSET == JT_ASSET,
-            ASSET_MISMATCH()
-        );
-
         // Initialize the base kernel state
         __RoycoKernel_init(_params);
         // Initialize the overridable NAV oracle identical assets quoter

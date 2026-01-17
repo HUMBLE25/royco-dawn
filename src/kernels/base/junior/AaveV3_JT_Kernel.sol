@@ -14,19 +14,23 @@ abstract contract AaveV3_JT_Kernel is RoycoKernel {
     using SafeERC20 for IERC20;
     using UnitsMathLib for TRANCHE_UNIT;
 
+    /// @inheritdoc IRoycoKernel
+    ExecutionModel public constant JT_DEPOSIT_EXECUTION_MODEL = ExecutionModel.SYNC;
+
+    /// @notice Address of the Aave V3 pool
+    address private immutable AAVE_V3_POOL;
+
+    /// @notice Address of the Aave V3 pool addresses provider
+    address private immutable AAVE_V3_POOL_ADDRESSES_PROVIDER;
+
+    /// @notice Address of the Aave V3 pool addresses provider
+    address private immutable JT_ASSET_ATOKEN;
+
     /// @notice Thrown when the JT base asset is not a supported reserve token in the Aave V3 Pool
     error UNSUPPORTED_RESERVE_TOKEN();
 
     /// @notice Thrown when a low-level call fails
     error FAILED_CALL();
-
-    /// @inheritdoc IRoycoKernel
-    ExecutionModel public constant JT_DEPOSIT_EXECUTION_MODEL = ExecutionModel.SYNC;
-
-    /// @notice Immutable addresses for the Aave V3 pool, Aave V3 pool addresses provider, and JT asset AToken
-    address private immutable AAVE_V3_POOL;
-    address private immutable AAVE_V3_POOL_ADDRESSES_PROVIDER;
-    address private immutable JT_ASSET_ATOKEN;
 
     /// @notice Constructor for the Aave V3 junior tranche kernel
     /// @param _aaveV3Pool The address of the Aave V3 Pool
@@ -39,7 +43,7 @@ abstract contract AaveV3_JT_Kernel is RoycoKernel {
         JT_ASSET_ATOKEN = IPool(_aaveV3Pool).getReserveAToken(JT_ASSET);
         require(JT_ASSET_ATOKEN != address(0), UNSUPPORTED_RESERVE_TOKEN());
 
-        // Set the immutable addresses for the Aave V3 pool and JT asset AToken
+        // Set the immutable addresses for the Aave V3 pool and addresses provider
         AAVE_V3_POOL = _aaveV3Pool;
         AAVE_V3_POOL_ADDRESSES_PROVIDER = address(IPool(_aaveV3Pool).ADDRESSES_PROVIDER());
     }
@@ -66,7 +70,7 @@ abstract contract AaveV3_JT_Kernel is RoycoKernel {
     /// @inheritdoc RoycoKernel
     function _getJuniorTrancheRawNAV() internal view override(RoycoKernel) returns (NAV_UNIT) {
         // The tranche's balance of the AToken is the total assets it is owed from the Aave pool
-        /// @dev This does not treat illiquidity in the Aave pool as a loss: we assume that total lent will be withdrawable at some point
+        /// @dev This does not treat illiquidity in the Aave pool as a loss: we assume that total lent and interest will be withdrawable at some point
         return jtConvertTrancheUnitsToNAVUnits(toTrancheUnits(IERC20(JT_ASSET_ATOKEN).balanceOf(address(this))));
     }
 
@@ -94,11 +98,11 @@ abstract contract AaveV3_JT_Kernel is RoycoKernel {
     }
 
     /**
-     * @notice Helper function to get the total accrued to treasury and total lent from the pool data provider
+     * @notice Helper function to get the total accrued to treasury and total lent and interest from the pool data provider
      * @dev IPoolDataProvider.getReserveData returns a tuple of 11 words which saturates the stack
      * @dev Uses a low-level static call to the pool data provider to avoid stack too deep errors
      * @param _poolDataProvider The Aave V3 pool data provider
-     * @param _asset The asset to get the total lent data for
+     * @param _asset The asset to get the total lent and interest data for
      * @return totalAccruedToTreasury The total assets accrued to the Aave treasury that exist in the lending pool
      * @return totalLent The total assets lent and owned by lenders of the pool
      */
@@ -120,7 +124,7 @@ abstract contract AaveV3_JT_Kernel is RoycoKernel {
             // Make the static call to the pool data provider
             success := staticcall(gas(), _poolDataProvider, add(data, 0x20), mload(data), ptr, 0x60)
 
-            // Load the total accrued to treasury and total lent from the return data
+            // Load the total accrued to treasury and total lent and interest from the return data
             // Refer IPoolDataProvider.getReserveData for the return data layout
             totalAccruedToTreasury := mload(add(ptr, 0x20))
             totalLent := mload(add(ptr, 0x40))
