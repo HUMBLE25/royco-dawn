@@ -4,18 +4,18 @@ pragma solidity ^0.8.28;
 import { RoycoKernelInitParams } from "../libraries/RoycoKernelStorageLib.sol";
 import { RoycoKernel } from "./base/RoycoKernel.sol";
 import { YieldBearingERC20_JT_Kernel } from "./base/junior/YieldBearingERC20_JT_Kernel.sol";
-import { IdenticalERC4626AssetsOracleQuoter } from "./base/quoter/IdenticalERC4626AssetsOracleQuoter.sol";
+import { IdenticalAssetsChainlinkOracleQuoter } from "./base/quoter/IdenticalAssetsChainlinkOracleQuoter.sol";
 import { YieldBearingERC20_ST_Kernel } from "./base/senior/YieldBearingERC20_ST_Kernel.sol";
 
 /**
- * @title YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsOracleQuoter_Kernel
- * @notice The senior and junior tranches transfer in the same yield bearing ERC4626 assets (sNUSD, sUSDe, etc.)
- * @notice The kernel uses an overridable oracle to convert tranche token units to NAV units, allowing NAVs to sync based on underlying PNL
+ * @title YBERC4626_ST_YBERC4626_JT_IdenticalAssetsChainlinkOracleQuoter_Kernel
+ * @notice The senior and junior tranches transfer in the same yield bearing asset
+ * @notice The kernel uses a Chainlink oracle to convert tranche token units to NAV units, allowing NAVs to sync based on underlying PNL
  */
-contract YBERC4626_ST_YBERC4626_JT_IdenticalERC4626Assets_Kernel is
+contract YBERC4626_ST_YBERC4626_JT_IdenticalAssetsChainlinkOracleQuoter_Kernel is
     YieldBearingERC20_ST_Kernel,
     YieldBearingERC20_JT_Kernel,
-    IdenticalERC4626AssetsOracleQuoter
+    IdenticalAssetsChainlinkOracleQuoter
 {
     /// @notice Thrown when a function is not implemented
     error NOT_IMPLEMENTED();
@@ -29,7 +29,7 @@ contract YBERC4626_ST_YBERC4626_JT_IdenticalERC4626Assets_Kernel is
      * @param _params The standard initialization parameters for the Royco Kernel
      * @param _initialConversionRateWAD The initial tranche unit to NAV unit conversion rate
      */
-    function __YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsOracleQuoter_Kernel_init(
+    function __YBERC4626_ST_YBERC4626_JT_IdenticalAssetsChainlinkOracleQuoter_Kernel_init(
         RoycoKernelInitParams calldata _params,
         uint256 _initialConversionRateWAD
     )

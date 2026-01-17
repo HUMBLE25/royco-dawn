@@ -23,7 +23,7 @@ abstract contract IdenticalAssetsOracleQuoter is RoycoKernel {
     bytes32 private constant IDENTICAL_ASSETS_ORACLE_QUOTER_STORAGE_SLOT = 0xca94f7ca84d231255275e1b9f26a7020d13b86fcd22e881d1138f23eeb47cf00;
 
     /// @notice A sentinel value for the conversion rate, indicating that the conversion rate should be queried in real time from the specified oracle
-    uint256 internal constant SENTINEL_TRANCHE_TO_NAV_UNIT_CONVERSION_RATE = 0;
+    uint256 internal constant SENTINEL_CONVERSION_RATE = 0;
 
     /// @dev Storage state for the Royco identical assets overridable oracle quoter
     /// @custom:storage-location erc7201:Royco.storage.IdenticalAssetsOracleQuoterState
@@ -47,7 +47,7 @@ abstract contract IdenticalAssetsOracleQuoter is RoycoKernel {
         require(ST_ASSET == JT_ASSET, TRANCHE_ASSETS_MUST_BE_IDENTICAL());
 
         // Premptively return if this quoter is reliant on an oracle instead of an admin set conversion rate
-        if (_initialConversionRateRAY == SENTINEL_TRANCHE_TO_NAV_UNIT_CONVERSION_RATE) return;
+        if (_initialConversionRateRAY == SENTINEL_CONVERSION_RATE) return;
         _getIdenticalAssetsOracleQuoterStorage().conversionRateRAY = _initialConversionRateRAY;
         emit ConversionRateUpdated(_initialConversionRateRAY);
     }
@@ -89,7 +89,7 @@ abstract contract IdenticalAssetsOracleQuoter is RoycoKernel {
     function getTrancheUnitToNAVUnitConversionRate() public view virtual returns (uint256 trancheToNAVUnitConversionRateRAY) {
         // If there is an admin set conversion rate, use that, else query the oracle for the rate
         trancheToNAVUnitConversionRateRAY = getStoredConversionRateRAY();
-        if (trancheToNAVUnitConversionRateRAY != SENTINEL_TRANCHE_TO_NAV_UNIT_CONVERSION_RATE) return trancheToNAVUnitConversionRateRAY;
+        if (trancheToNAVUnitConversionRateRAY != SENTINEL_CONVERSION_RATE) return trancheToNAVUnitConversionRateRAY;
         return _getConversionRateFromOracle();
     }
 

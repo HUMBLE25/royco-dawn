@@ -53,7 +53,7 @@ contract ReUSD_ST_ReUSD_JT_Kernel is YieldBearingERC20_ST_YieldBearingERC20_JT_I
      */
     function initialize(RoycoKernelInitParams calldata _params) external initializer {
         // The initial conversion rate is set to the sentinel value so that the reUSD -> REUSD_USD_QUOTE_TOKEN conversion rate is queried directly from the insurance capital layer
-        __YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsOracleQuoter_Kernel_init(_params, SENTINEL_TRANCHE_TO_NAV_UNIT_CONVERSION_RATE);
+        __YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsOracleQuoter_Kernel_init(_params, SENTINEL_CONVERSION_RATE);
     }
 
     /// @inheritdoc IdenticalAssetsOracleQuoter

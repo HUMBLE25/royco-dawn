@@ -22,7 +22,7 @@ abstract contract IdenticalAssetsAdminOracleQuoter is IdenticalAssetsOracleQuote
      */
     function __IdenticalAssetsAdminOracleQuoter_init(uint256 _initialConversionRateRAY) internal onlyInitializing {
         // Validate the conversion rate
-        require(_initialConversionRateRAY != SENTINEL_TRANCHE_TO_NAV_UNIT_CONVERSION_RATE, INVALID_CONVERSION_RATE());
+        require(_initialConversionRateRAY != SENTINEL_CONVERSION_RATE, INVALID_CONVERSION_RATE());
 
         // Initialize the oracle quoter with the initial admin set rate
         __IdenticalAssetsOracleQuoter_init_unchained(_initialConversionRateRAY);
@@ -32,7 +32,7 @@ abstract contract IdenticalAssetsAdminOracleQuoter is IdenticalAssetsOracleQuote
     /// @dev The conversion rate cannot be set to the sentinel value (0)
     function setConversionRate(uint256 _conversionRateRAY) public override(IdenticalAssetsOracleQuoter) restricted {
         // Validate the conversion rate
-        require(_conversionRateRAY != SENTINEL_TRANCHE_TO_NAV_UNIT_CONVERSION_RATE, INVALID_CONVERSION_RATE());
+        require(_conversionRateRAY != SENTINEL_CONVERSION_RATE, INVALID_CONVERSION_RATE());
 
         // Update the oracle quoter with the initial admin set rate
         super.setConversionRate(_conversionRateRAY);
