@@ -14,7 +14,7 @@ import { IRoycoKernel } from "../../src/interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoAsyncCancellableVault } from "../../src/interfaces/tranche/IRoycoAsyncCancellableVault.sol";
 import { IRoycoAsyncVault } from "../../src/interfaces/tranche/IRoycoAsyncVault.sol";
 import { IRoycoVaultTranche } from "../../src/interfaces/tranche/IRoycoVaultTranche.sol";
-import { ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel } from "../../src/kernels/ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel.sol";
+import { ERC4626_ST_AaveV3_JT_InKindAssets_Kernel } from "../../src/kernels/ERC4626_ST_AaveV3_JT_InKindAssets_Kernel.sol";
 import { RoycoKernel } from "../../src/kernels/base/RoycoKernel.sol";
 import { AssetClaims, MarketState, RolesConfiguration, TrancheType } from "../../src/libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, toUint256 } from "../../src/libraries/Units.sol";

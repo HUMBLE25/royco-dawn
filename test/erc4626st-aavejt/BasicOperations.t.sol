@@ -38,7 +38,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         uint256 initialTrancheShares = JT.balanceOf(depositor);
 
         // Assert that initially all tranche parameters are 0
-        _verifyPreviewNAVs(stState, jtState, AAVE_MAX_ABS_TRANCH_UNIT_DELTA, AAVE_MAX_ABS_NAV_DELTA);
+        _verifyPreviewNAVs(stState, jtState, AAVE_MAX_ABS_TRANCHE_UNIT_DELTA, AAVE_MAX_ABS_NAV_DELTA);
         _verifyFeeTaken(stState, jtState, PROTOCOL_FEE_RECIPIENT_ADDRESS);
 
         // Fetch the max deposit for the junior tranche
@@ -78,11 +78,11 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
 
         // Verify that an equivalent amount of AUSDCs were minted
         assertApproxEqAbs(
-            AUSDC.balanceOf(address(KERNEL)), _assets, toUint256(AAVE_MAX_ABS_TRANCH_UNIT_DELTA), "An equivalent amount of AUSDCs should be minted"
+            AUSDC.balanceOf(address(KERNEL)), _assets, toUint256(AAVE_MAX_ABS_TRANCHE_UNIT_DELTA), "An equivalent amount of AUSDCs should be minted"
         );
 
         // Verify that the tranche state has been updated
-        _verifyPreviewNAVs(stState, jtState, AAVE_MAX_ABS_TRANCH_UNIT_DELTA, AAVE_MAX_ABS_NAV_DELTA);
+        _verifyPreviewNAVs(stState, jtState, AAVE_MAX_ABS_TRANCHE_UNIT_DELTA, AAVE_MAX_ABS_NAV_DELTA);
         _verifyFeeTaken(stState, jtState, PROTOCOL_FEE_RECIPIENT_ADDRESS);
     }
 
@@ -91,7 +91,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         _numDepositors = bound(_numDepositors, 1, 10);
 
         // Assert that initially all tranche parameters are 0
-        _verifyPreviewNAVs(stState, jtState, AAVE_MAX_ABS_TRANCH_UNIT_DELTA, AAVE_MAX_ABS_NAV_DELTA);
+        _verifyPreviewNAVs(stState, jtState, AAVE_MAX_ABS_TRANCHE_UNIT_DELTA, AAVE_MAX_ABS_NAV_DELTA);
         _verifyFeeTaken(stState, jtState, PROTOCOL_FEE_RECIPIENT_ADDRESS);
 
         for (uint256 i = 0; i < _numDepositors; i++) {
@@ -123,7 +123,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
             assertApproxEqAbs(
                 AUSDC.balanceOf(address(KERNEL)),
                 amount + initialATokenBalance,
-                toUint256(AAVE_MAX_ABS_TRANCH_UNIT_DELTA),
+                toUint256(AAVE_MAX_ABS_TRANCHE_UNIT_DELTA),
                 "An equivalent amount of AUSDCs should be minted"
             );
 
@@ -147,7 +147,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
             assertEq(USDC.balanceOf(provider.addr), initialDepositorBalance - amount, "Provider balance should decrease by amount");
 
             // Verify that the tranche state has been updated
-            _verifyPreviewNAVs(stState, jtState, AAVE_MAX_ABS_TRANCH_UNIT_DELTA, AAVE_MAX_ABS_NAV_DELTA);
+            _verifyPreviewNAVs(stState, jtState, AAVE_MAX_ABS_TRANCHE_UNIT_DELTA, AAVE_MAX_ABS_NAV_DELTA);
             _verifyFeeTaken(stState, jtState, PROTOCOL_FEE_RECIPIENT_ADDRESS);
         }
     }
@@ -176,11 +176,12 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         vm.stopPrank();
 
         _updateOnDeposit(jtState, jtAssets, _toJTValue(jtAssets), shares, TrancheType.JUNIOR);
-        _verifyPreviewNAVs(stState, jtState, AAVE_MAX_ABS_TRANCH_UNIT_DELTA, AAVE_MAX_ABS_NAV_DELTA);
+        _verifyPreviewNAVs(stState, jtState, AAVE_MAX_ABS_TRANCHE_UNIT_DELTA, AAVE_MAX_ABS_NAV_DELTA);
 
         // Verify that ST.maxDeposit returns JTEff / coverage
         // BETA is 0
-        TRANCHE_UNIT expectedMaxDeposit = toTrancheUnits(toUint256(JT.totalAssets().nav).mulDiv(WAD, COVERAGE_WAD, Math.Rounding.Floor));
+        TRANCHE_UNIT expectedMaxDeposit =
+            toTrancheUnits(toUint256(KERNEL.jtConvertNAVUnitsToTrancheUnits(JT.totalAssets().nav)).mulDiv(WAD, COVERAGE_WAD, Math.Rounding.Floor));
         {
             TRANCHE_UNIT maxDeposit = ST.maxDeposit(jtDepositor);
             assertEq(maxDeposit, expectedMaxDeposit, "Max deposit should return JTEff * coverage");
@@ -222,7 +223,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         _updateOnDeposit(stState, depositAmount, _toSTValue(depositAmount), shares, TrancheType.SENIOR);
 
         // Verify that the tranche state has been updated
-        _verifyPreviewNAVs(stState, jtState, AAVE_MAX_ABS_TRANCH_UNIT_DELTA, AAVE_MAX_ABS_NAV_DELTA);
+        _verifyPreviewNAVs(stState, jtState, AAVE_MAX_ABS_TRANCHE_UNIT_DELTA, AAVE_MAX_ABS_NAV_DELTA);
         _verifyFeeTaken(stState, jtState, PROTOCOL_FEE_RECIPIENT_ADDRESS);
 
         // Verify that the amount was transferred to the underlying vault
@@ -246,14 +247,14 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
             // Verify that ST.convertToAssets returns the correct amount
             AssetClaims memory convertToAssetsResult = ST.convertToAssets(shares);
             assertApproxEqAbs(
-                convertToAssetsResult.stAssets, depositAmount, AAVE_MAX_ABS_TRANCH_UNIT_DELTA, "Convert to assets should return the correct amount"
+                convertToAssetsResult.stAssets, depositAmount, AAVE_MAX_ABS_TRANCHE_UNIT_DELTA, "Convert to assets should return the correct amount"
             );
             assertEq(convertToAssetsResult.jtAssets, ZERO_TRANCHE_UNITS, "Convert to assets should return 0 JT assets");
             assertApproxEqAbs(convertToAssetsResult.nav, _toSTValue(depositAmount), AAVE_MAX_ABS_NAV_DELTA, "Convert to assets should return the correct NAV");
 
             // Verify that ST.previewRedeem returns the correct amount
             AssetClaims memory previewRedeemResult = ST.previewRedeem(shares);
-            assertApproxEqAbs(previewRedeemResult.stAssets, depositAmount, AAVE_MAX_ABS_TRANCH_UNIT_DELTA, "Preview redeem should return the correct amount");
+            assertApproxEqAbs(previewRedeemResult.stAssets, depositAmount, AAVE_MAX_ABS_TRANCHE_UNIT_DELTA, "Preview redeem should return the correct amount");
             assertEq(previewRedeemResult.jtAssets, ZERO_TRANCHE_UNITS, "Preview redeem should return 0 JT assets");
             assertApproxEqAbs(previewRedeemResult.nav, _toSTValue(depositAmount), AAVE_MAX_ABS_NAV_DELTA, "Preview redeem should return the correct NAV");
 
@@ -292,7 +293,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         _updateOnDeposit(stState, depositAmount, _toSTValue(depositAmount), shares, TrancheType.SENIOR);
 
         // Verify that the tranche state has been updated
-        _verifyPreviewNAVs(stState, jtState, AAVE_MAX_ABS_TRANCH_UNIT_DELTA, AAVE_MAX_ABS_NAV_DELTA);
+        _verifyPreviewNAVs(stState, jtState, AAVE_MAX_ABS_TRANCHE_UNIT_DELTA, AAVE_MAX_ABS_NAV_DELTA);
         _verifyFeeTaken(stState, jtState, PROTOCOL_FEE_RECIPIENT_ADDRESS);
 
         // Verify that the amount was transferred to the underlying vault
@@ -318,14 +319,14 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         // Verify that ST.convertToAssets returns the correct amount
         AssetClaims memory convertToAssetsResult = ST.convertToAssets(shares + stDepositorSharesBeforeDeposit);
         assertApproxEqAbs(
-            convertToAssetsResult.stAssets, expectedMaxDeposit, AAVE_MAX_ABS_TRANCH_UNIT_DELTA, "Convert to assets should return the correct amount"
+            convertToAssetsResult.stAssets, expectedMaxDeposit, AAVE_MAX_ABS_TRANCHE_UNIT_DELTA, "Convert to assets should return the correct amount"
         );
         assertEq(convertToAssetsResult.jtAssets, ZERO_TRANCHE_UNITS, "Convert to assets should return 0 JT assets");
         assertApproxEqAbs(convertToAssetsResult.nav, _toSTValue(expectedMaxDeposit), AAVE_MAX_ABS_NAV_DELTA, "Convert to assets should return the correct NAV");
 
         // Verify that ST.previewRedeem returns the correct amount
         AssetClaims memory previewRedeemResult = ST.previewRedeem(shares + stDepositorSharesBeforeDeposit);
-        assertApproxEqAbs(previewRedeemResult.stAssets, expectedMaxDeposit, AAVE_MAX_ABS_TRANCH_UNIT_DELTA, "Preview redeem should return the correct amount");
+        assertApproxEqAbs(previewRedeemResult.stAssets, expectedMaxDeposit, AAVE_MAX_ABS_TRANCHE_UNIT_DELTA, "Preview redeem should return the correct amount");
         assertEq(previewRedeemResult.jtAssets, ZERO_TRANCHE_UNITS, "Preview redeem should return 0 JT assets");
         assertApproxEqAbs(previewRedeemResult.nav, _toSTValue(expectedMaxDeposit), AAVE_MAX_ABS_NAV_DELTA, "Preview redeem should return the correct NAV");
 
@@ -349,7 +350,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         vm.stopPrank();
 
         _updateOnDeposit(jtState, jtAssets, _toJTValue(jtAssets), shares, TrancheType.JUNIOR);
-        _verifyPreviewNAVs(stState, jtState, AAVE_MAX_ABS_TRANCH_UNIT_DELTA, AAVE_MAX_ABS_NAV_DELTA);
+        _verifyPreviewNAVs(stState, jtState, AAVE_MAX_ABS_TRANCHE_UNIT_DELTA, AAVE_MAX_ABS_NAV_DELTA);
 
         // Withdraw assets from the junior tranche
         uint256 sharesToWithdraw = shares / _totalWithdrawalRequests;
@@ -396,7 +397,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
 
             // Verify that the redeem result is the correct amount
             assertApproxEqAbs(
-                redeemResult.jtAssets, expectedAssetsToWithdraw, toUint256(AAVE_MAX_ABS_TRANCH_UNIT_DELTA), "Redeem result should be the correct amount"
+                redeemResult.jtAssets, expectedAssetsToWithdraw, toUint256(AAVE_MAX_ABS_TRANCHE_UNIT_DELTA), "Redeem result should be the correct amount"
             );
             assertEq(redeemResult.stAssets, ZERO_TRANCHE_UNITS, "Redeem result should be 0 ST assets");
             assertApproxEqAbs(redeemResult.nav, _toJTValue(expectedAssetsToWithdraw), AAVE_MAX_ABS_NAV_DELTA, "Redeem result should return the correct NAV");
@@ -405,7 +406,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
             assertApproxEqAbs(
                 toTrancheUnits(USDC.balanceOf(jtDepositor) - jtDepositorBalanceBeforeRedeem),
                 expectedAssetsToWithdraw,
-                toUint256(AAVE_MAX_ABS_TRANCH_UNIT_DELTA),
+                toUint256(AAVE_MAX_ABS_TRANCHE_UNIT_DELTA),
                 "Tokens should be transferred to the jtDepositor"
             );
 
@@ -432,7 +433,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         vm.stopPrank();
 
         _updateOnDeposit(jtState, jtAssets, _toJTValue(jtAssets), shares, TrancheType.JUNIOR);
-        _verifyPreviewNAVs(stState, jtState, AAVE_MAX_ABS_TRANCH_UNIT_DELTA, AAVE_MAX_ABS_NAV_DELTA);
+        _verifyPreviewNAVs(stState, jtState, AAVE_MAX_ABS_TRANCHE_UNIT_DELTA, AAVE_MAX_ABS_NAV_DELTA);
 
         // Withdraw assets from the junior tranche
         uint256 sharesToWithdraw = shares / _totalWithdrawalRequests;
@@ -489,7 +490,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
             assertApproxEqAbs(
                 redeemResult.jtAssets,
                 expectedAssetsToWithdrawForEachRequest[i],
-                toUint256(AAVE_MAX_ABS_TRANCH_UNIT_DELTA),
+                toUint256(AAVE_MAX_ABS_TRANCHE_UNIT_DELTA),
                 "Redeem result should be the correct amount"
             );
             assertEq(redeemResult.stAssets, ZERO_TRANCHE_UNITS, "Redeem result should be 0 ST assets");
@@ -501,7 +502,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
             assertApproxEqAbs(
                 toTrancheUnits(USDC.balanceOf(jtDepositor) - jtDepositorBalanceBeforeRedeem),
                 expectedAssetsToWithdrawForEachRequest[i],
-                toUint256(AAVE_MAX_ABS_TRANCH_UNIT_DELTA),
+                toUint256(AAVE_MAX_ABS_TRANCHE_UNIT_DELTA),
                 "Tokens should be transferred to the jtDepositor"
             );
 
@@ -531,7 +532,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         vm.stopPrank();
 
         _updateOnDeposit(jtState, jtAssets, _toJTValue(jtAssets), shares, TrancheType.JUNIOR);
-        _verifyPreviewNAVs(stState, jtState, AAVE_MAX_ABS_TRANCH_UNIT_DELTA, AAVE_MAX_ABS_NAV_DELTA);
+        _verifyPreviewNAVs(stState, jtState, AAVE_MAX_ABS_TRANCHE_UNIT_DELTA, AAVE_MAX_ABS_NAV_DELTA);
 
         // Calculate shares to withdraw based on percentage
         uint256 sharesToWithdraw = shares * _withdrawalPercentage / 100;
@@ -629,7 +630,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         vm.stopPrank();
 
         _updateOnDeposit(jtState, jtAssets, _toJTValue(jtAssets), jtShares, TrancheType.JUNIOR);
-        _verifyPreviewNAVs(stState, jtState, AAVE_MAX_ABS_TRANCH_UNIT_DELTA, AAVE_MAX_ABS_NAV_DELTA);
+        _verifyPreviewNAVs(stState, jtState, AAVE_MAX_ABS_TRANCHE_UNIT_DELTA, AAVE_MAX_ABS_NAV_DELTA);
 
         // Verify JT can exit initially (no ST deposits yet, so no coverage requirement)
         {
@@ -652,7 +653,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         vm.stopPrank();
 
         _updateOnDeposit(stState, stDepositAmount, _toSTValue(stDepositAmount), stShares, TrancheType.SENIOR);
-        _verifyPreviewNAVs(stState, jtState, AAVE_MAX_ABS_TRANCH_UNIT_DELTA, AAVE_MAX_ABS_NAV_DELTA);
+        _verifyPreviewNAVs(stState, jtState, AAVE_MAX_ABS_TRANCHE_UNIT_DELTA, AAVE_MAX_ABS_NAV_DELTA);
 
         // Verify JT cannot exit now (coverage requirement blocks it)
         {
@@ -722,7 +723,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         assertApproxEqAbs(
             USDC.balanceOf(address(MOCK_UNDERLYING_ST_VAULT)),
             0,
-            toUint256(AAVE_MAX_ABS_TRANCH_UNIT_DELTA),
+            toUint256(AAVE_MAX_ABS_TRANCHE_UNIT_DELTA),
             "Underlying ST vault should have no USDC assets remaining"
         );
     }

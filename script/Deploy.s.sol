@@ -11,7 +11,7 @@ import { IRoycoKernel } from "../src/interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoAsyncCancellableVault } from "../src/interfaces/tranche/IRoycoAsyncCancellableVault.sol";
 import { IRoycoAsyncVault } from "../src/interfaces/tranche/IRoycoAsyncVault.sol";
 import { IRoycoVaultTranche } from "../src/interfaces/tranche/IRoycoVaultTranche.sol";
-import { ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel } from "../src/kernels/ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel.sol";
+import { ERC4626_ST_AaveV3_JT_InKindAssets_Kernel } from "../src/kernels/ERC4626_ST_AaveV3_JT_InKindAssets_Kernel.sol";
 import { RoycoKernelInitParams } from "../src/libraries/RoycoKernelStorageLib.sol";
 import { DeployedContracts, MarketDeploymentParams, RolesConfiguration, TrancheDeploymentParams } from "../src/libraries/Types.sol";
 import { RoycoJT } from "../src/tranches/RoycoJT.sol";
@@ -69,13 +69,13 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
         address _expectedJuniorTrancheAddress
     )
         internal
-        returns (ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel)
+        returns (ERC4626_ST_AaveV3_JT_InKindAssets_Kernel)
     {
         address stVault = vm.envAddress("ST_VAULT_ADDRESS");
         address aaveV3Pool = vm.envAddress("AAVE_V3_POOL_ADDRESS");
 
         bytes memory creationCode = abi.encodePacked(
-            type(ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel).creationCode,
+            type(ERC4626_ST_AaveV3_JT_InKindAssets_Kernel).creationCode,
             abi.encode(_expectedSeniorTrancheAddress, _expectedJuniorTrancheAddress, stVault, aaveV3Pool)
         );
 
@@ -85,7 +85,7 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
         } else {
             console2.log("Kernel implementation deployed at:", addr);
         }
-        return ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel(addr);
+        return ERC4626_ST_AaveV3_JT_InKindAssets_Kernel(addr);
     }
 
     function _deploySTTrancheImpl() internal returns (RoycoST) {
@@ -148,7 +148,7 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
         address expectedAccountantAddress = factory.predictERC1967ProxyAddress(address(accountantImpl), salt);
 
         // Deploy the kernel implementation
-        // TODO: Allow deployment of any kernel implementation, not just ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel
+        // TODO: Allow deployment of any kernel implementation, not just ERC4626_ST_AaveV3_JT_InKindAssets_Kernel
         address kernelImpl = address(_deployERC4626STAAaveV3JTIdenticalAssetsKernelImpl(expectedSeniorTrancheAddress, expectedJuniorTrancheAddress));
         address expectedKernelAddress = factory.predictERC1967ProxyAddress(address(kernelImpl), salt);
 
@@ -214,7 +214,7 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
             jtRedemptionDelayInSeconds: jtRedemptionDelay
         });
 
-        return abi.encodeCall(ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel.initialize, (kernelParams));
+        return abi.encodeCall(ERC4626_ST_AaveV3_JT_InKindAssets_Kernel.initialize, (kernelParams));
     }
 
     function _buildAccountantInitializationData(address expectedKernelAddress, address ydmAddress, address factoryAddress)
