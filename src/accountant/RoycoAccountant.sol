@@ -482,6 +482,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
                 // Compute the time weighted average JT share of yield
                 uint256 elapsed = block.timestamp - $.lastDistributionTimestamp;
                 // If the last yield distribution happened in the same block, use the instantaneous JT yield share. Else, use the time-weighted average JT yield share since the last distribution
+                NAV_UNIT jtGain;
                 if (elapsed == 0) {
                     uint256 instantaneousJtYieldShareWAD =
                         IYDM($.ydm).previewJTYieldShare($.lastMarketState, $.lastSTRawNAV, $.lastJTRawNAV, $.betaWAD, $.coverageWAD, $.lastJTEffectiveNAV);
