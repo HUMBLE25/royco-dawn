@@ -511,7 +511,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
 
         // Determine the resulting market state:
         // 1. Perpetual: There is no existant JT IL in the system, LLTV has been breached, ST IL exists, or the fixed term duration is set to 0
-        // 2. Fixed term: There is IL in the system but LLTV has not been breached
+        // 2. Fixed term: There is JT IL in the protocol, but LLTV has not been breached, ST IL does not exist, and the fixed term duration is not set to 0
         MarketState resultingMarketState;
         if (jtCoverageImpermanentLoss == ZERO_NAV_UNITS) {
             resultingMarketState = MarketState.PERPETUAL;
