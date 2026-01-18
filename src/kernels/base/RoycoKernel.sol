@@ -37,7 +37,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     address internal immutable JT_ASSET;
 
     /// @dev Permissions the function to only the market's senior tranche
-    /// @dev Should be placed on all ST deposit and withdraw functions
+    /// @dev Should be placed on all ST deposit and redeem functions
     // forge-lint: disable-next-item(unwrapped-modifier-logic)
     modifier onlySeniorTranche() {
         require(msg.sender == SENIOR_TRANCHE, ONLY_SENIOR_TRANCHE());
@@ -45,16 +45,18 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     }
 
     /// @dev Permissions the function to only the market's junior tranche
-    /// @dev Should be placed on all JT deposit and withdraw functions
+    /// @dev Should be placed on all JT deposit and redeem functions
     // forge-lint: disable-next-item(unwrapped-modifier-logic)
     modifier onlyJuniorTranche() {
         require(msg.sender == JUNIOR_TRANCHE, ONLY_JUNIOR_TRANCHE());
         _;
     }
 
-    /// @notice Modifer to check that the provided JT redemption request ID is valid for the given controller
-    /// @param _controller The controller to check the redemption request ID for
-    /// @param _requestId The JT redemption request ID to validate
+    /**
+     * @notice Modifer to check that the provided JT redemption request ID is valid for the given controller
+     * @param _controller The controller to check the redemption request ID for
+     * @param _requestId The JT redemption request ID to validate
+     */
     // forge-lint: disable-next-item(unwrapped-modifier-logic)
     modifier checkJTRedemptionRequestId(address _controller, uint256 _requestId) {
         RoycoKernelState storage $ = RoycoKernelStorageLib._getRoycoKernelStorage();
@@ -66,24 +68,24 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     // Initializer and State Accessor Functions
     // =============================
 
-    /// @notice Constructor for the Royco kernel
-    /// @param _seniorTranche The address of the senior tranche
-    /// @param _stAsset The address of the ST asset
-    /// @param _juniorTranche The address of the junior tranche
-    /// @param _jtAsset The address of the JT asset
-    constructor(address _seniorTranche, address _stAsset, address _juniorTranche, address _jtAsset) {
+    /// @notice Constructs the base Royco kernel state
+    /// @param _params The standard construction parameters for the Royco kernel
+    constructor(RoycoKernelConstructionParams memory _params) {
         // Ensure that the tranche addresses are not null
-        require(_seniorTranche != address(0) && _stAsset != address(0) && _juniorTranche != address(0) && _jtAsset != address(0), NULL_ADDRESS());
+        require(
+            _params.seniorTranche != address(0) && _params.stAsset != address(0) && _params.juniorTranche != address(0) && _params.jtAsset != address(0),
+            NULL_ADDRESS()
+        );
 
         // Set the immutable addresses
-        SENIOR_TRANCHE = _seniorTranche;
-        ST_ASSET = _stAsset;
-        JUNIOR_TRANCHE = _juniorTranche;
-        JT_ASSET = _jtAsset;
+        SENIOR_TRANCHE = _params.seniorTranche;
+        ST_ASSET = _params.stAsset;
+        JUNIOR_TRANCHE = _params.juniorTranche;
+        JT_ASSET = _params.jtAsset;
     }
 
     /**
-     * @notice Initializes the base kernel state
+     * @notice Initializes the base Royco kernel state
      * @dev Initializes any parent contracts and the base kernel state
      * @param _params The standard initialization parameters for the Royco kernel
      */
@@ -92,6 +94,11 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         __RoycoBase_init(_params.initialAuthority);
 
         // Initialize the Royco kernel state
+        // Ensure that the tranches and their corresponding assets in the kernel match
+        require(
+            IRoycoVaultTranche(SENIOR_TRANCHE).asset() == ST_ASSET && IRoycoVaultTranche(JUNIOR_TRANCHE).asset() == JT_ASSET,
+            TRANCHE_AND_KERNEL_ASSETS_MISMATCH()
+        );
         // Ensure that the tranche addresses, accountant, and protocol fee recipient are not null
         require(_params.accountant != address(0) && _params.protocolFeeRecipient != address(0), NULL_ADDRESS());
         // Initialize the base kernel state
@@ -141,7 +148,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     // =============================
 
     /// @inheritdoc IRoycoKernel
-    /// @dev ST Deposits are allowed in the following market states: PERPETUAL, FIXED_TERM
+    /// @dev ST deposits are allowed if the market is in a PERPETUAL or FIXED_TERM state, granted that the market's coverage requirement is satisfied post-deposit
     function stMaxDeposit(address _receiver) public view virtual override(IRoycoKernel) returns (TRANCHE_UNIT) {
         // Since ST deposits are unrestricted in any market state, return the global max deposit
         NAV_UNIT stMaxDepositableNAV = _accountant().maxSTDepositGivenCoverage(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV());
@@ -149,7 +156,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     }
 
     /// @inheritdoc IRoycoKernel
-    /// @dev ST Withdrawals are allowed in the following market states: PERPETUAL
+    /// @dev ST redemptions are allowed in PERPETUAL market states
     function stMaxWithdrawable(address _owner)
         public
         view
@@ -174,7 +181,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     }
 
     /// @inheritdoc IRoycoKernel
-    /// @dev JT Deposits are allowed in the following market states: PERPETUAL
+    /// @dev JT deposits are allowed if the market is in a PERPETUAL state
     function jtMaxDeposit(address _receiver) public view virtual override(IRoycoKernel) returns (TRANCHE_UNIT) {
         // If the market is in a state where JT deposits are not allowed, return zero tranche units
         (SyncedAccountingState memory state,,) = previewSyncTrancheAccounting(TrancheType.JUNIOR);
@@ -186,7 +193,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     }
 
     /// @inheritdoc IRoycoKernel
-    /// @dev JT Withdrawals are allowed in the following market states: PERPETUAL, FIXED_TERM
+    /// @dev JT redemptions are allowed if the market is in a PERPETUAL or FIXED_TERM state, granted that the market's coverage requirement is satisfied post-redemption
     function jtMaxWithdrawable(address _owner)
         public
         view
@@ -263,7 +270,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     // =============================
 
     /// @inheritdoc IRoycoKernel
-    /// @dev ST Deposits are allowed in the following market states: PERPETUAL, FIXED_TERM
+    /// @dev ST deposits are allowed if the market is in a PERPETUAL or FIXED_TERM state, granted that the market's coverage requirement is satisfied post-deposit
     function stDeposit(
         TRANCHE_UNIT _assets,
         address,
@@ -290,7 +297,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     }
 
     /// @inheritdoc IRoycoKernel
-    /// @dev ST Redemptions are allowed in the following market states: PERPETUAL
+    /// @dev ST redemptions are allowed if the market is in a PERPETUAL state
     function stRedeem(
         uint256 _shares,
         address,
@@ -331,7 +338,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     // =============================
 
     /// @inheritdoc IRoycoKernel
-    /// @dev JT Deposits are allowed in the following market states: PERPETUAL
+    /// @dev JT deposits are allowed if the market is in a PERPETUAL state
     function jtDeposit(
         TRANCHE_UNIT _assets,
         address,
@@ -367,7 +374,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     }
 
     /// @inheritdoc IRoycoKernel
-    /// @dev JT Redemptions are allowed in the following market states: PERPETUAL, FIXED_TERM
+    /// @dev JT redemptions are allowed if the market is in a PERPETUAL or FIXED_TERM state, granted that the market's coverage requirement is satisfied post-redemption
     function jtRequestRedeem(
         address,
         uint256 _shares,
@@ -478,7 +485,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     }
 
     /// @inheritdoc IRoycoKernel
-    /// @dev JT Redemptions are allowed in the following market states: PERPETUAL, FIXED_TERM
+    /// @dev JT redemptions are allowed if the market is in a PERPETUAL or FIXED_TERM state, granted that the market's coverage requirement is satisfied post-redemption
     function jtRedeem(
         uint256 _shares,
         address _controller,

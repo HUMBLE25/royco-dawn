@@ -61,10 +61,13 @@ contract LossWaterfall is MainnetForkWithAaveTestBase {
             "JT LP claims must reflect the loss"
         );
         assertApproxEqRel(
-            toUint256(postDepositState.jtRawNAV - postLossState.jtRawNAV), lossAssets, MAX_CONVERT_TO_ASSETS_RELATIVE_DELTA, "JT raw NAV must reflect the loss"
+            toUint256(KERNEL.jtConvertNAVUnitsToTrancheUnits(postDepositState.jtRawNAV - postLossState.jtRawNAV)),
+            lossAssets,
+            MAX_CONVERT_TO_ASSETS_RELATIVE_DELTA,
+            "JT raw NAV must reflect the loss"
         );
         assertApproxEqRel(
-            toUint256(postDepositState.jtEffectiveNAV - postLossState.jtEffectiveNAV),
+            toUint256(KERNEL.jtConvertNAVUnitsToTrancheUnits(postDepositState.jtEffectiveNAV - postLossState.jtEffectiveNAV)),
             lossAssets,
             MAX_CONVERT_TO_ASSETS_RELATIVE_DELTA,
             "JT raw NAV must reflect the loss"
@@ -116,7 +119,7 @@ contract LossWaterfall is MainnetForkWithAaveTestBase {
         vm.stopPrank();
 
         address stDepositor = BOB_ADDRESS;
-        TRANCHE_UNIT expectedMaxDeposit = toTrancheUnits(toUint256(JT.totalAssets().nav).mulDiv(WAD, COVERAGE_WAD, Math.Rounding.Floor));
+        TRANCHE_UNIT expectedMaxDeposit = KERNEL.jtConvertNAVUnitsToTrancheUnits(JT.totalAssets().nav.mulDiv(WAD, COVERAGE_WAD, Math.Rounding.Floor));
         // Deposit a percentage of the max deposit
         TRANCHE_UNIT depositAmount = expectedMaxDeposit.mulDiv(_stDepositPercentage, 100, Math.Rounding.Floor);
         vm.startPrank(stDepositor);
@@ -165,7 +168,7 @@ contract LossWaterfall is MainnetForkWithAaveTestBase {
         vm.stopPrank();
 
         address stDepositor = BOB_ADDRESS;
-        TRANCHE_UNIT expectedMaxDeposit = toTrancheUnits(toUint256(JT.totalAssets().nav).mulDiv(WAD, COVERAGE_WAD, Math.Rounding.Floor));
+        TRANCHE_UNIT expectedMaxDeposit = KERNEL.jtConvertNAVUnitsToTrancheUnits(JT.totalAssets().nav.mulDiv(WAD, COVERAGE_WAD, Math.Rounding.Floor));
         // Deposit a percentage of the max deposit
         TRANCHE_UNIT depositAmount = expectedMaxDeposit.mulDiv(_stDepositPercentage, 100, Math.Rounding.Floor);
         vm.startPrank(stDepositor);

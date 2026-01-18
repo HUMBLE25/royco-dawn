@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import { IERC4626 } from "../../lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 import { RoycoKernelInitParams } from "../libraries/RoycoKernelStorageLib.sol";
 import { NAV_UNIT } from "../libraries/Units.sol";
 import { RoycoKernel } from "./base/RoycoKernel.sol";
@@ -12,19 +11,17 @@ import { ERC4626_ST_ERC4626_JT_Kernel } from "./base/recipe/ERC4626_ST_ERC4626_J
  * @title ERC4626_ST_ERC4626_JT_InKindAssets_Kernel
  * @notice The senior and junior tranches are deployed into a ERC4626 compliant vault
  * @notice The two tranches can be deployed into the same ERC4626 compliant vault
- * @notice The tranche assets are identical in value and can have differing precisions (eg. USDC and USDS, USDT and USDE, etc.)
+ * @notice The tranche assets are identical in value and can have differing precisions (eg. USDC and USDS, USDT and USDe, etc.)
  * @notice NAV units are always expressed in tranche units scaled to WAD (18 decimals) precision
  */
 contract ERC4626_ST_ERC4626_JT_InKindAssets_Kernel is ERC4626_ST_ERC4626_JT_Kernel, InKindAssetsQuoter {
-    constructor(
-        address _seniorTranche,
-        address _juniorTranche,
-        address _stVault,
-        address _jtVault
-    )
-        ERC4626_ST_ERC4626_JT_Kernel(_seniorTranche, IERC4626(_stVault).asset(), _juniorTranche, IERC4626(_jtVault).asset(), _stVault, _jtVault)
-        InKindAssetsQuoter()
-    { }
+    /**
+     * @notice Constructs the Royco kernel
+     * @param _params The standard construction parameters for the Royco kernel
+     * @param _stVault The address of the ERC4626 compliant vault that the senior tranche will deploy into
+     * @param _jtVault The address of the ERC4626 compliant vault that the junior tranche will deploy into
+     */
+    constructor(RoycoKernelConstructionParams memory _params, address _stVault, address _jtVault) ERC4626_ST_ERC4626_JT_Kernel(_params, _stVault, _jtVault) { }
 
     /**
      * @notice Initializes the Royco Kernel

@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import { Vm } from "../../../lib/forge-std/src/Vm.sol";
 import { IERC20 } from "../../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { RoycoAccountant } from "../../../src/accountant/RoycoAccountant.sol";
-import { ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel } from "../../../src/kernels/ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel.sol";
+import { ERC4626_ST_AaveV3_JT_InKindAssets_Kernel } from "../../../src/kernels/ERC4626_ST_AaveV3_JT_InKindAssets_Kernel.sol";
 import { RoycoKernel } from "../../../src/kernels/base/RoycoKernel.sol";
 import { RoycoKernelInitParams } from "../../../src/libraries/RoycoKernelStorageLib.sol";
 import { DeployedContracts, IRoycoAccountant, IRoycoKernel, MarketDeploymentParams } from "../../../src/libraries/Types.sol";
@@ -16,8 +16,8 @@ import { ERC4626Mock } from "../../mock/ERC4626Mock.sol";
 
 abstract contract MainnetForkWithAaveTestBase is BaseTest {
     // TODO: Review All
-    TRANCHE_UNIT internal AAVE_MAX_ABS_TRANCH_UNIT_DELTA = toTrancheUnits(3);
-    NAV_UNIT internal AAVE_MAX_ABS_NAV_DELTA = toNAVUnits(toUint256(AAVE_MAX_ABS_TRANCH_UNIT_DELTA));
+    TRANCHE_UNIT internal AAVE_MAX_ABS_TRANCHE_UNIT_DELTA = toTrancheUnits(3);
+    NAV_UNIT internal AAVE_MAX_ABS_NAV_DELTA = toNAVUnits(toUint256(AAVE_MAX_ABS_TRANCHE_UNIT_DELTA) * 10 ** 12); // NAVs are scaled to WAD and USDC has 6 decimals
     uint256 internal constant MAX_REDEEM_RELATIVE_DELTA = 1 * BPS;
     uint256 internal constant MAX_CONVERT_TO_ASSETS_RELATIVE_DELTA = 1 * BPS;
     uint256 internal constant AAVE_PREVIEW_DEPOSIT_RELATIVE_DELTA = 1 * BPS;
@@ -28,7 +28,7 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
 
     // Deployed contracts
     ERC4626Mock internal MOCK_UNDERLYING_ST_VAULT;
-    address internal ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel_IMPL;
+    address internal ERC4626_ST_AaveV3_JT_InKindAssets_Kernel_IMPL;
 
     // External Contracts
     IERC20 internal USDC;
@@ -100,17 +100,18 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
         bytes32 salt = keccak256(abi.encodePacked("SALT"));
         address expectedSeniorTrancheAddress = FACTORY.predictERC1967ProxyAddress(address(ST_IMPL), salt);
         address expectedJuniorTrancheAddress = FACTORY.predictERC1967ProxyAddress(address(JT_IMPL), salt);
-        ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel_IMPL = address(
-            new ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel(
-                expectedSeniorTrancheAddress, expectedJuniorTrancheAddress, address(MOCK_UNDERLYING_ST_VAULT), ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS
-            )
-        );
-        address expectedKernelAddress = FACTORY.predictERC1967ProxyAddress(ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel_IMPL, salt);
+
+        IRoycoKernel.RoycoKernelConstructionParams memory params =
+            IRoycoKernel.RoycoKernelConstructionParams(expectedSeniorTrancheAddress, address(USDC), expectedJuniorTrancheAddress, address(USDC));
+
+        ERC4626_ST_AaveV3_JT_InKindAssets_Kernel_IMPL =
+            address(new ERC4626_ST_AaveV3_JT_InKindAssets_Kernel(params, address(MOCK_UNDERLYING_ST_VAULT), ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS));
+        address expectedKernelAddress = FACTORY.predictERC1967ProxyAddress(ERC4626_ST_AaveV3_JT_InKindAssets_Kernel_IMPL, salt);
         address expectedAccountantAddress = FACTORY.predictERC1967ProxyAddress(address(ACCOUNTANT_IMPL), salt);
 
         // Create the initialization data
         bytes memory kernelInitializationData = abi.encodeCall(
-            ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel.initialize,
+            ERC4626_ST_AaveV3_JT_InKindAssets_Kernel.initialize,
             (RoycoKernelInitParams({
                     initialAuthority: address(FACTORY),
                     accountant: expectedAccountantAddress,
@@ -165,7 +166,7 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
                 marketId: marketID,
                 seniorTrancheImplementation: ST_IMPL,
                 juniorTrancheImplementation: JT_IMPL,
-                kernelImplementation: IRoycoKernel(address(ERC4626_ST_AaveV3_JT_IdenticalAssets_Kernel_IMPL)),
+                kernelImplementation: IRoycoKernel(address(ERC4626_ST_AaveV3_JT_InKindAssets_Kernel_IMPL)),
                 seniorTrancheInitializationData: seniorTrancheInitializationData,
                 juniorTrancheInitializationData: juniorTrancheInitializationData,
                 accountantImplementation: IRoycoAccountant(address(ACCOUNTANT_IMPL)),

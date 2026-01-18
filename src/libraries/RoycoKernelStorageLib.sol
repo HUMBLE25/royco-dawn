@@ -6,11 +6,8 @@ import { NAV_UNIT } from "./Units.sol";
 /**
  * @notice Initialization parameters for the Royco Kernel
  * @custom:field initialAuthority - The access manager for this kernel
- * @custom:field seniorTranche - The address of the Royco senior tranche associated with this kernel
- * @custom:field juniorTranche - The address of the Royco junior tranche associated with this kernel
  * @custom:field accountant - The address of the Royco accountant used to perform per operation accounting for this kernel
  * @custom:field protocolFeeRecipient - The market's protocol fee recipient
- * @custom:field claimableAtTimestamp - The timestamp at which the redemption request is allowed to be claimed
  * @custom:field jtRedemptionDelayInSeconds - The redemption delay in seconds that a JT LP has to wait between requesting and executing a redemption
  */
 struct RoycoKernelInitParams {

@@ -1,43 +1,34 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import { IERC4626 } from "../../../../lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 import { RoycoKernelInitParams } from "../../../libraries/RoycoKernelStorageLib.sol";
 import { NAV_UNIT } from "../../../libraries/Units.sol";
 import { RoycoKernel } from "../RoycoKernel.sol";
-import { OverridableNAVOracleIdenticalAssetsQuoter } from "../quoter/OverridableNAVOracleIdenticalAssetsQuoter.sol";
+import { IdenticalAssetsOracleQuoter } from "../quoter/base/IdenticalAssetsOracleQuoter.sol";
 import { ERC4626_ST_ERC4626_JT_Kernel } from "./ERC4626_ST_ERC4626_JT_Kernel.sol";
 
 /**
- * @title ERC4626_ST_ERC4626_JT_OverridableNAVOracleIdenticalAssets_Kernel
+ * @title ERC4626_ST_ERC4626_JT_IdenticalAssetsOracleQuoter_Kernel
  * @notice The senior and junior tranches are deployed into a ERC4626 compliant vault
  * @notice The two tranches can be deployed into the same ERC4626 compliant vault
  * @notice The tranche assets are identical in value and precision (eg. USDC for both tranches, USDC and USDT, etc.)
  * @notice Tranche and NAV units are always expressed in the tranche asset's precision. The NAV Unit factors in a conversion rate from the overridable NAV Conversion Rate oracle.
  */
-abstract contract ERC4626_ST_ERC4626_JT_OverridableNAVOracleIdenticalAssets_Kernel is ERC4626_ST_ERC4626_JT_Kernel, OverridableNAVOracleIdenticalAssetsQuoter {
+abstract contract ERC4626_ST_ERC4626_JT_IdenticalAssetsOracleQuoter_Kernel is ERC4626_ST_ERC4626_JT_Kernel, IdenticalAssetsOracleQuoter {
     /**
-     *@notice Constructor for the ERC4626_ST_ERC4626_JT_OverridableNAVOracleIdenticalAssets_Kernel
-     * @param _seniorTranche The address of the senior tranche
-     * @param _juniorTranche The address of the junior tranche
+     * @notice Constructs the Royco kernel
+     * @param _params The standard construction parameters for the Royco kernel
      * @param _stVault The address of the ERC4626 compliant vault that the senior tranche will deploy into
      * @param _jtVault The address of the ERC4626 compliant vault that the junior tranche will deploy into
      */
-    constructor(
-        address _seniorTranche,
-        address _juniorTranche,
-        address _stVault,
-        address _jtVault
-    )
-        ERC4626_ST_ERC4626_JT_Kernel(_seniorTranche, IERC4626(_stVault).asset(), _juniorTranche, IERC4626(_jtVault).asset(), _stVault, _jtVault)
-    { }
+    constructor(RoycoKernelConstructionParams memory _params, address _stVault, address _jtVault) ERC4626_ST_ERC4626_JT_Kernel(_params, _stVault, _jtVault) { }
 
     /**
      * @notice Initializes the Royco Kernel
      * @param _params The standard initialization parameters for the Royco Kernel
      * @param _initialConversionRateWAD The initial tranche unit to NAV unit conversion rate
      */
-    function __ERC4626_ST_ERC4626_JT_OverridableNAVOracleIdenticalAssets_Kernel_init(
+    function __ERC4626_ST_ERC4626_JT_IdenticalAssetsOracleQuoter_Kernel_init(
         RoycoKernelInitParams calldata _params,
         uint256 _initialConversionRateWAD
     )
@@ -47,7 +38,7 @@ abstract contract ERC4626_ST_ERC4626_JT_OverridableNAVOracleIdenticalAssets_Kern
         // Initialize the base kernel state
         __ERC4626_ST_ERC4626_JT_Kernel_init(_params);
         // Initialize the overridable NAV oracle identical assets quoter
-        __OverridableNAVOracleIdenticalAssetsQuoter_init_unchained(_initialConversionRateWAD);
+        __IdenticalAssetsOracleQuoter_init_unchained(_initialConversionRateWAD);
     }
 
     /// @inheritdoc ERC4626_ST_ERC4626_JT_Kernel

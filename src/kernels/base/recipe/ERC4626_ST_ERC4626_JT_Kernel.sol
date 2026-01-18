@@ -11,25 +11,23 @@ import { ERC4626_ST_Kernel } from "../senior/ERC4626_ST_Kernel.sol";
 /**
  * @title ERC4626_ST_ERC4626_JT_Kernel
  * @dev This contract functions as a base kernel for all kernels that deploy the senior and junior tranches ERC4626 compliant vaults
+ * @dev The concrete implementation must implement or inherit a quoter
  */
 abstract contract ERC4626_ST_ERC4626_JT_Kernel is ERC4626_ST_Kernel, ERC4626_JT_Kernel {
     using UnitsMathLib for TRANCHE_UNIT;
 
-    /// @notice Constructor for the ERC4626_ST_ERC4626_JT_Kernel
-    /// @param _stVault The address of the ERC4626 compliant vault that the senior tranche will deploy into
-    /// @param _stAsset The address of the asset that the senior tranche will deploy into
-    /// @param _juniorTranche The address of the junior tranche
-    /// @param _jtAsset The address of the asset that the junior tranche will deploy into
-    /// @param _jtVault The address of the ERC4626 compliant vault that the junior tranche will deploy into
+    /**
+     * @notice Constructs the Royco kernel
+     * @param _params The standard construction parameters for the Royco kernel
+     * @param _stVault The address of the ERC4626 compliant vault that the senior tranche will deploy into
+     * @param _jtVault The address of the ERC4626 compliant vault that the junior tranche will deploy into
+     */
     constructor(
-        address _seniorTranche,
-        address _stAsset,
-        address _juniorTranche,
-        address _jtAsset,
+        RoycoKernelConstructionParams memory _params,
         address _stVault,
         address _jtVault
     )
-        RoycoKernel(_seniorTranche, _stAsset, _juniorTranche, _jtAsset)
+        RoycoKernel(_params)
         ERC4626_ST_Kernel(_stVault)
         ERC4626_JT_Kernel(_jtVault)
     { }
@@ -49,7 +47,6 @@ abstract contract ERC4626_ST_ERC4626_JT_Kernel is ERC4626_ST_Kernel, ERC4626_JT_
 
     /// @inheritdoc IRoycoKernel
     /// @dev Override this function to prevent double counting of max withdrawable assets when both tranches deploy into the same ERC4626 vault
-    /// @dev ST Withdrawals are allowed in the following market states: PERPETUAL
     function stMaxWithdrawable(address _owner)
         public
         view
@@ -62,7 +59,7 @@ abstract contract ERC4626_ST_ERC4626_JT_Kernel is ERC4626_ST_Kernel, ERC4626_JT_
 
         (SyncedAccountingState memory state, AssetClaims memory stNotionalClaims,) = previewSyncTrancheAccounting(TrancheType.SENIOR);
 
-        // If the market is in a state where ST withdrawals are not allowed, return zero claims
+        // If the market is not in a perpetual state, ST withdrawals are disabled
         if (state.marketState != MarketState.PERPETUAL) {
             return (ZERO_NAV_UNITS, ZERO_NAV_UNITS, ZERO_NAV_UNITS, ZERO_NAV_UNITS);
         }

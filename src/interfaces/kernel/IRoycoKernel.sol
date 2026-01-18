@@ -12,6 +12,20 @@ import { NAV_UNIT, TRANCHE_UNIT } from "../../libraries/Units.sol";
  */
 interface IRoycoKernel {
     /**
+     * @notice Initialization parameters for the Royco Kernel
+     * @custom:field seniorTranche - The address of the Royco senior tranche associated with this kernel
+     * @custom:field seniorTranche - The address of the base asset of the senior tranche
+     * @custom:field juniorTranche - The address of the Royco junior tranche associated with this kernel
+     * @custom:field seniorTranche - The address of the base asset of the junior tranche
+     */
+    struct RoycoKernelConstructionParams {
+        address seniorTranche;
+        address stAsset;
+        address juniorTranche;
+        address jtAsset;
+    }
+
+    /**
      * @notice Emitted when the protocol fee recipient is updated
      * @param protocolFeeRecipient The new protocol fee recipient
      */
@@ -25,6 +39,9 @@ interface IRoycoKernel {
 
     /// @notice Thrown when any of the required initialization params are null
     error NULL_ADDRESS();
+
+    /// @notice Thrown when the tranche and the kernel's corresponding tranche assets don't match
+    error TRANCHE_AND_KERNEL_ASSETS_MISMATCH();
 
     /// @notice Thrown when the caller of a permissioned function isn't the market's senior tranche
     error ONLY_SENIOR_TRANCHE();
