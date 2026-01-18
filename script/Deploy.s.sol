@@ -239,14 +239,12 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
     /// @param _juniorTranche The junior tranche address
     /// @param _kernel The kernel address
     /// @param _accountant The accountant address
-    /// @param _params The deployment parameters
     /// @return roles The roles configuration array
     function buildRolesConfiguration(
         address _seniorTranche,
         address _juniorTranche,
         address _kernel,
-        address _accountant,
-        DeploymentParams memory _params
+        address _accountant
     )
         public
         pure
@@ -444,7 +442,7 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
 
         // Build roles configuration
         RolesConfiguration[] memory roles =
-            buildRolesConfiguration(expectedSeniorTrancheAddress, expectedJuniorTrancheAddress, expectedKernelAddress, expectedAccountantAddress, _params);
+            buildRolesConfiguration(expectedSeniorTrancheAddress, expectedJuniorTrancheAddress, expectedKernelAddress, expectedAccountantAddress);
 
         // Build market deployment params
         MarketDeploymentParams memory marketParams = MarketDeploymentParams({
@@ -693,10 +691,9 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
         } else if (_kernelType == KernelType.ReUSD_ST_ReUSD_JT) {
             return address(_deployReUSDSTReUSDJTKernelImpl(constructionParams, _kernelSpecificParams));
         } else if (_kernelType == KernelType.YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkOracleQuoter) {
-            return
-                address(_deployYieldBearingERC20STYieldBearingERC20JTIdenticalAssetsChainlinkOracleQuoterKernelImpl(constructionParams, _kernelSpecificParams));
+            return address(_deployYieldBearingERC20STYieldBearingERC20JTIdenticalAssetsChainlinkOracleQuoterKernelImpl(constructionParams));
         } else if (_kernelType == KernelType.YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626Assets) {
-            return address(_deployYieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626AssetsKernelImpl(constructionParams, _kernelSpecificParams));
+            return address(_deployYieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626AssetsKernelImpl(constructionParams));
         } else {
             revert UnsupportedKernelType(_kernelType);
         }
@@ -770,8 +767,7 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
     }
 
     function _deployYieldBearingERC20STYieldBearingERC20JTIdenticalAssetsChainlinkOracleQuoterKernelImpl(
-        IRoycoKernel.RoycoKernelConstructionParams memory _constructionParams,
-        bytes memory _params
+        IRoycoKernel.RoycoKernelConstructionParams memory _constructionParams
     )
         internal
         returns (YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkOracleQuoter_Kernel)
@@ -790,14 +786,14 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
     }
 
     function _deployYieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626AssetsKernelImpl(
-        IRoycoKernel.RoycoKernelConstructionParams memory _constructionParams,
-        bytes memory _params
+        IRoycoKernel.RoycoKernelConstructionParams memory _constructionParams
     )
         internal
         returns (YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626Assets_Kernel)
     {
-        bytes memory creationCode =
-            abi.encodePacked(type(YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626Assets_Kernel).creationCode, abi.encode(_constructionParams));
+        bytes memory creationCode = abi.encodePacked(
+            type(YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626Assets_Kernel).creationCode, abi.encode(_constructionParams)
+        );
 
         (address addr, bool alreadyDeployed) = deployWithSanityChecks(KERNEL_IMPL_SALT, creationCode, false);
         if (alreadyDeployed) {

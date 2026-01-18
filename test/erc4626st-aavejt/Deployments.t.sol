@@ -576,10 +576,6 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         FACTORY.deployMarket(params);
     }
 
-    /// @dev Helper to build a dummy DeploymentParams for buildRolesConfiguration
-    /// @dev Only used to pass to buildRolesConfiguration which needs DeploymentParams but only uses role addresses
-    function _buildDummyDeploymentParams() internal view returns (DeployScript.DeploymentParams memory m) { }
-
     /// @dev Helper to construct a valid set of market deployment params that mirrors `_deployMarketWithKernel`
     /// @dev Uses a default salt; useful for tests that only hit parameter validation
     function _buildValidMarketParams() internal view returns (MarketDeploymentParams memory params, bytes32 marketId, bytes32 salt) {
@@ -665,7 +661,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
             kernelProxyDeploymentSalt: salt,
             accountantProxyDeploymentSalt: salt,
             roles: DEPLOY_SCRIPT.buildRolesConfiguration(
-                expectedSeniorTrancheAddress, expectedJuniorTrancheAddress, expectedKernelAddress, expectedAccountantAddress, _buildDummyDeploymentParams()
+                expectedSeniorTrancheAddress, expectedJuniorTrancheAddress, expectedKernelAddress, expectedAccountantAddress
             )
         });
     }
