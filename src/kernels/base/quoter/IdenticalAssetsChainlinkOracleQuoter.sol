@@ -15,6 +15,25 @@ import { IdenticalAssetsOracleQuoter } from "./base/IdenticalAssetsOracleQuoter.
 abstract contract IdenticalAssetsChainlinkOracleQuoter is IdenticalAssetsOracleQuoter {
     using Math for uint256;
 
+    /// @dev Storage slot for IdenticalAssetsChainlinkOracleQuoterState using ERC-7201 pattern
+    // keccak256(abi.encode(uint256(keccak256("Royco.storage.IdenticalAssetsChainlinkOracleQuoterState")) - 1)) & ~bytes32(uint256(0xff))
+    bytes32 private constant IDENTICAL_ASSETS_CHAINLINK_ORACLE_QUOTER_STORAGE_SLOT = 0x36321e8ea9ef16a1b272d9cece1e9b80ed6532a47572ae703d9c65a3a5fa1800;
+
+    /// @dev Storage state for the Royco identical assets chainlink oracle quoter
+    /// @custom:storage-location erc7201:Royco.storage.IdenticalAssetsChainlinkOracleQuoterState
+    struct IdenticalAssetsChainlinkOracleQuoterState {
+        address trancheAssetToReferenceAssetOracle;
+        uint8 trancheAssetToReferenceAssetOracleDecimalPrecision;
+        uint48 stalenessThresholdSeconds;
+    }
+
+    /// @notice Emitted when the identical assets chainlink oracle quoter is updated
+    event IdenticalAssetsChainlinkOracleUpdated(
+        address indexed _trancheAssetToReferenceAssetOracle,
+        uint8 indexed _trancheAssetToReferenceAssetOracleDecimalPrecision,
+        uint48 indexed _stalenessThresholdSeconds
+    );
+
     /// @notice Thrown when the tranche asset to reference asset oracle is the zero address
     error INVALID_TRANCHE_ASSET_TO_REFERENCE_ASSET_ORACLE();
 
@@ -29,24 +48,6 @@ abstract contract IdenticalAssetsChainlinkOracleQuoter is IdenticalAssetsOracleQ
 
     /// @notice Thrown when the price is incomplete
     error PRICE_INCOMPLETE();
-
-    /// @notice Emitted when the identical assets chainlink oracle quoter is updated
-    event IdenticalAssetsChainlinkOracleUpdated(
-        address indexed _trancheAssetToReferenceAssetOracle,
-        uint8 indexed _trancheAssetToReferenceAssetOracleDecimalPrecision,
-        uint48 indexed _stalenessThresholdSeconds
-    );
-
-    // keccak256(abi.encode(uint256(keccak256("Royco.storage.IdenticalAssetsChainlinkOracleQuoterState")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant IDENTICAL_ASSETS_CHAINLINK_ORACLE_QUOTER_STORAGE_SLOT = 0x36321e8ea9ef16a1b272d9cece1e9b80ed6532a47572ae703d9c65a3a5fa1800;
-
-    /// @dev Storage state for the Royco identical assets chainlink oracle quoter
-    /// @custom:storage-location erc7201:Royco.storage.IdenticalAssetsChainlinkOracleQuoterState
-    struct IdenticalAssetsChainlinkOracleQuoterState {
-        address trancheAssetToReferenceAssetOracle;
-        uint8 trancheAssetToReferenceAssetOracleDecimalPrecision;
-        uint48 stalenessThresholdSeconds;
-    }
 
     /**
      * @notice Initializes the identical assets chainlink oracle quoter
