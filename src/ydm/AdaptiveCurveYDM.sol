@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import { FixedPointMathLib } from "../../lib/solady/src/utils/FixedPointMathLib.sol";
 import { IYDM, MarketState } from "../interfaces/IYDM.sol";
-import { TARGET_UTILIZATION_WAD_INT, WAD, WAD_INT } from "../libraries/Constants.sol";
+import { TARGET_UTILIZATION_WAD, TARGET_UTILIZATION_WAD_INT, WAD, WAD_INT } from "../libraries/Constants.sol";
 import { NAV_UNIT } from "../libraries/Units.sol";
 import { UtilsLib } from "../libraries/UtilsLib.sol";
 
@@ -157,14 +157,13 @@ contract AdaptiveCurveYDM is IYDM {
         returns (uint256 jtYieldShareWAD, uint256 newJtYieldShareAtTargetWAD)
     {
         // Compute the utilization of the market and bound it to 100%
-        uint256 unboundedUtilizationWAD = UtilsLib.computeUtilization(_stRawNAV, _jtRawNAV, _betaWAD, _coverageWAD, _jtEffectiveNAV);
-        // forge-lint: disable-next-item(unsafe-typecast)
-        int256 utilizationWAD = unboundedUtilizationWAD > WAD ? WAD_INT : int256(unboundedUtilizationWAD);
+        uint256 utilizationWAD = UtilsLib.computeUtilization(_stRawNAV, _jtRawNAV, _betaWAD, _coverageWAD, _jtEffectiveNAV);
+        utilizationWAD = utilizationWAD > WAD ? WAD : utilizationWAD;
 
         // Compute the max delta from the target utilization in the region of the curve that the market is currently in (above or below the kink)
-        int256 maxDeltaFromTargetInRegionWAD = utilizationWAD > TARGET_UTILIZATION_WAD_INT ? (WAD_INT - TARGET_UTILIZATION_WAD_INT) : TARGET_UTILIZATION_WAD_INT;
+        uint256 maxDeltaFromTargetInRegionWAD = utilizationWAD > TARGET_UTILIZATION_WAD ? (WAD - TARGET_UTILIZATION_WAD) : TARGET_UTILIZATION_WAD;
         // Normalize the actual delta from the target utilization relative to the max delta in the current region
-        int256 normalizedDeltaFromTargetWAD = ((utilizationWAD - TARGET_UTILIZATION_WAD_INT) * WAD_INT) / maxDeltaFromTargetInRegionWAD;
+        int256 normalizedDeltaFromTargetWAD = ((int256(utilizationWAD) - TARGET_UTILIZATION_WAD_INT) * WAD_INT) / int256(maxDeltaFromTargetInRegionWAD);
 
         // Retrieve the current YDM curve for the market
         // Only adapt the curve if the market is in a perpetual state and market forces are enabled to affect utilization
