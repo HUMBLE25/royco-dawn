@@ -9,8 +9,8 @@ import { IdenticalAssetsOracleQuoter } from "./base/IdenticalAssetsOracleQuoter.
 /**
  * @title IdenticalAssetsChainlinkOracleQuoter
  * @notice Quoter for markets where both tranches use the same tranche asset
- * @dev The NAV Unit is calculated as Tranche Unit * Chainlink Oracle Price * Conversion Rate (from storage or another oracle)
- * @dev For Example: Tranche Unit: PT-cUSD, NAV Unit: USDC where x Tranche Unit = x * PT-cUSD price in SY-cUSD * SY-cUSD price in USDC
+ * @dev The NAV unit is calculated as tranche unit * Chainlink Oracle Price * Conversion Rate (from storage or another oracle)
+ * @dev For Example: tranche unit: PT-cUSD, NAV unit: USD where x tranche unit = x * PT-cUSD price in SY-cUSD * SY-cUSD price in USD
  */
 abstract contract IdenticalAssetsChainlinkOracleQuoter is IdenticalAssetsOracleQuoter {
     using Math for uint256;
@@ -66,8 +66,8 @@ abstract contract IdenticalAssetsChainlinkOracleQuoter is IdenticalAssetsOracleQ
 
     /**
      * @notice Returns the conversion rate from tranche units to NAV units, scaled to RAY precision
-     * @dev The conversion rate is calculated as Tranche Asset Price in Reference Asset * Reference Asset Price in NAV Units
-     *      NAV Units = Tranche Asset Price in Reference Asset * Reference Asset Price in NAV Units
+     * @dev The conversion rate is calculated as Tranche Asset Price in Reference Asset * Reference Asset Price in NAV units
+     *      NAV units = Tranche Asset Price in Reference Asset * Reference Asset Price in NAV units
      * @return trancheToNAVUnitConversionRateRAY The conversion rate from tranche token units to NAV units, scaled to RAY precision
      */
     function getTrancheUnitToNAVUnitConversionRate() public view override returns (uint256 trancheToNAVUnitConversionRateRAY) {
@@ -127,7 +127,6 @@ abstract contract IdenticalAssetsChainlinkOracleQuoter is IdenticalAssetsOracleQ
         require(_stalenessThresholdSeconds > 0, INVALID_STALENESS_THRESHOLD_SECONDS());
 
         IdenticalAssetsChainlinkOracleQuoterState storage $ = _getIdenticalAssetsChainlinkOracleQuoterStorage();
-
         $.trancheAssetToReferenceAssetOracle = _trancheAssetToReferenceAssetOracle;
         $.trancheAssetToReferenceAssetOracleDecimalPrecision = AggregatorV3Interface(_trancheAssetToReferenceAssetOracle).decimals();
         $.stalenessThresholdSeconds = _stalenessThresholdSeconds;

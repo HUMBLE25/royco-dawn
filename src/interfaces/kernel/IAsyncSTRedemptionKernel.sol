@@ -2,25 +2,25 @@
 pragma solidity ^0.8.28;
 
 /**
- * @title IAsyncSTWithdrawalKernel
- * @notice Interface for Royco kernels that employ an asynchronous withdrawal flow for the senior tranche
+ * @title IAsyncSTRedemptionKernel
+ * @notice Interface for Royco kernels that employ an asynchronous redemption flow for the senior tranche
  * @dev We mandate that kernels implement the cancellation functions because of the market's utilization changing between request and claim
  *      if the underlying investment opportunity supports it
  */
-interface IAsyncSTWithdrawalKernel {
+interface IAsyncSTRedemptionKernel {
     /**
      * @notice Requests a redemption for a specified amount of shares from the underlying investment opportunity
-     * @param _caller The address of the user requesting the withdrawal for the senior tranche
+     * @param _caller The address of the user requesting the redemption for the senior tranche
      * @param _shares The amount of shares of the senior tranche being requested to be redeemed
      * @param _controller The controller that is allowed to operate the lifecycle of the request.
-     * @return requestId The request ID of this withdrawal request
+     * @return requestId The request ID of this redemption request
      * @return metadata The format prefixed metadata of the redemption request
      */
     function stRequestRedeem(address _caller, uint256 _shares, address _controller) external returns (uint256 requestId, bytes memory metadata);
 
     /**
      * @notice Returns the amount of assets pending redemption for a specific controller
-     * @param _requestId The request ID of this withdrawal request
+     * @param _requestId The request ID of this redemption request
      * @param _controller The controller to query pending redemptions for
      * @return pendingShares The amount of shares pending redemption for the controller
      */
@@ -28,7 +28,7 @@ interface IAsyncSTWithdrawalKernel {
 
     /**
      * @notice Returns the amount of shares claimable from completed redemption requests for a specific controller
-     * @param _requestId The request ID of this withdrawal request
+     * @param _requestId The request ID of this redemption request
      * @param _controller The controller to query claimable redemptions for
      * @return claimableShares The amount of shares claimable from completed redemption requests
      */

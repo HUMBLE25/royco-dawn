@@ -10,7 +10,7 @@ import { Math } from "../../lib/openzeppelin-contracts/contracts/utils/math/Math
 import { RoycoBase } from "../base/RoycoBase.sol";
 import { IAsyncJTDepositKernel } from "../interfaces/kernel/IAsyncJTDepositKernel.sol";
 import { IAsyncSTDepositKernel } from "../interfaces/kernel/IAsyncSTDepositKernel.sol";
-import { IAsyncSTWithdrawalKernel } from "../interfaces/kernel/IAsyncSTWithdrawalKernel.sol";
+import { IAsyncSTRedemptionKernel } from "../interfaces/kernel/IAsyncSTRedemptionKernel.sol";
 import { ExecutionModel, IRoycoKernel, SharesRedemptionModel } from "../interfaces/kernel/IRoycoKernel.sol";
 import { IERC165, IRoycoAsyncCancellableVault, IRoycoAsyncVault, IRoycoVaultTranche } from "../interfaces/tranche/IRoycoVaultTranche.sol";
 import { ZERO_NAV_UNITS } from "../libraries/Constants.sol";
@@ -392,7 +392,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         // Queue the redemption request and get the request ID from the kernel
         (requestId, metadata) =
         (TRANCHE_TYPE() == TrancheType.SENIOR
-                ? IAsyncSTWithdrawalKernel(kernel()).stRequestRedeem(msg.sender, _shares, _controller)
+                ? IAsyncSTRedemptionKernel(kernel()).stRequestRedeem(msg.sender, _shares, _controller)
                 : IRoycoKernel(kernel()).jtRequestRedeem(msg.sender, _shares, _controller));
 
         // Handle the shares being redeemed from the owner using the tranche's redemption behavior
@@ -423,13 +423,13 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         // Get the number of shares pending from the request
         uint256 pendingSharesFromRequest =
             (TRANCHE_TYPE() == TrancheType.SENIOR
-                ? IAsyncSTWithdrawalKernel(kernel()).stPendingRedeemRequest(_requestId, _controller)
+                ? IAsyncSTRedemptionKernel(kernel()).stPendingRedeemRequest(_requestId, _controller)
                 : IRoycoKernel(kernel()).jtPendingRedeemRequest(_requestId, _controller));
 
         // If the request is claimable from underlying, some shares may still be locked due to the coverage condition
         uint256 claimableSharesFromRequest =
             (TRANCHE_TYPE() == TrancheType.SENIOR
-                ? IAsyncSTWithdrawalKernel(kernel()).stClaimableRedeemRequest(_requestId, _controller)
+                ? IAsyncSTRedemptionKernel(kernel()).stClaimableRedeemRequest(_requestId, _controller)
                 : IRoycoKernel(kernel()).jtClaimableRedeemRequest(_requestId, _controller));
         uint256 lockedClaimableSharesDueToCoverageCondition = _maxRedeem(_controller, claimableSharesFromRequest) - claimableSharesFromRequest;
 
@@ -451,7 +451,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
     {
         claimableShares =
         (TRANCHE_TYPE() == TrancheType.SENIOR
-                ? IAsyncSTWithdrawalKernel(kernel()).stClaimableRedeemRequest(_requestId, _controller)
+                ? IAsyncSTRedemptionKernel(kernel()).stClaimableRedeemRequest(_requestId, _controller)
                 : IRoycoKernel(kernel()).jtClaimableRedeemRequest(_requestId, _controller));
 
         claimableShares = _maxRedeem(_controller, claimableShares);
@@ -560,7 +560,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
     {
         // Request the kernel to cancel a previously made redeem request on behalf of the user
         if (TRANCHE_TYPE() == TrancheType.SENIOR) {
-            IAsyncSTWithdrawalKernel(kernel()).stCancelRedeemRequest(_requestId, _controller);
+            IAsyncSTRedemptionKernel(kernel()).stCancelRedeemRequest(_requestId, _controller);
         } else {
             IRoycoKernel(kernel()).jtCancelRedeemRequest(_requestId, _controller);
         }
@@ -583,7 +583,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
     {
         isPending =
         (TRANCHE_TYPE() == TrancheType.SENIOR
-                ? IAsyncSTWithdrawalKernel(kernel()).stPendingCancelRedeemRequest(_requestId, _controller)
+                ? IAsyncSTRedemptionKernel(kernel()).stPendingCancelRedeemRequest(_requestId, _controller)
                 : IRoycoKernel(kernel()).jtPendingCancelRedeemRequest(_requestId, _controller));
     }
 
@@ -602,7 +602,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
     {
         shares =
         (TRANCHE_TYPE() == TrancheType.SENIOR
-                ? IAsyncSTWithdrawalKernel(kernel()).stClaimableCancelRedeemRequest(_requestId, _controller)
+                ? IAsyncSTRedemptionKernel(kernel()).stClaimableCancelRedeemRequest(_requestId, _controller)
                 : IRoycoKernel(kernel()).jtClaimableCancelRedeemRequest(_requestId, _controller));
     }
 
@@ -624,7 +624,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         // Get the number of shares in a canceled state for this request ID
         uint256 shares =
             (TRANCHE_TYPE() == TrancheType.SENIOR
-                ? IAsyncSTWithdrawalKernel(kernel()).stClaimCancelRedeemRequest(_requestId, _owner)
+                ? IAsyncSTRedemptionKernel(kernel()).stClaimCancelRedeemRequest(_requestId, _owner)
                 : IRoycoKernel(kernel()).jtClaimCancelRedeemRequest(_requestId, _owner));
 
         // Ensure a non-zero amount can be claimed
