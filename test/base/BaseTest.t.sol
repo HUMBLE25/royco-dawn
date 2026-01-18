@@ -5,11 +5,13 @@ import { Test } from "../../lib/forge-std/src/Test.sol";
 import { Vm } from "../../lib/forge-std/src/Vm.sol";
 import { ERC20Mock } from "../../lib/openzeppelin-contracts/contracts/mocks/token/ERC20Mock.sol";
 import { ERC1967Proxy } from "../../lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import { DeployScript } from "../../script/Deploy.s.sol";
 import { RoycoFactory } from "../../src/RoycoFactory.sol";
 import { RoycoAccountant } from "../../src/accountant/RoycoAccountant.sol";
 import { RoycoRoles } from "../../src/auth/RoycoRoles.sol";
 import { IRoycoAccountant } from "../../src/interfaces/IRoycoAccountant.sol";
 import { IRoycoAuth } from "../../src/interfaces/IRoycoAuth.sol";
+import { IYDM } from "../../src/interfaces/IYDM.sol";
 import { IRoycoKernel } from "../../src/interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoAsyncCancellableVault } from "../../src/interfaces/tranche/IRoycoAsyncCancellableVault.sol";
 import { IRoycoAsyncVault } from "../../src/interfaces/tranche/IRoycoAsyncVault.sol";
@@ -75,18 +77,20 @@ abstract contract BaseTest is Test, RoycoRoles, Assertions {
     // Royco Deployments
     // -----------------------------------------
 
-    // Initial Deployments
+    // Deploy Script
+    DeployScript internal DEPLOY_SCRIPT;
+
+    // Deployments
     RoycoFactory internal FACTORY;
-    StaticCurveYDM internal YDM;
+    IYDM internal YDM;
     RoycoST public ST_IMPL;
     RoycoJT internal JT_IMPL;
     RoycoAccountant internal ACCOUNTANT_IMPL;
-
-    // Deployed Later in the concrete tests
-    RoycoVaultTranche internal ST;
-    RoycoVaultTranche internal JT;
-    RoycoKernel internal KERNEL;
-    RoycoAccountant internal ACCOUNTANT;
+    address internal KERNEL_IMPL;
+    IRoycoVaultTranche internal ST;
+    IRoycoVaultTranche internal JT;
+    IRoycoKernel internal KERNEL;
+    IRoycoAccountant internal ACCOUNTANT;
     bytes32 internal MARKET_ID;
 
     // -----------------------------------------
@@ -126,27 +130,9 @@ abstract contract BaseTest is Test, RoycoRoles, Assertions {
     function _setUpRoyco() internal virtual {
         _setupFork();
         _setupWallets();
-        _setupAssets(10_000_000_000);
 
-        // Deploy YDM
-        YDM = new StaticCurveYDM();
-        vm.label(address(YDM), "YDM");
-
-        // Deploy tranche implementations
-        ST_IMPL = new RoycoST();
-        JT_IMPL = new RoycoJT();
-        vm.label(address(ST_IMPL), "STImpl");
-        vm.label(address(JT_IMPL), "JTImpl");
-
-        // Deploy accountant implementation
-        ACCOUNTANT_IMPL = new RoycoAccountant();
-        vm.label(address(ACCOUNTANT_IMPL), "AccountantImpl");
-
-        // Deploy FACTORY
-        FACTORY = new RoycoFactory(OWNER_ADDRESS);
-        vm.label(address(FACTORY), "Factory");
-
-        _setupFactoryAuth();
+        // Deploy the deploy script
+        DEPLOY_SCRIPT = new DeployScript();
     }
 
     function _setupFork() internal {
@@ -178,25 +164,29 @@ abstract contract BaseTest is Test, RoycoRoles, Assertions {
     }
 
     function _setupWallets() internal {
-        // Init wallets with 1000 ETH each
         OWNER = _initWallet("OWNER", 1000 ether);
         PAUSER = _initWallet("PAUSER", 1000 ether);
         UPGRADER = _initWallet("UPGRADER", 1000 ether);
-        ALICE = _initWallet("ALICE", 1000 ether);
-        BOB = _initWallet("BOB", 1000 ether);
-        CHARLIE = _initWallet("CHARLIE", 1000 ether);
-        DAN = _initWallet("DAN", 1000 ether);
         PROTOCOL_FEE_RECIPIENT = _initWallet("PROTOCOL_FEE_RECIPIENT", 1000 ether);
 
-        // Set addresses
         OWNER_ADDRESS = OWNER.addr;
         PAUSER_ADDRESS = PAUSER.addr;
+        PROTOCOL_FEE_RECIPIENT_ADDRESS = PROTOCOL_FEE_RECIPIENT.addr;
         UPGRADER_ADDRESS = UPGRADER.addr;
+    }
+
+    function _setupProviders() internal {
+        // Init wallets with 1000 ETH each
+        ALICE = _generateProvider("ALICE");
+        BOB = _generateProvider("BOB");
+        CHARLIE = _generateProvider("CHARLIE");
+        DAN = _generateProvider("DAN");
+
+        // Set addresses
         ALICE_ADDRESS = ALICE.addr;
         BOB_ADDRESS = BOB.addr;
         CHARLIE_ADDRESS = CHARLIE.addr;
         DAN_ADDRESS = DAN.addr;
-        PROTOCOL_FEE_RECIPIENT_ADDRESS = PROTOCOL_FEE_RECIPIENT.addr;
 
         providers.push(ALICE_ADDRESS);
         providers.push(BOB_ADDRESS);
@@ -204,17 +194,38 @@ abstract contract BaseTest is Test, RoycoRoles, Assertions {
         providers.push(DAN_ADDRESS);
     }
 
-    function _setDeployedMarket(RoycoVaultTranche _st, RoycoVaultTranche _jt, RoycoKernel _kernel, RoycoAccountant _accountant, bytes32 _marketId) internal {
-        ST = _st;
-        JT = _jt;
-        KERNEL = _kernel;
-        ACCOUNTANT = _accountant;
-        MARKET_ID = _marketId;
+    function _setDeployedMarket(DeployScript.DeploymentResult memory _deploymentResult) internal {
+        ST_IMPL = _deploymentResult.stTrancheImplementation;
+        vm.label(address(ST_IMPL), "STImpl");
 
+        JT_IMPL = _deploymentResult.jtTrancheImplementation;
+        vm.label(address(JT_IMPL), "JTImpl");
+
+        ACCOUNTANT_IMPL = _deploymentResult.accountantImplementation;
+        vm.label(address(ACCOUNTANT_IMPL), "AccountantImpl");
+
+        KERNEL_IMPL = _deploymentResult.kernelImplementation;
+        vm.label(address(KERNEL_IMPL), "KernelImpl");
+
+        YDM = _deploymentResult.ydm;
+        vm.label(address(YDM), "YDM");
+
+        ST = _deploymentResult.seniorTranche;
         vm.label(address(ST), "ST");
+
+        JT = _deploymentResult.juniorTranche;
         vm.label(address(JT), "JT");
-        vm.label(address(KERNEL), "Kernel");
+
+        ACCOUNTANT = _deploymentResult.accountant;
         vm.label(address(ACCOUNTANT), "Accountant");
+
+        KERNEL = _deploymentResult.kernel;
+        vm.label(address(KERNEL), "Kernel");
+
+        FACTORY = _deploymentResult.factory;
+        vm.label(address(FACTORY), "Factory");
+
+        MARKET_ID = _deploymentResult.marketId;
     }
 
     function _initWallet(string memory _name, uint256 _amount) internal returns (Vm.Wallet memory) {
@@ -224,32 +235,20 @@ abstract contract BaseTest is Test, RoycoRoles, Assertions {
         return wallet;
     }
 
-    /// @notice Sets up roles for a tranche
-    /// @param _providers The providers addresses
-    /// @param _pauser The pauser address
-    /// @param _upgrader The upgrader address
-    function _setUpTrancheRoles(address[] memory _providers, address _pauser, address _upgrader) internal prankModifier(OWNER_ADDRESS) {
-        FACTORY.grantRole(RoycoRoles.PAUSER_ROLE, _pauser, 0);
-        FACTORY.grantRole(RoycoRoles.UPGRADER_ROLE, _upgrader, 0);
-        for (uint256 i = 0; i < _providers.length; i++) {
-            FACTORY.grantRole(RoycoRoles.DEPOSIT_ROLE, _providers[i], 0);
-            FACTORY.grantRole(RoycoRoles.REDEEM_ROLE, _providers[i], 0);
-            FACTORY.grantRole(RoycoRoles.CANCEL_DEPOSIT_ROLE, _providers[i], 0);
-            FACTORY.grantRole(RoycoRoles.CANCEL_REDEEM_ROLE, _providers[i], 0);
-        }
-    }
+    /// @notice Generates a provider address
+    /// @param _name The name of the provider
+    /// @return provider The provider address
+    function _generateProvider(string memory _name) internal virtual prankModifier(OWNER_ADDRESS) returns (Vm.Wallet memory provider) {
+        // Generate a unique wallet
+        provider = _initWallet(_name, 10_000_000e6);
 
-    /// @notice Sets up roles for a kernel
-    /// @param _kernelAdmin The kernel admin address
-    function _setUpKernelRoles(address _kernelAdmin) internal prankModifier(OWNER_ADDRESS) {
-        FACTORY.grantRole(RoycoRoles.KERNEL_ADMIN_ROLE, _kernelAdmin, 0);
-    }
+        // Grant Permissions
+        FACTORY.grantRole(RoycoRoles.DEPOSIT_ROLE, provider.addr, 0);
+        FACTORY.grantRole(RoycoRoles.REDEEM_ROLE, provider.addr, 0);
+        FACTORY.grantRole(RoycoRoles.CANCEL_DEPOSIT_ROLE, provider.addr, 0);
+        FACTORY.grantRole(RoycoRoles.CANCEL_REDEEM_ROLE, provider.addr, 0);
 
-    /// @notice Sets up roles for the factory
-    function _setupFactoryAuth() internal prankModifier(OWNER_ADDRESS) {
-        bytes4[] memory selectors = new bytes4[](1);
-        selectors[0] = RoycoFactory.deployMarket.selector;
-        FACTORY.setTargetFunctionRole(address(FACTORY), selectors, type(uint64).max);
+        return provider;
     }
 
     /// @notice Generates a provider address
@@ -354,119 +353,6 @@ abstract contract BaseTest is Test, RoycoRoles, Assertions {
         _trancheState.stAssetsClaim = _trancheState.stAssetsClaim - _stAssetsWithdrawn;
         _trancheState.jtAssetsClaim = _trancheState.jtAssetsClaim - _jtAssetsWithdrawn;
         _trancheState.totalShares = _trancheState.totalShares - _shares;
-    }
-
-    /// @notice Generates the roles configuration for a market
-    /// @param _seniorTranche The senior tranche address
-    /// @param _juniorTranche The junior tranche address
-    /// @param _kernel The kernel address
-    /// @param _accountant The accountant address
-    /// @return roles The roles configuration
-    function _generateRolesConfiguration(
-        address _seniorTranche,
-        address _juniorTranche,
-        address _kernel,
-        address _accountant
-    )
-        internal
-        view
-        returns (RolesConfiguration[] memory roles)
-    {
-        // Senior Tranche: 12 functions (deposit x2 , redeem x2, requestDeposit, requestRedeem, cancelDepositRequest, claimCancelDepositRequest, cancelRedeemRequest, claimCancelRedeemRequest, pause, unpause)
-        bytes4[] memory stSelectors = new bytes4[](12);
-        uint64[] memory stRoles = new uint64[](12);
-
-        stSelectors[0] = IRoycoVaultTranche.deposit.selector;
-        stRoles[0] = DEPOSIT_ROLE;
-
-        // deposit(uint256,address,address,uint256)
-        stSelectors[1] = bytes4(0xe4cca4b0);
-        stRoles[1] = DEPOSIT_ROLE;
-
-        stSelectors[2] = IRoycoVaultTranche.redeem.selector;
-        stRoles[2] = REDEEM_ROLE;
-
-        // redeem(uint256,address,address,uint256)
-        stSelectors[3] = bytes4(0x9f40a7b3);
-        stRoles[3] = REDEEM_ROLE;
-
-        stSelectors[4] = IRoycoAsyncVault.requestDeposit.selector;
-        stRoles[4] = DEPOSIT_ROLE;
-
-        stSelectors[5] = IRoycoAsyncVault.requestRedeem.selector;
-        stRoles[5] = REDEEM_ROLE;
-
-        stSelectors[6] = IRoycoAsyncCancellableVault.cancelDepositRequest.selector;
-        stRoles[6] = CANCEL_DEPOSIT_ROLE;
-
-        stSelectors[7] = IRoycoAsyncCancellableVault.claimCancelDepositRequest.selector;
-        stRoles[7] = CANCEL_DEPOSIT_ROLE;
-
-        stSelectors[8] = IRoycoAsyncCancellableVault.cancelRedeemRequest.selector;
-        stRoles[8] = CANCEL_REDEEM_ROLE;
-
-        stSelectors[9] = IRoycoAsyncCancellableVault.claimCancelRedeemRequest.selector;
-        stRoles[9] = CANCEL_REDEEM_ROLE;
-
-        stSelectors[10] = IRoycoAuth.pause.selector;
-        stRoles[10] = PAUSER_ROLE;
-
-        stSelectors[11] = IRoycoAuth.unpause.selector;
-        stRoles[11] = PAUSER_ROLE;
-
-        // Junior Tranche: same as senior tranche
-        bytes4[] memory jtSelectors = stSelectors;
-        uint64[] memory jtRoles = stRoles;
-
-        bytes4[] memory kernelSelectors = new bytes4[](5);
-        uint64[] memory kernelRoles = new uint64[](5);
-
-        kernelSelectors[0] = IRoycoKernel.setProtocolFeeRecipient.selector;
-        kernelRoles[0] = KERNEL_ADMIN_ROLE;
-
-        kernelSelectors[1] = IRoycoKernel.syncTrancheAccounting.selector;
-        kernelRoles[1] = SYNC_ROLE;
-
-        kernelSelectors[2] = IRoycoAuth.pause.selector;
-        kernelRoles[2] = PAUSER_ROLE;
-
-        kernelSelectors[3] = IRoycoAuth.unpause.selector;
-        kernelRoles[3] = PAUSER_ROLE;
-
-        kernelSelectors[4] = IRoycoKernel.setJuniorTrancheRedemptionDelay.selector;
-        kernelRoles[4] = KERNEL_ADMIN_ROLE;
-
-        // Accountant: 6 functions (setYDM, setProtocolFee, setCoverage, setBeta, pause, unpause)
-        bytes4[] memory accountantSelectors = new bytes4[](7);
-        uint64[] memory accountantRoles = new uint64[](7);
-
-        accountantSelectors[0] = IRoycoAccountant.setYDM.selector;
-        accountantRoles[0] = KERNEL_ADMIN_ROLE;
-
-        accountantSelectors[1] = IRoycoAccountant.setSeniorTrancheProtocolFee.selector;
-        accountantRoles[1] = KERNEL_ADMIN_ROLE;
-
-        accountantSelectors[2] = IRoycoAccountant.setJuniorTrancheProtocolFee.selector;
-        accountantRoles[2] = KERNEL_ADMIN_ROLE;
-
-        accountantSelectors[3] = IRoycoAccountant.setCoverage.selector;
-        accountantRoles[3] = KERNEL_ADMIN_ROLE;
-
-        accountantSelectors[4] = IRoycoAccountant.setBeta.selector;
-        accountantRoles[4] = KERNEL_ADMIN_ROLE;
-
-        accountantSelectors[5] = IRoycoAuth.pause.selector;
-        accountantRoles[5] = PAUSER_ROLE;
-
-        accountantSelectors[6] = IRoycoAuth.unpause.selector;
-        accountantRoles[6] = PAUSER_ROLE;
-
-        // Create roles configuration array
-        roles = new RolesConfiguration[](4);
-        roles[0] = RolesConfiguration({ target: _seniorTranche, selectors: stSelectors, roles: stRoles });
-        roles[1] = RolesConfiguration({ target: _juniorTranche, selectors: jtSelectors, roles: jtRoles });
-        roles[2] = RolesConfiguration({ target: _kernel, selectors: kernelSelectors, roles: kernelRoles });
-        roles[3] = RolesConfiguration({ target: _accountant, selectors: accountantSelectors, roles: accountantRoles });
     }
 
     /// @notice Converts the specified assets denominated in JT's tranche units to the kernel's NAV units

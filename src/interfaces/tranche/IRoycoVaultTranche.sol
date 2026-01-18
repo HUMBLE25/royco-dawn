@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
+import { IERC20Metadata } from "../../../lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { IERC165 } from "../../../lib/openzeppelin-contracts/contracts/utils/introspection/IERC165.sol";
-import { AssetClaims } from "../../libraries/Types.sol";
+import { AssetClaims, TrancheType } from "../../libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT } from "../../libraries/Units.sol";
 import { IRoycoAsyncCancellableVault } from "./IRoycoAsyncCancellableVault.sol";
 import { IRoycoAsyncVault } from "./IRoycoAsyncVault.sol";
 
-interface IRoycoVaultTranche is IERC165, IRoycoAsyncVault, IRoycoAsyncCancellableVault {
+interface IRoycoVaultTranche is IERC165, IERC20Metadata, IRoycoAsyncVault, IRoycoAsyncCancellableVault {
     /**
      * @notice Emitted when a deposit is made
      * @param sender The address that made the deposit
@@ -137,6 +138,12 @@ interface IRoycoVaultTranche is IERC165, IRoycoAsyncVault, IRoycoAsyncCancellabl
      * @return claims The breakdown of assets that the shares have a claim on
      */
     function convertToAssets(uint256 _shares) external view returns (AssetClaims memory claims);
+
+    /**
+     * @notice Returns the type of the tranche
+     * @return The type of the tranche
+     */
+    function TRANCHE_TYPE() external view returns (TrancheType);
 
     /**
      * @notice Mints tranche shares to the receiver
