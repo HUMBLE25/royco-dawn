@@ -37,7 +37,7 @@ contract AdaptiveCurveYDM is IYDM {
     struct AdaptiveYieldCurve {
         uint64 jtYieldShareAtTargetWAD;
         uint32 lastAdaptationTimestamp;
-        int160 steepnessAfterTargetWAD;
+        uint160 steepnessAfterTargetWAD;
     }
 
     /// @dev A mapping from market accountants to its market's current YDM curve
@@ -70,7 +70,7 @@ contract AdaptiveCurveYDM is IYDM {
         // Ensure that the initial YDM curve is valid
         // forge-lint: disable-next-item(unsafe-typecast)
         require(
-            _jtYieldShareAtTargetUtilWAD >= uint256(MIN_JT_YIELD_SHARE_AT_TARGET) && _jtYieldShareAtTargetUtilWAD <= uint256(MAX_JT_YIELD_SHARE_AT_TARGET)
+            _jtYieldShareAtTargetUtilWAD >= MIN_JT_YIELD_SHARE_AT_TARGET && _jtYieldShareAtTargetUtilWAD <= MAX_JT_YIELD_SHARE_AT_TARGET
                 && _jtYieldShareAtTargetUtilWAD <= _jtYieldShareAtFullUtilWAD && _jtYieldShareAtFullUtilWAD <= WAD,
             INVALID_YDM_INITIALIZATION()
         );
@@ -78,10 +78,9 @@ contract AdaptiveCurveYDM is IYDM {
         // Initialize the YDM curve for this market
         AdaptiveYieldCurve storage curve = accountantToCurve[msg.sender];
         curve.jtYieldShareAtTargetWAD = _jtYieldShareAtTargetUtilWAD;
-        // forge-lint: disable-next-item(unsafe-typecast)
-        curve.steepnessAfterTargetWAD = int160(int256((_jtYieldShareAtFullUtilWAD * WAD) / _jtYieldShareAtTargetUtilWAD));
+        curve.steepnessAfterTargetWAD = uint160((_jtYieldShareAtFullUtilWAD * WAD) / _jtYieldShareAtTargetUtilWAD);
 
-        emit AdaptiveCurveYdmInitialized(msg.sender, uint256(int256(curve.steepnessAfterTargetWAD)), _jtYieldShareAtTargetUtilWAD);
+        emit AdaptiveCurveYdmInitialized(msg.sender, curve.steepnessAfterTargetWAD, _jtYieldShareAtTargetUtilWAD);
     }
 
     /// @inheritdoc IYDM
@@ -225,7 +224,7 @@ contract AdaptiveCurveYDM is IYDM {
      * @return jtYieldShareWAD The JT yield share at current utilization
      */
     function _computeCurrentJtYieldShare(
-        int256 _steepnessWAD,
+        uint256 _steepnessWAD,
         int256 _normalizedDeltaFromTargetWAD,
         uint256 _jtYieldShareAtTargetWAD
     )
@@ -262,8 +261,8 @@ contract AdaptiveCurveYDM is IYDM {
 
         // Compute the coefficient based on the region of the curve that the market is currently in
         int256 coefficient = _normalizedDeltaFromTargetWAD < 0
-            ? WAD_INT - ((WAD_INT * WAD_INT) / _steepnessWAD)  // 1 - 1/S if below the kink
-            : _steepnessWAD - WAD_INT; // S - 1 if at or above the kink
+            ? WAD_INT - ((WAD_INT * WAD_INT) / int256(_steepnessWAD))  // 1 - 1/S if below the kink
+            : int256(_steepnessWAD) - WAD_INT; // S - 1 if at or above the kink
 
         // forge-lint: disable-next-item(unsafe-typecast)
         jtYieldShareWAD = uint256((((coefficient * _normalizedDeltaFromTargetWAD / WAD_INT) + WAD_INT) * int256(_jtYieldShareAtTargetWAD)) / WAD_INT);
