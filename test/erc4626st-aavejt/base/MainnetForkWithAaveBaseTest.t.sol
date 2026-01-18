@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import { Vm } from "../../../lib/forge-std/src/Vm.sol";
 import { IERC20 } from "../../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import { DeployScript } from "../../../script/Deploy.s.sol";
 import { RoycoAccountant } from "../../../src/accountant/RoycoAccountant.sol";
 import { ERC4626_ST_AaveV3_JT_InKindAssets_Kernel } from "../../../src/kernels/ERC4626_ST_AaveV3_JT_InKindAssets_Kernel.sol";
 import { RoycoKernel } from "../../../src/kernels/base/RoycoKernel.sol";
@@ -28,7 +29,6 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
 
     // Deployed contracts
     ERC4626Mock internal MOCK_UNDERLYING_ST_VAULT;
-    address internal ERC4626_ST_AaveV3_JT_InKindAssets_Kernel_IMPL;
 
     // External Contracts
     IERC20 internal USDC;
@@ -51,9 +51,6 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
         vm.label(address(USDC), "USDC");
         vm.label(address(AUSDC), "aUSDC");
 
-        // Deal USDC to all configured addresses for mainnet fork tests
-        _dealUSDCToAddresses();
-
         // Deploy mock senior tranche underlying vault
         MOCK_UNDERLYING_ST_VAULT = new ERC4626Mock(ETHEREUM_MAINNET_USDC_ADDRESS, RESERVE_ADDRESS);
         vm.label(address(MOCK_UNDERLYING_ST_VAULT), "MockSTUnderlyingVault");
@@ -62,14 +59,15 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
         IERC20(ETHEREUM_MAINNET_USDC_ADDRESS).approve(address(MOCK_UNDERLYING_ST_VAULT), type(uint256).max);
 
         // Deploy the markets
-        (DeployedContracts memory deployedContracts, bytes32 marketID) = _deployMarketWithKernel();
-        _setDeployedMarket(
-            RoycoVaultTranche(address(deployedContracts.seniorTranche)),
-            RoycoVaultTranche(address(deployedContracts.juniorTranche)),
-            RoycoKernel(address(deployedContracts.kernel)),
-            RoycoAccountant(address(deployedContracts.accountant)),
-            marketID
-        );
+        DeployScript.DeploymentResult memory deploymentResult = _deployMarketWithKernel();
+        _setDeployedMarket(deploymentResult);
+
+        // Setup providers and assets
+        _setupProviders();
+        _setupAssets(10_000_000_000);
+
+        // Deal USDC to all configured addresses for mainnet fork tests
+        _dealUSDCToAddresses();
     }
 
     /// @notice Deals USDC tokens to all configured addresses for mainnet fork tests
@@ -93,92 +91,63 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
         deal(ETHEREUM_MAINNET_USDC_ADDRESS, RESERVE_ADDRESS, usdcAmount);
     }
 
-    function _deployMarketWithKernel() internal returns (DeployedContracts memory deployedContracts, bytes32 marketID) {
-        marketID = keccak256(abi.encodePacked(SENIOR_TRANCHE_NAME, JUNIOR_TRANCHE_NAME, block.timestamp));
+    function _deployMarketWithKernel() internal returns (DeployScript.DeploymentResult memory) {
+        bytes32 marketID = keccak256(abi.encodePacked(SENIOR_TRANCHE_NAME, JUNIOR_TRANCHE_NAME, block.timestamp));
 
-        // Precompute the expected addresses of the kernel and accountant
-        bytes32 salt = keccak256(abi.encodePacked("SALT"));
-        address expectedSeniorTrancheAddress = FACTORY.predictERC1967ProxyAddress(address(ST_IMPL), salt);
-        address expectedJuniorTrancheAddress = FACTORY.predictERC1967ProxyAddress(address(JT_IMPL), salt);
+        // Build kernel-specific params
+        DeployScript.ERC4626STAaveV3JTInKindAssetsKernelParams memory kernelParams = DeployScript.ERC4626STAaveV3JTInKindAssetsKernelParams({
+            stVault: address(MOCK_UNDERLYING_ST_VAULT), aaveV3Pool: ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS
+        });
 
-        IRoycoKernel.RoycoKernelConstructionParams memory params =
-            IRoycoKernel.RoycoKernelConstructionParams(expectedSeniorTrancheAddress, address(USDC), expectedJuniorTrancheAddress, address(USDC));
+        // Build YDM params (StaticCurve)
+        DeployScript.StaticCurveYDMParams memory ydmParams =
+            DeployScript.StaticCurveYDMParams({ jtYieldShareAtZeroUtilWAD: 0, jtYieldShareAtTargetUtilWAD: 0.225e18, jtYieldShareAtFullUtilWAD: 1e18 });
 
-        ERC4626_ST_AaveV3_JT_InKindAssets_Kernel_IMPL =
-            address(new ERC4626_ST_AaveV3_JT_InKindAssets_Kernel(params, address(MOCK_UNDERLYING_ST_VAULT), ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS));
-        address expectedKernelAddress = FACTORY.predictERC1967ProxyAddress(ERC4626_ST_AaveV3_JT_InKindAssets_Kernel_IMPL, salt);
-        address expectedAccountantAddress = FACTORY.predictERC1967ProxyAddress(address(ACCOUNTANT_IMPL), salt);
+        // Build deployment params
+        DeployScript.DeploymentParams memory params = DeployScript.DeploymentParams({
+            factoryAdmin: address(DEPLOY_SCRIPT),
+            factoryOwnerAddress: OWNER_ADDRESS,
+            marketId: marketID,
+            seniorTrancheName: SENIOR_TRANCHE_NAME,
+            seniorTrancheSymbol: SENIOR_TRANCHE_SYMBOL,
+            juniorTrancheName: JUNIOR_TRANCHE_NAME,
+            juniorTrancheSymbol: JUNIOR_TRANCHE_SYMBOL,
+            seniorAsset: ETHEREUM_MAINNET_USDC_ADDRESS,
+            juniorAsset: ETHEREUM_MAINNET_USDC_ADDRESS,
+            kernelType: DeployScript.KernelType.ERC4626_ST_AaveV3_JT_InKindAssets,
+            kernelSpecificParams: abi.encode(kernelParams),
+            protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS,
+            jtRedemptionDelayInSeconds: JT_REDEMPTION_DELAY_SECONDS,
+            stProtocolFeeWAD: ST_PROTOCOL_FEE_WAD,
+            jtProtocolFeeWAD: JT_PROTOCOL_FEE_WAD,
+            coverageWAD: COVERAGE_WAD,
+            betaWAD: BETA_WAD,
+            lltvWAD: LLTV,
+            fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
+            ydmType: DeployScript.YDMType.StaticCurve,
+            ydmSpecificParams: abi.encode(ydmParams),
+            pauserAddress: PAUSER_ADDRESS,
+            pauserExecutionDelay: 0,
+            upgraderAddress: UPGRADER_ADDRESS,
+            upgraderExecutionDelay: 0,
+            depositRoleAddress: OWNER_ADDRESS,
+            depositRoleExecutionDelay: 0,
+            redeemRoleAddress: OWNER_ADDRESS,
+            redeemRoleExecutionDelay: 0,
+            cancelDepositRoleAddress: OWNER_ADDRESS,
+            cancelDepositRoleExecutionDelay: 0,
+            cancelRedeemRoleAddress: OWNER_ADDRESS,
+            cancelRedeemRoleExecutionDelay: 0,
+            syncRoleAddress: OWNER_ADDRESS,
+            syncRoleExecutionDelay: 0,
+            kernelAdminRoleAddress: OWNER_ADDRESS,
+            kernelAdminRoleExecutionDelay: 0,
+            oracleQuoterAdminRoleAddress: OWNER_ADDRESS,
+            oracleQuoterAdminRoleExecutionDelay: 0
+        });
 
-        // Create the initialization data
-        bytes memory kernelInitializationData = abi.encodeCall(
-            ERC4626_ST_AaveV3_JT_InKindAssets_Kernel.initialize,
-            (RoycoKernelInitParams({
-                    initialAuthority: address(FACTORY),
-                    accountant: expectedAccountantAddress,
-                    protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS,
-                    jtRedemptionDelayInSeconds: JT_REDEMPTION_DELAY_SECONDS
-                }))
-        );
-        bytes memory accountantInitializationData = abi.encodeCall(
-            RoycoAccountant.initialize,
-            (
-                IRoycoAccountant.RoycoAccountantInitParams({
-                    kernel: expectedKernelAddress,
-                    stProtocolFeeWAD: ST_PROTOCOL_FEE_WAD,
-                    jtProtocolFeeWAD: JT_PROTOCOL_FEE_WAD,
-                    coverageWAD: COVERAGE_WAD,
-                    betaWAD: BETA_WAD,
-                    ydm: address(YDM),
-                    ydmInitializationData: abi.encodeCall(YDM.initializeYDMForMarket, (0, 0.225e18, 1e18)),
-                    fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
-                    lltvWAD: LLTV
-                }),
-                address(FACTORY)
-            )
-        );
-        bytes memory seniorTrancheInitializationData = abi.encodeCall(
-            ST_IMPL.initialize,
-            (
-                TrancheDeploymentParams({ name: SENIOR_TRANCHE_NAME, symbol: SENIOR_TRANCHE_SYMBOL, kernel: expectedKernelAddress }),
-                ETHEREUM_MAINNET_USDC_ADDRESS,
-                address(FACTORY),
-                marketID
-            )
-        );
-        bytes memory juniorTrancheInitializationData = abi.encodeCall(
-            JT_IMPL.initialize,
-            (
-                TrancheDeploymentParams({ name: JUNIOR_TRANCHE_NAME, symbol: JUNIOR_TRANCHE_SYMBOL, kernel: expectedKernelAddress }),
-                ETHEREUM_MAINNET_USDC_ADDRESS,
-                address(FACTORY),
-                marketID
-            )
-        );
-
-        deployedContracts = FACTORY.deployMarket(
-            MarketDeploymentParams({
-                seniorTrancheName: SENIOR_TRANCHE_NAME,
-                seniorTrancheSymbol: SENIOR_TRANCHE_SYMBOL,
-                juniorTrancheName: JUNIOR_TRANCHE_SYMBOL,
-                juniorTrancheSymbol: JUNIOR_TRANCHE_SYMBOL,
-                seniorAsset: ETHEREUM_MAINNET_USDC_ADDRESS,
-                juniorAsset: ETHEREUM_MAINNET_USDC_ADDRESS,
-                marketId: marketID,
-                seniorTrancheImplementation: ST_IMPL,
-                juniorTrancheImplementation: JT_IMPL,
-                kernelImplementation: IRoycoKernel(address(ERC4626_ST_AaveV3_JT_InKindAssets_Kernel_IMPL)),
-                seniorTrancheInitializationData: seniorTrancheInitializationData,
-                juniorTrancheInitializationData: juniorTrancheInitializationData,
-                accountantImplementation: IRoycoAccountant(address(ACCOUNTANT_IMPL)),
-                kernelInitializationData: kernelInitializationData,
-                accountantInitializationData: accountantInitializationData,
-                seniorTrancheProxyDeploymentSalt: salt,
-                juniorTrancheProxyDeploymentSalt: salt,
-                kernelProxyDeploymentSalt: salt,
-                accountantProxyDeploymentSalt: salt,
-                roles: _generateRolesConfiguration(expectedSeniorTrancheAddress, expectedJuniorTrancheAddress, expectedKernelAddress, expectedAccountantAddress)
-            })
-        );
+        // Deploy using the deployment script
+        return DEPLOY_SCRIPT.deploy(params);
     }
 
     /// @notice Returns the fork configuration

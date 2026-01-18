@@ -21,7 +21,6 @@ contract LossWaterfall is MainnetForkWithAaveTestBase {
 
     function setUp() public {
         _setUpRoyco();
-        _setUpTrancheRoles(providers, PAUSER_ADDRESS, UPGRADER_ADDRESS);
     }
 
     function testFuzz_jtLoss(uint256 _assets) external {

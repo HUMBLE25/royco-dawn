@@ -431,7 +431,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
             (TRANCHE_TYPE() == TrancheType.SENIOR
                 ? IAsyncSTRedemptionKernel(kernel()).stClaimableRedeemRequest(_requestId, _controller)
                 : IRoycoKernel(kernel()).jtClaimableRedeemRequest(_requestId, _controller));
-        uint256 lockedClaimableSharesDueToCoverageCondition = _maxRedeem(_controller, claimableSharesFromRequest) - claimableSharesFromRequest;
+        uint256 lockedClaimableSharesDueToCoverageCondition = claimableSharesFromRequest - _maxRedeem(_controller, claimableSharesFromRequest);
 
         pendingShares = pendingSharesFromRequest + lockedClaimableSharesDueToCoverageCondition;
     }
@@ -685,7 +685,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
     }
 
     /// @inheritdoc IERC20Metadata
-    function decimals() public view virtual override(ERC20Upgradeable) returns (uint8) {
+    function decimals() public view virtual override(ERC20Upgradeable, IERC20Metadata) returns (uint8) {
         return RoycoTrancheStorageLib._getRoycoTrancheStorage().underlyingAssetDecimals + _decimalsOffset();
     }
 

@@ -6,6 +6,7 @@ import { ZERO_NAV_UNITS } from "../../src/libraries/Constants.sol";
 import { WAD } from "../../src/libraries/Constants.sol";
 import { NAV_UNIT, toNAVUnits } from "../../src/libraries/Units.sol";
 import { UtilsLib } from "../../src/libraries/UtilsLib.sol";
+import { StaticCurveYDM } from "../../src/ydm/StaticCurveYDM.sol";
 import { BaseTest, MarketState } from "../base/BaseTest.t.sol";
 
 contract StaticCurveYDMTest is BaseTest {
@@ -24,7 +25,9 @@ contract StaticCurveYDMTest is BaseTest {
     function setUp() public {
         _setUpRoyco();
 
-        YDM.initializeYDMForMarket(0, uint64(JT_YIELD_SHARE_AT_TARGET_UTIL), uint64(WAD));
+        YDM = new StaticCurveYDM();
+
+        StaticCurveYDM(address(YDM)).initializeYDMForMarket(0, uint64(JT_YIELD_SHARE_AT_TARGET_UTIL), uint64(WAD));
     }
 
     // ============================================
@@ -563,7 +566,7 @@ contract StaticCurveYDMTest is BaseTest {
         }
     }
 
-    function test_jtYieldShare_matchesPreview() public view {
+    function test_jtYieldShare_matchesPreview() public {
         NAV_UNIT jtEffectiveNAV = toNAVUnits(uint256(1e18));
         NAV_UNIT stRawNAV = toNAVUnits(uint256(0.4e18));
         NAV_UNIT jtRawNAV = toNAVUnits(uint256(0.4e18));
@@ -577,7 +580,7 @@ contract StaticCurveYDMTest is BaseTest {
     }
 
     /// @notice When utilization >= 1, jtYieldShare should return 1.0 (WAD)
-    function test_jtYieldShare_utilizationAtOrAboveOne() public view {
+    function test_jtYieldShare_utilizationAtOrAboveOne() public {
         // Same setup as test_previewJTYieldShare_utilizationAtOne
         NAV_UNIT jtEffectiveNAV = toNAVUnits(uint256(1e18));
         NAV_UNIT stRawNAV = toNAVUnits(uint256(0.5e18));
@@ -593,7 +596,7 @@ contract StaticCurveYDMTest is BaseTest {
     }
 
     /// @notice When TARGET_UTILIZATION <= utilization < 1, jtYieldShare should use the second leg of the curve
-    function test_jtYieldShare_utilizationBetweenTargetAndOne() public view {
+    function test_jtYieldShare_utilizationBetweenTargetAndOne() public {
         // Choose U = 0.95 as a representative point between TARGET_UTILIZATION (0.9) and 1.0
         NAV_UNIT jtEffectiveNAV = toNAVUnits(uint256(1e18));
         NAV_UNIT stRawNAV = toNAVUnits(uint256(0.475e18));
