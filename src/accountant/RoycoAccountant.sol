@@ -476,9 +476,6 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
             }
             /// @dev STEP_DISTRIBUTE_YIELD: There are no remaining impermanent losses in the system, the residual gains will be used to distribute yield to both tranches
             if (stGain != ZERO_NAV_UNITS) {
-                uint256 jtProtocolFeeWAD = $.jtProtocolFeeWAD;
-                // Bring the twJTYieldShareAccruedWAD to the top of the stack
-                uint256 twJTYieldShareAccruedWAD = _twJTYieldShareAccruedWAD;
                 // Compute the time weighted average JT share of yield
                 uint256 elapsed = block.timestamp - $.lastDistributionTimestamp;
                 // If the last yield distribution happened in the same block, use the instantaneous JT yield share. Else, use the time-weighted average JT yield share since the last distribution
@@ -489,12 +486,12 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
                     if (instantaneousJtYieldShareWAD > WAD) instantaneousJtYieldShareWAD = WAD;
                     jtGain = stGain.mulDiv(instantaneousJtYieldShareWAD, WAD, Math.Rounding.Floor);
                 } else {
-                    jtGain = stGain.mulDiv(twJTYieldShareAccruedWAD, elapsed * WAD, Math.Rounding.Floor);
+                    jtGain = stGain.mulDiv(_twJTYieldShareAccruedWAD, elapsed * WAD, Math.Rounding.Floor);
                 }
                 // Apply the yield split to JT's effective NAV
                 if (jtGain != ZERO_NAV_UNITS) {
                     // Compute the protocol fee taken on this JT yield accrual (will be used to mint shares to the protocol fee recipient) at the updated JT effective NAV
-                    jtProtocolFeeAccrued = (jtProtocolFeeAccrued + jtGain.mulDiv(jtProtocolFeeWAD, WAD, Math.Rounding.Floor));
+                    jtProtocolFeeAccrued = (jtProtocolFeeAccrued + jtGain.mulDiv($.jtProtocolFeeWAD, WAD, Math.Rounding.Floor));
                     jtEffectiveNAV = (jtEffectiveNAV + jtGain);
                     stGain = (stGain - jtGain);
                 }
