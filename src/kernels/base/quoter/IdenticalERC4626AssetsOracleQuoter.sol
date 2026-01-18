@@ -26,7 +26,7 @@ abstract contract IdenticalERC4626AssetsOracleQuoter is IdenticalAssetsOracleQuo
 
         // Resolve the vaultAsset to NAV unit conversion rate
         uint256 vaultAssetToNAVUnitConversionRateRAY = getStoredConversionRateRAY();
-        if (vaultAssetToNAVUnitConversionRateRAY != SENTINEL_CONVERSION_RATE) {
+        if (vaultAssetToNAVUnitConversionRateRAY == SENTINEL_CONVERSION_RATE) {
             // If the stored conversion rate is the sentinel value, query the oracle for the rate
             // This is expected to return a RAY precision value
             vaultAssetToNAVUnitConversionRateRAY = _getConversionRateFromOracle();

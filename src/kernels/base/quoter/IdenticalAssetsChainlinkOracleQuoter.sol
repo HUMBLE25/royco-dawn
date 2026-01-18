@@ -75,7 +75,7 @@ abstract contract IdenticalAssetsChainlinkOracleQuoter is IdenticalAssetsOracleQ
 
         // Resolve the Reference Asset to NAV unit conversion rate
         uint256 referenceAssetToNAVUnitConversionRateRAY = getStoredConversionRateRAY();
-        if (referenceAssetToNAVUnitConversionRateRAY != SENTINEL_CONVERSION_RATE) {
+        if (referenceAssetToNAVUnitConversionRateRAY == SENTINEL_CONVERSION_RATE) {
             // If the stored conversion rate is the sentinel value, query the oracle for the rate
             // This is expected to return a RAY precision value
             referenceAssetToNAVUnitConversionRateRAY = _getConversionRateFromOracle();
