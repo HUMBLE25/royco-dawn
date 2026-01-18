@@ -36,7 +36,7 @@ contract YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626Assets_Ke
         __IdenticalAssetsOracleQuoter_init_unchained(_initialConversionRateWAD);
     }
 
-    function _getConversionRateFromOracle() internal view override returns (uint256) {
+    function _getConversionRateFromOracle() internal pure override returns (uint256) {
         revert NOT_IMPLEMENTED();
     }
 }

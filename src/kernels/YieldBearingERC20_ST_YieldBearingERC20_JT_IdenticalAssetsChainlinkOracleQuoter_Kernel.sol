@@ -48,7 +48,7 @@ contract YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkOracl
         __IdenticalAssetsChainlinkOracleQuoter_init(_trancheAssetToReferenceAssetOracle, _stalenessThresholdSeconds);
     }
 
-    function _getConversionRateFromOracle() internal view override returns (uint256) {
+    function _getConversionRateFromOracle() internal pure override returns (uint256) {
         revert NOT_IMPLEMENTED();
     }
 }
