@@ -8,11 +8,21 @@ import { NAV_UNIT, TRANCHE_UNIT } from "./Units.sol";
 
 /**
  * @title MarketState
- * @dev Defines the state of a Royco market
- * @custom:type PERPETUAL - JT coverage IL does not exist, the LLTV has been breached, ST IL exists, or the fixed term duration has been set to 0
- *                          Both tranches are fully liquid within the confines of the coverage requirement
- * @custom:type FIXED_TERM - There was a drawdown in the senior NAV, the LLTV has not been breached, and ST IL does not exist
- *                           ST withdrawals and JT deposits are blocked to prevent JT from realizing coverage associated losses during the fixed term
+ * @notice Defines the operational state of a Royco market
+ * @custom:state PERPETUAL
+ *      Normal operating state where market forces govern behavior.
+ *      - Both tranches liquid (within coverage constraints)
+ *      - JT redemptions subject to async delay for coverage protection
+ *      - Adaptive curve YDM adapts based on utilization
+ *      - No active JT coverage obligation or the market is distressed (LLTV breach or ST losses)
+ * @custom:state FIXED_TERM
+ *      Temporary recovery state triggered when JT provides coverage for ST drawdown
+ *      - ST experienced a fully covered drawdown but the market is still healthy in terms of its LLTV
+ *      - Fixed term that starts when JT coverage impermanent loss is first incurred
+ *      - ST redemptions blocked: protects existing JT from realizing losses by ST withdrawing coverage on arbitrary volatility
+ *      - JT deposits blocked: protects existing JT from realizing losses by new JT diluting them on arbitrary volatility
+ *      - Adaptive curve YDM does not adapt (prevents adaption during recovery since market forces aren't influencing utilization, underlying PNL is)
+ *      - Automatically transitions to PERPETUAL when term elapses, clearing JT coverage impermanent losses
  */
 enum MarketState {
     PERPETUAL,
