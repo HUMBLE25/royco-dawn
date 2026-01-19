@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import { DeployScript } from "../../script/Deploy.s.sol";
-import { IRoycoFactory } from "../../src/RoycoFactory.sol";
-import { RoycoAccountant } from "../../src/accountant/RoycoAccountant.sol";
-import { RoycoRoles } from "../../src/auth/RoycoRoles.sol";
-import { IRoycoAuth } from "../../src/interfaces/IRoycoAuth.sol";
-import { IPool } from "../../src/interfaces/external/aave/IPool.sol";
-import { TrancheType } from "../../src/interfaces/kernel/IRoycoKernel.sol";
-import { ERC4626_ST_AaveV3_JT_InKindAssets_Kernel } from "../../src/kernels/ERC4626_ST_AaveV3_JT_InKindAssets_Kernel.sol";
-import { ZERO_NAV_UNITS, ZERO_TRANCHE_UNITS } from "../../src/libraries/Constants.sol";
-import { RoycoKernelInitParams } from "../../src/libraries/RoycoKernelStorageLib.sol";
+import { DeployScript } from "../../../script/Deploy.s.sol";
+import { IRoycoFactory } from "../../../src/RoycoFactory.sol";
+import { RoycoAccountant } from "../../../src/accountant/RoycoAccountant.sol";
+import { RoycoRoles } from "../../../src/auth/RoycoRoles.sol";
+import { IRoycoAuth } from "../../../src/interfaces/IRoycoAuth.sol";
+import { IPool } from "../../../src/interfaces/external/aave/IPool.sol";
+import { TrancheType } from "../../../src/interfaces/kernel/IRoycoKernel.sol";
+import { ERC4626_ST_AaveV3_JT_InKindAssets_Kernel } from "../../../src/kernels/ERC4626_ST_AaveV3_JT_InKindAssets_Kernel.sol";
+import { ZERO_NAV_UNITS, ZERO_TRANCHE_UNITS } from "../../../src/libraries/Constants.sol";
+import { RoycoKernelInitParams } from "../../../src/libraries/RoycoKernelStorageLib.sol";
 import {
     IRoycoAccountant,
     IRoycoKernel,
@@ -18,8 +18,8 @@ import {
     RolesConfiguration,
     SyncedAccountingState,
     TrancheDeploymentParams
-} from "../../src/libraries/Types.sol";
-import { StaticCurveYDM } from "../../src/ydm/StaticCurveYDM.sol";
+} from "../../../src/libraries/Types.sol";
+import { AdaptiveCurveYDM } from "../../../src/ydm/AdaptiveCurveYDM.sol";
 import { MainnetForkWithAaveTestBase } from "./base/MainnetForkWithAaveBaseTest.t.sol";
 
 contract DeploymentsTest is MainnetForkWithAaveTestBase {
@@ -323,7 +323,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
                     coverageWAD: COVERAGE_WAD,
                     betaWAD: BETA_WAD,
                     ydm: address(YDM),
-                    ydmInitializationData: abi.encodeCall(StaticCurveYDM.initializeYDMForMarket, (0, 0.225e18, 1e18)),
+                    ydmInitializationData: abi.encodeCall(AdaptiveCurveYDM.initializeYDMForMarket, (0.225e18, 1e18)),
                     fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
                     lltvWAD: LLTV
                 }),
@@ -468,7 +468,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
                     coverageWAD: COVERAGE_WAD,
                     betaWAD: BETA_WAD,
                     ydm: address(YDM),
-                    ydmInitializationData: abi.encodeCall(StaticCurveYDM.initializeYDMForMarket, (0, 0.225e18, 1e18)),
+                    ydmInitializationData: abi.encodeCall(AdaptiveCurveYDM.initializeYDMForMarket, (0.225e18, 1e18)),
                     fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
                     lltvWAD: LLTV
                 }),
@@ -596,7 +596,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
                     coverageWAD: COVERAGE_WAD,
                     betaWAD: BETA_WAD,
                     ydm: address(YDM),
-                    ydmInitializationData: abi.encodeCall(StaticCurveYDM.initializeYDMForMarket, (0, 0.225e18, 1e18)),
+                    ydmInitializationData: abi.encodeCall(AdaptiveCurveYDM.initializeYDMForMarket, (0.225e18, 1e18)),
                     fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
                     lltvWAD: LLTV
                 }),

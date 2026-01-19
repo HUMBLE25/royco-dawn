@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import { Vm } from "../../../lib/forge-std/src/Vm.sol";
-import { IERC20 } from "../../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-import { DeployScript } from "../../../script/Deploy.s.sol";
-import { NAV_UNIT, TRANCHE_UNIT, toNAVUnits, toTrancheUnits, toUint256 } from "../../../src/libraries/Units.sol";
-import { BaseTest } from "../../base/BaseTest.t.sol";
-import { ERC4626Mock } from "../../mock/ERC4626Mock.sol";
+import { Vm } from "../../../../lib/forge-std/src/Vm.sol";
+import { IERC20 } from "../../../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import { DeployScript } from "../../../../script/Deploy.s.sol";
+import { NAV_UNIT, TRANCHE_UNIT, toNAVUnits, toTrancheUnits, toUint256 } from "../../../../src/libraries/Units.sol";
+import { BaseTest } from "../../../base/BaseTest.t.sol";
+import { ERC4626Mock } from "../../../mock/ERC4626Mock.sol";
 
 abstract contract MainnetForkWithAaveTestBase is BaseTest {
     /// @dev Maximum absolute delta for tranche unit comparisons (accounts for Aave rounding)
@@ -92,9 +92,9 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
             stVault: address(MOCK_UNDERLYING_ST_VAULT), aaveV3Pool: ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS
         });
 
-        // Build YDM params (StaticCurve)
-        DeployScript.StaticCurveYDMParams memory ydmParams =
-            DeployScript.StaticCurveYDMParams({ jtYieldShareAtZeroUtilWAD: 0, jtYieldShareAtTargetUtilWAD: 0.225e18, jtYieldShareAtFullUtilWAD: 1e18 });
+        // Build YDM params (AdaptiveCurve)
+        DeployScript.AdaptiveCurveYDMParams memory ydmParams =
+            DeployScript.AdaptiveCurveYDMParams({ jtYieldShareAtTargetUtilWAD: 0.225e18, jtYieldShareAtFullUtilWAD: 1e18 });
 
         // Build deployment params
         DeployScript.DeploymentParams memory params = DeployScript.DeploymentParams({
@@ -117,7 +117,7 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
             betaWAD: BETA_WAD,
             lltvWAD: LLTV,
             fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
-            ydmType: DeployScript.YDMType.StaticCurve,
+            ydmType: DeployScript.YDMType.AdaptiveCurve,
             ydmSpecificParams: abi.encode(ydmParams),
             pauserAddress: PAUSER_ADDRESS,
             pauserExecutionDelay: 0,
