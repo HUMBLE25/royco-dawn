@@ -677,7 +677,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         NAV_UNIT navBefore = JT.totalAssets().nav;
 
         // Simulate yield
-        this.simulateJTYield(_yieldPercentage * 1e16); // Convert to WAD
+        simulateJTYield(_yieldPercentage * 1e16); // Convert to WAD
 
         // Trigger sync
         vm.prank(OWNER_ADDRESS);
@@ -706,7 +706,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         NAV_UNIT jtNavBefore = JT.totalAssets().nav;
 
         // Simulate ST yield
-        this.simulateSTYield(_yieldPercentage * 1e16);
+        simulateSTYield(_yieldPercentage * 1e16);
 
         // Warp time for yield distribution
         vm.warp(block.timestamp + 1 days);
@@ -730,7 +730,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         uint256 feeRecipientSharesBefore = JT.balanceOf(PROTOCOL_FEE_RECIPIENT_ADDRESS);
 
         // Simulate yield
-        this.simulateJTYield(_yieldPercentage * 1e16);
+        simulateJTYield(_yieldPercentage * 1e16);
 
         // Warp time
         vm.warp(block.timestamp + 1 days);
@@ -771,7 +771,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         NAV_UNIT jtNavBefore = JT.totalAssets().nav;
 
         // Simulate JT loss
-        this.simulateJTLoss(_lossPercentage * 1e16);
+        simulateJTLoss(_lossPercentage * 1e16);
 
         // Trigger sync
         vm.prank(OWNER_ADDRESS);
@@ -812,7 +812,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         NAV_UNIT jtNavBefore = JT.totalAssets().nav;
 
         // Simulate ST loss
-        this.simulateSTLoss(_lossPercentage * 1e16);
+        simulateSTLoss(_lossPercentage * 1e16);
 
         // Trigger sync
         vm.prank(OWNER_ADDRESS);
@@ -847,7 +847,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         _depositST(BOB_ADDRESS, stAmount);
 
         // Simulate significant ST loss that JT covers
-        this.simulateSTLoss(5e16); // 5% loss
+        simulateSTLoss(5e16); // 5% loss
 
         // Trigger sync
         vm.prank(OWNER_ADDRESS);
@@ -890,7 +890,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         _depositJT(ALICE_ADDRESS, _jtAmount);
 
         // Simulate yield
-        this.simulateJTYield(_yieldPercentage * 1e16);
+        simulateJTYield(_yieldPercentage * 1e16);
 
         vm.prank(OWNER_ADDRESS);
         KERNEL.syncTrancheAccounting();
@@ -905,7 +905,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         _depositJT(ALICE_ADDRESS, _jtAmount);
 
         // Simulate loss
-        this.simulateJTLoss(_lossPercentage * 1e16);
+        simulateJTLoss(_lossPercentage * 1e16);
 
         vm.prank(OWNER_ADDRESS);
         KERNEL.syncTrancheAccounting();
@@ -950,7 +950,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         _depositST(BOB_ADDRESS, stAmount);
 
         // Step 3: Simulate yield
-        this.simulateJTYield(_yieldPercentage * 1e16);
+        simulateJTYield(_yieldPercentage * 1e16);
         vm.warp(block.timestamp + 1 days);
         vm.prank(OWNER_ADDRESS);
         KERNEL.syncTrancheAccounting();
@@ -1007,7 +1007,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         NAV_UNIT jtNavBeforeLoss = JT.totalAssets().nav;
 
         // Step 3: Simulate JT loss
-        this.simulateJTLoss(_lossPercentage * 1e16);
+        simulateJTLoss(_lossPercentage * 1e16);
         vm.prank(OWNER_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
@@ -1154,7 +1154,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         NAV_UNIT jtNavBeforeYield = JT.totalAssets().nav;
 
-        this.simulateJTYield(_yieldPercentage * 1e16);
+        simulateJTYield(_yieldPercentage * 1e16);
         vm.warp(block.timestamp + 1 days);
 
         vm.prank(OWNER_ADDRESS);
@@ -1312,7 +1312,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         // STEP 3: Simulate JT loss - ST should be protected
         // ═══════════════════════════════════════════════════════════════════════════
 
-        this.simulateJTLoss(_lossPercentage * 1e16);
+        simulateJTLoss(_lossPercentage * 1e16);
 
         vm.prank(OWNER_ADDRESS);
         KERNEL.syncTrancheAccounting();
@@ -1424,7 +1424,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
             NAV_UNIT jtNavBeforeYield = JT.totalAssets().nav;
 
-            this.simulateJTYield(_yieldPercentage * 1e16);
+            simulateJTYield(_yieldPercentage * 1e16);
             vm.warp(block.timestamp + 1 days);
 
             vm.prank(OWNER_ADDRESS);
@@ -2098,7 +2098,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         if (maxRedeemBeforeLoss == 0) return;
 
         // Simulate loss
-        this.simulateJTLoss(_lossPercentage * 1e16);
+        simulateJTLoss(_lossPercentage * 1e16);
         vm.prank(OWNER_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
@@ -2424,7 +2424,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         assertEq(claimableBefore, maxRedeemableBefore, "Initially all should be claimable");
 
         // Simulate loss to tighten coverage
-        this.simulateJTLoss(_lossPercentage * 1e16);
+        simulateJTLoss(_lossPercentage * 1e16);
 
         vm.prank(OWNER_ADDRESS);
         KERNEL.syncTrancheAccounting();
@@ -2659,7 +2659,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         uint256 jtMaxRedeemBeforeYield = JT.maxRedeem(ALICE_ADDRESS);
 
         // Simulate yield
-        this.simulateJTYield(_yieldPercentage * 1e16);
+        simulateJTYield(_yieldPercentage * 1e16);
         vm.warp(block.timestamp + 1 days);
         vm.prank(OWNER_ADDRESS);
         KERNEL.syncTrancheAccounting();
@@ -2697,7 +2697,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         assertLt(jtMaxRedeemBeforeLoss, jtShares, "Should be coverage constrained");
 
         // Simulate loss
-        this.simulateJTLoss(_lossPercentage * 1e16);
+        simulateJTLoss(_lossPercentage * 1e16);
         vm.prank(OWNER_ADDRESS);
         KERNEL.syncTrancheAccounting();
 

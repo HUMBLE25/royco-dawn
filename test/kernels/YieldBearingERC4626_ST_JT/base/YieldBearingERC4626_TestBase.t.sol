@@ -202,7 +202,7 @@ abstract contract YieldBearingERC4626_TestBase is AbstractKernelTestSuite {
         NAV_UNIT navBefore = JT.totalAssets().nav;
 
         // Simulate vault share price yield (mocks convertToAssets)
-        this.simulateVaultSharePriceYield(_yieldPercentage * 1e16); // Convert to WAD
+        simulateVaultSharePriceYield(_yieldPercentage * 1e16); // Convert to WAD
 
         // Trigger sync
         vm.prank(OWNER_ADDRESS);
@@ -223,7 +223,7 @@ abstract contract YieldBearingERC4626_TestBase is AbstractKernelTestSuite {
         NAV_UNIT navBefore = JT.totalAssets().nav;
 
         // Simulate vault share price loss (mocks convertToAssets)
-        this.simulateVaultSharePriceLoss(_lossPercentage * 1e16); // Convert to WAD
+        simulateVaultSharePriceLoss(_lossPercentage * 1e16); // Convert to WAD
 
         // Trigger sync
         vm.prank(OWNER_ADDRESS);
@@ -257,7 +257,7 @@ abstract contract YieldBearingERC4626_TestBase is AbstractKernelTestSuite {
         NAV_UNIT jtNavBefore = JT.totalAssets().nav;
 
         // Simulate vault share price yield
-        this.simulateVaultSharePriceYield(_yieldPercentage * 1e16);
+        simulateVaultSharePriceYield(_yieldPercentage * 1e16);
 
         // Warp time for yield distribution
         vm.warp(block.timestamp + 1 days);
@@ -280,7 +280,7 @@ abstract contract YieldBearingERC4626_TestBase is AbstractKernelTestSuite {
         _depositJT(ALICE_ADDRESS, _jtAmount);
 
         // Simulate vault share price yield
-        this.simulateVaultSharePriceYield(_yieldPercentage * 1e16);
+        simulateVaultSharePriceYield(_yieldPercentage * 1e16);
 
         vm.prank(OWNER_ADDRESS);
         KERNEL.syncTrancheAccounting();

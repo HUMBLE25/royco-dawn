@@ -99,7 +99,7 @@ contract sNUSD_sNUSD_Test is YieldBearingERC4626_TestBase {
 
         // Simulate yield by increasing the NUSD->USD rate
         uint256 yieldWAD = _yieldBps * 1e14; // Convert bps to WAD
-        this.simulateJTYield(yieldWAD);
+        simulateJTYield(yieldWAD);
 
         uint256 rateAfter = _getConversionRate();
         assertGt(rateAfter, rateBefore, "Rate should increase after yield");
@@ -124,7 +124,7 @@ contract sNUSD_sNUSD_Test is YieldBearingERC4626_TestBase {
 
         // Simulate loss by decreasing the NUSD->USD rate
         uint256 lossWAD = _lossBps * 1e14;
-        this.simulateJTLoss(lossWAD);
+        simulateJTLoss(lossWAD);
 
         uint256 rateAfter = _getConversionRate();
         assertLt(rateAfter, rateBefore, "Rate should decrease after loss");

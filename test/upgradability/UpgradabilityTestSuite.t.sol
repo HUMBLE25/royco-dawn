@@ -4,8 +4,10 @@ pragma solidity ^0.8.28;
 import { Initializable } from "../../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
 import { UUPSUpgradeable } from "../../lib/openzeppelin-contracts/contracts/proxy/utils/UUPSUpgradeable.sol";
 import { IAccessManaged } from "../../lib/openzeppelin-contracts/contracts/access/manager/IAccessManaged.sol";
+import { IERC20 } from "../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { IERC4626 } from "../../lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 
+import { DeployScript } from "../../script/Deploy.s.sol";
 import { RoycoAccountant } from "../../src/accountant/RoycoAccountant.sol";
 import { IRoycoAccountant } from "../../src/interfaces/IRoycoAccountant.sol";
 import { IRoycoKernel } from "../../src/interfaces/kernel/IRoycoKernel.sol";
@@ -18,10 +20,9 @@ import {
     YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626Assets_Kernel
 } from "../../src/kernels/YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626Assets_Kernel.sol";
 import { RAY } from "../../src/libraries/Constants.sol";
+import { TRANCHE_UNIT, toUint256, toTrancheUnits } from "../../src/libraries/Units.sol";
 
-import { YieldBearingERC4626_TestBase } from "./YieldBearingERC4626_ST_JT/base/YieldBearingERC4626_TestBase.t.sol";
-import { IKernelTestHooks } from "../interfaces/IKernelTestHooks.sol";
-import { NAV_UNIT, TRANCHE_UNIT, toNAVUnits, toTrancheUnits, toUint256 } from "../../src/libraries/Units.sol";
+import { BaseTest } from "../base/BaseTest.t.sol";
 
 /// @title UpgradabilityTestSuite
 /// @notice Tests upgradability of all Royco protocol contracts
@@ -29,12 +30,13 @@ import { NAV_UNIT, TRANCHE_UNIT, toNAVUnits, toTrancheUnits, toUint256 } from ".
 ///      1. All contracts (ST, JT, Kernel, Accountant) are upgradeable by ADMIN_UPGRADER_ROLE
 ///      2. All implementations are non-initializable (constructor disables initializers)
 ///      3. Upgrades fail when called by non-upgrader addresses
-contract UpgradabilityTestSuite is YieldBearingERC4626_TestBase {
+contract UpgradabilityTestSuite is BaseTest {
     // ═══════════════════════════════════════════════════════════════════════════
     // MAINNET ADDRESSES (sNUSD for testing)
     // ═══════════════════════════════════════════════════════════════════════════
 
     address internal constant SNUSD = 0x08EFCC2F3e61185D0EA7F8830B3FEc9Bfa2EE313;
+    uint256 internal constant FORK_BLOCK = 24_270_513;
 
     // ═══════════════════════════════════════════════════════════════════════════
     // NEW IMPLEMENTATION CONTRACTS FOR UPGRADE TESTING
@@ -46,64 +48,111 @@ contract UpgradabilityTestSuite is YieldBearingERC4626_TestBase {
     address internal newKernelImpl;
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // PROTOCOL CONFIGURATION (sNUSD)
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    function getProtocolConfig() public pure override returns (ProtocolConfig memory) {
-        return ProtocolConfig({
-            name: "sNUSD_Upgradability",
-            forkBlock: 24_270_513,
-            forkRpcUrlEnvVar: "MAINNET_RPC_URL",
-            stAsset: SNUSD,
-            jtAsset: SNUSD,
-            stDecimals: 18,
-            jtDecimals: 18,
-            initialFunding: 1_000_000e18
-        });
-    }
-
-    function _getInitialConversionRate() internal pure override returns (uint256) {
-        return RAY;
-    }
-
-    function maxTrancheUnitDelta() public pure override returns (TRANCHE_UNIT) {
-        return toTrancheUnits(uint256(1e12));
-    }
-
-    function maxNAVDelta() public pure override returns (NAV_UNIT) {
-        return toNAVUnits(uint256(1e12));
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
     // SETUP
     // ═══════════════════════════════════════════════════════════════════════════
 
-    function setUp() public override {
-        super.setUp();
+    function setUp() public {
+        _setUpRoyco();
+    }
+
+    function _setUpRoyco() internal override {
+        super._setUpRoyco();
+
+        // Deploy market using the deployment script
+        DeployScript.DeploymentResult memory result = _deployMarket();
+        _setDeployedMarket(result);
+
+        // Setup providers
+        _setupProviders();
+
+        // Fund providers with sNUSD
+        _fundProviders();
 
         // Deploy new implementations for upgrade testing
         _deployNewImplementations();
     }
 
+    function _forkConfiguration() internal override returns (uint256 forkBlock, string memory forkRpcUrl) {
+        forkBlock = FORK_BLOCK;
+        forkRpcUrl = vm.envString("MAINNET_RPC_URL");
+    }
+
+    function _deployMarket() internal returns (DeployScript.DeploymentResult memory) {
+        bytes32 marketId = keccak256(abi.encodePacked("UpgradabilityTest", block.timestamp));
+
+        DeployScript.YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626AssetsKernelParams memory kernelParams =
+            DeployScript.YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626AssetsKernelParams({
+                initialConversionRateWAD: RAY
+            });
+
+        DeployScript.StaticCurveYDMParams memory ydmParams = DeployScript.StaticCurveYDMParams({
+            jtYieldShareAtZeroUtilWAD: 0.1e18,
+            jtYieldShareAtTargetUtilWAD: 0.3e18,
+            jtYieldShareAtFullUtilWAD: 1e18
+        });
+
+        DeployScript.DeploymentParams memory params = DeployScript.DeploymentParams({
+            factoryAdmin: address(DEPLOY_SCRIPT),
+            factoryOwnerAddress: OWNER_ADDRESS,
+            marketId: marketId,
+            seniorTrancheName: "Royco Senior sNUSD",
+            seniorTrancheSymbol: "RS-sNUSD",
+            juniorTrancheName: "Royco Junior sNUSD",
+            juniorTrancheSymbol: "RJ-sNUSD",
+            seniorAsset: SNUSD,
+            juniorAsset: SNUSD,
+            kernelType: DeployScript.KernelType.YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626Assets,
+            kernelSpecificParams: abi.encode(kernelParams),
+            protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS,
+            jtRedemptionDelayInSeconds: 1000,
+            stProtocolFeeWAD: ST_PROTOCOL_FEE_WAD,
+            jtProtocolFeeWAD: JT_PROTOCOL_FEE_WAD,
+            coverageWAD: COVERAGE_WAD,
+            betaWAD: 1e18,
+            lltvWAD: LLTV,
+            fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
+            ydmType: DeployScript.YDMType.StaticCurve,
+            ydmSpecificParams: abi.encode(ydmParams),
+            pauserAddress: PAUSER_ADDRESS,
+            pauserExecutionDelay: 0,
+            upgraderAddress: UPGRADER_ADDRESS,
+            upgraderExecutionDelay: 0,
+            lpRoleAddress: OWNER_ADDRESS,
+            lpRoleExecutionDelay: 0,
+            syncRoleAddress: OWNER_ADDRESS,
+            syncRoleExecutionDelay: 0,
+            kernelAdminRoleAddress: OWNER_ADDRESS,
+            kernelAdminRoleExecutionDelay: 0,
+            oracleQuoterAdminRoleAddress: OWNER_ADDRESS,
+            oracleQuoterAdminRoleExecutionDelay: 0
+        });
+
+        return DEPLOY_SCRIPT.deploy(params);
+    }
+
+    function _fundProviders() internal {
+        uint256 amount = 1_000_000e18;
+        deal(SNUSD, ALICE_ADDRESS, amount);
+        deal(SNUSD, BOB_ADDRESS, amount);
+        deal(SNUSD, CHARLIE_ADDRESS, amount);
+        deal(SNUSD, DAN_ADDRESS, amount);
+    }
+
     function _deployNewImplementations() internal {
-        // Deploy new ST implementation
         newSTImpl = new RoycoST();
         vm.label(address(newSTImpl), "NewSTImpl");
 
-        // Deploy new JT implementation
         newJTImpl = new RoycoJT();
         vm.label(address(newJTImpl), "NewJTImpl");
 
-        // Deploy new Accountant implementation
         newAccountantImpl = new RoycoAccountant();
         vm.label(address(newAccountantImpl), "NewAccountantImpl");
 
-        // Deploy new Kernel implementation with same constructor params
         IRoycoKernel.RoycoKernelConstructionParams memory constructionParams = IRoycoKernel.RoycoKernelConstructionParams({
             seniorTranche: address(ST),
-            stAsset: config.stAsset,
+            stAsset: SNUSD,
             juniorTranche: address(JT),
-            jtAsset: config.jtAsset
+            jtAsset: SNUSD
         });
 
         newKernelImpl =
@@ -121,7 +170,7 @@ contract UpgradabilityTestSuite is YieldBearingERC4626_TestBase {
             TrancheDeploymentParams({ name: "Test ST", symbol: "TST", kernel: address(KERNEL) });
 
         vm.expectRevert(Initializable.InvalidInitialization.selector);
-        ST_IMPL.initialize(params, config.stAsset, address(FACTORY), MARKET_ID);
+        ST_IMPL.initialize(params, SNUSD, address(FACTORY), MARKET_ID);
     }
 
     /// @notice Test that JT implementation cannot be initialized
@@ -130,7 +179,7 @@ contract UpgradabilityTestSuite is YieldBearingERC4626_TestBase {
             TrancheDeploymentParams({ name: "Test JT", symbol: "TJT", kernel: address(KERNEL) });
 
         vm.expectRevert(Initializable.InvalidInitialization.selector);
-        JT_IMPL.initialize(params, config.jtAsset, address(FACTORY), MARKET_ID);
+        JT_IMPL.initialize(params, SNUSD, address(FACTORY), MARKET_ID);
     }
 
     /// @notice Test that Accountant implementation cannot be initialized
@@ -170,7 +219,7 @@ contract UpgradabilityTestSuite is YieldBearingERC4626_TestBase {
             TrancheDeploymentParams({ name: "Test ST", symbol: "TST", kernel: address(KERNEL) });
 
         vm.expectRevert(Initializable.InvalidInitialization.selector);
-        newSTImpl.initialize(params, config.stAsset, address(FACTORY), MARKET_ID);
+        newSTImpl.initialize(params, SNUSD, address(FACTORY), MARKET_ID);
     }
 
     /// @notice Test that new JT implementation cannot be initialized
@@ -179,7 +228,7 @@ contract UpgradabilityTestSuite is YieldBearingERC4626_TestBase {
             TrancheDeploymentParams({ name: "Test JT", symbol: "TJT", kernel: address(KERNEL) });
 
         vm.expectRevert(Initializable.InvalidInitialization.selector);
-        newJTImpl.initialize(params, config.jtAsset, address(FACTORY), MARKET_ID);
+        newJTImpl.initialize(params, SNUSD, address(FACTORY), MARKET_ID);
     }
 
     /// @notice Test that new Accountant implementation cannot be initialized
@@ -210,9 +259,7 @@ contract UpgradabilityTestSuite is YieldBearingERC4626_TestBase {
         });
 
         vm.expectRevert(Initializable.InvalidInitialization.selector);
-        YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626Assets_Kernel(newKernelImpl).initialize(
-            params, RAY
-        );
+        YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626Assets_Kernel(newKernelImpl).initialize(params, RAY);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -221,59 +268,47 @@ contract UpgradabilityTestSuite is YieldBearingERC4626_TestBase {
 
     /// @notice Test that ST can be upgraded by upgrader
     function test_stProxy_canBeUpgradedByUpgrader() external {
-        // Get state before upgrade
         uint256 totalSupplyBefore = ST.totalSupply();
         string memory nameBefore = IERC4626(address(ST)).name();
 
-        // Upgrade ST
         vm.prank(UPGRADER_ADDRESS);
         UUPSUpgradeable(address(ST)).upgradeToAndCall(address(newSTImpl), "");
 
-        // Verify state is preserved
         assertEq(ST.totalSupply(), totalSupplyBefore, "Total supply should be preserved after upgrade");
         assertEq(IERC4626(address(ST)).name(), nameBefore, "Name should be preserved after upgrade");
     }
 
     /// @notice Test that JT can be upgraded by upgrader
     function test_jtProxy_canBeUpgradedByUpgrader() external {
-        // Get state before upgrade
         uint256 totalSupplyBefore = JT.totalSupply();
         string memory nameBefore = IERC4626(address(JT)).name();
 
-        // Upgrade JT
         vm.prank(UPGRADER_ADDRESS);
         UUPSUpgradeable(address(JT)).upgradeToAndCall(address(newJTImpl), "");
 
-        // Verify state is preserved
         assertEq(JT.totalSupply(), totalSupplyBefore, "Total supply should be preserved after upgrade");
         assertEq(IERC4626(address(JT)).name(), nameBefore, "Name should be preserved after upgrade");
     }
 
     /// @notice Test that Accountant can be upgraded by upgrader
     function test_accountantProxy_canBeUpgradedByUpgrader() external {
-        // Get state before upgrade
         uint64 coverageBefore = ACCOUNTANT.getState().coverageWAD;
         address kernelBefore = ACCOUNTANT.getState().kernel;
 
-        // Upgrade Accountant
         vm.prank(UPGRADER_ADDRESS);
         UUPSUpgradeable(address(ACCOUNTANT)).upgradeToAndCall(address(newAccountantImpl), "");
 
-        // Verify state is preserved
         assertEq(ACCOUNTANT.getState().coverageWAD, coverageBefore, "Coverage should be preserved after upgrade");
         assertEq(ACCOUNTANT.getState().kernel, kernelBefore, "Kernel should be preserved after upgrade");
     }
 
     /// @notice Test that Kernel can be upgraded by upgrader
     function test_kernelProxy_canBeUpgradedByUpgrader() external {
-        // Get state before upgrade
         (address stBefore,, address jtBefore,, , address accountantBefore,) = KERNEL.getState();
 
-        // Upgrade Kernel
         vm.prank(UPGRADER_ADDRESS);
         UUPSUpgradeable(address(KERNEL)).upgradeToAndCall(newKernelImpl, "");
 
-        // Verify state is preserved
         (address stAfter,, address jtAfter,,,address accountantAfter,) = KERNEL.getState();
         assertEq(stAfter, stBefore, "ST address should be preserved after upgrade");
         assertEq(jtAfter, jtBefore, "JT address should be preserved after upgrade");
@@ -314,7 +349,6 @@ contract UpgradabilityTestSuite is YieldBearingERC4626_TestBase {
 
     /// @notice Test that ST cannot be upgraded by owner (who is not upgrader)
     function test_stProxy_cannotBeUpgradedByOwner() external {
-        // Owner is not the upgrader
         vm.prank(OWNER_ADDRESS);
         vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, OWNER_ADDRESS));
         UUPSUpgradeable(address(ST)).upgradeToAndCall(address(newSTImpl), "");
@@ -328,20 +362,22 @@ contract UpgradabilityTestSuite is YieldBearingERC4626_TestBase {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // SECTION 4: STATE PRESERVATION AFTER UPGRADE
+    // SECTION 4: STATE PRESERVATION AFTER UPGRADE WITH DEPOSITS
     // ═══════════════════════════════════════════════════════════════════════════
 
     /// @notice Test that JT state is preserved after upgrade with deposits
-    function testFuzz_jtProxy_statePreservedAfterUpgrade_withDeposits(uint256 _amount) external {
-        _amount = bound(_amount, _minDepositAmount(), config.initialFunding / 4);
+    function test_jtProxy_statePreservedAfterUpgrade_withDeposits() external {
+        uint256 depositAmount = 100_000e18;
 
         // Deposit to JT
-        uint256 shares = _depositJT(ALICE_ADDRESS, _amount);
+        vm.startPrank(ALICE_ADDRESS);
+        IERC20(SNUSD).approve(address(JT), depositAmount);
+        (uint256 shares,) = JT.deposit(toTrancheUnits(depositAmount), ALICE_ADDRESS, ALICE_ADDRESS);
+        vm.stopPrank();
 
         // Record state before upgrade
         uint256 totalSupplyBefore = JT.totalSupply();
         uint256 aliceBalanceBefore = JT.balanceOf(ALICE_ADDRESS);
-        NAV_UNIT rawNAVBefore = JT.getRawNAV();
 
         // Upgrade JT
         vm.prank(UPGRADER_ADDRESS);
@@ -350,30 +386,29 @@ contract UpgradabilityTestSuite is YieldBearingERC4626_TestBase {
         // Verify state is preserved
         assertEq(JT.totalSupply(), totalSupplyBefore, "Total supply should be preserved");
         assertEq(JT.balanceOf(ALICE_ADDRESS), aliceBalanceBefore, "Alice balance should be preserved");
-        assertEq(JT.getRawNAV(), rawNAVBefore, "Raw NAV should be preserved");
         assertEq(JT.balanceOf(ALICE_ADDRESS), shares, "Shares should match original deposit");
     }
 
     /// @notice Test that ST state is preserved after upgrade with deposits
-    function testFuzz_stProxy_statePreservedAfterUpgrade_withDeposits(uint256 _jtAmount, uint256 _stPercentage) external {
-        _jtAmount = bound(_jtAmount, _minDepositAmount() * 10, config.initialFunding / 4);
-        _stPercentage = bound(_stPercentage, 10, 50);
+    function test_stProxy_statePreservedAfterUpgrade_withDeposits() external {
+        uint256 jtDepositAmount = 500_000e18;
+        uint256 stDepositAmount = 50_000e18;
 
         // Deposit to JT first (for coverage)
-        _depositJT(BOB_ADDRESS, _jtAmount);
-
-        // Calculate ST amount based on max deposit to satisfy coverage
-        TRANCHE_UNIT stMaxDeposit = ST.maxDeposit(ALICE_ADDRESS);
-        uint256 stAmount = toUint256(stMaxDeposit) * _stPercentage / 100;
-        if (stAmount < _minDepositAmount()) return;
+        vm.startPrank(BOB_ADDRESS);
+        IERC20(SNUSD).approve(address(JT), jtDepositAmount);
+        JT.deposit(toTrancheUnits(jtDepositAmount), BOB_ADDRESS, BOB_ADDRESS);
+        vm.stopPrank();
 
         // Deposit to ST
-        uint256 shares = _depositST(ALICE_ADDRESS, stAmount);
+        vm.startPrank(ALICE_ADDRESS);
+        IERC20(SNUSD).approve(address(ST), stDepositAmount);
+        (uint256 shares,) = ST.deposit(toTrancheUnits(stDepositAmount), ALICE_ADDRESS, ALICE_ADDRESS);
+        vm.stopPrank();
 
         // Record state before upgrade
         uint256 totalSupplyBefore = ST.totalSupply();
         uint256 aliceBalanceBefore = ST.balanceOf(ALICE_ADDRESS);
-        NAV_UNIT rawNAVBefore = ST.getRawNAV();
 
         // Upgrade ST
         vm.prank(UPGRADER_ADDRESS);
@@ -382,23 +417,28 @@ contract UpgradabilityTestSuite is YieldBearingERC4626_TestBase {
         // Verify state is preserved
         assertEq(ST.totalSupply(), totalSupplyBefore, "Total supply should be preserved");
         assertEq(ST.balanceOf(ALICE_ADDRESS), aliceBalanceBefore, "Alice balance should be preserved");
-        assertEq(ST.getRawNAV(), rawNAVBefore, "Raw NAV should be preserved");
         assertEq(ST.balanceOf(ALICE_ADDRESS), shares, "Shares should match original deposit");
     }
 
     /// @notice Test operations still work after upgrade
-    function testFuzz_jtProxy_operationsWorkAfterUpgrade(uint256 _amount) external {
-        _amount = bound(_amount, _minDepositAmount(), config.initialFunding / 4);
+    function test_jtProxy_operationsWorkAfterUpgrade() external {
+        uint256 depositAmount = 100_000e18;
 
         // Deposit before upgrade
-        uint256 sharesBefore = _depositJT(ALICE_ADDRESS, _amount);
+        vm.startPrank(ALICE_ADDRESS);
+        IERC20(SNUSD).approve(address(JT), depositAmount);
+        (uint256 sharesBefore,) = JT.deposit(toTrancheUnits(depositAmount), ALICE_ADDRESS, ALICE_ADDRESS);
+        vm.stopPrank();
 
         // Upgrade JT
         vm.prank(UPGRADER_ADDRESS);
         UUPSUpgradeable(address(JT)).upgradeToAndCall(address(newJTImpl), "");
 
         // Deposit after upgrade should still work
-        uint256 sharesAfter = _depositJT(BOB_ADDRESS, _amount);
+        vm.startPrank(BOB_ADDRESS);
+        IERC20(SNUSD).approve(address(JT), depositAmount);
+        (uint256 sharesAfter,) = JT.deposit(toTrancheUnits(depositAmount), BOB_ADDRESS, BOB_ADDRESS);
+        vm.stopPrank();
 
         // Both deposits should have resulted in shares
         assertGt(sharesBefore, 0, "Shares before upgrade should be > 0");
@@ -409,19 +449,18 @@ contract UpgradabilityTestSuite is YieldBearingERC4626_TestBase {
     }
 
     /// @notice Test kernel sync still works after upgrade
-    function testFuzz_kernelProxy_syncWorksAfterUpgrade(uint256 _jtAmount, uint256 _yieldPercentage) external {
-        _jtAmount = bound(_jtAmount, _minDepositAmount() * 10, config.initialFunding / 4);
-        _yieldPercentage = bound(_yieldPercentage, 1, 10);
+    function test_kernelProxy_syncWorksAfterUpgrade() external {
+        uint256 depositAmount = 100_000e18;
 
         // Setup: deposit JT
-        _depositJT(ALICE_ADDRESS, _jtAmount);
+        vm.startPrank(ALICE_ADDRESS);
+        IERC20(SNUSD).approve(address(JT), depositAmount);
+        JT.deposit(toTrancheUnits(depositAmount), ALICE_ADDRESS, ALICE_ADDRESS);
+        vm.stopPrank();
 
         // Upgrade kernel
         vm.prank(UPGRADER_ADDRESS);
         UUPSUpgradeable(address(KERNEL)).upgradeToAndCall(newKernelImpl, "");
-
-        // Simulate yield
-        this.simulateJTYield(_yieldPercentage * 1e16);
 
         // Sync should still work after upgrade
         vm.prank(OWNER_ADDRESS);

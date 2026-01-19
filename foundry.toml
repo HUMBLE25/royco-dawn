@@ -8,10 +8,10 @@ bytecode_hash = "none"
 cbor_metadata = false
 sparse_mode = false
 build_info = true
-evm_version="prague"
+evm_version = "prague"
 via_ir = true
 deny = "never"
-fs_permissions = [{ access = "read", path = "./out"}]
+fs_permissions = [{ access = "read", path = "./out" }]
 
 [profile.default.optimizer_details]
 constantOptimizer = true
@@ -21,14 +21,14 @@ yul = true
 stackAllocation = true
 
 [fmt]
-line_length = 160        
+line_length = 160
 wrap_comments = false
 bracket_spacing = true
 number_underscore = "thousands"
 int_types = "long"
 multiline_func_header = "all"
 quote_style = "double"
-ignore = ["libs/*","*.t.sol"]
+ignore = ["libs/*", "*.t.sol"]
 sort_imports = true
 
 [lint]
@@ -36,6 +36,8 @@ exclude_lints = ["mixed-case-function", "mixed-case-variable"]
 
 [fuzz]
 runs = 200
+show_logs = true
+
 
 [etherscan]
 mainnet = { key = "${ETHERSCAN_API_KEY}" }
