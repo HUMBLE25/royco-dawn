@@ -14,9 +14,9 @@ import { MarketDeploymentParams, RolesConfiguration, RoycoMarket } from "./libra
 
 /**
  * @title RoycoFactory
- * @notice Factory contract for deploying Royco tranches (ST and JT) and their associated kernel using ERC1967 proxies
- * @notice The factory also acts as the shared access manager for all the Royco market
- * @dev This factory deploys upgradeable tranche contracts using the UUPS proxy pattern
+ * @notice Factory contract for deploying and initializing Royco markets (Senior Tranche, Junior Tranche, Kernel, and Accountant)
+ * @notice The factory also acts as a singleton access manager for all the Royco markets and their constituent contracts
+ * @dev The factory deploys each market's constituent contracts using the UUPS proxy pattern
  */
 contract RoycoFactory is AccessManager, RoycoRoles, IRoycoFactory {
     /**
