@@ -2,6 +2,7 @@
 pragma solidity ^0.8.28;
 
 import { IAccessManager } from "../lib/openzeppelin-contracts/contracts/access/manager/IAccessManager.sol";
+import { UUPSUpgradeable } from "../lib/openzeppelin-contracts/contracts/proxy/utils/UUPSUpgradeable.sol";
 import { RoycoFactory } from "../src/RoycoFactory.sol";
 import { RoycoAccountant } from "../src/accountant/RoycoAccountant.sol";
 import { RoycoRoles } from "../src/auth/RoycoRoles.sol";
@@ -22,7 +23,8 @@ import {
     YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626Assets_Kernel
 } from "../src/kernels/YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626Assets_Kernel.sol";
 import { RoycoKernelInitParams } from "../src/libraries/RoycoKernelStorageLib.sol";
-import { DeployedContracts, MarketDeploymentParams, RolesConfiguration, TrancheDeploymentParams } from "../src/libraries/Types.sol";
+import { AssetClaims, DeployedContracts, MarketDeploymentParams, RolesConfiguration, TrancheDeploymentParams } from "../src/libraries/Types.sol";
+import { TRANCHE_UNIT } from "../src/libraries/Units.sol";
 import { RoycoJT } from "../src/tranches/RoycoJT.sol";
 import { RoycoST } from "../src/tranches/RoycoST.sol";
 import { AdaptiveCurveYDM } from "../src/ydm/AdaptiveCurveYDM.sol";
@@ -30,6 +32,12 @@ import { StaticCurveYDM } from "../src/ydm/StaticCurveYDM.sol";
 import { Create2DeployUtils } from "./Create2DeployUtils.sol";
 import { Script } from "lib/forge-std/src/Script.sol";
 import { console2 } from "lib/forge-std/src/console2.sol";
+
+/// @notice Interface for kernel oracle quoter admin functions
+interface IKernelOracleQuoterAdmin {
+    function setConversionRate(uint256 _conversionRateRAY) external;
+    function setTrancheAssetToReferenceAssetOracle(address _trancheAssetToReferenceAssetOracle, uint48 _stalenessThresholdSeconds) external;
+}
 
 contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
     // Custom errors
@@ -257,8 +265,8 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
         uint256 index = 0;
 
         // Senior Tranche roles
-        bytes4[] memory stSelectors = new bytes4[](12);
-        uint64[] memory stRoles = new uint64[](12);
+        bytes4[] memory stSelectors = new bytes4[](13);
+        uint64[] memory stRoles = new uint64[](13);
 
         stSelectors[0] = IRoycoVaultTranche.deposit.selector;
         stRoles[0] = DEPOSIT_ROLE;
@@ -284,6 +292,8 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
         stRoles[10] = DEPOSIT_ROLE;
         stSelectors[11] = bytes4(0x9f40a7b3);
         stRoles[11] = REDEEM_ROLE;
+        stSelectors[12] = UUPSUpgradeable.upgradeToAndCall.selector;
+        stRoles[12] = UPGRADER_ROLE;
 
         roles[index++] = RolesConfiguration({ target: _seniorTranche, selectors: stSelectors, roles: stRoles });
 
@@ -294,8 +304,8 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
         roles[index++] = RolesConfiguration({ target: _juniorTranche, selectors: jtSelectors, roles: jtRoles });
 
         // Kernel roles
-        bytes4[] memory kernelSelectors = new bytes4[](7);
-        uint64[] memory kernelRoleValues = new uint64[](7);
+        bytes4[] memory kernelSelectors = new bytes4[](8);
+        uint64[] memory kernelRoleValues = new uint64[](8);
 
         kernelSelectors[0] = IRoycoKernel.setProtocolFeeRecipient.selector;
         kernelRoleValues[0] = KERNEL_ADMIN_ROLE;
@@ -312,12 +322,14 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
         kernelRoleValues[5] = ORACLE_QUOTER_ADMIN_ROLE;
         kernelSelectors[6] = bytes4(0x8138d87d); // setTrancheAssetToReferenceAssetOracle(address,uint48)
         kernelRoleValues[6] = ORACLE_QUOTER_ADMIN_ROLE;
+        kernelSelectors[7] = UUPSUpgradeable.upgradeToAndCall.selector;
+        kernelRoleValues[7] = UPGRADER_ROLE;
 
         roles[index++] = RolesConfiguration({ target: _kernel, selectors: kernelSelectors, roles: kernelRoleValues });
 
         // Accountant roles
-        bytes4[] memory accountantSelectors = new bytes4[](9);
-        uint64[] memory accountantRoleValues = new uint64[](9);
+        bytes4[] memory accountantSelectors = new bytes4[](10);
+        uint64[] memory accountantRoleValues = new uint64[](10);
 
         accountantSelectors[0] = IRoycoAccountant.setYDM.selector;
         accountantRoleValues[0] = KERNEL_ADMIN_ROLE;
@@ -337,6 +349,8 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
         accountantRoleValues[7] = PAUSER_ROLE;
         accountantSelectors[8] = IRoycoAuth.unpause.selector;
         accountantRoleValues[8] = PAUSER_ROLE;
+        accountantSelectors[9] = UUPSUpgradeable.upgradeToAndCall.selector;
+        accountantRoleValues[9] = UPGRADER_ROLE;
 
         roles[index++] = RolesConfiguration({ target: _accountant, selectors: accountantSelectors, roles: accountantRoleValues });
     }

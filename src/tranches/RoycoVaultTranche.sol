@@ -12,7 +12,7 @@ import { IAsyncJTDepositKernel } from "../interfaces/kernel/IAsyncJTDepositKerne
 import { IAsyncSTDepositKernel } from "../interfaces/kernel/IAsyncSTDepositKernel.sol";
 import { IAsyncSTRedemptionKernel } from "../interfaces/kernel/IAsyncSTRedemptionKernel.sol";
 import { ExecutionModel, IRoycoKernel, SharesRedemptionModel } from "../interfaces/kernel/IRoycoKernel.sol";
-import { IERC165, IRoycoAsyncCancellableVault, IRoycoAsyncVault, IRoycoVaultTranche } from "../interfaces/tranche/IRoycoVaultTranche.sol";
+import { IRoycoAsyncCancellableVault, IRoycoAsyncVault, IRoycoVaultTranche } from "../interfaces/tranche/IRoycoVaultTranche.sol";
 import { ZERO_NAV_UNITS } from "../libraries/Constants.sol";
 import { RoycoTrancheStorageLib } from "../libraries/RoycoTrancheStorageLib.sol";
 import { Action, AssetClaims, SyncedAccountingState, TrancheDeploymentParams, TrancheType } from "../libraries/Types.sol";
@@ -692,13 +692,6 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
     /// @inheritdoc IRoycoVaultTranche
     function asset() public view virtual override(IRoycoVaultTranche) returns (address) {
         return RoycoTrancheStorageLib._getRoycoTrancheStorage().asset;
-    }
-
-    /// @inheritdoc IERC165
-    function supportsInterface(bytes4 _interfaceId) public pure virtual override(IERC165) returns (bool) {
-        return _interfaceId == type(IERC165).interfaceId || _interfaceId == type(IRoycoAsyncVault).interfaceId
-            || _interfaceId == type(IRoycoAsyncCancellableVault).interfaceId || _interfaceId == type(IRoycoVaultTranche).interfaceId
-            || _interfaceId == type(IAccessControlEnumerable).interfaceId;
     }
 
     /**
