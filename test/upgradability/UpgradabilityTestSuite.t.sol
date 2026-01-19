@@ -85,8 +85,7 @@ contract UpgradabilityTestSuite is BaseTest {
                 initialConversionRateWAD: RAY
             });
 
-        DeployScript.StaticCurveYDMParams memory ydmParams = DeployScript.StaticCurveYDMParams({
-            jtYieldShareAtZeroUtilWAD: 0.1e18,
+        DeployScript.AdaptiveCurveYDMParams memory ydmParams = DeployScript.AdaptiveCurveYDMParams({
             jtYieldShareAtTargetUtilWAD: 0.3e18,
             jtYieldShareAtFullUtilWAD: 1e18
         });
@@ -111,7 +110,7 @@ contract UpgradabilityTestSuite is BaseTest {
             betaWAD: 1e18,
             lltvWAD: LLTV,
             fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
-            ydmType: DeployScript.YDMType.StaticCurve,
+            ydmType: DeployScript.YDMType.AdaptiveCurve,
             ydmSpecificParams: abi.encode(ydmParams),
             pauserAddress: PAUSER_ADDRESS,
             pauserExecutionDelay: 0,
