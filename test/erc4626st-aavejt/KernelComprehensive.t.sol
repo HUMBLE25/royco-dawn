@@ -2084,7 +2084,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
 
     /// @notice Test behavior when market stays in PERPETUAL state
     /// @dev Tests the normal PERPETUAL state behavior since setFixedTermDuration requires
-    ///      KERNEL_ADMIN_ROLE which has complex access control setup
+    ///      ADMIN_KERNEL_ROLE which has complex access control setup
     function test_fixedTermDurationZero_marketStartsPerpetual() public {
         // Setup market
         _depositJT(100_000e6, ALICE_ADDRESS);

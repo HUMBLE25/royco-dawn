@@ -44,6 +44,13 @@ contract StaticCurveYDM is IYDM {
     event StaticCurveYdmInitialized(address indexed accountant, uint256 jtYieldShareAtZeroUtilWAD, uint256 slopeLtTargetUtilWAD, uint256 slopeGteTargetUtilWAD);
 
     /**
+     * @notice Emitted when the JT yield share is updated
+     * @param accountant The accountant for the market that the yield share was updated for
+     * @param jtYieldShareWAD The JT yield share output (returned to the accountant)
+     */
+    event YdmOutput(address indexed accountant, uint256 jtYieldShareWAD);
+
+    /**
      * @notice Initializes the YDM curve for a particular Royco market
      * @dev Must be called during the initialization of the accountant for the Royco market
      * @dev Setting all three initialization parameters to the same value emulates a fixed JT yield share YDM
@@ -96,11 +103,11 @@ contract StaticCurveYDM is IYDM {
         NAV_UNIT _jtEffectiveNAV
     )
         external
-        view
         override(IYDM)
-        returns (uint256)
+        returns (uint256 jtYieldShareWAD)
     {
-        return _jtYieldShare(_stRawNAV, _jtRawNAV, _betaWAD, _coverageWAD, _jtEffectiveNAV);
+        jtYieldShareWAD = _jtYieldShare(_stRawNAV, _jtRawNAV, _betaWAD, _coverageWAD, _jtEffectiveNAV);
+        emit YdmOutput(msg.sender, jtYieldShareWAD);
     }
 
     /// @dev View helper to compute the instantaneous JT yield share based on the defined static curve
@@ -134,9 +141,9 @@ contract StaticCurveYDM is IYDM {
          * Output is capped at 100% when utilization reaches or exceeds 100%.
          */
 
-        // Compute the utilization of the market
+        // Compute the utilization of the market and bound it to 100%
         uint256 utilizationWAD = UtilsLib.computeUtilization(_stRawNAV, _jtRawNAV, _betaWAD, _coverageWAD, _jtEffectiveNAV);
-        utilizationWAD = utilizationWAD > WAD ? WAD : utilizationWAD;
+        if (utilizationWAD > WAD) utilizationWAD = WAD;
 
         // Retrieve the static curve for this market
         StaticYieldCurve storage curve = accountantToCurve[msg.sender];

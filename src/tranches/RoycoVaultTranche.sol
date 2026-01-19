@@ -260,6 +260,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         whenNotPaused
         returns (AssetClaims memory claims, bytes memory metadata)
     {
+        require(_receiver != address(0), ERC20InvalidReceiver(address(0)));
         require(_shares != 0, MUST_REQUEST_NON_ZERO_SHARES());
 
         // Process the withdrawal from the underlying investment opportunity
@@ -536,6 +537,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         onlyCallerOrOperator(_controller)
         executionIsAsync(Action.DEPOSIT)
     {
+        require(_receiver != address(0), ERC20InvalidReceiver(address(0)));
         // Expect the kernel to transfer the assets to the receiver directly after the cancellation is processed
         TRANCHE_UNIT claimedAssets =
         (TRANCHE_TYPE() == TrancheType.SENIOR

@@ -274,10 +274,8 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         NAV_UNIT totalCoveredAssets = state.jtEffectiveNAV.mulDiv(WAD, $.coverageWAD, Math.Rounding.Floor);
         // Compute the assets required to cover current junior tranche exposure
         NAV_UNIT jtCoverageRequired = _jtRawNAV.mulDiv($.betaWAD, WAD, Math.Rounding.Ceil);
-        // Compute the assets required to cover current senior tranche exposure
-        NAV_UNIT stCoverageRequired = _stRawNAV;
         // Compute the amount of assets that can be deposited into senior while retaining full coverage
-        maxSTDeposit = totalCoveredAssets.saturatingSub(jtCoverageRequired).saturatingSub(stCoverageRequired);
+        maxSTDeposit = totalCoveredAssets.saturatingSub(jtCoverageRequired).saturatingSub(_stRawNAV);
     }
 
     /**
@@ -337,7 +335,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         // Compute the minimum junior tranche assets required to cover the exposure as per the market's coverage requirement
         NAV_UNIT requiredJTAssets = totalCoveredExposure.mulDiv($.coverageWAD, WAD, Math.Rounding.Ceil);
         // Compute the surplus coverage currently provided by the junior tranche based on its currently remaining loss-absorption buffer
-        surplusJTAssets = UnitsMathLib.saturatingSub(state.jtEffectiveNAV, requiredJTAssets);
+        surplusJTAssets = state.jtEffectiveNAV.saturatingSub(requiredJTAssets);
     }
 
     /**
@@ -484,7 +482,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
                     // Get the instantaneous YDM output and ensure that JT cannot earn more than 100% of senior appreciation
                     uint256 instantaneousJtYieldShareWAD =
                         IYDM($.ydm).previewJTYieldShare($.lastMarketState, $.lastSTRawNAV, $.lastJTRawNAV, $.betaWAD, $.coverageWAD, $.lastJTEffectiveNAV);
-                    instantaneousJtYieldShareWAD = (instantaneousJtYieldShareWAD > WAD) ? WAD : instantaneousJtYieldShareWAD;
+                    if (instantaneousJtYieldShareWAD > WAD) instantaneousJtYieldShareWAD = WAD;
                     jtGain = stGain.mulDiv(instantaneousJtYieldShareWAD, WAD, Math.Rounding.Floor);
                 } else {
                     jtGain = stGain.mulDiv(_twJTYieldShareAccruedWAD, elapsed * WAD, Math.Rounding.Floor);
@@ -565,7 +563,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         // Get the instantaneous JT yield share, scaled to WAD precision
         uint256 jtYieldShareWAD = IYDM($.ydm).jtYieldShare($.lastMarketState, $.lastSTRawNAV, $.lastJTRawNAV, $.betaWAD, $.coverageWAD, $.lastJTEffectiveNAV);
         // Ensure that JT cannot earn more than 100% of senior appreciation
-        jtYieldShareWAD = (jtYieldShareWAD > WAD) ? WAD : jtYieldShareWAD;
+        if (jtYieldShareWAD > WAD) jtYieldShareWAD = WAD;
 
         // Accrue the time-weighted yield share accrued to JT since the last tranche interaction
         /// forge-lint: disable-next-item(unsafe-typecast)
@@ -597,7 +595,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         uint256 jtYieldShareWAD =
             IYDM($.ydm).previewJTYieldShare($.lastMarketState, $.lastSTRawNAV, $.lastJTRawNAV, $.betaWAD, $.coverageWAD, $.lastJTEffectiveNAV);
         // Ensure that JT cannot earn more than 100% of senior appreciation
-        jtYieldShareWAD = (jtYieldShareWAD > WAD) ? WAD : jtYieldShareWAD;
+        if (jtYieldShareWAD > WAD) jtYieldShareWAD = WAD;
 
         // Apply the accural of JT yield share to the accumulator, weighted by the time elapsed
         /// forge-lint: disable-next-item(unsafe-typecast)
