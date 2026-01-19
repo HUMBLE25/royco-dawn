@@ -24,10 +24,10 @@ contract StaticCurveYDM is IYDM {
      * @custom:field slopeGteTargetUtilWAD - The slope when the market's utilization is greater than or equal to the target utilization, scaled to WAD precision
      */
     struct StaticYieldCurve {
-        uint128 jtYieldShareAtZeroUtilWAD;
-        uint128 slopeLtTargetUtilWAD;
-        uint128 jtYieldShareAtTargetUtilWAD;
-        uint128 slopeGteTargetUtilWAD;
+        uint64 jtYieldShareAtZeroUtilWAD;
+        uint192 slopeLtTargetUtilWAD;
+        uint64 jtYieldShareAtTargetUtilWAD;
+        uint192 slopeGteTargetUtilWAD;
     }
 
     /// @dev A mapping from market accountants to its market's current YDM curve
@@ -46,6 +46,7 @@ contract StaticCurveYDM is IYDM {
     /**
      * @notice Initializes the YDM curve for a particular Royco market
      * @dev Must be called during the initialization of the accountant for the Royco market
+     * @dev Setting all three initialization parameters to the same value emulates a fixed JT yield share YDM
      * @param _jtYieldShareAtZeroUtilWAD The JT yield share at 0% utilization, scaled to WAD precision
      * @param _jtYieldShareAtTargetUtilWAD The JT yield share at target utilization, scaled to WAD precision
      * @param _jtYieldShareAtFullUtilWAD The JT yield share at 100% utilization, scaled to WAD precision
@@ -58,14 +59,12 @@ contract StaticCurveYDM is IYDM {
             INVALID_YDM_INITIALIZATION()
         );
 
-        // Initialize the YDM curve for this market
+        // Initialize the YDM curve for this market (2 SSTOREs: slot0 = y0 + slopeLt, slot1 = yT + slopeGte)
         StaticYieldCurve storage curve = accountantToCurve[msg.sender];
-        curve.jtYieldShareAtZeroUtilWAD = uint128(_jtYieldShareAtZeroUtilWAD);
-        curve.slopeLtTargetUtilWAD =
-            uint128((uint256(_jtYieldShareAtTargetUtilWAD - _jtYieldShareAtZeroUtilWAD).mulDiv(WAD, TARGET_UTILIZATION_WAD, Math.Rounding.Floor)));
-        curve.jtYieldShareAtTargetUtilWAD = uint128(_jtYieldShareAtTargetUtilWAD);
-        curve.slopeGteTargetUtilWAD =
-            uint128((uint256(_jtYieldShareAtFullUtilWAD - _jtYieldShareAtTargetUtilWAD).mulDiv(WAD, (WAD - TARGET_UTILIZATION_WAD), Math.Rounding.Floor)));
+        curve.jtYieldShareAtZeroUtilWAD = _jtYieldShareAtZeroUtilWAD;
+        curve.slopeLtTargetUtilWAD = _computeSlope(_jtYieldShareAtZeroUtilWAD, _jtYieldShareAtTargetUtilWAD, 0, TARGET_UTILIZATION_WAD);
+        curve.jtYieldShareAtTargetUtilWAD = _jtYieldShareAtTargetUtilWAD;
+        curve.slopeGteTargetUtilWAD = _computeSlope(_jtYieldShareAtTargetUtilWAD, _jtYieldShareAtFullUtilWAD, TARGET_UTILIZATION_WAD, WAD);
 
         emit StaticCurveYdmInitialized(msg.sender, _jtYieldShareAtZeroUtilWAD, curve.slopeLtTargetUtilWAD, curve.slopeGteTargetUtilWAD);
     }
@@ -150,5 +149,17 @@ contract StaticCurveYDM is IYDM {
             return uint256(curve.slopeGteTargetUtilWAD).mulDiv((utilizationWAD - TARGET_UTILIZATION_WAD), WAD, Math.Rounding.Floor)
                 + curve.jtYieldShareAtTargetUtilWAD;
         }
+    }
+
+    /**
+     * @notice Computes the slope between two points on the curve: (y1 - y0) / (x1 - x0)
+     * @param _y0WAD Y coordinate for point 0, scaled to WAD precision
+     * @param _y1WAD Y coordinate for point 1, scaled to WAD precision
+     * @param _x0WAD X coordinate for point 0, scaled to WAD precision
+     * @param _x1WAD X coordinate for point 1, scaled to WAD precision
+     * @return slopeWAD The slope of the line, scaled to WAD precision
+     */
+    function _computeSlope(uint256 _y0WAD, uint256 _y1WAD, uint256 _x0WAD, uint256 _x1WAD) internal pure returns (uint192 slopeWAD) {
+        slopeWAD = uint192((_y1WAD - _y0WAD).mulDiv(WAD, (_x1WAD - _x0WAD), Math.Rounding.Floor));
     }
 }
