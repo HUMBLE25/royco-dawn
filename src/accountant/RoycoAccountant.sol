@@ -274,10 +274,8 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         NAV_UNIT totalCoveredAssets = state.jtEffectiveNAV.mulDiv(WAD, $.coverageWAD, Math.Rounding.Floor);
         // Compute the assets required to cover current junior tranche exposure
         NAV_UNIT jtCoverageRequired = _jtRawNAV.mulDiv($.betaWAD, WAD, Math.Rounding.Ceil);
-        // Compute the assets required to cover current senior tranche exposure
-        NAV_UNIT stCoverageRequired = _stRawNAV;
         // Compute the amount of assets that can be deposited into senior while retaining full coverage
-        maxSTDeposit = totalCoveredAssets.saturatingSub(jtCoverageRequired).saturatingSub(stCoverageRequired);
+        maxSTDeposit = totalCoveredAssets.saturatingSub(jtCoverageRequired).saturatingSub(_stRawNAV);
     }
 
     /**
@@ -337,7 +335,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         // Compute the minimum junior tranche assets required to cover the exposure as per the market's coverage requirement
         NAV_UNIT requiredJTAssets = totalCoveredExposure.mulDiv($.coverageWAD, WAD, Math.Rounding.Ceil);
         // Compute the surplus coverage currently provided by the junior tranche based on its currently remaining loss-absorption buffer
-        surplusJTAssets = UnitsMathLib.saturatingSub(state.jtEffectiveNAV, requiredJTAssets);
+        surplusJTAssets = state.jtEffectiveNAV.saturatingSub(requiredJTAssets);
     }
 
     /**
