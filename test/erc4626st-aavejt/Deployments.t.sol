@@ -155,24 +155,6 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         FACTORY.deployMarket(params);
     }
 
-    function test_deployMarket_revertsOnZeroSeniorAsset() public {
-        (MarketDeploymentParams memory params,,) = _buildValidMarketParams();
-        params.seniorAsset = address(0);
-
-        vm.expectRevert(IRoycoFactory.INVALID_ASSET.selector);
-        vm.prank(address(DEPLOY_SCRIPT));
-        FACTORY.deployMarket(params);
-    }
-
-    function test_deployMarket_revertsOnZeroJuniorAsset() public {
-        (MarketDeploymentParams memory params,,) = _buildValidMarketParams();
-        params.juniorAsset = address(0);
-
-        vm.expectRevert(IRoycoFactory.INVALID_ASSET.selector);
-        vm.prank(address(DEPLOY_SCRIPT));
-        FACTORY.deployMarket(params);
-    }
-
     function test_deployMarket_revertsOnZeroMarketId() public {
         (MarketDeploymentParams memory params,,) = _buildValidMarketParams();
         params.marketId = bytes32(0);
@@ -645,8 +627,6 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
             seniorTrancheSymbol: SENIOR_TRANCHE_SYMBOL,
             juniorTrancheName: JUNIOR_TRANCHE_NAME,
             juniorTrancheSymbol: JUNIOR_TRANCHE_SYMBOL,
-            seniorAsset: ETHEREUM_MAINNET_USDC_ADDRESS,
-            juniorAsset: ETHEREUM_MAINNET_USDC_ADDRESS,
             marketId: marketId,
             seniorTrancheImplementation: ST_IMPL,
             juniorTrancheImplementation: JT_IMPL,

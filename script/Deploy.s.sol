@@ -23,7 +23,7 @@ import {
     YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626Assets_Kernel
 } from "../src/kernels/YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626Assets_Kernel.sol";
 import { RoycoKernelInitParams } from "../src/libraries/RoycoKernelStorageLib.sol";
-import { AssetClaims, DeployedContracts, MarketDeploymentParams, RolesConfiguration, TrancheDeploymentParams } from "../src/libraries/Types.sol";
+import { AssetClaims, MarketDeploymentParams, RolesConfiguration, RoycoMarket, TrancheDeploymentParams } from "../src/libraries/Types.sol";
 import { TRANCHE_UNIT } from "../src/libraries/Units.sol";
 import { RoycoJT } from "../src/tranches/RoycoJT.sol";
 import { RoycoST } from "../src/tranches/RoycoST.sol";
@@ -196,7 +196,7 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
         RoycoFactory factory = _deployFactory(_params.factoryAdmin);
 
         // Deploy market using factory (kernel implementation is deployed inside _deployMarket)
-        (DeployedContracts memory market, address kernelImpl) = _deployMarket(factory, accountantImpl, stTrancheImpl, jtTrancheImpl, address(ydm), _params);
+        (RoycoMarket memory market, address kernelImpl) = _deployMarket(factory, accountantImpl, stTrancheImpl, jtTrancheImpl, address(ydm), _params);
 
         // Transfer factory ownership to new admin if provided
         _transferFactoryOwnership(factory, _params.factoryOwnerAddress);
@@ -404,7 +404,7 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
         DeploymentParams memory _params
     )
         internal
-        returns (DeployedContracts memory, address)
+        returns (RoycoMarket memory, address)
     {
         // Precompute expected proxy addresses using inline salt
         bytes32 salt = MARKET_DEPLOYMENT_SALT;
@@ -446,8 +446,6 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
             seniorTrancheSymbol: _params.seniorTrancheSymbol,
             juniorTrancheName: _params.juniorTrancheName,
             juniorTrancheSymbol: _params.juniorTrancheSymbol,
-            seniorAsset: _params.seniorAsset,
-            juniorAsset: _params.juniorAsset,
             marketId: _params.marketId,
             seniorTrancheImplementation: IRoycoVaultTranche(address(stTrancheImpl)),
             juniorTrancheImplementation: IRoycoVaultTranche(address(jtTrancheImpl)),
@@ -466,7 +464,7 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
 
         // Deploy market
         console2.log("Deploying market...");
-        DeployedContracts memory deployedContracts = factory.deployMarket(marketParams);
+        RoycoMarket memory deployedContracts = factory.deployMarket(marketParams);
 
         console2.log("Market deployed successfully!");
         console2.log("Senior Tranche:", address(deployedContracts.seniorTranche));

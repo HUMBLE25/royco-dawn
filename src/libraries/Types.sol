@@ -10,7 +10,7 @@ import { NAV_UNIT, TRANCHE_UNIT } from "./Units.sol";
  * @title MarketState
  * @notice Defines the operational state of a Royco market
  * @custom:state PERPETUAL
- *      Normal operating state where market forces govern behavior.
+ *      Normal operating state where market forces govern behavior
  *      - Both tranches liquid (within coverage constraints)
  *      - JT redemptions subject to async delay for coverage protection
  *      - Adaptive curve YDM adapts based on utilization
@@ -90,8 +90,8 @@ enum Operation {
 /**
  * @title Action
  * @dev Defines the action being executed by the user
- * @custom:type DEPOSIT Depositing assets into the tranche
- * @custom:type WITHDRAW Withdrawing assets from the tranche
+ * @custom:type DEPOSIT - Depositing assets into the tranche
+ * @custom:type WITHDRAW - Withdrawing assets from the tranche
  */
 enum Action {
     DEPOSIT,
@@ -101,8 +101,8 @@ enum Action {
 /**
  * @title TrancheType
  * @dev Defines the two types of Royco tranches deployed per market.
- * @custom:type SENIOR The identifier for the senior tranche (second-loss capital)
- * @custom:type JUNIOR The identifier for the junior tranche (first-loss capital)
+ * @custom:type SENIOR - The identifier for the senior tranche (protected capital)
+ * @custom:type JUNIOR - The identifier for the junior tranche (first-loss capital)
  */
 enum TrancheType {
     SENIOR,
@@ -112,8 +112,8 @@ enum TrancheType {
 /**
  * @title SharesRedemptionModel
  * @dev Defines the behavior of the shares when a redeem request is made
- * @custom:type BURN_ON_REQUEST_REDEEM The shares are burned when calling requestRedeem
- * @custom:type BURN_ON_CLAIM_REDEEM The shares are burned when calling redeem
+ * @custom:type BURN_ON_REQUEST_REDEEM - The shares are burned when calling requestRedeem
+ * @custom:type BURN_ON_CLAIM_REDEEM - The shares are burned when calling redeem
  */
 enum SharesRedemptionModel {
     BURN_ON_REQUEST_REDEEM,
@@ -123,8 +123,8 @@ enum SharesRedemptionModel {
 /**
  * @title ExecutionModel
  * @dev Defines the execution semantics for the deposit or withdrawal flow of a vault
- * @custom:type SYNC Refers to the flow being synchronous
- * @custom:type ASYNC Refers to the flow being asynchronous
+ * @custom:type SYNC - Refers to the flow being synchronous
+ * @custom:type ASYNC - Refers to the flow being asynchronous
  */
 enum ExecutionModel {
     SYNC,
@@ -134,7 +134,8 @@ enum ExecutionModel {
 /**
  * @title ActionMetadataFormat
  * @dev Defines the format of the metadata for the action
- * @custom:type REDEMPTION_CLAIMABLE_AT_TIMESTAMP is followed by a uint256 representing the claimable at timestamp of the redemption request
+ * @dev Encoded as the first byte of any metadata, indicating the significance and format of the following metadata
+ * @custom:type REDEMPTION_CLAIMABLE_AT_TIMESTAMP - Encodes a uint256 representing the claimable at timestamp of the redemption request
  */
 enum ActionMetadataFormat {
     REDEMPTION_CLAIMABLE_AT_TIMESTAMP
@@ -142,25 +143,25 @@ enum ActionMetadataFormat {
 
 /**
  * @notice Parameters for deploying a new market
- * @custom:field seniorTrancheName The name of the senior tranche
- * @custom:field seniorTrancheSymbol The symbol of the senior tranche
- * @custom:field juniorTrancheName The name of the junior tranche
- * @custom:field juniorTrancheSymbol The symbol of the junior tranche
- * @custom:field seniorAsset The underlying asset for the senior tranche
- * @custom:field juniorAsset The underlying asset for the junior tranche
- * @custom:field marketId The identifier of the Royco market
- * @custom:field kernelImplementation The implementation address for the kernel
- * @custom:field accountantImplementation The implementation address for the accountant
- * @custom:field seniorTrancheImplementation The implementation address for the senior tranche
- * @custom:field juniorTrancheImplementation The implementation address for the junior tranche
- * @custom:field kernelInitializationData The initialization data for the kernel
- * @custom:field accountantInitializationData The initialization data for the accountant
- * @custom:field seniorTrancheInitializationData The initialization data for the senior tranche
- * @custom:field juniorTrancheInitializationData The initialization data for the junior tranche
- * @custom:field seniorTrancheProxyDeploymentSalt The salt for the senior tranche proxy deployment
- * @custom:field juniorTrancheProxyDeploymentSalt The salt for the junior tranche proxy deployment
- * @custom:field kernelProxyDeploymentSalt The salt for the kernel proxy deployment
- * @custom:field accountantProxyDeploymentSalt The salt for the accountant proxy deployment
+ * @custom:field seniorTrancheName - The name of the senior tranche
+ * @custom:field seniorTrancheSymbol - The symbol of the senior tranche
+ * @custom:field juniorTrancheName - The name of the junior tranche
+ * @custom:field juniorTrancheSymbol - The symbol of the junior tranche
+ * @custom:field seniorAsset - The underlying asset for the senior tranche
+ * @custom:field juniorAsset - The underlying asset for the junior tranche
+ * @custom:field marketId - The identifier of the Royco market
+ * @custom:field kernelImplementation - The implementation address for the kernel
+ * @custom:field accountantImplementation - The implementation address for the accountant
+ * @custom:field seniorTrancheImplementation - The implementation address for the senior tranche
+ * @custom:field juniorTrancheImplementation - The implementation address for the junior tranche
+ * @custom:field kernelInitializationData - The initialization data for the kernel
+ * @custom:field accountantInitializationData - The initialization data for the accountant
+ * @custom:field seniorTrancheInitializationData - The initialization data for the senior tranche
+ * @custom:field juniorTrancheInitializationData - The initialization data for the junior tranche
+ * @custom:field seniorTrancheProxyDeploymentSalt - The salt for the senior tranche proxy deployment
+ * @custom:field juniorTrancheProxyDeploymentSalt - The salt for the junior tranche proxy deployment
+ * @custom:field kernelProxyDeploymentSalt - The salt for the kernel proxy deployment
+ * @custom:field accountantProxyDeploymentSalt - The salt for the accountant proxy deployment
  */
 struct MarketDeploymentParams {
     // Tranche Deployment Parameters
@@ -168,8 +169,6 @@ struct MarketDeploymentParams {
     string seniorTrancheSymbol;
     string juniorTrancheName;
     string juniorTrancheSymbol;
-    address seniorAsset;
-    address juniorAsset;
     bytes32 marketId;
     // Implementation Addresses
     IRoycoVaultTranche seniorTrancheImplementation;
@@ -191,9 +190,9 @@ struct MarketDeploymentParams {
 }
 
 /**
- * @custom:field name - The name of the tranche (should be prefixed with "Royco-ST" or "Royco-JT") share token
- * @custom:field symbol - The symbol of the tranche (should be prefixed with "ST" or "JT") share token
- * @custom:field kernel - The tranche kernel responsible for defining the execution model and logic of the tranche
+ * @custom:field name - The name of the tranche share token (should be prefixed with "Royco-ST" or "Royco-JT")
+ * @custom:field symbol - The symbol of the tranche share token (should be prefixed with "ST" or "JT")
+ * @custom:field kernel - The tranche kernel responsible for defining the execution model and core logic of the market
  */
 struct TrancheDeploymentParams {
     string name;
@@ -203,9 +202,9 @@ struct TrancheDeploymentParams {
 
 /**
  * @notice The configuration for a role
- * @custom:field target The target address of the role
- * @custom:field selectors The selectors of the role
- * @custom:field roles The roles of the role
+ * @custom:field target - The target address of the role
+ * @custom:field selectors - The selectors of the role
+ * @custom:field roles - The roles of the role
  */
 struct RolesConfiguration {
     address target;
@@ -214,15 +213,15 @@ struct RolesConfiguration {
 }
 
 /**
- * @notice The deployed contracts for a new market
- * @custom:field seniorTranche The senior tranche contract
- * @custom:field juniorTranche The junior tranche contract
- * @custom:field accountant The accountant contract
- * @custom:field kernel The kernel contract
+ * @notice The contracts constituting a Royco market
+ * @custom:field seniorTranche - The senior tranche contract
+ * @custom:field juniorTranche - The junior tranche contract
+ * @custom:field kernel - The kernel contract
+ * @custom:field accountant - The accountant contract
  */
-struct DeployedContracts {
+struct RoycoMarket {
     IRoycoVaultTranche seniorTranche;
     IRoycoVaultTranche juniorTranche;
-    IRoycoAccountant accountant;
     IRoycoKernel kernel;
+    IRoycoAccountant accountant;
 }
