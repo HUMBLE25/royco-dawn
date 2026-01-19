@@ -510,7 +510,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
 
         selectors[0] = IRoycoAuth.pause.selector;
         selectors[1] = IRoycoAuth.unpause.selector;
-        rolesArray[0] = RoycoRoles.PAUSER_ROLE;
+        rolesArray[0] = RoycoRoles.ADMIN_PAUSER_ROLE;
 
         roles[0] = RolesConfiguration({
             target: params.roles[0].target, // Use a valid target
@@ -535,7 +535,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         uint64[] memory rolesArray = new uint64[](1);
 
         selectors[0] = IRoycoAuth.pause.selector;
-        rolesArray[0] = RoycoRoles.PAUSER_ROLE;
+        rolesArray[0] = RoycoRoles.ADMIN_PAUSER_ROLE;
 
         roles[0] = RolesConfiguration({
             target: address(0xdead), // Invalid target - not one of the deployed contracts
@@ -560,7 +560,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         uint64[] memory rolesArray = new uint64[](1);
 
         selectors[0] = IRoycoAuth.pause.selector;
-        rolesArray[0] = RoycoRoles.PAUSER_ROLE;
+        rolesArray[0] = RoycoRoles.ADMIN_PAUSER_ROLE;
 
         address invalidTarget = address(0x1234567890123456789012345678901234567890);
         roles[0] = RolesConfiguration({

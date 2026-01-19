@@ -154,14 +154,8 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
         uint32 pauserExecutionDelay;
         address upgraderAddress;
         uint32 upgraderExecutionDelay;
-        address depositRoleAddress;
-        uint32 depositRoleExecutionDelay;
-        address redeemRoleAddress;
-        uint32 redeemRoleExecutionDelay;
-        address cancelDepositRoleAddress;
-        uint32 cancelDepositRoleExecutionDelay;
-        address cancelRedeemRoleAddress;
-        uint32 cancelRedeemRoleExecutionDelay;
+        address lpRoleAddress;
+        uint32 lpRoleExecutionDelay;
         address syncRoleAddress;
         uint32 syncRoleExecutionDelay;
         address kernelAdminRoleAddress;
@@ -261,29 +255,29 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
         uint64[] memory stRoles = new uint64[](12);
 
         stSelectors[0] = IRoycoVaultTranche.deposit.selector;
-        stRoles[0] = DEPOSIT_ROLE;
+        stRoles[0] = LP_ROLE;
         stSelectors[1] = IRoycoVaultTranche.redeem.selector;
-        stRoles[1] = REDEEM_ROLE;
+        stRoles[1] = LP_ROLE;
         stSelectors[2] = IRoycoAsyncVault.requestDeposit.selector;
-        stRoles[2] = DEPOSIT_ROLE;
+        stRoles[2] = LP_ROLE;
         stSelectors[3] = IRoycoAsyncVault.requestRedeem.selector;
-        stRoles[3] = REDEEM_ROLE;
+        stRoles[3] = LP_ROLE;
         stSelectors[4] = IRoycoAsyncCancellableVault.cancelDepositRequest.selector;
-        stRoles[4] = CANCEL_DEPOSIT_ROLE;
+        stRoles[4] = LP_ROLE;
         stSelectors[5] = IRoycoAsyncCancellableVault.claimCancelDepositRequest.selector;
-        stRoles[5] = CANCEL_DEPOSIT_ROLE;
+        stRoles[5] = LP_ROLE;
         stSelectors[6] = IRoycoAsyncCancellableVault.cancelRedeemRequest.selector;
-        stRoles[6] = CANCEL_REDEEM_ROLE;
+        stRoles[6] = LP_ROLE;
         stSelectors[7] = IRoycoAsyncCancellableVault.claimCancelRedeemRequest.selector;
-        stRoles[7] = CANCEL_REDEEM_ROLE;
+        stRoles[7] = LP_ROLE;
         stSelectors[8] = IRoycoAuth.pause.selector;
-        stRoles[8] = PAUSER_ROLE;
+        stRoles[8] = ADMIN_PAUSER_ROLE;
         stSelectors[9] = IRoycoAuth.unpause.selector;
-        stRoles[9] = PAUSER_ROLE;
+        stRoles[9] = ADMIN_PAUSER_ROLE;
         stSelectors[10] = bytes4(0xe4cca4b0);
-        stRoles[10] = DEPOSIT_ROLE;
+        stRoles[10] = LP_ROLE;
         stSelectors[11] = bytes4(0x9f40a7b3);
-        stRoles[11] = REDEEM_ROLE;
+        stRoles[11] = LP_ROLE;
 
         roles[index++] = RolesConfiguration({ target: _seniorTranche, selectors: stSelectors, roles: stRoles });
 
@@ -298,20 +292,20 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
         uint64[] memory kernelRoleValues = new uint64[](7);
 
         kernelSelectors[0] = IRoycoKernel.setProtocolFeeRecipient.selector;
-        kernelRoleValues[0] = KERNEL_ADMIN_ROLE;
+        kernelRoleValues[0] = ADMIN_KERNEL_ROLE;
         kernelSelectors[1] = IRoycoKernel.syncTrancheAccounting.selector;
         kernelRoleValues[1] = SYNC_ROLE;
         kernelSelectors[2] = IRoycoAuth.pause.selector;
-        kernelRoleValues[2] = PAUSER_ROLE;
+        kernelRoleValues[2] = ADMIN_PAUSER_ROLE;
         kernelSelectors[3] = IRoycoAuth.unpause.selector;
-        kernelRoleValues[3] = PAUSER_ROLE;
+        kernelRoleValues[3] = ADMIN_PAUSER_ROLE;
         kernelSelectors[4] = IRoycoKernel.setJuniorTrancheRedemptionDelay.selector;
-        kernelRoleValues[4] = KERNEL_ADMIN_ROLE;
+        kernelRoleValues[4] = ADMIN_KERNEL_ROLE;
         // Quoter admin functions (only present in kernels with oracle quoters)
         kernelSelectors[5] = bytes4(0xd2e80494); // setConversionRate(uint256)
-        kernelRoleValues[5] = ORACLE_QUOTER_ADMIN_ROLE;
+        kernelRoleValues[5] = ADMIN_ORACLE_QUOTER_ROLE;
         kernelSelectors[6] = bytes4(0x8138d87d); // setTrancheAssetToReferenceAssetOracle(address,uint48)
-        kernelRoleValues[6] = ORACLE_QUOTER_ADMIN_ROLE;
+        kernelRoleValues[6] = ADMIN_ORACLE_QUOTER_ROLE;
 
         roles[index++] = RolesConfiguration({ target: _kernel, selectors: kernelSelectors, roles: kernelRoleValues });
 
@@ -320,23 +314,23 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
         uint64[] memory accountantRoleValues = new uint64[](9);
 
         accountantSelectors[0] = IRoycoAccountant.setYDM.selector;
-        accountantRoleValues[0] = KERNEL_ADMIN_ROLE;
+        accountantRoleValues[0] = ADMIN_KERNEL_ROLE;
         accountantSelectors[1] = IRoycoAccountant.setSeniorTrancheProtocolFee.selector;
-        accountantRoleValues[1] = KERNEL_ADMIN_ROLE;
+        accountantRoleValues[1] = ADMIN_KERNEL_ROLE;
         accountantSelectors[2] = IRoycoAccountant.setJuniorTrancheProtocolFee.selector;
-        accountantRoleValues[2] = KERNEL_ADMIN_ROLE;
+        accountantRoleValues[2] = ADMIN_KERNEL_ROLE;
         accountantSelectors[3] = IRoycoAccountant.setCoverage.selector;
-        accountantRoleValues[3] = KERNEL_ADMIN_ROLE;
+        accountantRoleValues[3] = ADMIN_KERNEL_ROLE;
         accountantSelectors[4] = IRoycoAccountant.setBeta.selector;
-        accountantRoleValues[4] = KERNEL_ADMIN_ROLE;
+        accountantRoleValues[4] = ADMIN_KERNEL_ROLE;
         accountantSelectors[5] = IRoycoAccountant.setLLTV.selector;
-        accountantRoleValues[5] = KERNEL_ADMIN_ROLE;
+        accountantRoleValues[5] = ADMIN_KERNEL_ROLE;
         accountantSelectors[6] = IRoycoAccountant.setFixedTermDuration.selector;
-        accountantRoleValues[6] = KERNEL_ADMIN_ROLE;
+        accountantRoleValues[6] = ADMIN_KERNEL_ROLE;
         accountantSelectors[7] = IRoycoAuth.pause.selector;
-        accountantRoleValues[7] = PAUSER_ROLE;
+        accountantRoleValues[7] = ADMIN_PAUSER_ROLE;
         accountantSelectors[8] = IRoycoAuth.unpause.selector;
-        accountantRoleValues[8] = PAUSER_ROLE;
+        accountantRoleValues[8] = ADMIN_PAUSER_ROLE;
 
         roles[index++] = RolesConfiguration({ target: _accountant, selectors: accountantSelectors, roles: accountantRoleValues });
     }
@@ -349,42 +343,30 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
 
         console2.log("Granting roles on AccessManager:", address(_factory));
 
-        // Grant PAUSER_ROLE (used by ST, JT, Kernel, Accountant)
-        accessManager.grantRole(PAUSER_ROLE, _params.pauserAddress, _params.pauserExecutionDelay);
-        console2.log("  - PAUSER_ROLE granted to:", _params.pauserAddress, "with delay:", _params.pauserExecutionDelay);
+        // Grant ADMIN_PAUSER_ROLE (used by ST, JT, Kernel, Accountant)
+        accessManager.grantRole(ADMIN_PAUSER_ROLE, _params.pauserAddress, _params.pauserExecutionDelay);
+        console2.log("  - ADMIN_PAUSER_ROLE granted to:", _params.pauserAddress, "with delay:", _params.pauserExecutionDelay);
 
-        // Grant UPGRADER_ROLE (used by ST, JT, Kernel, Accountant for UUPS upgrades)
-        accessManager.grantRole(UPGRADER_ROLE, _params.upgraderAddress, _params.upgraderExecutionDelay);
-        console2.log("  - UPGRADER_ROLE granted to:", _params.upgraderAddress, "with delay:", _params.upgraderExecutionDelay);
+        // Grant ADMIN_UPGRADER_ROLE (used by ST, JT, Kernel, Accountant for UUPS upgrades)
+        accessManager.grantRole(ADMIN_UPGRADER_ROLE, _params.upgraderAddress, _params.upgraderExecutionDelay);
+        console2.log("  - ADMIN_UPGRADER_ROLE granted to:", _params.upgraderAddress, "with delay:", _params.upgraderExecutionDelay);
 
-        // Grant DEPOSIT_ROLE (used by ST, JT)
-        accessManager.grantRole(DEPOSIT_ROLE, _params.depositRoleAddress, _params.depositRoleExecutionDelay);
-        console2.log("  - DEPOSIT_ROLE granted to:", _params.depositRoleAddress, "with delay:", _params.depositRoleExecutionDelay);
-
-        // Grant REDEEM_ROLE (used by ST, JT)
-        accessManager.grantRole(REDEEM_ROLE, _params.redeemRoleAddress, _params.redeemRoleExecutionDelay);
-        console2.log("  - REDEEM_ROLE granted to:", _params.redeemRoleAddress, "with delay:", _params.redeemRoleExecutionDelay);
-
-        // Grant CANCEL_DEPOSIT_ROLE (used by ST, JT)
-        accessManager.grantRole(CANCEL_DEPOSIT_ROLE, _params.cancelDepositRoleAddress, _params.cancelDepositRoleExecutionDelay);
-        console2.log("  - CANCEL_DEPOSIT_ROLE granted to:", _params.cancelDepositRoleAddress, "with delay:", _params.cancelDepositRoleExecutionDelay);
-
-        // Grant CANCEL_REDEEM_ROLE (used by ST, JT)
-        accessManager.grantRole(CANCEL_REDEEM_ROLE, _params.cancelRedeemRoleAddress, _params.cancelRedeemRoleExecutionDelay);
-        console2.log("  - CANCEL_REDEEM_ROLE granted to:", _params.cancelRedeemRoleAddress, "with delay:", _params.cancelRedeemRoleExecutionDelay);
+        // Grant LP_ROLE (used by ST, JT)
+        accessManager.grantRole(LP_ROLE, _params.lpRoleAddress, _params.lpRoleExecutionDelay);
+        console2.log("  - LP_ROLE granted to:", _params.lpRoleAddress, "with delay:", _params.lpRoleExecutionDelay);
 
         // Grant SYNC_ROLE (used by Kernel)
         accessManager.grantRole(SYNC_ROLE, _params.syncRoleAddress, _params.syncRoleExecutionDelay);
         console2.log("  - SYNC_ROLE granted to:", _params.syncRoleAddress, "with delay:", _params.syncRoleExecutionDelay);
 
-        // Grant KERNEL_ADMIN_ROLE (used by Kernel, Accountant)
-        accessManager.grantRole(KERNEL_ADMIN_ROLE, _params.kernelAdminRoleAddress, _params.kernelAdminRoleExecutionDelay);
-        console2.log("  - KERNEL_ADMIN_ROLE granted to:", _params.kernelAdminRoleAddress, "with delay:", _params.kernelAdminRoleExecutionDelay);
+        // Grant ADMIN_KERNEL_ROLE (used by Kernel, Accountant)
+        accessManager.grantRole(ADMIN_KERNEL_ROLE, _params.kernelAdminRoleAddress, _params.kernelAdminRoleExecutionDelay);
+        console2.log("  - ADMIN_KERNEL_ROLE granted to:", _params.kernelAdminRoleAddress, "with delay:", _params.kernelAdminRoleExecutionDelay);
 
-        // Grant ORACLE_QUOTER_ADMIN_ROLE (used by Kernel quoters)
-        accessManager.grantRole(ORACLE_QUOTER_ADMIN_ROLE, _params.oracleQuoterAdminRoleAddress, _params.oracleQuoterAdminRoleExecutionDelay);
+        // Grant ADMIN_ORACLE_QUOTER_ROLE (used by Kernel quoters)
+        accessManager.grantRole(ADMIN_ORACLE_QUOTER_ROLE, _params.oracleQuoterAdminRoleAddress, _params.oracleQuoterAdminRoleExecutionDelay);
         console2.log(
-            "  - ORACLE_QUOTER_ADMIN_ROLE granted to:", _params.oracleQuoterAdminRoleAddress, "with delay:", _params.oracleQuoterAdminRoleExecutionDelay
+            "  - ADMIN_ORACLE_QUOTER_ROLE granted to:", _params.oracleQuoterAdminRoleAddress, "with delay:", _params.oracleQuoterAdminRoleExecutionDelay
         );
 
         console2.log("All roles granted successfully!");
@@ -546,20 +528,14 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
             pauserExecutionDelay: uint32(vm.envUint("PAUSER_EXECUTION_DELAY")),
             upgraderAddress: vm.envAddress("UPGRADER_ADDRESS"),
             upgraderExecutionDelay: uint32(vm.envUint("UPGRADER_EXECUTION_DELAY")),
-            depositRoleAddress: vm.envAddress("DEPOSIT_ROLE_ADDRESS"),
-            depositRoleExecutionDelay: uint32(vm.envUint("DEPOSIT_ROLE_EXECUTION_DELAY")),
-            redeemRoleAddress: vm.envAddress("REDEEM_ROLE_ADDRESS"),
-            redeemRoleExecutionDelay: uint32(vm.envUint("REDEEM_ROLE_EXECUTION_DELAY")),
-            cancelDepositRoleAddress: vm.envAddress("CANCEL_DEPOSIT_ROLE_ADDRESS"),
-            cancelDepositRoleExecutionDelay: uint32(vm.envUint("CANCEL_DEPOSIT_ROLE_EXECUTION_DELAY")),
-            cancelRedeemRoleAddress: vm.envAddress("CANCEL_REDEEM_ROLE_ADDRESS"),
-            cancelRedeemRoleExecutionDelay: uint32(vm.envUint("CANCEL_REDEEM_ROLE_EXECUTION_DELAY")),
+            lpRoleAddress: vm.envAddress("LP_ROLE_ADDRESS"),
+            lpRoleExecutionDelay: uint32(vm.envUint("LP_ROLE_EXECUTION_DELAY")),
             syncRoleAddress: vm.envAddress("SYNC_ROLE_ADDRESS"),
             syncRoleExecutionDelay: uint32(vm.envUint("SYNC_ROLE_EXECUTION_DELAY")),
-            kernelAdminRoleAddress: vm.envAddress("KERNEL_ADMIN_ROLE_ADDRESS"),
-            kernelAdminRoleExecutionDelay: uint32(vm.envUint("KERNEL_ADMIN_ROLE_EXECUTION_DELAY")),
-            oracleQuoterAdminRoleAddress: vm.envAddress("ORACLE_QUOTER_ADMIN_ROLE_ADDRESS"),
-            oracleQuoterAdminRoleExecutionDelay: uint32(vm.envUint("ORACLE_QUOTER_ADMIN_ROLE_EXECUTION_DELAY"))
+            kernelAdminRoleAddress: vm.envAddress("ADMIN_KERNEL_ROLE_ADDRESS"),
+            kernelAdminRoleExecutionDelay: uint32(vm.envUint("ADMIN_KERNEL_ROLE_EXECUTION_DELAY")),
+            oracleQuoterAdminRoleAddress: vm.envAddress("ADMIN_ORACLE_QUOTER_ROLE_ADDRESS"),
+            oracleQuoterAdminRoleExecutionDelay: uint32(vm.envUint("ADMIN_ORACLE_QUOTER_ROLE_EXECUTION_DELAY"))
         });
     }
 

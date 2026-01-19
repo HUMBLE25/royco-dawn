@@ -237,10 +237,10 @@ abstract contract BaseTest is Test, RoycoRoles, Assertions {
         provider = _initWallet(_name, 10_000_000e6);
 
         // Grant Permissions
-        FACTORY.grantRole(RoycoRoles.DEPOSIT_ROLE, provider.addr, 0);
-        FACTORY.grantRole(RoycoRoles.REDEEM_ROLE, provider.addr, 0);
-        FACTORY.grantRole(RoycoRoles.CANCEL_DEPOSIT_ROLE, provider.addr, 0);
-        FACTORY.grantRole(RoycoRoles.CANCEL_REDEEM_ROLE, provider.addr, 0);
+        FACTORY.grantRole(RoycoRoles.LP_ROLE, provider.addr, 0);
+        FACTORY.grantRole(RoycoRoles.LP_ROLE, provider.addr, 0);
+        FACTORY.grantRole(RoycoRoles.LP_ROLE, provider.addr, 0);
+        FACTORY.grantRole(RoycoRoles.LP_ROLE, provider.addr, 0);
 
         return provider;
     }
@@ -254,8 +254,8 @@ abstract contract BaseTest is Test, RoycoRoles, Assertions {
         provider = _initWallet(providerName, 10_000_000e6);
 
         // Grant Permissions
-        FACTORY.grantRole(RoycoRoles.DEPOSIT_ROLE, provider.addr, 0);
-        FACTORY.grantRole(RoycoRoles.REDEEM_ROLE, provider.addr, 0);
+        FACTORY.grantRole(RoycoRoles.LP_ROLE, provider.addr, 0);
+        FACTORY.grantRole(RoycoRoles.LP_ROLE, provider.addr, 0);
 
         return provider;
     }
