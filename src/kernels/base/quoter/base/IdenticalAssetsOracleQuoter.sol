@@ -38,14 +38,16 @@ abstract contract IdenticalAssetsOracleQuoter is RoycoKernel {
     /// @notice Thrown when the senior and junior tranche assets are not identical
     error TRANCHE_ASSETS_MUST_BE_IDENTICAL();
 
+    constructor() {
+        // The tranche units must be non-null and identical for both tranches since there is a single conversion rate
+        require(ST_ASSET == JT_ASSET, TRANCHE_ASSETS_MUST_BE_IDENTICAL());
+    }
+
     /**
      * @notice Initializes the identical assets oracle quoter
      * @param _initialConversionRateRAY The initial conversion rate as defined by the oracle, scaled to RAY precision
      */
     function __IdenticalAssetsOracleQuoter_init_unchained(uint256 _initialConversionRateRAY) internal onlyInitializing {
-        // The tranche units must be identical for both tranches since their is a single conversion rate
-        require(ST_ASSET == JT_ASSET, TRANCHE_ASSETS_MUST_BE_IDENTICAL());
-
         // Premptively return if this quoter is reliant on an oracle instead of an admin set conversion rate
         if (_initialConversionRateRAY == SENTINEL_CONVERSION_RATE) return;
         _getIdenticalAssetsOracleQuoterStorage().conversionRateRAY = _initialConversionRateRAY;

@@ -79,6 +79,8 @@ contract AdaptiveCurveYDM is IYDM {
         AdaptiveYieldCurve storage curve = accountantToCurve[msg.sender];
         curve.jtYieldShareAtTargetWAD = _jtYieldShareAtTargetUtilWAD;
         curve.steepnessAfterTargetWAD = uint160((_jtYieldShareAtFullUtilWAD * WAD) / _jtYieldShareAtTargetUtilWAD);
+        // Ensure that the last adaptation timestamp is zero on initialization: pertains primarily to reinitialization
+        delete accountantToCurve[msg.sender].lastAdaptationTimestamp;
 
         emit AdaptiveCurveYdmInitialized(msg.sender, curve.steepnessAfterTargetWAD, _jtYieldShareAtTargetUtilWAD);
     }
