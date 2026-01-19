@@ -162,15 +162,15 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
                 // If the withdrawal used JT capital as coverage to facilitate this ST withdrawal
                 NAV_UNIT preWithdrawalSTEffectiveNAV = $.lastSTEffectiveNAV;
                 // The actual amount withdrawn was the delta in ST raw NAV and the coverage applied from JT
-                $.lastSTEffectiveNAV = preWithdrawalSTEffectiveNAV - (toNAVUnits(-deltaST) + toNAVUnits(-deltaJT));
+                NAV_UNIT postWithdrawalSTEffectiveNAV = $.lastSTEffectiveNAV = preWithdrawalSTEffectiveNAV - (toNAVUnits(-deltaST) + toNAVUnits(-deltaJT));
                 // The withdrawing senior LP has realized its proportional share of past uncovered losses and associated recovery optionality, rounding in favor of senior
                 NAV_UNIT stImpermanentLoss = $.lastSTImpermanentLoss;
                 if (stImpermanentLoss != ZERO_NAV_UNITS) {
-                    $.lastSTImpermanentLoss = stImpermanentLoss.mulDiv($.lastSTEffectiveNAV, preWithdrawalSTEffectiveNAV, Math.Rounding.Ceil);
+                    $.lastSTImpermanentLoss = stImpermanentLoss.mulDiv(postWithdrawalSTEffectiveNAV, preWithdrawalSTEffectiveNAV, Math.Rounding.Ceil);
                 }
                 // If some coverage was realized by this ST LP
                 if (deltaJT != 0) {
-                    // The withdrawing senior LP has realized its proportional share of past JT losses from its own deprecition and associated recovery optionality, rounding in favor of senior
+                    // JT raw NAV that is leaving the market realized its proportional share of past JT losses from its own depreciation, rounding in favor of senior
                     NAV_UNIT jtSelfImpermanentLoss = $.lastJTSelfImpermanentLoss;
                     if (jtSelfImpermanentLoss != ZERO_NAV_UNITS) {
                         $.lastJTSelfImpermanentLoss = jtSelfImpermanentLoss.mulDiv(_jtRawNAV, $.lastJTRawNAV, Math.Rounding.Floor);
@@ -181,11 +181,11 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
                 // Junior withdrew: The NAV deltas include the discrete withdrawal amount in addition to any assets (yield + impermanent loss repayments) pulled from ST to JT
                 NAV_UNIT preWithdrawalJTEffectiveNAV = $.lastJTEffectiveNAV;
                 // The actual amount withdrawn by JT was the delta in JT raw NAV and the assets claimed from ST
-                $.lastJTEffectiveNAV = preWithdrawalJTEffectiveNAV - (toNAVUnits(-deltaJT) + toNAVUnits(-deltaST));
-                // The withdrawing junior LP has realized its proportional share of past losses (from coverage provided and its own deprecition) and associated recovery optionality, rounding in favor of senior
+                NAV_UNIT postWithdrawalJTEffectiveNAV = $.lastJTEffectiveNAV = preWithdrawalJTEffectiveNAV - (toNAVUnits(-deltaJT) + toNAVUnits(-deltaST));
+                // The withdrawing junior LP has realized its proportional share of past losses (from coverage provided and its own depreciation) and associated recovery optionality, rounding in favor of senior
                 NAV_UNIT jtImpermanentLoss = $.lastJTCoverageImpermanentLoss;
                 if (jtImpermanentLoss != ZERO_NAV_UNITS) {
-                    $.lastJTCoverageImpermanentLoss = jtImpermanentLoss.mulDiv($.lastJTEffectiveNAV, preWithdrawalJTEffectiveNAV, Math.Rounding.Floor);
+                    $.lastJTCoverageImpermanentLoss = jtImpermanentLoss.mulDiv(postWithdrawalJTEffectiveNAV, preWithdrawalJTEffectiveNAV, Math.Rounding.Floor);
                 }
                 jtImpermanentLoss = $.lastJTSelfImpermanentLoss;
                 if (jtImpermanentLoss != ZERO_NAV_UNITS) {
@@ -345,7 +345,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
      * @param _stRawNAV The senior tranche's current raw NAV: the pure value of its invested assets
      * @param _jtRawNAV The junior tranche's current raw NAV: the pure value of its invested assets
      * @param _twJTYieldShareAccruedWAD The currently accrued time-weighted JT yield share YDM output since the last distribution, scaled to WAD precision
-     * @return state A struct containing all synced NAV, impermanent losses, and fee data after executing the sync
+     * @return state A struct containing all mark to market NAV, impermanent losses, and fee data after executing the sync
      * @return initialMarketState The initial state the market was in before the synchronization
      * @return yieldDistributed A boolean indicating whether ST yield was split between ST and JT
      */
@@ -362,6 +362,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         RoycoAccountantState storage $ = _getRoycoAccountantStorage();
 
         // Cache the last checkpointed market state, effective NAV, and impermanent losses for each tranche
+        initialMarketState = $.lastMarketState;
         NAV_UNIT stEffectiveNAV = $.lastSTEffectiveNAV;
         NAV_UNIT jtEffectiveNAV = $.lastJTEffectiveNAV;
         NAV_UNIT stImpermanentLoss = $.lastSTImpermanentLoss;
@@ -370,8 +371,6 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         NAV_UNIT stProtocolFeeAccrued;
         NAV_UNIT jtProtocolFeeAccrued;
 
-        // If the fixed term duration is set to zero, the market is permanently in a perpetual state
-        initialMarketState = $.lastMarketState;
         // If the market was in a fixed term state that has elapsed, we must transition this market to a perpetual state
         if (initialMarketState == MarketState.FIXED_TERM && $.fixedTermEndTimestamp <= block.timestamp) {
             initialMarketState = MarketState.PERPETUAL;
@@ -386,6 +385,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         int256 deltaST = UnitsMathLib.computeNAVDelta(_stRawNAV, $.lastSTRawNAV);
         int256 deltaJT = UnitsMathLib.computeNAVDelta(_jtRawNAV, $.lastJTRawNAV);
 
+        // Mark both the tranche NAVs to market
         /// @dev STEP_APPLY_JT_LOSS: The JT assets depreciated in value
         if (deltaJT < 0) {
             /// @dev STEP_JT_ABSORB_LOSS: JT's remaning loss-absorption buffer incurs as much of the loss as possible
