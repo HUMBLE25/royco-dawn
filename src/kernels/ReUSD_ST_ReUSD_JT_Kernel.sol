@@ -11,6 +11,7 @@ import {
 
 /**
  * @title ReUSD_ST_ReUSD_JT_Kernel
+ * @author Waymont
  * @notice The senior and junior tranches transfer in reUSD
  * @notice The NAV can be expressed in any quote token supported by reUSD's Insurance Capital Layer (ICL) or manually fixed to an admin set oracle input
  * @dev https://docs.re.xyz/insurance-capital-layers/what-is-reusd

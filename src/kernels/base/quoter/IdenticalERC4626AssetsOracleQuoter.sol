@@ -10,7 +10,7 @@ import { IdenticalAssetsOracleQuoter } from "./base/IdenticalAssetsOracleQuoter.
 /**
  * @title IdenticalERC4626AssetsOracleQuoter
  * @notice Quoter for markets where both tranches use the same ERC4626 compliant tranche asset and the NAV is represented in the tranche's share's value in some reference asset
- * @dev Example: Tranche Unit: sNUSD, NAV Unit: USD where x Tranche Unit = x * sNUSD share price in NUSD * NUSD share price in USD
+ * @dev Example: Tranche Unit of sUSDe, NAV Unit of USD where x Tranche Unit = x * sUSDe share price in USDe * USDe price in USD
  */
 abstract contract IdenticalERC4626AssetsOracleQuoter is IdenticalAssetsOracleQuoter {
     using Math for uint256;

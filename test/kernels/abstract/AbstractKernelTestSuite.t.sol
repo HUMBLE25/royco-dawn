@@ -3,8 +3,8 @@ pragma solidity ^0.8.28;
 
 import { Test } from "../../../lib/forge-std/src/Test.sol";
 import { Vm } from "../../../lib/forge-std/src/Vm.sol";
-import { Math } from "../../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 import { IERC20 } from "../../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import { Math } from "../../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 
 import { DeployScript } from "../../../script/Deploy.s.sol";
 import { RoycoFactory } from "../../../src/RoycoFactory.sol";
@@ -12,19 +12,12 @@ import { RoycoRoles } from "../../../src/auth/RoycoRoles.sol";
 import { IRoycoAccountant } from "../../../src/interfaces/IRoycoAccountant.sol";
 import { IRoycoKernel } from "../../../src/interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoVaultTranche } from "../../../src/interfaces/tranche/IRoycoVaultTranche.sol";
-import { AssetClaims, MarketState, TrancheType } from "../../../src/libraries/Types.sol";
-import {
-    NAV_UNIT,
-    TRANCHE_UNIT,
-    UnitsMathLib,
-    toNAVUnits,
-    toTrancheUnits,
-    toUint256
-} from "../../../src/libraries/Units.sol";
 import { ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, WAD, ZERO_NAV_UNITS, ZERO_TRANCHE_UNITS } from "../../../src/libraries/Constants.sol";
+import { AssetClaims, MarketState, TrancheType } from "../../../src/libraries/Types.sol";
+import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib, toNAVUnits, toTrancheUnits, toUint256 } from "../../../src/libraries/Units.sol";
 
-import { IKernelTestHooks } from "../../interfaces/IKernelTestHooks.sol";
 import { BaseTest } from "../../base/BaseTest.t.sol";
+import { IKernelTestHooks } from "../../interfaces/IKernelTestHooks.sol";
 
 /// @title AbstractKernelTestSuite
 /// @notice Abstract test suite containing all tests that apply to every kernel type
@@ -360,8 +353,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         uint256 totalShares = 0;
         for (uint256 i = 0; i < _numDepositors; i++) {
             Vm.Wallet memory depositor = _generateFundedDepositor(i);
-            uint256 amount =
-                bound(uint256(keccak256(abi.encodePacked(_amountSeed, i))), _minDepositAmount(), config.initialFunding / 20);
+            uint256 amount = bound(uint256(keccak256(abi.encodePacked(_amountSeed, i))), _minDepositAmount(), config.initialFunding / 20);
 
             uint256 shares = _depositJT(depositor.addr, amount);
             totalShares += shares;
@@ -377,8 +369,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         uint256 totalJTShares = 0;
         for (uint256 i = 0; i < _numDepositors; i++) {
             Vm.Wallet memory depositor = _generateFundedDepositor(i);
-            uint256 amount =
-                bound(uint256(keccak256(abi.encodePacked(_amountSeed, i))), _minDepositAmount(), config.initialFunding / 20);
+            uint256 amount = bound(uint256(keccak256(abi.encodePacked(_amountSeed, i))), _minDepositAmount(), config.initialFunding / 20);
 
             uint256 shares = _depositJT(depositor.addr, amount);
             totalJTShares += shares;
@@ -458,12 +449,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         vm.prank(BOB_ADDRESS);
         (AssetClaims memory actualClaims,) = ST.redeem(maxRedeem, BOB_ADDRESS, BOB_ADDRESS);
 
-        assertApproxEqRel(
-            toUint256(actualClaims.stAssets),
-            toUint256(previewClaims.stAssets),
-            PREVIEW_RELATIVE_DELTA,
-            "Preview ST assets should match actual"
-        );
+        assertApproxEqRel(toUint256(actualClaims.stAssets), toUint256(previewClaims.stAssets), PREVIEW_RELATIVE_DELTA, "Preview ST assets should match actual");
     }
 
     function testFuzz_JT_redeem_asyncWithDelay(uint256 _amount) external {
@@ -478,9 +464,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         vm.prank(ALICE_ADDRESS);
         (uint256 requestId,) = JT.requestRedeem(maxRedeem, ALICE_ADDRESS, ALICE_ADDRESS);
 
-        assertNotEq(
-            requestId, ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, "Request ID must not be the discriminated ID"
-        );
+        assertNotEq(requestId, ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, "Request ID must not be the discriminated ID");
 
         // Should not be claimable immediately
         assertEq(JT.claimableRedeemRequest(requestId, ALICE_ADDRESS), 0, "Should not be claimable immediately");
@@ -539,9 +523,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         JT.cancelRedeemRequest(requestId, ALICE_ADDRESS);
 
         // Should be claimable for cancel
-        assertEq(
-            JT.claimableCancelRedeemRequest(requestId, ALICE_ADDRESS), sharesToWithdraw, "Should be claimable for cancel"
-        );
+        assertEq(JT.claimableCancelRedeemRequest(requestId, ALICE_ADDRESS), sharesToWithdraw, "Should be claimable for cancel");
         assertEq(JT.pendingRedeemRequest(requestId, ALICE_ADDRESS), 0, "Should no longer be pending");
 
         // Claim cancelled shares
@@ -687,9 +669,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         assertGt(navAfter, navBefore, "NAV should increase after yield");
     }
 
-    function testFuzz_yield_STGain_distributesToJT(uint256 _jtAmount, uint256 _stPercentage, uint256 _yieldPercentage)
-        external
-    {
+    function testFuzz_yield_STGain_distributesToJT(uint256 _jtAmount, uint256 _stPercentage, uint256 _yieldPercentage) external {
         _jtAmount = bound(_jtAmount, _minDepositAmount(), config.initialFunding / 2);
         _stPercentage = bound(_stPercentage, 10, 50);
         _yieldPercentage = bound(_yieldPercentage, 1, 20);
@@ -781,21 +761,13 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         NAV_UNIT jtNavAfter = JT.totalAssets().nav;
 
         // ST should be unaffected (JT absorbs loss first)
-        assertApproxEqRel(
-            toUint256(stNavAfter), toUint256(stNavBefore), MAX_RELATIVE_DELTA, "ST NAV should be unaffected by JT loss"
-        );
+        assertApproxEqRel(toUint256(stNavAfter), toUint256(stNavBefore), MAX_RELATIVE_DELTA, "ST NAV should be unaffected by JT loss");
 
         // JT should decrease
         assertLt(jtNavAfter, jtNavBefore, "JT NAV should decrease");
     }
 
-    function testFuzz_loss_STLoss_JTProvidesCoverage(
-        uint256 _jtAmount,
-        uint256 _stPercentage,
-        uint256 _lossPercentage
-    )
-        external
-    {
+    function testFuzz_loss_STLoss_JTProvidesCoverage(uint256 _jtAmount, uint256 _stPercentage, uint256 _lossPercentage) external {
         _jtAmount = bound(_jtAmount, _minDepositAmount() * 10, config.initialFunding / 2);
         _stPercentage = bound(_stPercentage, 10, 30); // Keep utilization moderate
         _lossPercentage = bound(_lossPercentage, 1, 10); // Small loss
@@ -932,9 +904,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
     // SECTION 10: FULL FLOW TESTS
     // ═══════════════════════════════════════════════════════════════════════════
 
-    function testFuzz_fullFlow_depositYieldRedeem(uint256 _jtAmount, uint256 _stPercentage, uint256 _yieldPercentage)
-        external
-    {
+    function testFuzz_fullFlow_depositYieldRedeem(uint256 _jtAmount, uint256 _stPercentage, uint256 _yieldPercentage) external {
         _jtAmount = bound(_jtAmount, _minDepositAmount() * 10, config.initialFunding / 2);
         _stPercentage = bound(_stPercentage, 10, 40);
         _yieldPercentage = bound(_yieldPercentage, 1, 20);
@@ -986,9 +956,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         _assertNAVConservation();
     }
 
-    function testFuzz_fullFlow_depositLossRedeem(uint256 _jtAmount, uint256 _stPercentage, uint256 _lossPercentage)
-        external
-    {
+    function testFuzz_fullFlow_depositLossRedeem(uint256 _jtAmount, uint256 _stPercentage, uint256 _lossPercentage) external {
         _jtAmount = bound(_jtAmount, _minDepositAmount() * 10, config.initialFunding / 2);
         _stPercentage = bound(_stPercentage, 10, 30);
         _lossPercentage = bound(_lossPercentage, 1, 15);
@@ -1015,9 +983,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         NAV_UNIT jtNavAfterLoss = JT.totalAssets().nav;
 
         // ST should be protected, JT absorbs loss
-        assertApproxEqRel(
-            toUint256(stNavAfterLoss), toUint256(stNavBeforeLoss), MAX_RELATIVE_DELTA, "ST NAV should be protected"
-        );
+        assertApproxEqRel(toUint256(stNavAfterLoss), toUint256(stNavBeforeLoss), MAX_RELATIVE_DELTA, "ST NAV should be protected");
         assertLt(jtNavAfterLoss, jtNavBeforeLoss, "JT NAV should decrease");
 
         // Step 4: Verify NAV conservation
@@ -1077,13 +1043,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
     /// @notice Full lifecycle test: JT deposit → ST deposit → yield → verify coverage → ST redeem → JT exit
     /// @dev Verifies all view functions after each operation
-    function testFuzz_scenario_fullLifecycle_withYield_verifyViewFunctions(
-        uint256 _jtAmount,
-        uint256 _stPercentage,
-        uint256 _yieldPercentage
-    )
-        external
-    {
+    function testFuzz_scenario_fullLifecycle_withYield_verifyViewFunctions(uint256 _jtAmount, uint256 _stPercentage, uint256 _yieldPercentage) external {
         _jtAmount = bound(_jtAmount, _minDepositAmount() * 10, config.initialFunding / 2);
         _stPercentage = bound(_stPercentage, 10, 80);
         _yieldPercentage = bound(_yieldPercentage, 1, 20);
@@ -1188,12 +1148,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         // Verify ST received assets
         assertGt(stBalanceAfter, stBalanceBefore, "ST should receive assets on redeem");
-        assertApproxEqRel(
-            toUint256(stRedeemClaims.stAssets),
-            toUint256(stPreviewClaims.stAssets),
-            PREVIEW_RELATIVE_DELTA,
-            "Redeem should match preview"
-        );
+        assertApproxEqRel(toUint256(stRedeemClaims.stAssets), toUint256(stPreviewClaims.stAssets), PREVIEW_RELATIVE_DELTA, "Redeem should match preview");
 
         // Verify ST state after redeem
         assertEq(ST.balanceOf(BOB_ADDRESS), 0, "ST balance should be 0 after full redeem");
@@ -1262,11 +1217,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         for (uint256 i = 0; i < _numJTDepositors; i++) {
             Vm.Wallet memory depositor = _generateFundedDepositor(i);
-            uint256 amount = bound(
-                uint256(keccak256(abi.encodePacked(_jtAmountSeed, i))),
-                _minDepositAmount() * 5,
-                config.initialFunding / 10
-            );
+            uint256 amount = bound(uint256(keccak256(abi.encodePacked(_jtAmountSeed, i))), _minDepositAmount() * 5, config.initialFunding / 10);
 
             uint256 sharesBefore = JT.totalSupply();
             uint256 shares = _depositJT(depositor.addr, amount);
@@ -1285,10 +1236,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         // Verify total JT state
         assertEq(JT.totalSupply(), totalJTShares, "JT total supply should match sum");
         assertApproxEqAbs(
-            toUint256(JT.totalAssets().nav),
-            toUint256(totalJTNavDeposited),
-            toUint256(maxNAVDelta()) * _numJTDepositors,
-            "JT NAV should match deposits"
+            toUint256(JT.totalAssets().nav), toUint256(totalJTNavDeposited), toUint256(maxNAVDelta()) * _numJTDepositors, "JT NAV should match deposits"
         );
 
         // ═══════════════════════════════════════════════════════════════════════════
@@ -1321,12 +1269,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         NAV_UNIT jtNavAfterLoss = JT.totalAssets().nav;
 
         // ST should be protected (approximately unchanged)
-        assertApproxEqRel(
-            toUint256(stNavAfterLoss),
-            toUint256(stNavBeforeLoss),
-            MAX_RELATIVE_DELTA,
-            "ST should be protected from JT loss"
-        );
+        assertApproxEqRel(toUint256(stNavAfterLoss), toUint256(stNavBeforeLoss), MAX_RELATIVE_DELTA, "ST should be protected from JT loss");
 
         // JT should absorb the loss
         assertLt(jtNavAfterLoss, jtNavBeforeLoss, "JT should absorb the loss");
@@ -1361,22 +1304,13 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
             // The NAV should be approximately what was deposited (coverage protected)
             assertApproxEqRel(
-                toUint256(stPreviewClaims.nav),
-                toUint256(stNavBeforeLoss),
-                MAX_RELATIVE_DELTA,
-                "ST preview NAV should be approximately original deposit"
+                toUint256(stPreviewClaims.nav), toUint256(stNavBeforeLoss), MAX_RELATIVE_DELTA, "ST preview NAV should be approximately original deposit"
             );
         }
     }
 
     /// @notice Consecutive deposit/redeem cycles with yield accrual
-    function testFuzz_scenario_consecutiveDepositRedeemCycles_withYield(
-        uint256 _numCycles,
-        uint256 _amountSeed,
-        uint256 _yieldPercentage
-    )
-        external
-    {
+    function testFuzz_scenario_consecutiveDepositRedeemCycles_withYield(uint256 _numCycles, uint256 _amountSeed, uint256 _yieldPercentage) external {
         _numCycles = bound(_numCycles, 2, 4);
         _yieldPercentage = bound(_yieldPercentage, 1, 10);
 
@@ -1387,11 +1321,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
             // STEP A: JT deposits
             // ═══════════════════════════════════════════════════════════════════════════
 
-            uint256 jtAmount = bound(
-                uint256(keccak256(abi.encodePacked(_amountSeed, cycle, "jt"))),
-                _minDepositAmount() * 10,
-                config.initialFunding / 8
-            );
+            uint256 jtAmount = bound(uint256(keccak256(abi.encodePacked(_amountSeed, cycle, "jt"))), _minDepositAmount() * 10, config.initialFunding / 8);
 
             NAV_UNIT jtNavBefore = JT.totalAssets().nav;
             uint256 jtTotalSupplyBefore = JT.totalSupply();
@@ -1407,11 +1337,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
             // ═══════════════════════════════════════════════════════════════════════════
 
             TRANCHE_UNIT stMaxDeposit = ST.maxDeposit(BOB_ADDRESS);
-            uint256 stAmount = bound(
-                uint256(keccak256(abi.encodePacked(_amountSeed, cycle, "st"))),
-                _minDepositAmount(),
-                toUint256(stMaxDeposit) / 2
-            );
+            uint256 stAmount = bound(uint256(keccak256(abi.encodePacked(_amountSeed, cycle, "st"))), _minDepositAmount(), toUint256(stMaxDeposit) / 2);
 
             if (stAmount >= _minDepositAmount() && stAmount <= toUint256(stMaxDeposit)) {
                 uint256 stShares = _depositST(BOB_ADDRESS, stAmount);
@@ -1449,10 +1375,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
                 (AssetClaims memory stRedeemClaims,) = ST.redeem(stMaxRedeem, BOB_ADDRESS, BOB_ADDRESS);
 
                 assertApproxEqRel(
-                    toUint256(stRedeemClaims.stAssets),
-                    toUint256(stPreviewClaims.stAssets),
-                    PREVIEW_RELATIVE_DELTA,
-                    "ST redeem should match preview"
+                    toUint256(stRedeemClaims.stAssets), toUint256(stPreviewClaims.stAssets), PREVIEW_RELATIVE_DELTA, "ST redeem should match preview"
                 );
             }
 
@@ -1465,12 +1388,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
     }
 
     /// @notice Parallel redeem requests scenario
-    function testFuzz_scenario_parallelRedeemRequests_verifyClaimability(
-        uint256 _jtAmount,
-        uint256 _numRequests
-    )
-        external
-    {
+    function testFuzz_scenario_parallelRedeemRequests_verifyClaimability(uint256 _jtAmount, uint256 _numRequests) external {
         _jtAmount = bound(_jtAmount, _minDepositAmount() * 20, config.initialFunding / 4);
         _numRequests = bound(_numRequests, 2, 5);
 
@@ -1495,9 +1413,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         for (uint256 i = 0; i < _numRequests; i++) {
             // Last request gets remaining shares
-            requestAmounts[i] = (i == _numRequests - 1)
-                ? jtShares - totalRequestedShares
-                : sharesToWithdrawPerRequest;
+            requestAmounts[i] = (i == _numRequests - 1) ? jtShares - totalRequestedShares : sharesToWithdrawPerRequest;
 
             vm.prank(ALICE_ADDRESS);
             (requestIds[i],) = JT.requestRedeem(requestAmounts[i], ALICE_ADDRESS, ALICE_ADDRESS);
@@ -1505,16 +1421,8 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
             totalRequestedShares += requestAmounts[i];
 
             // Verify request state
-            assertEq(
-                JT.pendingRedeemRequest(requestIds[i], ALICE_ADDRESS),
-                requestAmounts[i],
-                "Pending amount should match"
-            );
-            assertEq(
-                JT.claimableRedeemRequest(requestIds[i], ALICE_ADDRESS),
-                0,
-                "Should not be claimable yet"
-            );
+            assertEq(JT.pendingRedeemRequest(requestIds[i], ALICE_ADDRESS), requestAmounts[i], "Pending amount should match");
+            assertEq(JT.claimableRedeemRequest(requestIds[i], ALICE_ADDRESS), 0, "Should not be claimable yet");
         }
 
         // Verify all shares are locked
@@ -1532,16 +1440,8 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         // ═══════════════════════════════════════════════════════════════════════════
 
         for (uint256 i = 0; i < _numRequests; i++) {
-            assertEq(
-                JT.pendingRedeemRequest(requestIds[i], ALICE_ADDRESS),
-                0,
-                "Should no longer be pending"
-            );
-            assertEq(
-                JT.claimableRedeemRequest(requestIds[i], ALICE_ADDRESS),
-                requestAmounts[i],
-                "Should be claimable"
-            );
+            assertEq(JT.pendingRedeemRequest(requestIds[i], ALICE_ADDRESS), 0, "Should no longer be pending");
+            assertEq(JT.claimableRedeemRequest(requestIds[i], ALICE_ADDRESS), requestAmounts[i], "Should be claimable");
         }
 
         // ═══════════════════════════════════════════════════════════════════════════
@@ -1572,12 +1472,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
     }
 
     /// @notice Cancel redeem request scenario with state verification
-    function testFuzz_scenario_cancelRedeemRequest_verifySharesToReturn(
-        uint256 _jtAmount,
-        uint256 _withdrawPercentage
-    )
-        external
-    {
+    function testFuzz_scenario_cancelRedeemRequest_verifySharesToReturn(uint256 _jtAmount, uint256 _withdrawPercentage) external {
         _jtAmount = bound(_jtAmount, _minDepositAmount() * 10, config.initialFunding / 4);
         _withdrawPercentage = bound(_withdrawPercentage, 20, 80);
 
@@ -1613,11 +1508,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         // Verify cancel state
         assertEq(JT.pendingRedeemRequest(requestId, ALICE_ADDRESS), 0, "Should not be pending after cancel");
-        assertEq(
-            JT.claimableCancelRedeemRequest(requestId, ALICE_ADDRESS),
-            sharesToWithdraw,
-            "Should be claimable for cancel"
-        );
+        assertEq(JT.claimableCancelRedeemRequest(requestId, ALICE_ADDRESS), sharesToWithdraw, "Should be claimable for cancel");
 
         // ═══════════════════════════════════════════════════════════════════════════
         // STEP 4: Claim cancelled shares
@@ -1643,12 +1534,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
     }
 
     /// @notice High utilization scenario: Test coverage limits
-    function testFuzz_scenario_highUtilization_verifyCoverageLimits(
-        uint256 _jtAmount,
-        uint256 _additionalJTAmount
-    )
-        external
-    {
+    function testFuzz_scenario_highUtilization_verifyCoverageLimits(uint256 _jtAmount, uint256 _additionalJTAmount) external {
         _jtAmount = bound(_jtAmount, _minDepositAmount() * 10, config.initialFunding / 4);
         _additionalJTAmount = bound(_additionalJTAmount, _minDepositAmount() * 5, config.initialFunding / 4);
 
@@ -1742,45 +1628,18 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
     }
 
     /// @notice Verifies tranche state matches expected
-    function _verifyTrancheState(
-        TrancheState memory _expectedState,
-        TrancheType _trancheType,
-        string memory _context
-    )
-        internal
-        view
-    {
+    function _verifyTrancheState(TrancheState memory _expectedState, TrancheType _trancheType, string memory _context) internal view {
         IRoycoVaultTranche tranche = _trancheType == TrancheType.SENIOR ? ST : JT;
 
-        assertApproxEqAbs(
-            tranche.getRawNAV(),
-            _expectedState.rawNAV,
-            maxNAVDelta(),
-            string.concat(_context, ": raw NAV mismatch")
-        );
+        assertApproxEqAbs(tranche.getRawNAV(), _expectedState.rawNAV, maxNAVDelta(), string.concat(_context, ": raw NAV mismatch"));
 
         AssetClaims memory claims = tranche.totalAssets();
-        assertApproxEqAbs(
-            claims.nav,
-            _expectedState.effectiveNAV,
-            maxNAVDelta(),
-            string.concat(_context, ": effective NAV mismatch")
-        );
+        assertApproxEqAbs(claims.nav, _expectedState.effectiveNAV, maxNAVDelta(), string.concat(_context, ": effective NAV mismatch"));
 
         if (_trancheType == TrancheType.SENIOR) {
-            assertApproxEqAbs(
-                claims.stAssets,
-                _expectedState.stAssetsClaim,
-                maxTrancheUnitDelta(),
-                string.concat(_context, ": ST assets claim mismatch")
-            );
+            assertApproxEqAbs(claims.stAssets, _expectedState.stAssetsClaim, maxTrancheUnitDelta(), string.concat(_context, ": ST assets claim mismatch"));
         } else {
-            assertApproxEqAbs(
-                claims.jtAssets,
-                _expectedState.jtAssetsClaim,
-                maxTrancheUnitDelta(),
-                string.concat(_context, ": JT assets claim mismatch")
-            );
+            assertApproxEqAbs(claims.jtAssets, _expectedState.jtAssetsClaim, maxTrancheUnitDelta(), string.concat(_context, ": JT assets claim mismatch"));
         }
     }
 
@@ -2071,13 +1930,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
     }
 
     /// @notice Test that requestRedeem reverts after loss tightens coverage
-    function testFuzz_redemptionLimit_revertsAfterLossTightensCoverage(
-        uint256 _jtAmount,
-        uint256 _stPercentage,
-        uint256 _lossPercentage
-    )
-        external
-    {
+    function testFuzz_redemptionLimit_revertsAfterLossTightensCoverage(uint256 _jtAmount, uint256 _stPercentage, uint256 _lossPercentage) external {
         _jtAmount = bound(_jtAmount, _minDepositAmount() * 20, config.initialFunding / 4);
         _stPercentage = bound(_stPercentage, 30, 60);
         _lossPercentage = bound(_lossPercentage, 5, 15);
@@ -2387,13 +2240,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
     // ═══════════════════════════════════════════════════════════════════════════
 
     /// @notice Test that claimableRedeemRequest is reduced when coverage tightens due to loss
-    function testFuzz_coverageTightening_claimableRedeemRequest_reducedOnLoss(
-        uint256 _jtAmount,
-        uint256 _stPercentage,
-        uint256 _lossPercentage
-    )
-        external
-    {
+    function testFuzz_coverageTightening_claimableRedeemRequest_reducedOnLoss(uint256 _jtAmount, uint256 _stPercentage, uint256 _lossPercentage) external {
         _jtAmount = bound(_jtAmount, _minDepositAmount() * 20, config.initialFunding / 4);
         _stPercentage = bound(_stPercentage, 30, 70);
         _lossPercentage = bound(_lossPercentage, 5, 15);
@@ -2446,12 +2293,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
     }
 
     /// @notice Test that pendingRedeemRequest reflects shares that became unredeemable
-    function testFuzz_coverageTightening_pendingRedeemRequest_reflectsLockedShares(
-        uint256 _jtAmount,
-        uint256 _stPercentage
-    )
-        external
-    {
+    function testFuzz_coverageTightening_pendingRedeemRequest_reflectsLockedShares(uint256 _jtAmount, uint256 _stPercentage) external {
         _jtAmount = bound(_jtAmount, _minDepositAmount() * 20, config.initialFunding / 4);
         _stPercentage = bound(_stPercentage, 40, 80);
 
@@ -2496,12 +2338,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
     }
 
     /// @notice Test that redeem respects coverage limits even on claimable requests
-    function testFuzz_coverageTightening_redeem_respectsCoverageLimits(
-        uint256 _jtAmount,
-        uint256 _stPercentage
-    )
-        external
-    {
+    function testFuzz_coverageTightening_redeem_respectsCoverageLimits(uint256 _jtAmount, uint256 _stPercentage) external {
         _jtAmount = bound(_jtAmount, _minDepositAmount() * 20, config.initialFunding / 4);
         _stPercentage = bound(_stPercentage, 50, 90);
 

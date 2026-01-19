@@ -9,6 +9,7 @@ import { UtilsLib } from "../libraries/UtilsLib.sol";
 
 /**
  * @title AdaptiveCurveYDM
+ * @author Shivaansh Kapoor, Ankur Dubey
  * @notice Royco's adaptive curve yield distribution model (YDM)
  * @dev Responsible for computing the yield distribution between the senior and junior tranches of a Royco market
  * @dev The curve is defined as an adaptive piece-wise function parameterized by the utilization of a Royco market

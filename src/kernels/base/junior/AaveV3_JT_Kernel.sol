@@ -10,6 +10,14 @@ import { MAX_TRANCHE_UNITS, ZERO_TRANCHE_UNITS } from "../../../libraries/Consta
 import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib, toTrancheUnits, toUint256 } from "../../../libraries/Units.sol";
 import { RoycoKernel, SyncedAccountingState } from "../RoycoKernel.sol";
 
+/**
+ * @title AaveV3_JT_Kernel
+ * @author Shivaansh Kapoor, Ankur Dubey
+ * @notice Junior tranche kernel for Aave V3 lending pool deposits
+ * @dev Manages junior tranche deposits and withdrawals via the Aave V3 lending pool
+ *      Deposited assets are supplied to the pool and aTokens are received
+ *      Handles illiquidity gracefully by transferring aTokens when withdrawals fail
+ */
 abstract contract AaveV3_JT_Kernel is RoycoKernel {
     using SafeERC20 for IERC20;
     using UnitsMathLib for TRANCHE_UNIT;

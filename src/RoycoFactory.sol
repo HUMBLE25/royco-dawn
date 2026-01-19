@@ -14,6 +14,7 @@ import { MarketDeploymentParams, RolesConfiguration, RoycoMarket } from "./libra
 
 /**
  * @title RoycoFactory
+ * @author Ankur Dubey, Shivaansh Kapoor
  * @notice Factory contract for deploying and initializing Royco markets (Senior Tranche, Junior Tranche, Kernel, and Accountant)
  * @notice The factory also acts as a singleton access manager for all the Royco markets and their constituent contracts
  * @dev The factory deploys each market's constituent contracts using the UUPS proxy pattern
@@ -53,17 +54,10 @@ contract RoycoFactory is AccessManager, RoycoRoles, IRoycoFactory {
      * @param roycoMarket The deployed components constituting the Royco market
      */
     function _deployMarket(MarketDeploymentParams calldata _params) internal virtual returns (RoycoMarket memory roycoMarket) {
-        // Deploy the kernel, accountant and tranches with empty initialization data
+        // Deploy the tranches, kernel, and accountant for the market with empty initialization data
         // It is expected that the kernel initialization data contains the address of the accountant and vice versa
         // Therefore, it is expected that the proxy address is precomputed based on an uninitialized erc1967 proxy initcode
         // and that the proxy is initalized separately after deployment, in the same transaction
-
-        // Deploy the accountant with empty initialization data
-        roycoMarket.accountant =
-            IRoycoAccountant(_deployERC1967ProxyDeterministic(address(_params.accountantImplementation), _params.accountantProxyDeploymentSalt));
-
-        // Deploy the kernel with empty initialization data
-        roycoMarket.kernel = IRoycoKernel(_deployERC1967ProxyDeterministic(address(_params.kernelImplementation), _params.kernelProxyDeploymentSalt));
 
         // Deploy the senior tranche with empty initialization data
         roycoMarket.seniorTranche =
@@ -73,6 +67,13 @@ contract RoycoFactory is AccessManager, RoycoRoles, IRoycoFactory {
         roycoMarket.juniorTranche =
             IRoycoVaultTranche(_deployERC1967ProxyDeterministic(address(_params.juniorTrancheImplementation), _params.juniorTrancheProxyDeploymentSalt));
 
+        // Deploy the kernel with empty initialization data
+        roycoMarket.kernel = IRoycoKernel(_deployERC1967ProxyDeterministic(address(_params.kernelImplementation), _params.kernelProxyDeploymentSalt));
+
+        // Deploy the accountant with empty initialization data
+        roycoMarket.accountant =
+            IRoycoAccountant(_deployERC1967ProxyDeterministic(address(_params.accountantImplementation), _params.accountantProxyDeploymentSalt));
+
         // Initialize the senior tranche
         (bool success, bytes memory data) = address(roycoMarket.seniorTranche).call(_params.seniorTrancheInitializationData);
         require(success, FAILED_TO_INITIALIZE_SENIOR_TRANCHE(data));
@@ -81,13 +82,13 @@ contract RoycoFactory is AccessManager, RoycoRoles, IRoycoFactory {
         (success, data) = address(roycoMarket.juniorTranche).call(_params.juniorTrancheInitializationData);
         require(success, FAILED_TO_INITIALIZE_JUNIOR_TRANCHE(data));
 
-        // Initialize the accountant
-        (success, data) = address(roycoMarket.accountant).call(_params.accountantInitializationData);
-        require(success, FAILED_TO_INITIALIZE_ACCOUNTANT(data));
-
         // Initialize the kernel
         (success, data) = address(roycoMarket.kernel).call(_params.kernelInitializationData);
         require(success, FAILED_TO_INITIALIZE_KERNEL(data));
+
+        // Initialize the accountant
+        (success, data) = address(roycoMarket.accountant).call(_params.accountantInitializationData);
+        require(success, FAILED_TO_INITIALIZE_ACCOUNTANT(data));
     }
 
     /// @notice Validates the deployments
@@ -122,6 +123,8 @@ contract RoycoFactory is AccessManager, RoycoRoles, IRoycoFactory {
         // Validate the implementation addresses
         require(address(_params.kernelImplementation) != address(0), INVALID_KERNEL_IMPLEMENTATION());
         require(address(_params.accountantImplementation) != address(0), INVALID_ACCOUNTANT_IMPLEMENTATION());
+        require(address(_params.seniorTrancheImplementation) != address(0), INVALID_SENIOR_TRANCHE_IMPLEMENTATION());
+        require(address(_params.juniorTrancheImplementation) != address(0), INVALID_JUNIOR_TRANCHE_IMPLEMENTATION());
         // Validate the initialization data
         require(_params.kernelInitializationData.length > 0, INVALID_KERNEL_INITIALIZATION_DATA());
         require(_params.accountantInitializationData.length > 0, INVALID_ACCOUNTANT_INITIALIZATION_DATA());

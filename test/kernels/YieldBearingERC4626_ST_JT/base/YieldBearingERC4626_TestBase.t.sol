@@ -4,11 +4,11 @@ pragma solidity ^0.8.28;
 import { IERC4626 } from "../../../../lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 
 import { DeployScript } from "../../../../script/Deploy.s.sol";
-import { NAV_UNIT, TRANCHE_UNIT, toNAVUnits, toTrancheUnits, toUint256 } from "../../../../src/libraries/Units.sol";
-import { RAY, WAD } from "../../../../src/libraries/Constants.sol";
 import {
     YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626Assets_Kernel
 } from "../../../../src/kernels/YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626Assets_Kernel.sol";
+import { RAY, WAD } from "../../../../src/libraries/Constants.sol";
+import { NAV_UNIT, TRANCHE_UNIT, toNAVUnits, toTrancheUnits, toUint256 } from "../../../../src/libraries/Units.sol";
 
 import { AbstractKernelTestSuite } from "../../abstract/AbstractKernelTestSuite.t.sol";
 
@@ -143,11 +143,7 @@ abstract contract YieldBearingERC4626_TestBase is AbstractKernelTestSuite {
 
         // Mock convertToAssets(RAY) to return the new share price
         // The kernel calls: IERC4626(ST_ASSET).convertToAssets(RAY)
-        vm.mockCall(
-            config.stAsset,
-            abi.encodeWithSelector(IERC4626.convertToAssets.selector, RAY),
-            abi.encode(_newSharePriceRAY)
-        );
+        vm.mockCall(config.stAsset, abi.encodeWithSelector(IERC4626.convertToAssets.selector, RAY), abi.encode(_newSharePriceRAY));
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -174,17 +170,14 @@ abstract contract YieldBearingERC4626_TestBase is AbstractKernelTestSuite {
 
     /// @notice Gets the current conversion rate using the kernel's getter (in RAY precision)
     function _getConversionRate() internal view returns (uint256) {
-        return YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626Assets_Kernel(address(KERNEL))
-            .getStoredConversionRateRAY();
+        return YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626Assets_Kernel(address(KERNEL)).getStoredConversionRateRAY();
     }
 
     /// @notice Sets the conversion rate using the kernel's setter (in RAY precision)
     /// @dev Requires ORACLE_QUOTER_ADMIN_ROLE, which is granted to OWNER_ADDRESS
     function _setConversionRate(uint256 _newRateRAY) internal {
         vm.prank(OWNER_ADDRESS);
-        YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626Assets_Kernel(address(KERNEL)).setConversionRate(
-            _newRateRAY
-        );
+        YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626Assets_Kernel(address(KERNEL)).setConversionRate(_newRateRAY);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -234,13 +227,7 @@ abstract contract YieldBearingERC4626_TestBase is AbstractKernelTestSuite {
     }
 
     /// @notice Tests that vault share price yield with ST deposits distributes correctly
-    function testFuzz_vaultSharePrice_yield_distributesToJT(
-        uint256 _jtAmount,
-        uint256 _stPercentage,
-        uint256 _yieldPercentage
-    )
-        external
-    {
+    function testFuzz_vaultSharePrice_yield_distributesToJT(uint256 _jtAmount, uint256 _stPercentage, uint256 _yieldPercentage) external {
         _jtAmount = bound(_jtAmount, _minDepositAmount(), config.initialFunding / 2);
         _stPercentage = bound(_stPercentage, 10, 50);
         _yieldPercentage = bound(_yieldPercentage, 1, 20);

@@ -9,6 +9,7 @@ import { YieldBearingERC20_ST_Kernel } from "./base/senior/YieldBearingERC20_ST_
 
 /**
  * @title YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsOracleQuoter_Kernel
+ * @author Waymont
  * @notice The senior and junior tranches transfer in the same yield bearing ERC4626 shares (sNUSD, sUSDe, etc.)
  * @notice The kernel uses an overridable oracle to convert tranche token units (ERC4626 shares) to NAV units, allowing NAVs to sync based on underlying PNL
  */

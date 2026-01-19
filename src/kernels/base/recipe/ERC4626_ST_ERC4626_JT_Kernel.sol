@@ -10,7 +10,8 @@ import { ERC4626_ST_Kernel } from "../senior/ERC4626_ST_Kernel.sol";
 
 /**
  * @title ERC4626_ST_ERC4626_JT_Kernel
- * @dev This contract functions as a base kernel for all kernels that deploy the senior and junior tranches ERC4626 compliant vaults
+ * @author Waymont
+ * @dev This contract functions as a base kernel for all kernels that deploy the senior and junior tranches into ERC4626 compliant vaults
  * @dev The concrete implementation must implement or inherit a quoter
  */
 abstract contract ERC4626_ST_ERC4626_JT_Kernel is ERC4626_ST_Kernel, ERC4626_JT_Kernel {

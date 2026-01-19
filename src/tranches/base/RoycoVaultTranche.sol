@@ -1,28 +1,28 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import { ERC20Upgradeable, IERC20, IERC20Metadata } from "../../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/ERC20Upgradeable.sol";
-import { ERC20PausableUpgradeable } from "../../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/ERC20PausableUpgradeable.sol";
-import { ERC20PermitUpgradeable } from "../../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
-import { IAccessControlEnumerable } from "../../lib/openzeppelin-contracts/contracts/access/extensions/IAccessControlEnumerable.sol";
-import { SafeERC20 } from "../../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
-import { Math } from "../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
-import { RoycoBase } from "../base/RoycoBase.sol";
-import { IAsyncJTDepositKernel } from "../interfaces/kernel/IAsyncJTDepositKernel.sol";
-import { IAsyncSTDepositKernel } from "../interfaces/kernel/IAsyncSTDepositKernel.sol";
-import { IAsyncSTRedemptionKernel } from "../interfaces/kernel/IAsyncSTRedemptionKernel.sol";
-import { ExecutionModel, IRoycoKernel, SharesRedemptionModel } from "../interfaces/kernel/IRoycoKernel.sol";
-import { IRoycoAsyncCancellableVault, IRoycoAsyncVault, IRoycoVaultTranche } from "../interfaces/tranche/IRoycoVaultTranche.sol";
-import { ZERO_NAV_UNITS } from "../libraries/Constants.sol";
-import { RoycoTrancheStorageLib } from "../libraries/RoycoTrancheStorageLib.sol";
-import { Action, AssetClaims, SyncedAccountingState, TrancheDeploymentParams, TrancheType } from "../libraries/Types.sol";
-import { NAV_UNIT, TRANCHE_UNIT, toNAVUnits, toTrancheUnits, toUint256 } from "../libraries/Units.sol";
-import { UnitsMathLib } from "../libraries/Units.sol";
-import { UtilsLib } from "../libraries/UtilsLib.sol";
+import { ERC20Upgradeable, IERC20, IERC20Metadata } from "../../../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/ERC20Upgradeable.sol";
+import { ERC20PausableUpgradeable } from "../../../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/ERC20PausableUpgradeable.sol";
+import { ERC20PermitUpgradeable } from "../../../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
+import { SafeERC20 } from "../../../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+import { Math } from "../../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
+import { RoycoBase } from "../../base/RoycoBase.sol";
+import { IAsyncJTDepositKernel } from "../../interfaces/kernel/IAsyncJTDepositKernel.sol";
+import { IAsyncSTDepositKernel } from "../../interfaces/kernel/IAsyncSTDepositKernel.sol";
+import { IAsyncSTRedemptionKernel } from "../../interfaces/kernel/IAsyncSTRedemptionKernel.sol";
+import { ExecutionModel, IRoycoKernel, SharesRedemptionModel } from "../../interfaces/kernel/IRoycoKernel.sol";
+import { IRoycoAsyncCancellableVault, IRoycoAsyncVault, IRoycoVaultTranche } from "../../interfaces/tranche/IRoycoVaultTranche.sol";
+import { ZERO_NAV_UNITS } from "../../libraries/Constants.sol";
+import { RoycoTrancheStorageLib } from "../../libraries/RoycoTrancheStorageLib.sol";
+import { Action, AssetClaims, SyncedAccountingState, TrancheDeploymentParams, TrancheType } from "../../libraries/Types.sol";
+import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib, toNAVUnits, toTrancheUnits, toUint256 } from "../../libraries/Units.sol";
+import { UtilsLib } from "../../libraries/UtilsLib.sol";
 
 /**
  * @title RoycoVaultTranche
- * @notice Abstract base contract implementing core functionality for Royco tranches
+ * @author Ankur Dubey, Shivaansh Kapoor
+ * @notice Abstract base contract implementing core vault functionality for Royco tranches (ST and JT)
+ * @dev Tranches interact with the kernel for asset operations and the accountant for NAV synchronizations
  */
 abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20PausableUpgradeable, ERC20PermitUpgradeable {
     using Math for uint256;

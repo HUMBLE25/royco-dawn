@@ -10,6 +10,13 @@ import { MarketState, NAV_UNIT, SyncedAccountingState } from "../libraries/Types
 import { UnitsMathLib, toNAVUnits, toUint256 } from "../libraries/Units.sol";
 import { Math, UtilsLib } from "../libraries/UtilsLib.sol";
 
+/**
+ * @title RoycoAccountant
+ * @author Shivaansh Kapoor, Ankur Dubey
+ * @notice Performs and tracks the core accounting operations for a Royco market
+ * @notice Responsible for marking tranche NAVs to market, tracking impermanent losses, distributing yield via the YDM, and computing protocol fees
+ * @notice Responsible for tracking the operational and coverage state of the Royco market
+ */
 contract RoycoAccountant is IRoycoAccountant, RoycoBase {
     using Math for uint256;
     using UnitsMathLib for NAV_UNIT;

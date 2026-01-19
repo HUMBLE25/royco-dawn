@@ -9,6 +9,7 @@ import { ERC4626_ST_ERC4626_JT_Kernel } from "./base/recipe/ERC4626_ST_ERC4626_J
 
 /**
  * @title ERC4626_ST_ERC4626_JT_InKindAssets_Kernel
+ * @author Waymont
  * @notice The senior and junior tranches are deployed into a ERC4626 compliant vault
  * @notice The two tranches can be deployed into the same ERC4626 compliant vault
  * @notice The tranche assets are identical in value and can have differing precisions (eg. USDC and USDS, USDT and USDe, etc.)

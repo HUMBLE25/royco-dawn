@@ -9,6 +9,13 @@ import { NAV_UNIT, TRANCHE_UNIT, toUint256 } from "../../../libraries/Units.sol"
 import { YieldBearingERC20KernelState, YieldBearingERC20KernelStorageLib } from "../../../libraries/kernels/YieldBearingERC20KernelStorageLib.sol";
 import { RoycoKernel } from "../RoycoKernel.sol";
 
+/**
+ * @title YieldBearingERC20_JT_Kernel
+ * @author Shivaansh Kapoor, Ankur Dubey
+ * @notice Junior tranche kernel for yield-bearing ERC20 tokens
+ * @dev Manages junior tranche deposits and withdrawals using yield-bearing ERC20 assets
+ *      Assets are held directly by the kernel and tracked via storage
+ */
 abstract contract YieldBearingERC20_JT_Kernel is RoycoKernel {
     using SafeERC20 for IERC20;
 

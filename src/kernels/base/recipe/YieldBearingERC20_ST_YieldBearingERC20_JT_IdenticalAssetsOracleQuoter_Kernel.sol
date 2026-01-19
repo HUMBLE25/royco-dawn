@@ -9,6 +9,7 @@ import { YieldBearingERC20_ST_Kernel } from "../senior/YieldBearingERC20_ST_Kern
 
 /**
  * @title YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsOracleQuoter_Kernel
+ * @author Waymont
  * @notice The senior and junior tranches transfer in the same yield bearing ERC20 assets (sACRED, mF-ONE, reUSD, etc.)
  * @notice The kernel uses an overridable oracle to convert tranche units to NAV units, allowing NAVs to sync based on underlying PNL
  */

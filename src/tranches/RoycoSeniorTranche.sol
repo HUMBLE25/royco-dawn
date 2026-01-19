@@ -1,11 +1,16 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import { TrancheDeploymentParams } from "../libraries/Types.sol";
-import { TrancheType } from "../libraries/Types.sol";
-import { RoycoVaultTranche } from "./RoycoVaultTranche.sol";
+import { TrancheDeploymentParams, TrancheType } from "../libraries/Types.sol";
+import { RoycoVaultTranche } from "./base/RoycoVaultTranche.sol";
 
-contract RoycoST is RoycoVaultTranche {
+/**
+ * @title RoycoSeniorTranche
+ * @author Ankur Dubey, Shivaansh Kapoor
+ * @notice Senior tranche implementation for Royco markets
+ * @dev Inherits from RoycoVaultTranche and specifies SENIOR as the tranche type
+ */
+contract RoycoSeniorTranche is RoycoVaultTranche {
     /**
      * @notice Initializes the Royco senior tranche
      * @param _stParams Deployment parameters including name, symbol, kernel, and kernel initialization data for the senior tranche

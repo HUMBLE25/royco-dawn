@@ -15,8 +15,8 @@ import { IRoycoKernel } from "../../src/interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoVaultTranche } from "../../src/interfaces/tranche/IRoycoVaultTranche.sol";
 import { AssetClaims, MarketState, TrancheType } from "../../src/libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, toUint256 } from "../../src/libraries/Units.sol";
-import { RoycoJT } from "../../src/tranches/RoycoJT.sol";
-import { RoycoST } from "../../src/tranches/RoycoST.sol";
+import { RoycoJuniorTranche } from "../../src/tranches/RoycoJuniorTranche.sol";
+import { RoycoSeniorTranche } from "../../src/tranches/RoycoSeniorTranche.sol";
 import { Assertions } from "./Assertions.t.sol";
 
 abstract contract BaseTest is Test, RoycoRoles, Assertions {
@@ -77,8 +77,8 @@ abstract contract BaseTest is Test, RoycoRoles, Assertions {
     // Deployments
     RoycoFactory internal FACTORY;
     IYDM internal YDM;
-    RoycoST public ST_IMPL;
-    RoycoJT internal JT_IMPL;
+    RoycoSeniorTranche public ST_IMPL;
+    RoycoJuniorTranche internal JT_IMPL;
     RoycoAccountant internal ACCOUNTANT_IMPL;
     address internal KERNEL_IMPL;
     IRoycoVaultTranche internal ST;
