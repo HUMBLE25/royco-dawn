@@ -9,6 +9,7 @@ import { UtilsLib } from "../libraries/UtilsLib.sol";
 
 /**
  * @title StaticCurveYDM
+ * @author Shivaansh Kapoor, Ankur Dubey
  * @notice Royco's static curve yield distribution model (YDM)
  * @dev Responsible for computing the yield distribution between the senior and junior tranches of a Royco market
  * @dev The curve is defined as piece-wise function parameterized by the utilization of a Royco market

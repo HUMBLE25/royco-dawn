@@ -9,6 +9,14 @@ import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib, toTrancheUnits, toUint256 } from 
 import { ERC4626KernelState, ERC4626KernelStorageLib } from "../../../libraries/kernels/ERC4626KernelStorageLib.sol";
 import { RoycoKernel, TrancheType } from "../RoycoKernel.sol";
 
+/**
+ * @title ERC4626_ST_Kernel
+ * @author Shivaansh Kapoor, Ankur Dubey
+ * @notice Senior tranche kernel for ERC4626 vault deposits
+ * @dev Manages senior tranche deposits, withdrawals, and redemptions via an ERC4626 compliant vault
+ *      Deposited assets are converted to vault shares
+ *      Handles illiquidity gracefully by transferring vault shares when withdrawals fail
+ */
 abstract contract ERC4626_ST_Kernel is RoycoKernel {
     using SafeERC20 for IERC20;
     using UnitsMathLib for TRANCHE_UNIT;

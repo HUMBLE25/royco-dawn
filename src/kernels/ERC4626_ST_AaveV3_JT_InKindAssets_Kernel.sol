@@ -9,6 +9,7 @@ import { ERC4626_ST_Kernel } from "./base/senior/ERC4626_ST_Kernel.sol";
 
 /**
  * @title ERC4626_ST_AaveV3_JT_InKindAssets_Kernel
+ * @author Waymont
  * @notice The senior tranche is deployed into a ERC4626 compliant vault and the junior tranche is deployed into Aave V3
  * @notice The tranche assets are identical in value and can have differing precisions (eg. USDC and USDS, USDT and USDe, etc.)
  * @notice Tranche units are always expressed in the tranche's assets precision

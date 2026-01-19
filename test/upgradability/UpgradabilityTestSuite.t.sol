@@ -2,25 +2,25 @@
 pragma solidity ^0.8.28;
 
 import { Initializable } from "../../lib/openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
-import { UUPSUpgradeable } from "../../lib/openzeppelin-contracts/contracts/proxy/utils/UUPSUpgradeable.sol";
 import { IAccessManaged } from "../../lib/openzeppelin-contracts/contracts/access/manager/IAccessManaged.sol";
-import { IERC20 } from "../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { IERC4626 } from "../../lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
+import { UUPSUpgradeable } from "../../lib/openzeppelin-contracts/contracts/proxy/utils/UUPSUpgradeable.sol";
+import { IERC20 } from "../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 import { DeployScript } from "../../script/Deploy.s.sol";
 import { RoycoAccountant } from "../../src/accountant/RoycoAccountant.sol";
 import { IRoycoAccountant } from "../../src/interfaces/IRoycoAccountant.sol";
 import { IRoycoKernel } from "../../src/interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoVaultTranche } from "../../src/interfaces/tranche/IRoycoVaultTranche.sol";
-import { RoycoKernelInitParams } from "../../src/libraries/RoycoKernelStorageLib.sol";
-import { TrancheDeploymentParams } from "../../src/libraries/Types.sol";
-import { RoycoJT } from "../../src/tranches/RoycoJT.sol";
-import { RoycoST } from "../../src/tranches/RoycoST.sol";
 import {
     YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626Assets_Kernel
 } from "../../src/kernels/YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626Assets_Kernel.sol";
 import { RAY } from "../../src/libraries/Constants.sol";
-import { TRANCHE_UNIT, toUint256, toTrancheUnits } from "../../src/libraries/Units.sol";
+import { RoycoKernelInitParams } from "../../src/libraries/RoycoKernelStorageLib.sol";
+import { TrancheDeploymentParams } from "../../src/libraries/Types.sol";
+import { TRANCHE_UNIT, toTrancheUnits, toUint256 } from "../../src/libraries/Units.sol";
+import { RoycoJuniorTranche } from "../../src/tranches/RoycoJuniorTranche.sol";
+import { RoycoSeniorTranche } from "../../src/tranches/RoycoSeniorTranche.sol";
 
 import { BaseTest } from "../base/BaseTest.t.sol";
 
@@ -42,8 +42,8 @@ contract UpgradabilityTestSuite is BaseTest {
     // NEW IMPLEMENTATION CONTRACTS FOR UPGRADE TESTING
     // ═══════════════════════════════════════════════════════════════════════════
 
-    RoycoST internal newSTImpl;
-    RoycoJT internal newJTImpl;
+    RoycoSeniorTranche internal newSTImpl;
+    RoycoJuniorTranche internal newJTImpl;
     RoycoAccountant internal newAccountantImpl;
     address internal newKernelImpl;
 
@@ -81,14 +81,10 @@ contract UpgradabilityTestSuite is BaseTest {
         bytes32 marketId = keccak256(abi.encodePacked("UpgradabilityTest", block.timestamp));
 
         DeployScript.YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626AssetsKernelParams memory kernelParams =
-            DeployScript.YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626AssetsKernelParams({
-                initialConversionRateWAD: RAY
-            });
+            DeployScript.YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626AssetsKernelParams({ initialConversionRateWAD: RAY });
 
-        DeployScript.AdaptiveCurveYDMParams memory ydmParams = DeployScript.AdaptiveCurveYDMParams({
-            jtYieldShareAtTargetUtilWAD: 0.3e18,
-            jtYieldShareAtFullUtilWAD: 1e18
-        });
+        DeployScript.AdaptiveCurveYDMParams memory ydmParams =
+            DeployScript.AdaptiveCurveYDMParams({ jtYieldShareAtTargetUtilWAD: 0.3e18, jtYieldShareAtFullUtilWAD: 1e18 });
 
         DeployScript.DeploymentParams memory params = DeployScript.DeploymentParams({
             factoryAdmin: address(DEPLOY_SCRIPT),
@@ -138,24 +134,19 @@ contract UpgradabilityTestSuite is BaseTest {
     }
 
     function _deployNewImplementations() internal {
-        newSTImpl = new RoycoST();
+        newSTImpl = new RoycoSeniorTranche();
         vm.label(address(newSTImpl), "NewSTImpl");
 
-        newJTImpl = new RoycoJT();
+        newJTImpl = new RoycoJuniorTranche();
         vm.label(address(newJTImpl), "NewJTImpl");
 
         newAccountantImpl = new RoycoAccountant();
         vm.label(address(newAccountantImpl), "NewAccountantImpl");
 
-        IRoycoKernel.RoycoKernelConstructionParams memory constructionParams = IRoycoKernel.RoycoKernelConstructionParams({
-            seniorTranche: address(ST),
-            stAsset: SNUSD,
-            juniorTranche: address(JT),
-            jtAsset: SNUSD
-        });
+        IRoycoKernel.RoycoKernelConstructionParams memory constructionParams =
+            IRoycoKernel.RoycoKernelConstructionParams({ seniorTranche: address(ST), stAsset: SNUSD, juniorTranche: address(JT), jtAsset: SNUSD });
 
-        newKernelImpl =
-            address(new YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626Assets_Kernel(constructionParams));
+        newKernelImpl = address(new YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626Assets_Kernel(constructionParams));
         vm.label(newKernelImpl, "NewKernelImpl");
     }
 
@@ -165,8 +156,7 @@ contract UpgradabilityTestSuite is BaseTest {
 
     /// @notice Test that ST implementation cannot be initialized
     function test_stImplementation_cannotBeInitialized() external {
-        TrancheDeploymentParams memory params =
-            TrancheDeploymentParams({ name: "Test ST", symbol: "TST", kernel: address(KERNEL) });
+        TrancheDeploymentParams memory params = TrancheDeploymentParams({ name: "Test ST", symbol: "TST", kernel: address(KERNEL) });
 
         vm.expectRevert(Initializable.InvalidInitialization.selector);
         ST_IMPL.initialize(params, SNUSD, address(FACTORY), MARKET_ID);
@@ -174,8 +164,7 @@ contract UpgradabilityTestSuite is BaseTest {
 
     /// @notice Test that JT implementation cannot be initialized
     function test_jtImplementation_cannotBeInitialized() external {
-        TrancheDeploymentParams memory params =
-            TrancheDeploymentParams({ name: "Test JT", symbol: "TJT", kernel: address(KERNEL) });
+        TrancheDeploymentParams memory params = TrancheDeploymentParams({ name: "Test JT", symbol: "TJT", kernel: address(KERNEL) });
 
         vm.expectRevert(Initializable.InvalidInitialization.selector);
         JT_IMPL.initialize(params, SNUSD, address(FACTORY), MARKET_ID);
@@ -214,8 +203,7 @@ contract UpgradabilityTestSuite is BaseTest {
 
     /// @notice Test that new ST implementation cannot be initialized
     function test_newSTImplementation_cannotBeInitialized() external {
-        TrancheDeploymentParams memory params =
-            TrancheDeploymentParams({ name: "Test ST", symbol: "TST", kernel: address(KERNEL) });
+        TrancheDeploymentParams memory params = TrancheDeploymentParams({ name: "Test ST", symbol: "TST", kernel: address(KERNEL) });
 
         vm.expectRevert(Initializable.InvalidInitialization.selector);
         newSTImpl.initialize(params, SNUSD, address(FACTORY), MARKET_ID);
@@ -223,8 +211,7 @@ contract UpgradabilityTestSuite is BaseTest {
 
     /// @notice Test that new JT implementation cannot be initialized
     function test_newJTImplementation_cannotBeInitialized() external {
-        TrancheDeploymentParams memory params =
-            TrancheDeploymentParams({ name: "Test JT", symbol: "TJT", kernel: address(KERNEL) });
+        TrancheDeploymentParams memory params = TrancheDeploymentParams({ name: "Test JT", symbol: "TJT", kernel: address(KERNEL) });
 
         vm.expectRevert(Initializable.InvalidInitialization.selector);
         newJTImpl.initialize(params, SNUSD, address(FACTORY), MARKET_ID);
@@ -303,12 +290,12 @@ contract UpgradabilityTestSuite is BaseTest {
 
     /// @notice Test that Kernel can be upgraded by upgrader
     function test_kernelProxy_canBeUpgradedByUpgrader() external {
-        (address stBefore,, address jtBefore,, , address accountantBefore,) = KERNEL.getState();
+        (address stBefore,, address jtBefore,,, address accountantBefore,) = KERNEL.getState();
 
         vm.prank(UPGRADER_ADDRESS);
         UUPSUpgradeable(address(KERNEL)).upgradeToAndCall(newKernelImpl, "");
 
-        (address stAfter,, address jtAfter,,,address accountantAfter,) = KERNEL.getState();
+        (address stAfter,, address jtAfter,,, address accountantAfter,) = KERNEL.getState();
         assertEq(stAfter, stBefore, "ST address should be preserved after upgrade");
         assertEq(jtAfter, jtBefore, "JT address should be preserved after upgrade");
         assertEq(accountantAfter, accountantBefore, "Accountant should be preserved after upgrade");

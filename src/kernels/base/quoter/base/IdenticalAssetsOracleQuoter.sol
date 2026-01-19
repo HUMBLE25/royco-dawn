@@ -13,7 +13,6 @@ import { RoycoKernel } from "../../RoycoKernel.sol";
  *      Supported use-cases include:
  *      - Identical Yield Bearing ERC20 for ST And JT: Yield Bearing ERC20 and Tranche Unit (sACRED, reUSD, etc.), NAV Unit (USD)
  */
-// TODO: Cache conversion rate initially
 abstract contract IdenticalAssetsOracleQuoter is RoycoKernel {
     using UnitsMathLib for NAV_UNIT;
     using UnitsMathLib for TRANCHE_UNIT;

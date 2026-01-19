@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import { DeployedContracts, MarketDeploymentParams } from "../libraries/Types.sol";
+import { MarketDeploymentParams, RoycoMarket } from "../libraries/Types.sol";
 
 /// @title IRoycoFactory
 /// @notice Interface for the RoycoFactory contract that deploys Royco markets
@@ -82,7 +82,7 @@ interface IRoycoFactory {
     error INVALID_TARGET(address target);
 
     /// @notice Emitted when a new market is deployed
-    event MarketDeployed(DeployedContracts deployedContracts, MarketDeploymentParams params);
+    event MarketDeployed(RoycoMarket roycoMarket, MarketDeploymentParams params);
 
     /// @notice Emitted when a role delay is set
     event RoleDelaySet(uint64 role, uint256 delay);
@@ -90,8 +90,9 @@ interface IRoycoFactory {
     /**
      * @notice Deploys a new market with senior tranche, junior tranche, and kernel
      * @param _params The parameters for deploying a new market
+     * @param roycoMarket The deployed components constituting the Royco market
      */
-    function deployMarket(MarketDeploymentParams calldata _params) external returns (DeployedContracts memory deployedContracts);
+    function deployMarket(MarketDeploymentParams calldata _params) external returns (RoycoMarket memory roycoMarket);
 
     /**
      * @notice Predicts the address of a tranche proxy

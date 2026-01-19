@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import { Pausable } from "../../lib/openzeppelin-contracts/contracts/utils/Pausable.sol";
 import { PausableUpgradeable } from "../../lib/openzeppelin-contracts-upgradeable/contracts/utils/PausableUpgradeable.sol";
 import { IAccessManaged } from "../../lib/openzeppelin-contracts/contracts/access/manager/IAccessManaged.sol";
 import { IERC20 } from "../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import { Pausable } from "../../lib/openzeppelin-contracts/contracts/utils/Pausable.sol";
 
 import { DeployScript } from "../../script/Deploy.s.sol";
 import { IRoycoAuth } from "../../src/interfaces/IRoycoAuth.sol";
@@ -58,14 +58,10 @@ contract PausabilityTestSuite is BaseTest {
         bytes32 marketId = keccak256(abi.encodePacked("PausabilityTest", block.timestamp));
 
         DeployScript.YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626AssetsKernelParams memory kernelParams =
-            DeployScript.YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626AssetsKernelParams({
-                initialConversionRateWAD: RAY
-            });
+            DeployScript.YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626AssetsKernelParams({ initialConversionRateWAD: RAY });
 
-        DeployScript.AdaptiveCurveYDMParams memory ydmParams = DeployScript.AdaptiveCurveYDMParams({
-            jtYieldShareAtTargetUtilWAD: 0.3e18,
-            jtYieldShareAtFullUtilWAD: 1e18
-        });
+        DeployScript.AdaptiveCurveYDMParams memory ydmParams =
+            DeployScript.AdaptiveCurveYDMParams({ jtYieldShareAtTargetUtilWAD: 0.3e18, jtYieldShareAtFullUtilWAD: 1e18 });
 
         DeployScript.DeploymentParams memory params = DeployScript.DeploymentParams({
             factoryAdmin: address(DEPLOY_SCRIPT),

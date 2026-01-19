@@ -7,14 +7,14 @@ import { ExecutionModel, IRoycoKernel, SharesRedemptionModel } from "../../inter
 import { IRoycoVaultTranche } from "../../interfaces/tranche/IRoycoVaultTranche.sol";
 import { ZERO_NAV_UNITS, ZERO_TRANCHE_UNITS } from "../../libraries/Constants.sol";
 import { RedemptionRequest, RoycoKernelInitParams, RoycoKernelState, RoycoKernelStorageLib } from "../../libraries/RoycoKernelStorageLib.sol";
-import { MarketState } from "../../libraries/Types.sol";
-import { ActionMetadataFormat, AssetClaims, SyncedAccountingState, TrancheType } from "../../libraries/Types.sol";
+import { ActionMetadataFormat, AssetClaims, MarketState, SyncedAccountingState, TrancheType } from "../../libraries/Types.sol";
 import { Math, NAV_UNIT, TRANCHE_UNIT, UnitsMathLib } from "../../libraries/Units.sol";
 import { UtilsLib } from "../../libraries/UtilsLib.sol";
 
 /**
  * @title RoycoKernel
- * @notice Abstract contract for Royco kernel implementations
+ * @author Ankur Dubey, Shivaansh Kapoor
+ * @notice Abstract contract serving as the base for all Royco kernel implementations
  * @dev Provides the foundational logic for kernel contracts including pre and post operation NAV reconciliation, coverage enforcement logic,
  *      and base wiring for tranche synchronization. All concrete kernel implementations should inherit from the Royco Kernel.
  */
