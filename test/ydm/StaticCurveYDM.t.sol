@@ -47,11 +47,7 @@ contract StaticCurveYDMTest is BaseTest {
     /// @dev Creates inputs that result in a specific utilization
     /// @param _utilizationWAD The target utilization (0 to WAD+)
     /// @return stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV
-    function _createInputsForUtilization(uint256 _utilizationWAD)
-        internal
-        pure
-        returns (NAV_UNIT, NAV_UNIT, uint256, uint256, NAV_UNIT)
-    {
+    function _createInputsForUtilization(uint256 _utilizationWAD) internal pure returns (NAV_UNIT, NAV_UNIT, uint256, uint256, NAV_UNIT) {
         // With beta=1, coverage=1, jtEffectiveNAV=1e18:
         // U = (ST + JT * 1) * 1 / 1e18 = (ST + JT) / 1e18
         // So ST + JT = U * 1e18 / 1e18 = U
@@ -72,8 +68,7 @@ contract StaticCurveYDMTest is BaseTest {
             return DEFAULT_SLOPE_LT.mulDiv(_utilizationWAD, WAD, Math.Rounding.Floor) + DEFAULT_Y0;
         } else {
             // Second leg: Y = Y_T + S_gte * (U - 0.9)
-            return DEFAULT_SLOPE_GTE.mulDiv(_utilizationWAD - TARGET_UTILIZATION_WAD, WAD, Math.Rounding.Floor)
-                + DEFAULT_YT;
+            return DEFAULT_SLOPE_GTE.mulDiv(_utilizationWAD - TARGET_UTILIZATION_WAD, WAD, Math.Rounding.Floor) + DEFAULT_YT;
         }
     }
 
@@ -103,8 +98,7 @@ contract StaticCurveYDMTest is BaseTest {
         StaticCurveYDM newYdm = new StaticCurveYDM();
 
         uint256 expectedSlopeLt = uint256(DEFAULT_YT - DEFAULT_Y0).mulDiv(WAD, TARGET_UTILIZATION_WAD, Math.Rounding.Floor);
-        uint256 expectedSlopeGte =
-            uint256(DEFAULT_YFULL - DEFAULT_YT).mulDiv(WAD, WAD - TARGET_UTILIZATION_WAD, Math.Rounding.Floor);
+        uint256 expectedSlopeGte = uint256(DEFAULT_YFULL - DEFAULT_YT).mulDiv(WAD, WAD - TARGET_UTILIZATION_WAD, Math.Rounding.Floor);
 
         vm.expectEmit(true, false, false, true);
         emit StaticCurveYDM.StaticCurveYdmInitialized(address(this), DEFAULT_Y0, expectedSlopeLt, expectedSlopeGte);
@@ -174,19 +168,12 @@ contract StaticCurveYDMTest is BaseTest {
         StaticCurveYDM newYdm = new StaticCurveYDM();
         newYdm.initializeYDMForMarket(_y0, _yT, _yFull);
 
-        (uint128 storedY0,,, ) = newYdm.accountantToCurve(address(this));
+        (uint128 storedY0,,,) = newYdm.accountantToCurve(address(this));
         assertEq(storedY0, _y0, "Y0 should be stored");
     }
 
     /// @notice Fuzz test: verify curve invariants hold for any valid configuration
-    function testFuzz_curveConfiguration_invariants(
-        uint64 _y0,
-        uint64 _yT,
-        uint64 _yFull,
-        uint256 _utilization
-    )
-        public
-    {
+    function testFuzz_curveConfiguration_invariants(uint64 _y0, uint64 _yT, uint64 _yFull, uint256 _utilization) public {
         // Bound curve parameters to valid ordering
         _y0 = uint64(bound(_y0, 0, WAD));
         _yT = uint64(bound(_yT, _y0, WAD));
@@ -198,8 +185,7 @@ contract StaticCurveYDMTest is BaseTest {
         fuzzedYdm.initializeYDMForMarket(_y0, _yT, _yFull);
 
         // Create inputs for the fuzzed utilization
-        (NAV_UNIT stRaw, NAV_UNIT jtRaw, uint256 beta, uint256 cov, NAV_UNIT jtEff) =
-            _createInputsForUtilization(_utilization);
+        (NAV_UNIT stRaw, NAV_UNIT jtRaw, uint256 beta, uint256 cov, NAV_UNIT jtEff) = _createInputsForUtilization(_utilization);
 
         uint256 result = fuzzedYdm.previewJTYieldShare(MarketState.PERPETUAL, stRaw, jtRaw, beta, cov, jtEff);
 
@@ -222,15 +208,7 @@ contract StaticCurveYDMTest is BaseTest {
     }
 
     /// @notice Fuzz test: verify monotonicity for any curve configuration
-    function testFuzz_curveConfiguration_monotonicity(
-        uint64 _y0,
-        uint64 _yT,
-        uint64 _yFull,
-        uint256 _util1,
-        uint256 _util2
-    )
-        public
-    {
+    function testFuzz_curveConfiguration_monotonicity(uint64 _y0, uint64 _yT, uint64 _yFull, uint256 _util1, uint256 _util2) public {
         // Bound curve parameters to valid ordering
         _y0 = uint64(bound(_y0, 0, WAD));
         _yT = uint64(bound(_yT, _y0, WAD));
@@ -249,10 +227,8 @@ contract StaticCurveYDMTest is BaseTest {
         StaticCurveYDM fuzzedYdm = new StaticCurveYDM();
         fuzzedYdm.initializeYDMForMarket(_y0, _yT, _yFull);
 
-        (NAV_UNIT stRaw1, NAV_UNIT jtRaw1, uint256 beta1, uint256 cov1, NAV_UNIT jtEff1) =
-            _createInputsForUtilization(_util1);
-        (NAV_UNIT stRaw2, NAV_UNIT jtRaw2, uint256 beta2, uint256 cov2, NAV_UNIT jtEff2) =
-            _createInputsForUtilization(_util2);
+        (NAV_UNIT stRaw1, NAV_UNIT jtRaw1, uint256 beta1, uint256 cov1, NAV_UNIT jtEff1) = _createInputsForUtilization(_util1);
+        (NAV_UNIT stRaw2, NAV_UNIT jtRaw2, uint256 beta2, uint256 cov2, NAV_UNIT jtEff2) = _createInputsForUtilization(_util2);
 
         uint256 result1 = fuzzedYdm.previewJTYieldShare(MarketState.PERPETUAL, stRaw1, jtRaw1, beta1, cov1, jtEff1);
         uint256 result2 = fuzzedYdm.previewJTYieldShare(MarketState.PERPETUAL, stRaw2, jtRaw2, beta2, cov2, jtEff2);
@@ -272,8 +248,7 @@ contract StaticCurveYDMTest is BaseTest {
         fuzzedYdm.initializeYDMForMarket(_y0, _yT, _yFull);
 
         // Get result at exactly target utilization
-        (NAV_UNIT stRaw, NAV_UNIT jtRaw, uint256 beta, uint256 cov, NAV_UNIT jtEff) =
-            _createInputsForUtilization(TARGET_UTILIZATION_WAD);
+        (NAV_UNIT stRaw, NAV_UNIT jtRaw, uint256 beta, uint256 cov, NAV_UNIT jtEff) = _createInputsForUtilization(TARGET_UTILIZATION_WAD);
         uint256 resultAtTarget = fuzzedYdm.previewJTYieldShare(MarketState.PERPETUAL, stRaw, jtRaw, beta, cov, jtEff);
 
         // Result at target should equal YT
@@ -292,8 +267,7 @@ contract StaticCurveYDMTest is BaseTest {
     }
 
     function test_previewJTYieldShare_utilizationAtTarget() public view {
-        (NAV_UNIT stRaw, NAV_UNIT jtRaw, uint256 beta, uint256 cov, NAV_UNIT jtEff) =
-            _createInputsForUtilization(TARGET_UTILIZATION_WAD);
+        (NAV_UNIT stRaw, NAV_UNIT jtRaw, uint256 beta, uint256 cov, NAV_UNIT jtEff) = _createInputsForUtilization(TARGET_UTILIZATION_WAD);
         uint256 result = ydm.previewJTYieldShare(MarketState.PERPETUAL, stRaw, jtRaw, beta, cov, jtEff);
 
         assertEq(result, DEFAULT_YT, "At U=0.9, yield share should equal YT");
@@ -307,8 +281,7 @@ contract StaticCurveYDMTest is BaseTest {
     }
 
     function test_previewJTYieldShare_utilizationAboveOne() public view {
-        (NAV_UNIT stRaw, NAV_UNIT jtRaw, uint256 beta, uint256 cov, NAV_UNIT jtEff) =
-            _createInputsForUtilization(1.5e18);
+        (NAV_UNIT stRaw, NAV_UNIT jtRaw, uint256 beta, uint256 cov, NAV_UNIT jtEff) = _createInputsForUtilization(1.5e18);
         uint256 result = ydm.previewJTYieldShare(MarketState.PERPETUAL, stRaw, jtRaw, beta, cov, jtEff);
 
         assertEq(result, WAD, "At U>1.0, yield share should be capped at 100%");
@@ -316,8 +289,7 @@ contract StaticCurveYDMTest is BaseTest {
 
     function test_previewJTYieldShare_utilizationJustBelowTarget() public view {
         uint256 utilization = TARGET_UTILIZATION_WAD - 1;
-        (NAV_UNIT stRaw, NAV_UNIT jtRaw, uint256 beta, uint256 cov, NAV_UNIT jtEff) =
-            _createInputsForUtilization(utilization);
+        (NAV_UNIT stRaw, NAV_UNIT jtRaw, uint256 beta, uint256 cov, NAV_UNIT jtEff) = _createInputsForUtilization(utilization);
         uint256 result = ydm.previewJTYieldShare(MarketState.PERPETUAL, stRaw, jtRaw, beta, cov, jtEff);
 
         uint256 expected = _expectedYieldShare(utilization);
@@ -327,8 +299,7 @@ contract StaticCurveYDMTest is BaseTest {
 
     function test_previewJTYieldShare_utilizationJustAboveTarget() public view {
         uint256 utilization = TARGET_UTILIZATION_WAD + 1;
-        (NAV_UNIT stRaw, NAV_UNIT jtRaw, uint256 beta, uint256 cov, NAV_UNIT jtEff) =
-            _createInputsForUtilization(utilization);
+        (NAV_UNIT stRaw, NAV_UNIT jtRaw, uint256 beta, uint256 cov, NAV_UNIT jtEff) = _createInputsForUtilization(utilization);
         uint256 result = ydm.previewJTYieldShare(MarketState.PERPETUAL, stRaw, jtRaw, beta, cov, jtEff);
 
         assertGe(result, DEFAULT_YT, "Just above target should be >= YT");
@@ -336,8 +307,7 @@ contract StaticCurveYDMTest is BaseTest {
 
     function test_previewJTYieldShare_utilizationJustBelowOne() public view {
         uint256 utilization = WAD - 1;
-        (NAV_UNIT stRaw, NAV_UNIT jtRaw, uint256 beta, uint256 cov, NAV_UNIT jtEff) =
-            _createInputsForUtilization(utilization);
+        (NAV_UNIT stRaw, NAV_UNIT jtRaw, uint256 beta, uint256 cov, NAV_UNIT jtEff) = _createInputsForUtilization(utilization);
         uint256 result = ydm.previewJTYieldShare(MarketState.PERPETUAL, stRaw, jtRaw, beta, cov, jtEff);
 
         assertLt(result, WAD, "Just below 1.0 should be < 100%");
@@ -376,8 +346,7 @@ contract StaticCurveYDMTest is BaseTest {
         ];
 
         for (uint256 i = 0; i < utilizations.length; i++) {
-            (NAV_UNIT stRaw, NAV_UNIT jtRaw, uint256 beta, uint256 cov, NAV_UNIT jtEff) =
-                _createInputsForUtilization(utilizations[i]);
+            (NAV_UNIT stRaw, NAV_UNIT jtRaw, uint256 beta, uint256 cov, NAV_UNIT jtEff) = _createInputsForUtilization(utilizations[i]);
             uint256 result = ydm.previewJTYieldShare(MarketState.PERPETUAL, stRaw, jtRaw, beta, cov, jtEff);
 
             assertEq(result, expectedResults[i], string.concat("Failed at index ", vm.toString(i)));
@@ -427,8 +396,7 @@ contract StaticCurveYDMTest is BaseTest {
         uint256[4] memory utilizations = [uint256(0), 0.5e18, 0.9e18, WAD];
 
         for (uint256 i = 0; i < utilizations.length; i++) {
-            (NAV_UNIT stRaw, NAV_UNIT jtRaw, uint256 beta, uint256 cov, NAV_UNIT jtEff) =
-                _createInputsForUtilization(utilizations[i]);
+            (NAV_UNIT stRaw, NAV_UNIT jtRaw, uint256 beta, uint256 cov, NAV_UNIT jtEff) = _createInputsForUtilization(utilizations[i]);
             uint256 result = flatYdm.previewJTYieldShare(MarketState.PERPETUAL, stRaw, jtRaw, beta, cov, jtEff);
 
             assertEq(result, 0.5e18, "Flat curve should return constant yield");
@@ -441,15 +409,13 @@ contract StaticCurveYDMTest is BaseTest {
         steepFlatYdm.initializeYDMForMarket(0, 0.9e18, 0.9e18);
 
         // Below target: should rise steeply
-        (NAV_UNIT stRaw1, NAV_UNIT jtRaw1, uint256 beta1, uint256 cov1, NAV_UNIT jtEff1) =
-            _createInputsForUtilization(0.45e18);
+        (NAV_UNIT stRaw1, NAV_UNIT jtRaw1, uint256 beta1, uint256 cov1, NAV_UNIT jtEff1) = _createInputsForUtilization(0.45e18);
         uint256 result1 = steepFlatYdm.previewJTYieldShare(MarketState.PERPETUAL, stRaw1, jtRaw1, beta1, cov1, jtEff1);
         // Expected: (0.9 - 0) / 0.9 * 0.45 = 0.45
         assertEq(result1, 0.45e18, "Steep first leg at U=0.45");
 
         // Above target: should be flat at 0.9
-        (NAV_UNIT stRaw2, NAV_UNIT jtRaw2, uint256 beta2, uint256 cov2, NAV_UNIT jtEff2) =
-            _createInputsForUtilization(0.95e18);
+        (NAV_UNIT stRaw2, NAV_UNIT jtRaw2, uint256 beta2, uint256 cov2, NAV_UNIT jtEff2) = _createInputsForUtilization(0.95e18);
         uint256 result2 = steepFlatYdm.previewJTYieldShare(MarketState.PERPETUAL, stRaw2, jtRaw2, beta2, cov2, jtEff2);
         assertEq(result2, 0.9e18, "Flat second leg should stay at 0.9");
     }
@@ -460,14 +426,12 @@ contract StaticCurveYDMTest is BaseTest {
         flatSteepYdm.initializeYDMForMarket(0.1e18, 0.1e18, uint64(WAD));
 
         // Below target: should be flat at 0.1
-        (NAV_UNIT stRaw1, NAV_UNIT jtRaw1, uint256 beta1, uint256 cov1, NAV_UNIT jtEff1) =
-            _createInputsForUtilization(0.45e18);
+        (NAV_UNIT stRaw1, NAV_UNIT jtRaw1, uint256 beta1, uint256 cov1, NAV_UNIT jtEff1) = _createInputsForUtilization(0.45e18);
         uint256 result1 = flatSteepYdm.previewJTYieldShare(MarketState.PERPETUAL, stRaw1, jtRaw1, beta1, cov1, jtEff1);
         assertEq(result1, 0.1e18, "Flat first leg should stay at 0.1");
 
         // Above target: should rise steeply
-        (NAV_UNIT stRaw2, NAV_UNIT jtRaw2, uint256 beta2, uint256 cov2, NAV_UNIT jtEff2) =
-            _createInputsForUtilization(0.95e18);
+        (NAV_UNIT stRaw2, NAV_UNIT jtRaw2, uint256 beta2, uint256 cov2, NAV_UNIT jtEff2) = _createInputsForUtilization(0.95e18);
         uint256 result2 = flatSteepYdm.previewJTYieldShare(MarketState.PERPETUAL, stRaw2, jtRaw2, beta2, cov2, jtEff2);
         // Expected: (1.0 - 0.1) / 0.1 * (0.95 - 0.9) + 0.1 = 9 * 0.05 + 0.1 = 0.55
         assertEq(result2, 0.55e18, "Steep second leg at U=0.95");
@@ -579,12 +543,7 @@ contract StaticCurveYDMTest is BaseTest {
         _coverageWAD = uint128(bound(_coverageWAD, 0, WAD * 2));
 
         uint256 result = ydm.previewJTYieldShare(
-            MarketState.PERPETUAL,
-            toNAVUnits(uint256(_stRawNAV)),
-            toNAVUnits(uint256(_jtRawNAV)),
-            _betaWAD,
-            _coverageWAD,
-            toNAVUnits(uint256(_jtEffectiveNAV))
+            MarketState.PERPETUAL, toNAVUnits(uint256(_stRawNAV)), toNAVUnits(uint256(_jtRawNAV)), _betaWAD, _coverageWAD, toNAVUnits(uint256(_jtEffectiveNAV))
         );
 
         assertGe(result, 0, "Result should be >= 0");
@@ -605,10 +564,8 @@ contract StaticCurveYDMTest is BaseTest {
             (_util1, _util2) = (_util2, _util1);
         }
 
-        (NAV_UNIT stRaw1, NAV_UNIT jtRaw1, uint256 beta1, uint256 cov1, NAV_UNIT jtEff1) =
-            _createInputsForUtilization(_util1);
-        (NAV_UNIT stRaw2, NAV_UNIT jtRaw2, uint256 beta2, uint256 cov2, NAV_UNIT jtEff2) =
-            _createInputsForUtilization(_util2);
+        (NAV_UNIT stRaw1, NAV_UNIT jtRaw1, uint256 beta1, uint256 cov1, NAV_UNIT jtEff1) = _createInputsForUtilization(_util1);
+        (NAV_UNIT stRaw2, NAV_UNIT jtRaw2, uint256 beta2, uint256 cov2, NAV_UNIT jtEff2) = _createInputsForUtilization(_util2);
 
         uint256 result1 = ydm.previewJTYieldShare(MarketState.PERPETUAL, stRaw1, jtRaw1, beta1, cov1, jtEff1);
         uint256 result2 = ydm.previewJTYieldShare(MarketState.PERPETUAL, stRaw2, jtRaw2, beta2, cov2, jtEff2);
@@ -622,8 +579,7 @@ contract StaticCurveYDMTest is BaseTest {
         // Test 100 points across the curve
         for (uint256 i = 0; i <= 100; i++) {
             uint256 utilization = (WAD * i) / 100;
-            (NAV_UNIT stRaw, NAV_UNIT jtRaw, uint256 beta, uint256 cov, NAV_UNIT jtEff) =
-                _createInputsForUtilization(utilization);
+            (NAV_UNIT stRaw, NAV_UNIT jtRaw, uint256 beta, uint256 cov, NAV_UNIT jtEff) = _createInputsForUtilization(utilization);
             uint256 result = ydm.previewJTYieldShare(MarketState.PERPETUAL, stRaw, jtRaw, beta, cov, jtEff);
 
             assertGe(result, prevResult, string.concat("Monotonicity violated at i=", vm.toString(i)));
@@ -669,8 +625,7 @@ contract StaticCurveYDMTest is BaseTest {
         // Test first leg: U < 0.9
         _utilization = bound(_utilization, 0, TARGET_UTILIZATION_WAD - 1);
 
-        (NAV_UNIT stRaw, NAV_UNIT jtRaw, uint256 beta, uint256 cov, NAV_UNIT jtEff) =
-            _createInputsForUtilization(_utilization);
+        (NAV_UNIT stRaw, NAV_UNIT jtRaw, uint256 beta, uint256 cov, NAV_UNIT jtEff) = _createInputsForUtilization(_utilization);
         uint256 result = ydm.previewJTYieldShare(MarketState.PERPETUAL, stRaw, jtRaw, beta, cov, jtEff);
 
         // Y = Y_0 + S_lt * U
@@ -682,14 +637,12 @@ contract StaticCurveYDMTest is BaseTest {
         // Test second leg: 0.9 <= U < 1.0
         _utilization = bound(_utilization, TARGET_UTILIZATION_WAD, WAD - 1);
 
-        (NAV_UNIT stRaw, NAV_UNIT jtRaw, uint256 beta, uint256 cov, NAV_UNIT jtEff) =
-            _createInputsForUtilization(_utilization);
+        (NAV_UNIT stRaw, NAV_UNIT jtRaw, uint256 beta, uint256 cov, NAV_UNIT jtEff) = _createInputsForUtilization(_utilization);
         uint256 result = ydm.previewJTYieldShare(MarketState.PERPETUAL, stRaw, jtRaw, beta, cov, jtEff);
 
         // Y = Y_T + S_gte * (U - 0.9)
         // Note: Allow 1 wei tolerance due to rounding differences in utilization calculation
-        uint256 expected =
-            DEFAULT_SLOPE_GTE.mulDiv(_utilization - TARGET_UTILIZATION_WAD, WAD, Math.Rounding.Floor) + DEFAULT_YT;
+        uint256 expected = DEFAULT_SLOPE_GTE.mulDiv(_utilization - TARGET_UTILIZATION_WAD, WAD, Math.Rounding.Floor) + DEFAULT_YT;
         assertApproxEqAbs(result, expected, 10, "Second leg formula should be correct within rounding tolerance");
     }
 
