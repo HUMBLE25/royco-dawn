@@ -157,7 +157,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         view
         virtual
         override(IRoycoVaultTranche)
-        executionIsSync(Action.WITHDRAW)
+        executionIsSync(Action.REDEEM)
         returns (AssetClaims memory claims)
     {
         claims = (TRANCHE_TYPE() == TrancheType.SENIOR ? IRoycoKernel(kernel()).stPreviewRedeem(_shares) : IRoycoKernel(kernel()).jtPreviewRedeem(_shares));
@@ -376,7 +376,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         override(IRoycoAsyncVault)
         restricted
         whenNotPaused
-        executionIsAsync(Action.WITHDRAW)
+        executionIsAsync(Action.REDEEM)
         returns (uint256 requestId, bytes memory metadata)
     {
         // Must be requesting to redeem a non-zero number of shares
@@ -418,7 +418,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         view
         virtual
         override(IRoycoAsyncVault)
-        executionIsAsync(Action.WITHDRAW)
+        executionIsAsync(Action.REDEEM)
         returns (uint256 pendingShares)
     {
         // Get the number of shares pending from the request
@@ -447,7 +447,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         view
         virtual
         override(IRoycoAsyncVault)
-        executionIsAsync(Action.WITHDRAW)
+        executionIsAsync(Action.REDEEM)
         returns (uint256 claimableShares)
     {
         claimableShares =
@@ -558,7 +558,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         restricted
         whenNotPaused
         onlyCallerOrOperator(_controller)
-        executionIsAsync(Action.WITHDRAW)
+        executionIsAsync(Action.REDEEM)
     {
         // Request the kernel to cancel a previously made redeem request on behalf of the user
         if (TRANCHE_TYPE() == TrancheType.SENIOR) {
@@ -580,7 +580,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         view
         virtual
         override(IRoycoAsyncCancellableVault)
-        executionIsAsync(Action.WITHDRAW)
+        executionIsAsync(Action.REDEEM)
         returns (bool isPending)
     {
         isPending =
@@ -599,7 +599,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         view
         virtual
         override(IRoycoAsyncCancellableVault)
-        executionIsAsync(Action.WITHDRAW)
+        executionIsAsync(Action.REDEEM)
         returns (uint256 shares)
     {
         shares =
@@ -621,7 +621,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         restricted
         whenNotPaused
         onlyCallerOrOperator(_owner)
-        executionIsAsync(Action.WITHDRAW)
+        executionIsAsync(Action.REDEEM)
     {
         // Get the number of shares in a canceled state for this request ID
         uint256 shares =
@@ -732,7 +732,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
      */
     function _redeem(address _caller, address _owner, uint256 _shares) internal virtual {
         // If withdrawals are synchronous, burn the shares from the owner
-        if (_isSync(Action.WITHDRAW)) {
+        if (_isSync(Action.REDEEM)) {
             // Spend the caller's share allowance if the caller isn't the owner
             if (_caller != _owner) _spendAllowance(_owner, _caller, _shares);
             // Burn the shares being redeemed from the owner

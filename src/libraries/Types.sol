@@ -90,12 +90,12 @@ enum Operation {
 /**
  * @title Action
  * @dev Defines the action being executed by the user
- * @custom:type DEPOSIT - Depositing assets into the tranche
- * @custom:type WITHDRAW - Withdrawing assets from the tranche
+ * @custom:type DEPOSIT - Depositing assets for shares into the tranche
+ * @custom:type REDEEM - Redeeming shares for assets from the tranche
  */
 enum Action {
     DEPOSIT,
-    WITHDRAW
+    REDEEM
 }
 
 /**
