@@ -42,7 +42,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
 
         // Fetch the max deposit for the junior tranche
         TRANCHE_UNIT maxDeposit = JT.maxDeposit(depositor);
-        assertGt(maxDeposit, toTrancheUnits(0), "Max deposit should be greater than 0");
+        assertGt(maxDeposit, toTrancheUnits(0), "Max deposit must be greater than zero");
 
         // Preview the deposit
         uint256 expectedShares = JT.previewDeposit(assets);
@@ -54,30 +54,30 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         // Deposit into junior tranche
         vm.prank(depositor);
         (uint256 shares,) = JT.deposit(assets, depositor, depositor);
-        assertApproxEqRel(shares, expectedShares, AAVE_PREVIEW_DEPOSIT_RELATIVE_DELTA, "Shares minted should be equal to the previewed shares");
+        assertApproxEqRel(shares, expectedShares, AAVE_PREVIEW_DEPOSIT_RELATIVE_DELTA, "Shares minted must equal previewed shares");
         _updateOnDeposit(jtState, assets, _toJTValue(assets), shares, TrancheType.JUNIOR);
 
         // Verify shares were minted
-        assertGt(shares, 0, "Shares should be greater than 0");
-        assertEq(JT.balanceOf(depositor), initialTrancheShares + shares, "Depositor should receive shares");
+        assertGt(shares, 0, "Shares must be greater than zero");
+        assertEq(JT.balanceOf(depositor), initialTrancheShares + shares, "Depositor must receive shares");
 
         // Verify that maxRedeemable shares returns the correct amount
         uint256 maxRedeemableShares = JT.maxRedeem(depositor);
-        assertApproxEqRel(maxRedeemableShares, shares, MAX_REDEEM_RELATIVE_DELTA, "Max redeemable shares should return the correct amount");
-        assertTrue(maxRedeemableShares <= shares, "Max redeemable shares should be less than or equal to shares");
+        assertApproxEqRel(maxRedeemableShares, shares, MAX_REDEEM_RELATIVE_DELTA, "Max redeemable shares must return correct amount");
+        assertTrue(maxRedeemableShares <= shares, "Max redeemable shares must be less than or equal to shares");
 
         // Verify that convertToAssets returns the correct amount
         TRANCHE_UNIT convertedAssets = JT.convertToAssets(shares).jtAssets;
-        assertApproxEqRel(convertedAssets, assets, MAX_CONVERT_TO_ASSETS_RELATIVE_DELTA, "Convert to assets should return the correct amount");
+        assertApproxEqRel(convertedAssets, assets, MAX_CONVERT_TO_ASSETS_RELATIVE_DELTA, "Convert to assets must return correct amount");
 
         // We do not test previewRedeem here because it is expected to revert in async mode
 
         // Verify assets were transferred
-        assertEq(USDC.balanceOf(depositor), initialDepositorBalance - _assets, "Depositor balance should decrease by assets amount");
+        assertEq(USDC.balanceOf(depositor), initialDepositorBalance - _assets, "Depositor balance must decrease by assets amount");
 
         // Verify that an equivalent amount of AUSDCs were minted
         assertApproxEqAbs(
-            AUSDC.balanceOf(address(KERNEL)), _assets, toUint256(AAVE_MAX_ABS_TRANCHE_UNIT_DELTA), "An equivalent amount of AUSDCs should be minted"
+            AUSDC.balanceOf(address(KERNEL)), _assets, toUint256(AAVE_MAX_ABS_TRANCHE_UNIT_DELTA), "An equivalent amount of AUSDCs must be minted"
         );
 
         // Verify that the tranche state has been updated
@@ -116,34 +116,34 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
             // Deposit into the tranche
             vm.prank(provider.addr);
             (uint256 shares,) = JT.deposit(assets, provider.addr, provider.addr);
-            assertApproxEqRel(shares, expectedShares, AAVE_PREVIEW_DEPOSIT_RELATIVE_DELTA, "Shares minted should be equal to the previewed shares");
+            assertApproxEqRel(shares, expectedShares, AAVE_PREVIEW_DEPOSIT_RELATIVE_DELTA, "Shares minted must equal previewed shares");
 
             // Verify that an equivalent amount of AUSDCs were minted
             assertApproxEqAbs(
                 AUSDC.balanceOf(address(KERNEL)),
                 amount + initialATokenBalance,
                 toUint256(AAVE_MAX_ABS_TRANCHE_UNIT_DELTA),
-                "An equivalent amount of AUSDCs should be minted"
+                "An equivalent amount of AUSDCs must be minted"
             );
 
             uint256 aTokensMinted = AUSDC.balanceOf(address(KERNEL)) - initialATokenBalance;
             _updateOnDeposit(jtState, toTrancheUnits(aTokensMinted), _toJTValue(toTrancheUnits(aTokensMinted)), shares, TrancheType.JUNIOR);
 
             // Verify that shares were minted
-            assertEq(JT.balanceOf(provider.addr), initialTrancheShares + shares, "Provider should receive shares");
+            assertEq(JT.balanceOf(provider.addr), initialTrancheShares + shares, "Provider must receive shares");
 
             // Verify that maxRedeemable shares returns the correct amount
             uint256 maxRedeemableShares = JT.maxRedeem(provider.addr);
-            assertApproxEqRel(maxRedeemableShares, shares, MAX_REDEEM_RELATIVE_DELTA, "Max redeemable shares should return the correct amount");
-            assertTrue(maxRedeemableShares <= shares, "Max redeemable shares should be less than or equal to shares");
+            assertApproxEqRel(maxRedeemableShares, shares, MAX_REDEEM_RELATIVE_DELTA, "Max redeemable shares must return correct amount");
+            assertTrue(maxRedeemableShares <= shares, "Max redeemable shares must be less than or equal to shares");
 
             // Verify that convertToAssets returns the correct amount
             TRANCHE_UNIT convertedAssets = JT.convertToAssets(shares).jtAssets;
-            assertApproxEqRel(convertedAssets, assets, MAX_CONVERT_TO_ASSETS_RELATIVE_DELTA, "Convert to assets should return the correct amount");
-            assertTrue(convertedAssets <= assets, "Convert to assets should be less than or equal to amount");
+            assertApproxEqRel(convertedAssets, assets, MAX_CONVERT_TO_ASSETS_RELATIVE_DELTA, "Convert to assets must return correct amount");
+            assertTrue(convertedAssets <= assets, "Convert to assets must be less than or equal to amount");
 
             // Verify that assets were transferred
-            assertEq(USDC.balanceOf(provider.addr), initialDepositorBalance - amount, "Provider balance should decrease by amount");
+            assertEq(USDC.balanceOf(provider.addr), initialDepositorBalance - amount, "Provider balance must decrease by amount");
 
             // Verify that the tranche state has been updated
             _verifyPreviewNAVs(stState, jtState, AAVE_MAX_ABS_TRANCHE_UNIT_DELTA, AAVE_MAX_ABS_NAV_DELTA);
@@ -183,7 +183,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
             toTrancheUnits(toUint256(KERNEL.jtConvertNAVUnitsToTrancheUnits(JT.totalAssets().nav)).mulDiv(WAD, COVERAGE_WAD, Math.Rounding.Floor));
         {
             TRANCHE_UNIT maxDeposit = ST.maxDeposit(jtDepositor);
-            assertEq(maxDeposit, expectedMaxDeposit, "Max deposit should return JTEff * coverage");
+            assertEq(maxDeposit, expectedMaxDeposit, "Max deposit must return JTEff * coverage");
         }
 
         // Try to deposit more than the max deposit, it should revert
@@ -203,7 +203,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
 
         // Preview the deposit
         uint256 expectedSharesMinted = ST.previewDeposit(depositAmount);
-        assertTrue(expectedSharesMinted > 0, "Expected shares minted should be greater than 0");
+        assertTrue(expectedSharesMinted > 0, "Expected shares minted must be greater than zero");
 
         // Perform the deposit
         vm.startPrank(stDepositor);
@@ -212,11 +212,11 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         vm.stopPrank();
 
         // Assert that ST shares were minted to the user
-        assertGt(shares, 0, "Shares should be greater than 0");
-        assertEq(ST.balanceOf(stDepositor), shares, "User should receive shares");
+        assertGt(shares, 0, "Shares must be greater than zero");
+        assertEq(ST.balanceOf(stDepositor), shares, "User must receive shares");
 
         // Verify that the shares minted are equal to the previewed shares
-        assertEq(shares, expectedSharesMinted, "Shares minted should be equal to the previewed shares");
+        assertEq(shares, expectedSharesMinted, "Shares minted must equal previewed shares");
 
         // Update the tranche state
         _updateOnDeposit(stState, depositAmount, _toSTValue(depositAmount), shares, TrancheType.SENIOR);
@@ -226,40 +226,38 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         _verifyFeeTaken(stState, jtState, PROTOCOL_FEE_RECIPIENT_ADDRESS);
 
         // Verify that the amount was transferred to the underlying vault
-        assertEq(USDC.balanceOf(address(MOCK_UNDERLYING_ST_VAULT)), toUint256(depositAmount), "Amount should be transferred to the underlying vault");
+        assertEq(USDC.balanceOf(address(MOCK_UNDERLYING_ST_VAULT)), toUint256(depositAmount), "Amount must be transferred to the underlying vault");
 
         // Verify that underlying shares were minted to the kernel
-        assertEq(MOCK_UNDERLYING_ST_VAULT.balanceOf(address(KERNEL)), toUint256(depositAmount), "Underlying shares should be minted to the kernel");
+        assertEq(MOCK_UNDERLYING_ST_VAULT.balanceOf(address(KERNEL)), toUint256(depositAmount), "Underlying shares must be minted to the kernel");
 
         // Verify that ST.maxDeposit went down
-        assertEq(ST.maxDeposit(stDepositor), expectedMaxDeposit - depositAmount, "Max deposit should go down expected amount");
+        assertEq(ST.maxDeposit(stDepositor), expectedMaxDeposit - depositAmount, "Max deposit must decrease expected amount");
 
         // Verify that JT.maxRedeem went down
         assertApproxEqRel(
             JT.maxRedeem(jtDepositor),
             JT.totalSupply() * (100 - _stDepositPercentage) / 100,
             MAX_REDEEM_RELATIVE_DELTA,
-            "Max redeem should go down expected amount"
+            "Max redeem must decrease expected amount"
         );
         {
 
             // Verify that ST.convertToAssets returns the correct amount
             AssetClaims memory convertToAssetsResult = ST.convertToAssets(shares);
-            assertApproxEqAbs(
-                convertToAssetsResult.stAssets, depositAmount, AAVE_MAX_ABS_TRANCHE_UNIT_DELTA, "Convert to assets should return the correct amount"
-            );
-            assertEq(convertToAssetsResult.jtAssets, ZERO_TRANCHE_UNITS, "Convert to assets should return 0 JT assets");
-            assertApproxEqAbs(convertToAssetsResult.nav, _toSTValue(depositAmount), AAVE_MAX_ABS_NAV_DELTA, "Convert to assets should return the correct NAV");
+            assertApproxEqAbs(convertToAssetsResult.stAssets, depositAmount, AAVE_MAX_ABS_TRANCHE_UNIT_DELTA, "Convert to assets must return correct amount");
+            assertEq(convertToAssetsResult.jtAssets, ZERO_TRANCHE_UNITS, "Convert to assets must return 0 JT assets");
+            assertApproxEqAbs(convertToAssetsResult.nav, _toSTValue(depositAmount), AAVE_MAX_ABS_NAV_DELTA, "Convert to assets must return the correct NAV");
 
             // Verify that ST.previewRedeem returns the correct amount
             AssetClaims memory previewRedeemResult = ST.previewRedeem(shares);
-            assertApproxEqAbs(previewRedeemResult.stAssets, depositAmount, AAVE_MAX_ABS_TRANCHE_UNIT_DELTA, "Preview redeem should return the correct amount");
-            assertEq(previewRedeemResult.jtAssets, ZERO_TRANCHE_UNITS, "Preview redeem should return 0 JT assets");
-            assertApproxEqAbs(previewRedeemResult.nav, _toSTValue(depositAmount), AAVE_MAX_ABS_NAV_DELTA, "Preview redeem should return the correct NAV");
+            assertApproxEqAbs(previewRedeemResult.stAssets, depositAmount, AAVE_MAX_ABS_TRANCHE_UNIT_DELTA, "Preview redeem must return correct amount");
+            assertEq(previewRedeemResult.jtAssets, ZERO_TRANCHE_UNITS, "Preview redeem must return 0 JT assets");
+            assertApproxEqAbs(previewRedeemResult.nav, _toSTValue(depositAmount), AAVE_MAX_ABS_NAV_DELTA, "Preview redeem must return the correct NAV");
 
             // Verify that ST.maxRedeem returns the correct amount
             uint256 maxRedeem = ST.maxRedeem(stDepositor);
-            assertEq(maxRedeem, shares, "Max redeem should return the correct amount");
+            assertEq(maxRedeem, shares, "Max redeem must return correct amount");
         }
 
         ////////////////////////////////////////////////////////////////////
@@ -269,7 +267,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         // Preview the deposit
         depositAmount = expectedMaxDeposit - depositAmount;
         expectedSharesMinted = ST.previewDeposit(depositAmount);
-        assertTrue(expectedSharesMinted > 0, "Expected shares minted should be greater than 0");
+        assertTrue(expectedSharesMinted > 0, "Expected shares minted must be greater than zero");
 
         uint256 stDepositorSharesBeforeDeposit = ST.balanceOf(stDepositor);
         uint256 underlyingVaultSharesBalanceOfKernelBeforeDeposit = MOCK_UNDERLYING_ST_VAULT.balanceOf(address(KERNEL));
@@ -282,11 +280,11 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         vm.stopPrank();
 
         // Assert that ST shares were minted to the user
-        assertGt(shares, 0, "Shares should be greater than 0");
-        assertEq(ST.balanceOf(stDepositor), stDepositorSharesBeforeDeposit + shares, "User should receive shares");
+        assertGt(shares, 0, "Shares must be greater than zero");
+        assertEq(ST.balanceOf(stDepositor), stDepositorSharesBeforeDeposit + shares, "User must receive shares");
 
         // Verify that the shares minted are equal to the previewed shares
-        assertEq(shares, expectedSharesMinted, "Shares minted should be equal to the previewed shares");
+        assertEq(shares, expectedSharesMinted, "Shares minted must equal previewed shares");
 
         // Update the tranche state
         _updateOnDeposit(stState, depositAmount, _toSTValue(depositAmount), shares, TrancheType.SENIOR);
@@ -299,39 +297,37 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         assertEq(
             USDC.balanceOf(address(MOCK_UNDERLYING_ST_VAULT)),
             toUint256(depositAmount) + usdcBalanceOfMockUnderlyingVaultBeforeDeposit,
-            "Amount should be transferred to the underlying vault"
+            "Amount must be transferred to the underlying vault"
         );
 
         // Verify that underlying shares were minted to the kernel
         assertEq(
             MOCK_UNDERLYING_ST_VAULT.balanceOf(address(KERNEL)),
             toUint256(depositAmount) + underlyingVaultSharesBalanceOfKernelBeforeDeposit,
-            "Underlying shares should be minted to the kernel"
+            "Underlying shares must be minted to the kernel"
         );
 
         // Verify that ST.maxDeposit went down to 0
-        assertEq(ST.maxDeposit(stDepositor), ZERO_TRANCHE_UNITS, "Max deposit should go down to 0");
+        assertEq(ST.maxDeposit(stDepositor), ZERO_TRANCHE_UNITS, "Max deposit must decrease to 0");
 
         // Verify that JT.maxRedeem went down to 0
-        assertEq(JT.maxRedeem(jtDepositor), 0, "Max redeem should go down to 0");
+        assertEq(JT.maxRedeem(jtDepositor), 0, "Max redeem must decrease to 0");
 
         // Verify that ST.convertToAssets returns the correct amount
         AssetClaims memory convertToAssetsResult = ST.convertToAssets(shares + stDepositorSharesBeforeDeposit);
-        assertApproxEqAbs(
-            convertToAssetsResult.stAssets, expectedMaxDeposit, AAVE_MAX_ABS_TRANCHE_UNIT_DELTA, "Convert to assets should return the correct amount"
-        );
-        assertEq(convertToAssetsResult.jtAssets, ZERO_TRANCHE_UNITS, "Convert to assets should return 0 JT assets");
-        assertApproxEqAbs(convertToAssetsResult.nav, _toSTValue(expectedMaxDeposit), AAVE_MAX_ABS_NAV_DELTA, "Convert to assets should return the correct NAV");
+        assertApproxEqAbs(convertToAssetsResult.stAssets, expectedMaxDeposit, AAVE_MAX_ABS_TRANCHE_UNIT_DELTA, "Convert to assets must return correct amount");
+        assertEq(convertToAssetsResult.jtAssets, ZERO_TRANCHE_UNITS, "Convert to assets must return 0 JT assets");
+        assertApproxEqAbs(convertToAssetsResult.nav, _toSTValue(expectedMaxDeposit), AAVE_MAX_ABS_NAV_DELTA, "Convert to assets must return the correct NAV");
 
         // Verify that ST.previewRedeem returns the correct amount
         AssetClaims memory previewRedeemResult = ST.previewRedeem(shares + stDepositorSharesBeforeDeposit);
-        assertApproxEqAbs(previewRedeemResult.stAssets, expectedMaxDeposit, AAVE_MAX_ABS_TRANCHE_UNIT_DELTA, "Preview redeem should return the correct amount");
-        assertEq(previewRedeemResult.jtAssets, ZERO_TRANCHE_UNITS, "Preview redeem should return 0 JT assets");
-        assertApproxEqAbs(previewRedeemResult.nav, _toSTValue(expectedMaxDeposit), AAVE_MAX_ABS_NAV_DELTA, "Preview redeem should return the correct NAV");
+        assertApproxEqAbs(previewRedeemResult.stAssets, expectedMaxDeposit, AAVE_MAX_ABS_TRANCHE_UNIT_DELTA, "Preview redeem must return correct amount");
+        assertEq(previewRedeemResult.jtAssets, ZERO_TRANCHE_UNITS, "Preview redeem must return 0 JT assets");
+        assertApproxEqAbs(previewRedeemResult.nav, _toSTValue(expectedMaxDeposit), AAVE_MAX_ABS_NAV_DELTA, "Preview redeem must return the correct NAV");
 
         // Verify that ST.maxRedeem returns the correct amount
         uint256 maxRedeem = ST.maxRedeem(stDepositor);
-        assertEq(maxRedeem, shares + stDepositorSharesBeforeDeposit, "Max redeem should return the correct amount");
+        assertEq(maxRedeem, shares + stDepositorSharesBeforeDeposit, "Max redeem must return correct amount");
     }
 
     function testFuzz_jtDeposit_and_consecutive_jtWithdrawals(uint256 _jtAssets, uint256 _totalWithdrawalRequests) external {
@@ -361,18 +357,14 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
             uint256 requestId;
             {
                 (requestId,) = JT.requestRedeem(sharesToWithdraw, jtDepositor, jtDepositor);
-                assertNotEq(
-                    requestId, ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, "Request ID should not be the ERC-7540 controller discriminated request ID"
-                );
+                assertNotEq(requestId, ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, "Request ID must not be the ERC-7540 controller discriminated request ID");
             }
 
             // Verify that the pending redeem request is equal to the shares to withdraw
-            assertEq(
-                JT.pendingRedeemRequest(requestId, jtDepositor), sharesToWithdraw, "Pending redeem request should be equal to the shares to withdraw initially"
-            );
+            assertEq(JT.pendingRedeemRequest(requestId, jtDepositor), sharesToWithdraw, "Pending redeem request must equal the shares to withdraw initially");
 
             // Verify that the claimable redeem request is 0
-            assertEq(JT.claimableRedeemRequest(requestId, jtDepositor), 0, "Claimable redeem request should be 0 initially");
+            assertEq(JT.claimableRedeemRequest(requestId, jtDepositor), 0, "Claimable redeem request must be zero initially");
 
             // Attempts to redeem right now should revert
             vm.prank(jtDepositor);
@@ -383,10 +375,10 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
             vm.warp(vm.getBlockTimestamp() + JT_REDEMPTION_DELAY_SECONDS);
 
             // Verify that the pending redeem request is equal to 0
-            assertEq(JT.pendingRedeemRequest(requestId, jtDepositor), 0, "Pending redeem request should be 0");
+            assertEq(JT.pendingRedeemRequest(requestId, jtDepositor), 0, "Pending redeem request must be zero");
 
             // Verify that the claimable redeem request is equal to the shares to withdraw
-            assertEq(JT.claimableRedeemRequest(requestId, jtDepositor), sharesToWithdraw, "Claimable redeem request should be equal to the shares to withdraw");
+            assertEq(JT.claimableRedeemRequest(requestId, jtDepositor), sharesToWithdraw, "Claimable redeem request must equal the shares to withdraw");
 
             uint256 jtDepositorBalanceBeforeRedeem = USDC.balanceOf(jtDepositor);
 
@@ -396,24 +388,24 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
 
             // Verify that the redeem result is the correct amount
             assertApproxEqAbs(
-                redeemResult.jtAssets, expectedAssetsToWithdraw, toUint256(AAVE_MAX_ABS_TRANCHE_UNIT_DELTA), "Redeem result should be the correct amount"
+                redeemResult.jtAssets, expectedAssetsToWithdraw, toUint256(AAVE_MAX_ABS_TRANCHE_UNIT_DELTA), "Redeem result must be correct amount"
             );
-            assertEq(redeemResult.stAssets, ZERO_TRANCHE_UNITS, "Redeem result should be 0 ST assets");
-            assertApproxEqAbs(redeemResult.nav, _toJTValue(expectedAssetsToWithdraw), AAVE_MAX_ABS_NAV_DELTA, "Redeem result should return the correct NAV");
+            assertEq(redeemResult.stAssets, ZERO_TRANCHE_UNITS, "Redeem result must be zero ST assets");
+            assertApproxEqAbs(redeemResult.nav, _toJTValue(expectedAssetsToWithdraw), AAVE_MAX_ABS_NAV_DELTA, "Redeem result must return the correct NAV");
 
             // Verify that the tokens were transferred to the jtDepositor
             assertApproxEqAbs(
                 toTrancheUnits(USDC.balanceOf(jtDepositor) - jtDepositorBalanceBeforeRedeem),
                 expectedAssetsToWithdraw,
                 toUint256(AAVE_MAX_ABS_TRANCHE_UNIT_DELTA),
-                "Tokens should be transferred to the jtDepositor"
+                "Tokens must be transferred to the jtDepositor"
             );
 
             // Verify that the pending redeem request is equal to 0
-            assertEq(JT.pendingRedeemRequest(requestId, jtDepositor), 0, "Pending redeem request should be 0");
+            assertEq(JT.pendingRedeemRequest(requestId, jtDepositor), 0, "Pending redeem request must be zero");
 
             // Verify that the claimable redeem request is equal to 0
-            assertEq(JT.claimableRedeemRequest(requestId, jtDepositor), 0, "Claimable redeem request should be 0");
+            assertEq(JT.claimableRedeemRequest(requestId, jtDepositor), 0, "Claimable redeem request must be zero");
         }
     }
 
@@ -455,7 +447,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
             {
                 (requestIds[i],) = JT.requestRedeem(sharesToWithdrawForEachRequest[i], jtDepositor, jtDepositor);
                 assertNotEq(
-                    requestIds[i], ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, "Request ID should not be the ERC-7540 controller discriminated request ID"
+                    requestIds[i], ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, "Request ID must not be the ERC-7540 controller discriminated request ID"
                 );
             }
 
@@ -470,13 +462,13 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
             uint256 requestId = requestIds[i];
 
             // Verify that the pending redeem request is equal to 0
-            assertEq(JT.pendingRedeemRequest(requestId, jtDepositor), 0, "Pending redeem request should be 0");
+            assertEq(JT.pendingRedeemRequest(requestId, jtDepositor), 0, "Pending redeem request must be zero");
 
             // Verify that the claimable redeem request is equal to the shares to withdraw
             assertEq(
                 JT.claimableRedeemRequest(requestId, jtDepositor),
                 sharesToWithdrawForEachRequest[i],
-                "Claimable redeem request should be equal to the shares to withdraw"
+                "Claimable redeem request must equal the shares to withdraw"
             );
 
             uint256 jtDepositorBalanceBeforeRedeem = USDC.balanceOf(jtDepositor);
@@ -490,11 +482,11 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
                 redeemResult.jtAssets,
                 expectedAssetsToWithdrawForEachRequest[i],
                 toUint256(AAVE_MAX_ABS_TRANCHE_UNIT_DELTA),
-                "Redeem result should be the correct amount"
+                "Redeem result must be correct amount"
             );
-            assertEq(redeemResult.stAssets, ZERO_TRANCHE_UNITS, "Redeem result should be 0 ST assets");
+            assertEq(redeemResult.stAssets, ZERO_TRANCHE_UNITS, "Redeem result must be zero ST assets");
             assertApproxEqAbs(
-                redeemResult.nav, _toJTValue(expectedAssetsToWithdrawForEachRequest[i]), AAVE_MAX_ABS_NAV_DELTA, "Redeem result should return the correct NAV"
+                redeemResult.nav, _toJTValue(expectedAssetsToWithdrawForEachRequest[i]), AAVE_MAX_ABS_NAV_DELTA, "Redeem result must return the correct NAV"
             );
 
             // Verify that the tokens were transferred to the jtDepositor
@@ -502,14 +494,14 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
                 toTrancheUnits(USDC.balanceOf(jtDepositor) - jtDepositorBalanceBeforeRedeem),
                 expectedAssetsToWithdrawForEachRequest[i],
                 toUint256(AAVE_MAX_ABS_TRANCHE_UNIT_DELTA),
-                "Tokens should be transferred to the jtDepositor"
+                "Tokens must be transferred to the jtDepositor"
             );
 
             // Verify that the pending redeem request is equal to 0
-            assertEq(JT.pendingRedeemRequest(requestId, jtDepositor), 0, "Pending redeem request should be 0");
+            assertEq(JT.pendingRedeemRequest(requestId, jtDepositor), 0, "Pending redeem request must be zero");
 
             // Verify that the claimable redeem request is equal to 0
-            assertEq(JT.claimableRedeemRequest(requestId, jtDepositor), 0, "Claimable redeem request should be 0");
+            assertEq(JT.claimableRedeemRequest(requestId, jtDepositor), 0, "Claimable redeem request must be zero");
 
             vm.warp(vm.getBlockTimestamp() + 1);
         }
@@ -547,43 +539,43 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         uint256 initialTotalShares = JT.totalSupply();
 
         // Verify initial state: depositor has the shares
-        assertEq(JT.balanceOf(jtDepositor), initialDepositorShares + shares, "Depositor should have all shares initially");
+        assertEq(JT.balanceOf(jtDepositor), initialDepositorShares + shares, "Depositor must have all shares initially");
 
         // Request the redeem
         vm.prank(jtDepositor);
         uint256 requestId;
         {
             (requestId,) = JT.requestRedeem(sharesToWithdraw, jtDepositor, jtDepositor);
-            assertNotEq(requestId, ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, "Request ID should not be the ERC-7540 controller discriminated request ID");
+            assertNotEq(requestId, ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, "Request ID must not be the ERC-7540 controller discriminated request ID");
         }
 
         // Verify that shares were locked (transferred to the tranche contract) since JT uses BURN_ON_CLAIM_REDEEM
-        assertEq(JT.balanceOf(jtDepositor), initialDepositorShares + shares - sharesToWithdraw, "Depositor should have shares reduced by withdrawal amount");
-        assertEq(JT.balanceOf(address(JT)), sharesToWithdraw, "Tranche should have locked shares");
+        assertEq(JT.balanceOf(jtDepositor), initialDepositorShares + shares - sharesToWithdraw, "Depositor must have shares reduced by withdrawal amount");
+        assertEq(JT.balanceOf(address(JT)), sharesToWithdraw, "Tranche must have locked shares");
 
         // Verify that the pending redeem request is equal to the shares to withdraw
-        assertEq(JT.pendingRedeemRequest(requestId, jtDepositor), sharesToWithdraw, "Pending redeem request should be equal to the shares to withdraw");
+        assertEq(JT.pendingRedeemRequest(requestId, jtDepositor), sharesToWithdraw, "Pending redeem request must equal the shares to withdraw");
 
         // Verify that the claimable redeem request is 0 (not yet claimable)
-        assertEq(JT.claimableRedeemRequest(requestId, jtDepositor), 0, "Claimable redeem request should be 0 initially");
+        assertEq(JT.claimableRedeemRequest(requestId, jtDepositor), 0, "Claimable redeem request must be zero initially");
 
         // Verify that cancel is not yet claimable
-        assertEq(JT.claimableCancelRedeemRequest(requestId, jtDepositor), 0, "Claimable cancel should be 0 before cancellation");
+        assertEq(JT.claimableCancelRedeemRequest(requestId, jtDepositor), 0, "Claimable cancel must be zero before cancellation");
 
         // Cancel the withdrawal request
         vm.prank(jtDepositor);
         JT.cancelRedeemRequest(requestId, jtDepositor);
 
         // Verify that the pending redeem request is 0 after cancellation (cancellation is instant)
-        assertEq(JT.pendingRedeemRequest(requestId, jtDepositor), 0, "Pending redeem request should be 0 after cancellation");
+        assertEq(JT.pendingRedeemRequest(requestId, jtDepositor), 0, "Pending redeem request must be zero after cancellation");
 
         // Verify that claimable cancel redeem request returns the shares
         assertEq(
-            JT.claimableCancelRedeemRequest(requestId, jtDepositor), sharesToWithdraw, "Claimable cancel redeem request should return the shares to withdraw"
+            JT.claimableCancelRedeemRequest(requestId, jtDepositor), sharesToWithdraw, "Claimable cancel redeem request must return the shares to withdraw"
         );
 
         // Verify that pending cancel is false (cancellation is instant)
-        assertFalse(JT.pendingCancelRedeemRequest(requestId, jtDepositor), "Pending cancel should be false (cancellation is instant)");
+        assertFalse(JT.pendingCancelRedeemRequest(requestId, jtDepositor), "Pending cancel must be false (cancellation is instant)");
 
         // Claim the cancelled withdrawal to get shares back
         uint256 depositorSharesBeforeClaim = JT.balanceOf(jtDepositor);
@@ -591,28 +583,26 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         JT.claimCancelRedeemRequest(requestId, jtDepositor, jtDepositor);
 
         // Verify that shares were returned to the depositor (transferred back from the tranche)
-        assertEq(JT.balanceOf(jtDepositor), depositorSharesBeforeClaim + sharesToWithdraw, "Depositor should receive shares back after claiming cancellation");
-        assertEq(JT.balanceOf(address(JT)), 0, "Tranche should have no locked shares after claiming cancellation");
+        assertEq(JT.balanceOf(jtDepositor), depositorSharesBeforeClaim + sharesToWithdraw, "Depositor must receive shares back after claiming cancellation");
+        assertEq(JT.balanceOf(address(JT)), 0, "Tranche must have no locked shares after claiming cancellation");
 
         // Verify that the final balance matches the initial balance (all shares returned)
-        assertEq(JT.balanceOf(jtDepositor), initialDepositorShares + shares, "Depositor should have all original shares back");
+        assertEq(JT.balanceOf(jtDepositor), initialDepositorShares + shares, "Depositor must have all original shares back");
 
         // Verify that claimable cancel redeem request is now 0
-        assertEq(JT.claimableCancelRedeemRequest(requestId, jtDepositor), 0, "Claimable cancel redeem request should be 0 after claiming");
+        assertEq(JT.claimableCancelRedeemRequest(requestId, jtDepositor), 0, "Claimable cancel redeem request must be zero after claiming");
 
         // Verify that pending redeem request is 0
-        assertEq(JT.pendingRedeemRequest(requestId, jtDepositor), 0, "Pending redeem request should be 0 after cancellation and claim");
+        assertEq(JT.pendingRedeemRequest(requestId, jtDepositor), 0, "Pending redeem request must be zero after cancellation and claim");
 
         // Verify that claimable redeem request is 0
-        assertEq(JT.claimableRedeemRequest(requestId, jtDepositor), 0, "Claimable redeem request should be 0 after cancellation");
+        assertEq(JT.claimableRedeemRequest(requestId, jtDepositor), 0, "Claimable redeem request must be zero after cancellation");
 
         // Verify that total shares is the same as the initial total shares
-        assertEq(JT.totalSupply(), initialTotalShares, "Total shares should be the same as the initial total shares");
+        assertEq(JT.totalSupply(), initialTotalShares, "Total shares must equal the initial total shares");
     }
 
     function testFuzz_jtDeposit_allowsSTDeposit_thenSTRedeem_allowsJTExit_verifyVaultEmpty(uint256 _jtAssets, uint256 _stDepositPercentage) external {
-        // TODO: Improve this test by exactly accouning for the JT appreciation
-
         // Bound assets to reasonable range (avoid zero and very large amounts)
         _jtAssets = bound(_jtAssets, 1e6, 1_000_000e6); // Between 1 USDC and 1M USDC (6 decimals)
         _stDepositPercentage = bound(_stDepositPercentage, 1, 100); // Between 1% and 100%
@@ -634,7 +624,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         // Verify JT can exit initially (no ST deposits yet, so no coverage requirement)
         {
             uint256 initialJTMaxRedeem = JT.maxRedeem(jtDepositor);
-            assertEq(initialJTMaxRedeem, jtShares, "JT should be able to redeem all shares initially (no ST deposits)");
+            assertEq(initialJTMaxRedeem, jtShares, "JT must be able to redeem all shares initially (no ST deposits)");
         }
 
         // Step 2: ST deposits (uses coverage, JT cannot exit now)
@@ -657,7 +647,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         // Verify JT cannot exit now (coverage requirement blocks it)
         {
             uint256 jtMaxRedeemAfterSTDeposit = JT.maxRedeem(jtDepositor);
-            assertLt(jtMaxRedeemAfterSTDeposit, jtShares, "JT should not be able to redeem all shares after ST deposit");
+            assertLt(jtMaxRedeemAfterSTDeposit, jtShares, "JT must not be able to redeem all shares after ST deposit");
 
             uint256 snapshot = vm.snapshotState();
 
@@ -680,30 +670,30 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
             toTrancheUnits(USDC.balanceOf(stDepositor) - stDepositorBalanceBeforeRedeem),
             stDepositAmount,
             toTrancheUnits(1),
-            "ST should receive assets after redeem"
+            "ST must receive assets after redeem"
         );
 
         // Verify ST shares were burned
-        assertEq(ST.balanceOf(stDepositor), 0, "ST shares should be burned after redeem");
-        assertEq(ST.totalSupply(), 0, "ST total supply should be 0 after redeem");
+        assertEq(ST.balanceOf(stDepositor), 0, "ST shares must be burned after redeem");
+        assertEq(ST.totalSupply(), 0, "ST total supply must be zero after redeem");
 
         // Step 4: After ST redeems, JT can now exit (coverage requirement satisfied again)
         uint256 jtMaxRedeemAfterSTRedeem = JT.maxRedeem(jtDepositor);
-        assertApproxEqRel(jtMaxRedeemAfterSTRedeem, jtShares, MAX_REDEEM_RELATIVE_DELTA, "JT should be able to redeem all shares after ST redeems");
+        assertApproxEqRel(jtMaxRedeemAfterSTRedeem, jtShares, MAX_REDEEM_RELATIVE_DELTA, "JT must be able to redeem all shares after ST redeems");
 
         // Step 5: JT requests withdrawal (async), waits for delay, then redeems
         vm.prank(jtDepositor);
         uint256 requestId;
         {
             (requestId,) = JT.requestRedeem(jtMaxRedeemAfterSTRedeem, jtDepositor, jtDepositor);
-            assertNotEq(requestId, ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, "Request ID should not be the ERC-7540 controller discriminated request ID");
+            assertNotEq(requestId, ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, "Request ID must not be the ERC-7540 controller discriminated request ID");
         }
 
         // Wait for the redemption delay
         vm.warp(vm.getBlockTimestamp() + JT_REDEMPTION_DELAY_SECONDS);
 
         // Verify the request is claimable
-        assertEq(JT.claimableRedeemRequest(requestId, jtDepositor), jtMaxRedeemAfterSTRedeem, "JT redeem request should be claimable after delay");
+        assertEq(JT.claimableRedeemRequest(requestId, jtDepositor), jtMaxRedeemAfterSTRedeem, "JT redeem request must be claimable after delay");
 
         // Claim the redeem
         uint256 jtDepositorBalanceBeforeRedeem = USDC.balanceOf(jtDepositor);
@@ -715,7 +705,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
             toTrancheUnits(USDC.balanceOf(jtDepositor) - jtDepositorBalanceBeforeRedeem),
             jtAssets,
             MAX_REDEEM_RELATIVE_DELTA,
-            "JT should receive assets after redeem"
+            "JT must receive assets after redeem"
         );
 
         // Check that no assets remain in the underlying ST vault
@@ -723,7 +713,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
             USDC.balanceOf(address(MOCK_UNDERLYING_ST_VAULT)),
             0,
             toUint256(AAVE_MAX_ABS_TRANCHE_UNIT_DELTA),
-            "Underlying ST vault should have no USDC assets remaining"
+            "Underlying ST vault must have no USDC assets remaining"
         );
     }
 }

@@ -9,7 +9,7 @@ import { BaseTest } from "../../base/BaseTest.t.sol";
 import { ERC4626Mock } from "../../mock/ERC4626Mock.sol";
 
 abstract contract MainnetForkWithAaveTestBase is BaseTest {
-    // TODO: Review All
+    /// @dev Maximum absolute delta for tranche unit comparisons (accounts for Aave rounding)
     TRANCHE_UNIT internal AAVE_MAX_ABS_TRANCHE_UNIT_DELTA = toTrancheUnits(3);
     NAV_UNIT internal AAVE_MAX_ABS_NAV_DELTA = toNAVUnits(toUint256(AAVE_MAX_ABS_TRANCHE_UNIT_DELTA) * 10 ** 12); // NAVs are scaled to WAD and USDC has 6 decimals
     uint256 internal constant MAX_REDEEM_RELATIVE_DELTA = 1 * BPS;

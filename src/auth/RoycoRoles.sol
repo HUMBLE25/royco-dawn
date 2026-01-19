@@ -18,6 +18,10 @@ abstract contract RoycoRoles {
     uint64 public constant SYNC_ROLE = uint64(uint256(keccak256(abi.encode("ROYCO_SYNC_ROLE"))));
     uint64 public constant KERNEL_ADMIN_ROLE = uint64(uint256(keccak256(abi.encode("ROYCO_KERNEL_ADMIN_ROLE"))));
 
+    /// Accountant roles
+    uint64 public constant ACCOUNTANT_ADMIN_ROLE = uint64(uint256(keccak256(abi.encode("ACCOUNTANT_ADMIN_ROLE"))));
+    uint64 public constant FEE_SETTER_ADMIN_ROLE = uint64(uint256(keccak256(abi.encode("FEE_SETTER_ADMIN_ROLE"))));
+
     /// Quoter roles
     uint64 public constant ORACLE_QUOTER_ADMIN_ROLE = uint64(uint256(keccak256(abi.encode("ORACLE_QUOTER_ADMIN_ROLE"))));
 }

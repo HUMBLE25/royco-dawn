@@ -474,16 +474,17 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
                 jtEffectiveNAV = (jtEffectiveNAV + impermanentLossRecovery);
                 stGain = (stGain - impermanentLossRecovery);
             }
-            /// @dev STEP_DISTRIBUTE_YIELD: There are no remaining impermanent losses in the system, the residual gains will be used to distribute yield to both tranches
+            /// @dev STEP_DISTRIBUTE_YIELD: There are no remaining impermanent losses that ST yield is obligated to repay, the residual gains will be used to distribute yield to both tranches
             if (stGain != ZERO_NAV_UNITS) {
                 // Compute the time weighted average JT share of yield
                 uint256 elapsed = block.timestamp - $.lastDistributionTimestamp;
                 // If the last yield distribution happened in the same block, use the instantaneous JT yield share. Else, use the time-weighted average JT yield share since the last distribution
                 NAV_UNIT jtGain;
                 if (elapsed == 0) {
+                    // Get the instantaneous YDM output and ensure that JT cannot earn more than 100% of senior appreciation
                     uint256 instantaneousJtYieldShareWAD =
                         IYDM($.ydm).previewJTYieldShare($.lastMarketState, $.lastSTRawNAV, $.lastJTRawNAV, $.betaWAD, $.coverageWAD, $.lastJTEffectiveNAV);
-                    if (instantaneousJtYieldShareWAD > WAD) instantaneousJtYieldShareWAD = WAD;
+                    instantaneousJtYieldShareWAD = (instantaneousJtYieldShareWAD > WAD) ? WAD : instantaneousJtYieldShareWAD;
                     jtGain = stGain.mulDiv(instantaneousJtYieldShareWAD, WAD, Math.Rounding.Floor);
                 } else {
                     jtGain = stGain.mulDiv(_twJTYieldShareAccruedWAD, elapsed * WAD, Math.Rounding.Floor);
@@ -564,7 +565,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         // Get the instantaneous JT yield share, scaled to WAD precision
         uint256 jtYieldShareWAD = IYDM($.ydm).jtYieldShare($.lastMarketState, $.lastSTRawNAV, $.lastJTRawNAV, $.betaWAD, $.coverageWAD, $.lastJTEffectiveNAV);
         // Ensure that JT cannot earn more than 100% of senior appreciation
-        if (jtYieldShareWAD > WAD) jtYieldShareWAD = WAD;
+        jtYieldShareWAD = (jtYieldShareWAD > WAD) ? WAD : jtYieldShareWAD;
 
         // Accrue the time-weighted yield share accrued to JT since the last tranche interaction
         /// forge-lint: disable-next-item(unsafe-typecast)
@@ -596,7 +597,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         uint256 jtYieldShareWAD =
             IYDM($.ydm).previewJTYieldShare($.lastMarketState, $.lastSTRawNAV, $.lastJTRawNAV, $.betaWAD, $.coverageWAD, $.lastJTEffectiveNAV);
         // Ensure that JT cannot earn more than 100% of senior appreciation
-        if (jtYieldShareWAD > WAD) jtYieldShareWAD = WAD;
+        jtYieldShareWAD = (jtYieldShareWAD > WAD) ? WAD : jtYieldShareWAD;
 
         // Apply the accural of JT yield share to the accumulator, weighted by the time elapsed
         /// forge-lint: disable-next-item(unsafe-typecast)

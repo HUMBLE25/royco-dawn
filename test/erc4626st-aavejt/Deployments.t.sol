@@ -40,17 +40,17 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         assertEq(ST.marketId(), MARKET_ID, "ST MARKET_ID mismatch");
 
         // Asset and metadata
-        assertEq(address(ST.asset()), ETHEREUM_MAINNET_USDC_ADDRESS, "ST asset should be USDC");
+        assertEq(address(ST.asset()), ETHEREUM_MAINNET_USDC_ADDRESS, "ST asset must be USDC");
         assertEq(ST.name(), SENIOR_TRANCHE_NAME, "ST name mismatch");
         assertEq(ST.symbol(), SENIOR_TRANCHE_SYMBOL, "ST symbol mismatch");
         assertTrue(ST.TRANCHE_TYPE() == TrancheType.SENIOR, "ST tranche type mismatch");
 
         // Initial NAV and totals
-        assertEq(ST.totalSupply(), 0, "ST initial totalSupply should be 0");
-        assertEq(ST.getRawNAV(), ZERO_NAV_UNITS, "ST initial raw NAV should be 0");
-        assertEq(ST.totalAssets().nav, ZERO_NAV_UNITS, "ST initial effective NAV should be 0");
-        assertEq(ST.totalAssets().stAssets, ZERO_TRANCHE_UNITS, "ST initial total st assets should be 0");
-        assertEq(ST.totalAssets().jtAssets, ZERO_TRANCHE_UNITS, "ST initial total jt assets should be 0");
+        assertEq(ST.totalSupply(), 0, "ST initial totalSupply must be 0");
+        assertEq(ST.getRawNAV(), ZERO_NAV_UNITS, "ST initial raw NAV must be 0");
+        assertEq(ST.totalAssets().nav, ZERO_NAV_UNITS, "ST initial effective NAV must be 0");
+        assertEq(ST.totalAssets().stAssets, ZERO_TRANCHE_UNITS, "ST initial total st assets must be 0");
+        assertEq(ST.totalAssets().jtAssets, ZERO_TRANCHE_UNITS, "ST initial total jt assets must be 0");
     }
 
     /// @notice Verifies junior tranche deployment parameters
@@ -63,16 +63,16 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         assertTrue(JT.TRANCHE_TYPE() == TrancheType.JUNIOR, "JT tranche type mismatch");
 
         // Asset and metadata
-        assertEq(address(JT.asset()), ETHEREUM_MAINNET_USDC_ADDRESS, "JT asset should be USDC");
+        assertEq(address(JT.asset()), ETHEREUM_MAINNET_USDC_ADDRESS, "JT asset must be USDC");
         assertEq(JT.name(), JUNIOR_TRANCHE_NAME, "JT name mismatch");
         assertEq(JT.symbol(), JUNIOR_TRANCHE_SYMBOL, "JT symbol mismatch");
 
         // Initial NAV and totals
-        assertEq(JT.totalSupply(), 0, "JT initial totalSupply should be 0");
-        assertEq(JT.getRawNAV(), ZERO_NAV_UNITS, "JT initial raw NAV should be 0");
-        assertEq(JT.totalAssets().nav, ZERO_NAV_UNITS, "JT initial effective NAV should be 0");
-        assertEq(JT.totalAssets().stAssets, ZERO_TRANCHE_UNITS, "JT initial total st assets should be 0");
-        assertEq(JT.totalAssets().jtAssets, ZERO_TRANCHE_UNITS, "JT initial total jt assets should be 0");
+        assertEq(JT.totalSupply(), 0, "JT initial totalSupply must be 0");
+        assertEq(JT.getRawNAV(), ZERO_NAV_UNITS, "JT initial raw NAV must be 0");
+        assertEq(JT.totalAssets().nav, ZERO_NAV_UNITS, "JT initial effective NAV must be 0");
+        assertEq(JT.totalAssets().stAssets, ZERO_TRANCHE_UNITS, "JT initial total st assets must be 0");
+        assertEq(JT.totalAssets().jtAssets, ZERO_TRANCHE_UNITS, "JT initial total jt assets must be 0");
     }
 
     /// @notice Verifies kernel and accountant deployment parameters and wiring
@@ -109,14 +109,14 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
 
         // Initial NAV / ASSETS via KERNEL view functions
         (SyncedAccountingState memory state,,) = KERNEL.previewSyncTrancheAccounting(TrancheType.SENIOR);
-        assertEq(state.stEffectiveNAV, ZERO_NAV_UNITS, "Kernel ST total effective ASSETS should be 0");
-        assertEq(state.jtEffectiveNAV, ZERO_NAV_UNITS, "Kernel JT total effective ASSETS should be 0");
-        assertEq(state.stRawNAV, ZERO_NAV_UNITS, "Kernel ST raw NAV should be 0");
-        assertEq(state.jtRawNAV, ZERO_NAV_UNITS, "Kernel JT raw NAV should be 0");
+        assertEq(state.stEffectiveNAV, ZERO_NAV_UNITS, "Kernel ST total effective ASSETS must be 0");
+        assertEq(state.jtEffectiveNAV, ZERO_NAV_UNITS, "Kernel JT total effective ASSETS must be 0");
+        assertEq(state.stRawNAV, ZERO_NAV_UNITS, "Kernel ST raw NAV must be 0");
+        assertEq(state.jtRawNAV, ZERO_NAV_UNITS, "Kernel JT raw NAV must be 0");
 
         // Aave wiring: pool and AUSDC mapping must be consistent
         address expectedAToken = IPool(ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS).getReserveAToken(ETHEREUM_MAINNET_USDC_ADDRESS);
-        assertEq(expectedAToken, address(AUSDC), "AUSDC address should match Aave pool data");
+        assertEq(expectedAToken, address(AUSDC), "AUSDC address must match Aave pool data");
     }
 
     function test_deployMarket_revertsOnEmptySeniorTrancheName() public {
@@ -314,7 +314,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
             (
                 TrancheDeploymentParams({ name: SENIOR_TRANCHE_NAME, symbol: SENIOR_TRANCHE_SYMBOL, kernel: expectedKernelAddress }),
                 ETHEREUM_MAINNET_USDC_ADDRESS,
-                OWNER_ADDRESS, // invalid authority: should be FACTORY
+                OWNER_ADDRESS, // invalid authority: must be FACTORY
                 marketId
             )
         );
@@ -345,7 +345,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
                     fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
                     lltvWAD: LLTV
                 }),
-                OWNER_ADDRESS // invalid authority: should be FACTORY
+                OWNER_ADDRESS // invalid authority: must be FACTORY
             )
         );
 
@@ -390,7 +390,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
             (
                 TrancheDeploymentParams({ name: JUNIOR_TRANCHE_NAME, symbol: JUNIOR_TRANCHE_SYMBOL, kernel: expectedKernelAddress }),
                 ETHEREUM_MAINNET_USDC_ADDRESS,
-                OWNER_ADDRESS, // invalid authority: should be FACTORY
+                OWNER_ADDRESS, // invalid authority: must be FACTORY
                 marketId
             )
         );
