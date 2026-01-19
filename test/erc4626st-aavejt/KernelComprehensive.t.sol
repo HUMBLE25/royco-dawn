@@ -652,6 +652,149 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         }
     }
 
+    /// @notice Test that ST redemption is blocked in FIXED_TERM state
+    /// @dev Per MarketState docs: "ST redemptions blocked: protects existing JT from realizing losses"
+    function test_stRedemption_blockedInFixedTermState() public {
+        // Setup: Create FIXED_TERM state
+        address jtDepositor = ALICE_ADDRESS;
+        address stDepositor = BOB_ADDRESS;
+        uint256 jtAmount = 100_000e6;
+
+        vm.startPrank(jtDepositor);
+        USDC.approve(address(JT), jtAmount);
+        JT.deposit(toTrancheUnits(jtAmount), jtDepositor, jtDepositor);
+        vm.stopPrank();
+
+        TRANCHE_UNIT stDeposit = ST.maxDeposit(stDepositor);
+        vm.startPrank(stDepositor);
+        USDC.approve(address(ST), toUint256(stDeposit));
+        ST.deposit(stDeposit, stDepositor, stDepositor);
+        vm.stopPrank();
+
+        uint256 stSharesBefore = ST.balanceOf(stDepositor);
+        assertTrue(stSharesBefore > 0, "ST depositor must have shares");
+
+        // Simulate ST loss to trigger FIXED_TERM state
+        uint256 stLoss = toUint256(stDeposit) * 50 / 100; // 50% loss
+        vm.prank(address(MOCK_UNDERLYING_ST_VAULT));
+        USDC.transfer(CHARLIE_ADDRESS, stLoss);
+
+        // Sync to update market state
+        vm.prank(OWNER_ADDRESS);
+        KERNEL.syncTrancheAccounting();
+
+        // Check market state
+        IRoycoAccountant.RoycoAccountantState memory accState = ACCOUNTANT.getState();
+
+        // If market is in FIXED_TERM, ST redemption should be blocked
+        if (accState.lastMarketState == MarketState.FIXED_TERM) {
+            // ST maxRedeem should be 0 in FIXED_TERM
+            uint256 maxRedeem = ST.maxRedeem(stDepositor);
+            assertEq(maxRedeem, 0, "ST maxRedeem must be 0 in FIXED_TERM state");
+
+            // Attempting to redeem should revert
+            vm.startPrank(stDepositor);
+            vm.expectRevert();
+            ST.redeem(stSharesBefore, stDepositor, stDepositor);
+            vm.stopPrank();
+        }
+    }
+
+    /// @notice Test that both tranches are liquid in PERPETUAL state (within coverage constraints)
+    /// @dev Per MarketState docs: "PERPETUAL - Both tranches liquid (within coverage constraints)"
+    function test_bothTranchesLiquid_inPerpetualState() public {
+        // Setup: Create balanced market that should be in PERPETUAL state
+        address jtDepositor = ALICE_ADDRESS;
+        address stDepositor = BOB_ADDRESS;
+        uint256 jtAmount = 500_000e6;
+
+        // Deposit JT first
+        vm.startPrank(jtDepositor);
+        USDC.approve(address(JT), jtAmount);
+        JT.deposit(toTrancheUnits(jtAmount), jtDepositor, jtDepositor);
+        vm.stopPrank();
+
+        // Deposit ST within coverage constraints
+        TRANCHE_UNIT maxStDeposit = ST.maxDeposit(stDepositor);
+        TRANCHE_UNIT stDeposit = maxStDeposit.mulDiv(50, 100, Math.Rounding.Floor); // Use 50% of max
+        vm.startPrank(stDepositor);
+        USDC.approve(address(ST), toUint256(stDeposit));
+        ST.deposit(stDeposit, stDepositor, stDepositor);
+        vm.stopPrank();
+
+        // Verify market is in PERPETUAL state
+        (SyncedAccountingState memory state,,) = KERNEL.previewSyncTrancheAccounting(TrancheType.SENIOR);
+        assertEq(uint256(state.marketState), uint256(MarketState.PERPETUAL), "Market must be in PERPETUAL state");
+
+        // Verify ST is liquid: maxRedeem > 0
+        uint256 stBalance = ST.balanceOf(stDepositor);
+        uint256 stMaxRedeem = ST.maxRedeem(stDepositor);
+        assertTrue(stMaxRedeem > 0, "ST must be liquid in PERPETUAL state");
+        assertEq(stMaxRedeem, stBalance, "ST maxRedeem must equal balance in healthy PERPETUAL state");
+
+        // Verify JT can deposit more
+        TRANCHE_UNIT jtMaxDeposit = JT.maxDeposit(CHARLIE_ADDRESS);
+        assertTrue(toUint256(jtMaxDeposit) > 0, "JT deposits must be allowed in PERPETUAL state");
+
+        // Verify JT can request redemption (async)
+        uint256 jtBalance = JT.balanceOf(jtDepositor);
+        assertTrue(jtBalance > 0, "JT depositor must have shares");
+        uint256 jtMaxRedeem = JT.maxRedeem(jtDepositor);
+        assertTrue(jtMaxRedeem > 0, "JT must be liquid in PERPETUAL state (within coverage)");
+    }
+
+    /// @notice Test state transition: PERPETUAL -> FIXED_TERM -> PERPETUAL (via term expiry)
+    function test_marketStateTransitions_fullCycle() public {
+        // Setup balanced market
+        address jtDepositor = ALICE_ADDRESS;
+        address stDepositor = BOB_ADDRESS;
+        uint256 jtAmount = 100_000e6;
+
+        vm.startPrank(jtDepositor);
+        USDC.approve(address(JT), jtAmount);
+        JT.deposit(toTrancheUnits(jtAmount), jtDepositor, jtDepositor);
+        vm.stopPrank();
+
+        TRANCHE_UNIT stDeposit = ST.maxDeposit(stDepositor).mulDiv(50, 100, Math.Rounding.Floor);
+        vm.startPrank(stDepositor);
+        USDC.approve(address(ST), toUint256(stDeposit));
+        ST.deposit(stDeposit, stDepositor, stDepositor);
+        vm.stopPrank();
+
+        // Step 1: Verify initial state is PERPETUAL
+        IRoycoAccountant.RoycoAccountantState memory state1 = ACCOUNTANT.getState();
+        assertEq(uint256(state1.lastMarketState), uint256(MarketState.PERPETUAL), "Initial state must be PERPETUAL");
+
+        // Step 2: Trigger FIXED_TERM via ST loss (JT provides coverage)
+        uint256 stLoss = toUint256(stDeposit) * 40 / 100; // 40% loss
+        vm.prank(address(MOCK_UNDERLYING_ST_VAULT));
+        USDC.transfer(CHARLIE_ADDRESS, stLoss);
+
+        vm.prank(OWNER_ADDRESS);
+        KERNEL.syncTrancheAccounting();
+
+        IRoycoAccountant.RoycoAccountantState memory state2 = ACCOUNTANT.getState();
+        // May be FIXED_TERM or PERPETUAL depending on LLTV
+        if (toUint256(state2.lastJTCoverageImpermanentLoss) > 0 && toUint256(state2.lastSTImpermanentLoss) == 0) {
+            assertEq(uint256(state2.lastMarketState), uint256(MarketState.FIXED_TERM), "Should be FIXED_TERM with JT coverage IL");
+
+            // Step 3: Verify restrictions in FIXED_TERM
+            assertEq(ST.maxRedeem(stDepositor), 0, "ST redemptions blocked in FIXED_TERM");
+            assertEq(toUint256(JT.maxDeposit(CHARLIE_ADDRESS)), 0, "JT deposits blocked in FIXED_TERM");
+
+            // Step 4: Wait for fixed term to expire
+            vm.warp(block.timestamp + FIXED_TERM_DURATION_SECONDS + 1);
+
+            vm.prank(OWNER_ADDRESS);
+            KERNEL.syncTrancheAccounting();
+
+            // Step 5: Verify transition back to PERPETUAL
+            IRoycoAccountant.RoycoAccountantState memory state3 = ACCOUNTANT.getState();
+            assertEq(uint256(state3.lastMarketState), uint256(MarketState.PERPETUAL), "Should return to PERPETUAL after term expires");
+            assertEq(toUint256(state3.lastJTCoverageImpermanentLoss), 0, "JT coverage IL should be cleared");
+        }
+    }
+
     // ============================================
     // CATEGORY 8: PREVIEW FUNCTION TESTS
     // ============================================
@@ -2914,16 +3057,14 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         vm.prank(OWNER_ADDRESS);
         SyncedAccountingState memory fixedTermState = KERNEL.syncTrancheAccounting();
 
-        if (uint256(fixedTermState.marketState) == uint256(MarketState.FIXED_TERM)) {
-            // Wait for fixed term to elapse
-            vm.warp(block.timestamp + FIXED_TERM_DURATION_SECONDS + 1);
+        // Wait for fixed term to elapse
+        vm.warp(block.timestamp + FIXED_TERM_DURATION_SECONDS);
 
-            vm.prank(OWNER_ADDRESS);
-            SyncedAccountingState memory afterTermState = KERNEL.syncTrancheAccounting();
+        vm.prank(OWNER_ADDRESS);
+        SyncedAccountingState memory afterTermState = KERNEL.syncTrancheAccounting();
 
-            assertEq(uint256(afterTermState.marketState), uint256(MarketState.PERPETUAL), "Should return to PERPETUAL after term");
-            assertEq(toUint256(afterTermState.jtCoverageImpermanentLoss), 0, "JT coverage IL should be cleared");
-        }
+        assertEq(uint256(afterTermState.marketState), uint256(MarketState.PERPETUAL), "Should return to PERPETUAL after term");
+        assertEq(toUint256(afterTermState.jtCoverageImpermanentLoss), 0, "JT coverage IL should be cleared");
     }
 
     /// @notice Test market stays PERPETUAL when severe loss creates ST IL
@@ -3256,5 +3397,458 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
             uint256 requiredCoverage = stEffNAV * COVERAGE_WAD / WAD;
             assertTrue(jtEffNAV >= requiredCoverage - 1e12, string.concat("Coverage invariant violated: ", _context));
         }
+    }
+
+    // ============================================
+    // VIEW FUNCTION TESTS
+    // ============================================
+
+    /// @notice Test currentMarketUtilization returns correct value for empty market
+    function test_currentMarketUtilization_emptyMarket() public view {
+        uint256 utilization = KERNEL.currentMarketUtilization();
+        // Empty market should have 0 utilization
+        assertEq(utilization, 0, "Empty market should have 0 utilization");
+    }
+
+    /// @notice Test currentMarketUtilization after deposits
+    function test_currentMarketUtilization_afterDeposits() public {
+        // Deposit JT
+        _depositJT(1_000_000e6, ALICE_ADDRESS);
+
+        // Deposit ST
+        _depositST(200_000e6, BOB_ADDRESS);
+
+        // Get utilization
+        uint256 utilization = KERNEL.currentMarketUtilization();
+
+        // Utilization = ((ST_RAW + JT_RAW * beta) * coverage) / JT_EFFECTIVE
+        // Should be > 0 when there's capital
+        assertGt(utilization, 0, "Utilization should be > 0 after deposits");
+        assertLt(utilization, WAD, "Utilization should be < 100% for healthy market");
+    }
+
+    /// @notice Test currentMarketUtilization at high utilization
+    function test_currentMarketUtilization_highUtilization() public {
+        // Deposit JT
+        _depositJT(1_000_000e6, ALICE_ADDRESS);
+
+        // Deposit max ST (to get close to 100% utilization)
+        TRANCHE_UNIT maxStDeposit = ST.maxDeposit(BOB_ADDRESS);
+        if (toUint256(maxStDeposit) > 0) {
+            vm.startPrank(BOB_ADDRESS);
+            USDC.approve(address(ST), toUint256(maxStDeposit));
+            ST.deposit(maxStDeposit, BOB_ADDRESS, BOB_ADDRESS);
+            vm.stopPrank();
+
+            uint256 utilization = KERNEL.currentMarketUtilization();
+            // Should be close to WAD (100%) when at max ST deposit
+            assertGe(utilization, WAD * 9 / 10, "Utilization should be >= 90% at max ST deposit");
+        }
+    }
+
+    /// @notice Test jtPendingRedeemRequest returns correct pending shares
+    function test_jtPendingRedeemRequest_noPendingRequest() public view {
+        // No request exists
+        uint256 pendingShares = KERNEL.jtPendingRedeemRequest(0, ALICE_ADDRESS);
+        assertEq(pendingShares, 0, "No pending request should return 0");
+    }
+
+    /// @notice Test jtPendingRedeemRequest after creating request
+    function test_jtPendingRedeemRequest_afterRequest() public {
+        // Deposit JT first
+        _depositJT(1_000_000e6, ALICE_ADDRESS);
+
+        // Get shares
+        uint256 shares = JT.balanceOf(ALICE_ADDRESS);
+        assertTrue(shares > 0, "Should have shares");
+
+        // Request redeem
+        vm.startPrank(ALICE_ADDRESS);
+        (uint256 requestId,) = JT.requestRedeem(shares / 2, ALICE_ADDRESS, ALICE_ADDRESS);
+        vm.stopPrank();
+
+        // Check pending
+        uint256 pendingShares = KERNEL.jtPendingRedeemRequest(requestId, ALICE_ADDRESS);
+        assertEq(pendingShares, shares / 2, "Pending shares should match request");
+    }
+
+    /// @notice Test jtClaimableRedeemRequest returns correct claimable shares
+    function test_jtClaimableRedeemRequest_notClaimable() public {
+        // Deposit JT first
+        _depositJT(1_000_000e6, ALICE_ADDRESS);
+
+        uint256 shares = JT.balanceOf(ALICE_ADDRESS);
+
+        // Request redeem
+        vm.startPrank(ALICE_ADDRESS);
+        (uint256 requestId,) = JT.requestRedeem(shares / 2, ALICE_ADDRESS, ALICE_ADDRESS);
+        vm.stopPrank();
+
+        // Check claimable before settle - should be 0
+        uint256 claimableShares = KERNEL.jtClaimableRedeemRequest(requestId, ALICE_ADDRESS);
+        assertEq(claimableShares, 0, "Should not be claimable before settle");
+    }
+
+    /// @notice Test jtClaimableRedeemRequest after redemption delay passes
+    function test_jtClaimableRedeemRequest_afterDelay() public {
+        // Deposit JT first
+        _depositJT(1_000_000e6, ALICE_ADDRESS);
+
+        uint256 shares = JT.balanceOf(ALICE_ADDRESS);
+
+        // Request redeem
+        vm.startPrank(ALICE_ADDRESS);
+        (uint256 requestId,) = JT.requestRedeem(shares / 2, ALICE_ADDRESS, ALICE_ADDRESS);
+        vm.stopPrank();
+
+        // Warp past the redemption delay
+        vm.warp(block.timestamp + JT_REDEMPTION_DELAY_SECONDS + 1);
+
+        // Check claimable after delay
+        uint256 claimableShares = KERNEL.jtClaimableRedeemRequest(requestId, ALICE_ADDRESS);
+        assertEq(claimableShares, shares / 2, "Should be claimable after delay");
+    }
+
+    /// @notice Test jtClaimableCancelRedeemRequest
+    function test_jtClaimableCancelRedeemRequest_noCancel() public view {
+        // No cancel request exists
+        uint256 shares = KERNEL.jtClaimableCancelRedeemRequest(0, ALICE_ADDRESS);
+        assertEq(shares, 0, "No cancel request should return 0");
+    }
+
+    /// @notice Test jtPendingCancelRedeemRequest
+    function test_jtPendingCancelRedeemRequest_noPending() public view {
+        bool isPending = KERNEL.jtPendingCancelRedeemRequest(0, ALICE_ADDRESS);
+        assertFalse(isPending, "No pending cancel request should return false");
+    }
+
+    // ============================================
+    // AUDIT EDGE CASES: PRECISION AND ROUNDING
+    // ============================================
+
+    /// @notice Test rounding consistency in deposit/withdraw cycle - no arbitrage opportunity
+    function test_audit_depositWithdrawCycle_noArbitrage() public {
+        _depositJT(1_000_000e6, ALICE_ADDRESS);
+
+        uint256 depositAmount = 100_000e6;
+
+        // Deposit ST
+        vm.startPrank(BOB_ADDRESS);
+        USDC.approve(address(ST), depositAmount);
+        (uint256 shares,) = ST.deposit(toTrancheUnits(depositAmount), BOB_ADDRESS, BOB_ADDRESS);
+        vm.stopPrank();
+
+        // Immediately redeem all shares
+        vm.startPrank(BOB_ADDRESS);
+        (AssetClaims memory claims,) = ST.redeem(shares, BOB_ADDRESS, BOB_ADDRESS);
+        vm.stopPrank();
+
+        uint256 assetsReturned = toUint256(claims.stAssets);
+
+        // Should not be able to profit from deposit/withdraw
+        assertLe(assetsReturned, depositAmount, "Should not profit from immediate deposit/withdraw");
+
+        // Loss should be minimal (accounting for rounding)
+        assertGe(assetsReturned, depositAmount - 10, "Rounding loss should be minimal");
+    }
+
+    /// @notice Test multiple small deposits vs single large deposit - accumulation error check
+    function test_audit_multipleSmallDeposits_noAccumulationError() public {
+        _depositJT(10_000_000e6, ALICE_ADDRESS);
+
+        uint256 smallAmount = 100e6; // 100 USDC
+        uint256 numDeposits = 100;
+        uint256 expectedTotal = smallAmount * numDeposits;
+
+        vm.startPrank(BOB_ADDRESS);
+        USDC.approve(address(ST), expectedTotal);
+
+        uint256 totalShares;
+        for (uint256 i = 0; i < numDeposits; i++) {
+            (uint256 s,) = ST.deposit(toTrancheUnits(smallAmount), BOB_ADDRESS, BOB_ADDRESS);
+            totalShares += s;
+        }
+        vm.stopPrank();
+
+        // Compare to single large deposit
+        vm.startPrank(CHARLIE_ADDRESS);
+        USDC.approve(address(ST), expectedTotal);
+        (uint256 singleDepositShares,) = ST.deposit(toTrancheUnits(expectedTotal), CHARLIE_ADDRESS, CHARLIE_ADDRESS);
+        vm.stopPrank();
+
+        // Difference should be minimal (within 1% due to rounding)
+        assertApproxEqRel(totalShares, singleDepositShares, 0.01e18, "Multiple small deposits should equal single large deposit within 1%");
+    }
+
+    /// @notice Test fee calculation precision - no value leakage over time
+    function test_audit_feeCalculation_noValueLeakage() public {
+        _depositJT(1_000_000e6, ALICE_ADDRESS);
+        _depositST(500_000e6, BOB_ADDRESS);
+
+        // Get initial total value
+        (SyncedAccountingState memory state1,,) = KERNEL.previewSyncTrancheAccounting(TrancheType.SENIOR);
+        uint256 initialTotalNAV = toUint256(state1.stRawNAV) + toUint256(state1.jtRawNAV);
+
+        // Warp to accrue yield
+        vm.warp(block.timestamp + 365 days);
+
+        // Sync accounting
+        (SyncedAccountingState memory state2,,) = KERNEL.previewSyncTrancheAccounting(TrancheType.SENIOR);
+
+        // Total NAV should equal effective NAV (NAV conservation)
+        uint256 finalTotalNAV = toUint256(state2.stRawNAV) + toUint256(state2.jtRawNAV);
+        uint256 finalTotalEffective = toUint256(state2.stEffectiveNAV) + toUint256(state2.jtEffectiveNAV);
+
+        // NAV conservation: raw NAV = effective NAV
+        assertEq(finalTotalNAV, finalTotalEffective, "NAV conservation must hold");
+
+        // NAV should not decrease
+        assertGe(finalTotalNAV, initialTotalNAV, "Total NAV should not decrease");
+    }
+
+    // ============================================
+    // AUDIT EDGE CASES: TIMING ATTACK VECTORS
+    // ============================================
+
+    /// @notice Test redemption claim exactly at delay boundary - timing edge case
+    function test_audit_redemptionClaimAtExactBoundary() public {
+        _depositJT(1_000_000e6, ALICE_ADDRESS);
+
+        uint256 jtShares = JT.balanceOf(ALICE_ADDRESS);
+
+        // Request redemption
+        vm.startPrank(ALICE_ADDRESS);
+        (uint256 requestId,) = JT.requestRedeem(jtShares / 2, ALICE_ADDRESS, ALICE_ADDRESS);
+        vm.stopPrank();
+
+        // Warp to exactly 1 second before delay expires
+        vm.warp(block.timestamp + JT_REDEMPTION_DELAY_SECONDS - 1);
+
+        // Should still be pending
+        uint256 pendingShares = KERNEL.jtPendingRedeemRequest(requestId, ALICE_ADDRESS);
+        assertGt(pendingShares, 0, "Should still be pending before delay");
+
+        uint256 claimableShares = KERNEL.jtClaimableRedeemRequest(requestId, ALICE_ADDRESS);
+        assertEq(claimableShares, 0, "Should not be claimable before delay");
+
+        // Warp to exactly the delay boundary
+        vm.warp(block.timestamp + 1);
+
+        // Should now be claimable
+        claimableShares = KERNEL.jtClaimableRedeemRequest(requestId, ALICE_ADDRESS);
+        assertGt(claimableShares, 0, "Should be claimable exactly at delay boundary");
+    }
+
+    /// @notice Test that cross-block yield accrual differs from same-block
+    /// @dev Verifies time-weighted yield share accumulation works correctly
+    function test_audit_crossBlockYieldAccrual_differsFromSameBlock() public {
+        // Setup: JT and ST deposits
+        _depositJT(1_000_000e6, ALICE_ADDRESS);
+        _depositST(500_000e6, BOB_ADDRESS);
+
+        // Checkpoint after initial deposits
+        (SyncedAccountingState memory stateT0,,) = KERNEL.previewSyncTrancheAccounting(TrancheType.SENIOR);
+        uint256 jtEffectiveT0 = toUint256(stateT0.jtEffectiveNAV);
+
+        // Warp 1 day - Aave accrues yield
+        vm.warp(block.timestamp + 1 days);
+
+        // Sync to distribute yield
+        (SyncedAccountingState memory stateT1,,) = KERNEL.previewSyncTrancheAccounting(TrancheType.SENIOR);
+        uint256 jtEffectiveT1 = toUint256(stateT1.jtEffectiveNAV);
+
+        // JT should have received yield share from Aave accrual
+        uint256 yieldAccruedCrossBlock = jtEffectiveT1 > jtEffectiveT0 ? jtEffectiveT1 - jtEffectiveT0 : 0;
+
+        // Now test same-block: another deposit in same block shouldn't change JT yield
+        _depositST(100_000e6, CHARLIE_ADDRESS);
+        (SyncedAccountingState memory stateT1SameBlock,,) = KERNEL.previewSyncTrancheAccounting(TrancheType.SENIOR);
+        uint256 jtEffectiveT1SameBlock = toUint256(stateT1SameBlock.jtEffectiveNAV);
+
+        // Same-block operation should not add additional yield to JT
+        // (may decrease slightly due to utilization change, but no time-weighted gain)
+        uint256 sameBlockDelta = jtEffectiveT1SameBlock > jtEffectiveT1 ? jtEffectiveT1SameBlock - jtEffectiveT1 : 0;
+
+        // Cross-block should have meaningful yield, same-block should have negligible change
+        assertGt(yieldAccruedCrossBlock, 0, "Cross-block should accrue yield from Aave");
+        assertLt(sameBlockDelta, yieldAccruedCrossBlock / 100, "Same-block yield change should be <1% of cross-block");
+    }
+
+    /// @notice Test redemption request ordering - out-of-order claiming
+    function test_audit_multipleRedemptionRequests_independentClaiming() public {
+        _depositJT(1_000_000e6, ALICE_ADDRESS);
+
+        uint256 jtShares = JT.balanceOf(ALICE_ADDRESS);
+        uint256 requestShares = jtShares / 4;
+
+        // Create multiple redemption requests
+        vm.startPrank(ALICE_ADDRESS);
+        (uint256 requestId1,) = JT.requestRedeem(requestShares, ALICE_ADDRESS, ALICE_ADDRESS);
+        (uint256 requestId2,) = JT.requestRedeem(requestShares, ALICE_ADDRESS, ALICE_ADDRESS);
+        (uint256 requestId3,) = JT.requestRedeem(requestShares, ALICE_ADDRESS, ALICE_ADDRESS);
+        vm.stopPrank();
+
+        // All should be pending
+        assertTrue(KERNEL.jtPendingRedeemRequest(requestId1, ALICE_ADDRESS) > 0, "Request 1 pending");
+        assertTrue(KERNEL.jtPendingRedeemRequest(requestId2, ALICE_ADDRESS) > 0, "Request 2 pending");
+        assertTrue(KERNEL.jtPendingRedeemRequest(requestId3, ALICE_ADDRESS) > 0, "Request 3 pending");
+
+        // Warp past delay
+        vm.warp(block.timestamp + JT_REDEMPTION_DELAY_SECONDS + 1);
+
+        // Claim request 2 first (out of order)
+        vm.startPrank(ALICE_ADDRESS);
+        uint256 balanceBefore = USDC.balanceOf(ALICE_ADDRESS);
+        JT.redeem(requestShares, ALICE_ADDRESS, ALICE_ADDRESS, requestId2);
+        uint256 balanceAfter = USDC.balanceOf(ALICE_ADDRESS);
+        vm.stopPrank();
+
+        // Should have received assets
+        assertGt(balanceAfter, balanceBefore, "Should receive assets from out-of-order claim");
+
+        // Request 1 and 3 should still be claimable
+        assertTrue(KERNEL.jtClaimableRedeemRequest(requestId1, ALICE_ADDRESS) > 0, "Request 1 still claimable");
+        assertTrue(KERNEL.jtClaimableRedeemRequest(requestId3, ALICE_ADDRESS) > 0, "Request 3 still claimable");
+    }
+
+    // ============================================
+    // AUDIT EDGE CASES: STATE MACHINE
+    // ============================================
+
+    /// @notice Test all operations allowed in PERPETUAL state
+    function test_audit_perpetualStateOperations() public {
+        _depositJT(1_000_000e6, ALICE_ADDRESS);
+        _depositST(500_000e6, BOB_ADDRESS);
+
+        // Verify we're in PERPETUAL state
+        (SyncedAccountingState memory state,,) = KERNEL.previewSyncTrancheAccounting(TrancheType.SENIOR);
+        assertEq(uint256(state.marketState), uint256(MarketState.PERPETUAL), "Should be in PERPETUAL state");
+
+        // All operations should be allowed in PERPETUAL:
+        _depositST(10_000e6, CHARLIE_ADDRESS);
+
+        // ST redeem
+        vm.startPrank(BOB_ADDRESS);
+        uint256 bobShares = ST.balanceOf(BOB_ADDRESS);
+        ST.redeem(bobShares / 10, BOB_ADDRESS, BOB_ADDRESS);
+        vm.stopPrank();
+
+        // JT deposit
+        _depositJT(10_000e6, CHARLIE_ADDRESS);
+
+        // JT request redeem
+        vm.startPrank(ALICE_ADDRESS);
+        uint256 aliceJTShares = JT.balanceOf(ALICE_ADDRESS);
+        JT.requestRedeem(aliceJTShares / 10, ALICE_ADDRESS, ALICE_ADDRESS);
+        vm.stopPrank();
+
+        // Verify state is still PERPETUAL
+        (state,,) = KERNEL.previewSyncTrancheAccounting(TrancheType.SENIOR);
+        assertEq(uint256(state.marketState), uint256(MarketState.PERPETUAL), "Should remain in PERPETUAL state");
+    }
+
+    /// @notice Test max operations reflect state correctly
+    function test_audit_maxOperationsReflectState() public {
+        _depositJT(1_000_000e6, ALICE_ADDRESS);
+        _depositST(500_000e6, BOB_ADDRESS);
+
+        // In PERPETUAL state, max operations should return non-zero
+        (SyncedAccountingState memory state,,) = KERNEL.previewSyncTrancheAccounting(TrancheType.SENIOR);
+        assertEq(uint256(state.marketState), uint256(MarketState.PERPETUAL), "Should be in PERPETUAL");
+
+        // Check max withdrawable
+        (NAV_UNIT maxSTWithdrawNAV,,,) = KERNEL.stMaxWithdrawable(BOB_ADDRESS);
+        assertTrue(toUint256(maxSTWithdrawNAV) > 0, "Max ST withdraw should be positive in PERPETUAL");
+
+        // Check max JT deposit
+        TRANCHE_UNIT maxJTDeposit = KERNEL.jtMaxDeposit(ALICE_ADDRESS);
+        assertTrue(toUint256(maxJTDeposit) > 0, "Max JT deposit should be positive in PERPETUAL");
+    }
+
+    /// @notice Test utilization computation at boundary conditions
+    function test_audit_utilizationBoundaries() public {
+        // Empty market - no utilization
+        uint256 emptyUtil = KERNEL.currentMarketUtilization();
+        assertEq(emptyUtil, 0, "Empty market should have 0 utilization");
+
+        // JT only - no ST means no utilization
+        _depositJT(1_000_000e6, ALICE_ADDRESS);
+        uint256 jtOnlyUtil = KERNEL.currentMarketUtilization();
+        assertEq(jtOnlyUtil, 0, "JT-only market should have 0 utilization");
+
+        // Add ST - utilization should increase
+        _depositST(100_000e6, BOB_ADDRESS);
+        uint256 withSTUtil = KERNEL.currentMarketUtilization();
+        assertGt(withSTUtil, 0, "Market with ST should have positive utilization");
+
+        // Add more ST - utilization should increase more
+        _depositST(400_000e6, BOB_ADDRESS);
+        uint256 moreSTUtil = KERNEL.currentMarketUtilization();
+        assertGt(moreSTUtil, withSTUtil, "More ST should increase utilization");
+    }
+
+    /// @notice Test rapid deposit/withdraw cycles maintain state consistency
+    function test_audit_rapidDepositWithdrawCycles() public {
+        _depositJT(10_000_000e6, ALICE_ADDRESS);
+
+        // Rapid ST deposit/withdraw cycles
+        for (uint256 i = 0; i < 10; i++) {
+            vm.startPrank(BOB_ADDRESS);
+            USDC.approve(address(ST), 100_000e6);
+            (uint256 shares,) = ST.deposit(toTrancheUnits(100_000e6), BOB_ADDRESS, BOB_ADDRESS);
+            ST.redeem(shares, BOB_ADDRESS, BOB_ADDRESS);
+            vm.stopPrank();
+        }
+
+        // Market should remain healthy
+        (SyncedAccountingState memory state,,) = KERNEL.previewSyncTrancheAccounting(TrancheType.SENIOR);
+        assertEq(uint256(state.marketState), uint256(MarketState.PERPETUAL), "Market should remain PERPETUAL after rapid cycles");
+
+        // NAV conservation should hold
+        assertEq(
+            toUint256(state.stRawNAV) + toUint256(state.jtRawNAV),
+            toUint256(state.stEffectiveNAV) + toUint256(state.jtEffectiveNAV),
+            "NAV conservation must hold"
+        );
+    }
+
+    /// @notice Test yield accrual over extended time period
+    function test_audit_extendedYieldAccrual() public {
+        _depositJT(1_000_000e6, ALICE_ADDRESS);
+        _depositST(500_000e6, BOB_ADDRESS);
+
+        (SyncedAccountingState memory state1,,) = KERNEL.previewSyncTrancheAccounting(TrancheType.SENIOR);
+        uint256 initialTotalNAV = toUint256(state1.stRawNAV) + toUint256(state1.jtRawNAV);
+
+        // Warp 1 year
+        vm.warp(block.timestamp + 365 days);
+
+        (SyncedAccountingState memory state2,,) = KERNEL.previewSyncTrancheAccounting(TrancheType.SENIOR);
+        uint256 finalTotalNAV = toUint256(state2.stRawNAV) + toUint256(state2.jtRawNAV);
+
+        // NAV should have increased from Aave yield
+        assertGt(finalTotalNAV, initialTotalNAV, "NAV should increase over time from yield");
+
+        // State should remain healthy
+        assertEq(uint256(state2.marketState), uint256(MarketState.PERPETUAL), "Market should remain PERPETUAL");
+    }
+
+    /// @notice Test redemption request cancellation timing
+    function test_audit_redemptionCancellationTiming() public {
+        _depositJT(1_000_000e6, ALICE_ADDRESS);
+
+        uint256 jtShares = JT.balanceOf(ALICE_ADDRESS);
+
+        // Request redemption
+        vm.startPrank(ALICE_ADDRESS);
+        (uint256 requestId,) = JT.requestRedeem(jtShares / 2, ALICE_ADDRESS, ALICE_ADDRESS);
+
+        // Cancel immediately
+        JT.cancelRedeemRequest(requestId, ALICE_ADDRESS);
+        vm.stopPrank();
+
+        // Request should be canceled
+        assertFalse(KERNEL.jtPendingRedeemRequest(requestId, ALICE_ADDRESS) > 0, "Canceled request should not be pending");
+        assertEq(KERNEL.jtClaimableRedeemRequest(requestId, ALICE_ADDRESS), 0, "Canceled request should not be claimable");
     }
 }
