@@ -2130,3 +2130,491 @@ contract RoycoAccountantLLTVInvariantTest is BaseTest {
         }
     }
 }
+
+// =============================================================================
+// MOCK KERNEL FOR ADMIN FUNCTION TESTING
+// =============================================================================
+
+/// @notice Mock kernel contract that supports syncTrancheAccounting callback
+contract MockKernelForAdmin {
+    IRoycoAccountant public accountant;
+    NAV_UNIT public stRawNAV;
+    NAV_UNIT public jtRawNAV;
+
+    constructor() {
+        stRawNAV = NAV_UNIT.wrap(100e18);
+        jtRawNAV = NAV_UNIT.wrap(50e18);
+    }
+
+    function setAccountant(address _accountant) external {
+        accountant = IRoycoAccountant(_accountant);
+    }
+
+    function setNAVs(uint256 _stRawNAV, uint256 _jtRawNAV) external {
+        stRawNAV = NAV_UNIT.wrap(uint128(_stRawNAV));
+        jtRawNAV = NAV_UNIT.wrap(uint128(_jtRawNAV));
+    }
+
+    function syncTrancheAccounting() external returns (SyncedAccountingState memory) {
+        return accountant.preOpSyncTrancheAccounting(stRawNAV, jtRawNAV);
+    }
+}
+
+// =============================================================================
+// ADMIN FUNCTION TESTS
+// =============================================================================
+
+contract RoycoAccountantAdminTest is BaseTest {
+    using Math for uint256;
+    using UnitsMathLib for NAV_UNIT;
+
+    RoycoAccountant internal accountantImpl;
+    IRoycoAccountant internal accountant;
+    AdaptiveCurveYDM internal adaptiveYDM;
+    AdaptiveCurveYDM internal newYDM;
+    AccessManager internal accessManager;
+    MockKernelForAdmin internal mockKernel;
+
+    uint64 internal LLTV_WAD = 0.95e18;
+
+    function setUp() public {
+        _setUpRoyco();
+
+        mockKernel = new MockKernelForAdmin();
+        accessManager = new AccessManager(OWNER_ADDRESS);
+        adaptiveYDM = new AdaptiveCurveYDM();
+        newYDM = new AdaptiveCurveYDM();
+        accountantImpl = new RoycoAccountant();
+
+        bytes memory ydmInitData = abi.encodeCall(AdaptiveCurveYDM.initializeYDMForMarket, (0.3e18, 0.9e18));
+
+        IRoycoAccountant.RoycoAccountantInitParams memory params = IRoycoAccountant.RoycoAccountantInitParams({
+            kernel: address(mockKernel),
+            stProtocolFeeWAD: ST_PROTOCOL_FEE_WAD,
+            jtProtocolFeeWAD: JT_PROTOCOL_FEE_WAD,
+            coverageWAD: COVERAGE_WAD,
+            betaWAD: BETA_WAD,
+            ydm: address(adaptiveYDM),
+            ydmInitializationData: ydmInitData,
+            fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
+            lltvWAD: LLTV_WAD
+        });
+
+        bytes memory initData = abi.encodeCall(RoycoAccountant.initialize, (params, address(accessManager)));
+        address proxy = address(new ERC1967Proxy(address(accountantImpl), initData));
+        accountant = IRoycoAccountant(proxy);
+
+        mockKernel.setAccountant(address(accountant));
+
+        // Grant admin role to OWNER_ADDRESS
+        vm.startPrank(OWNER_ADDRESS);
+        accessManager.grantRole(0, OWNER_ADDRESS, 0); // Admin role
+        vm.stopPrank();
+    }
+
+    function _nav(uint256 value) internal pure returns (NAV_UNIT) {
+        return NAV_UNIT.wrap(uint128(value));
+    }
+
+    // =========================================================================
+    // setCoverage Tests
+    // =========================================================================
+
+    function test_setCoverage_success() public {
+        uint64 newCoverage = 0.15e18;
+
+        vm.prank(OWNER_ADDRESS);
+        accountant.setCoverage(newCoverage);
+
+        assertEq(accountant.getState().coverageWAD, newCoverage, "Coverage not updated");
+    }
+
+    function test_setCoverage_triggersSync() public {
+        // Set NAVs that will change state
+        mockKernel.setNAVs(100e18, 50e18);
+
+        vm.prank(OWNER_ADDRESS);
+        accountant.setCoverage(0.15e18);
+
+        // Sync should have been called
+        IRoycoAccountant.RoycoAccountantState memory state = accountant.getState();
+        assertEq(toUint256(state.lastSTRawNAV), 100e18, "Sync not triggered");
+    }
+
+    function testFuzz_setCoverage(uint64 newCoverage) public {
+        // Bound to valid coverage range
+        newCoverage = uint64(bound(newCoverage, MIN_COVERAGE_WAD, WAD - 1));
+
+        // Also need to ensure coverage * beta < 1
+        uint96 beta = accountant.getState().betaWAD;
+        if (uint256(newCoverage) * beta / WAD >= WAD) {
+            return; // Skip invalid config
+        }
+
+        vm.prank(OWNER_ADDRESS);
+        try accountant.setCoverage(newCoverage) {
+            assertEq(accountant.getState().coverageWAD, newCoverage);
+        } catch {
+            // Invalid config - acceptable
+        }
+    }
+
+    // =========================================================================
+    // setBeta Tests
+    // =========================================================================
+
+    function test_setBeta_success() public {
+        uint96 newBeta = 0.5e18;
+
+        vm.prank(OWNER_ADDRESS);
+        accountant.setBeta(newBeta);
+
+        assertEq(accountant.getState().betaWAD, newBeta, "Beta not updated");
+    }
+
+    function testFuzz_setBeta(uint96 newBeta) public {
+        newBeta = uint96(bound(newBeta, 0, 2e18));
+
+        uint64 coverage = accountant.getState().coverageWAD;
+        if (uint256(coverage) * newBeta / WAD >= WAD) {
+            return; // Skip invalid config
+        }
+
+        vm.prank(OWNER_ADDRESS);
+        try accountant.setBeta(newBeta) {
+            assertEq(accountant.getState().betaWAD, newBeta);
+        } catch {
+            // Invalid config - acceptable
+        }
+    }
+
+    // =========================================================================
+    // setLLTV Tests
+    // =========================================================================
+
+    function test_setLLTV_success() public {
+        uint64 newLLTV = 0.98e18;
+
+        vm.prank(OWNER_ADDRESS);
+        accountant.setLLTV(newLLTV);
+
+        assertEq(accountant.getState().lltvWAD, newLLTV, "LLTV not updated");
+    }
+
+    function testFuzz_setLLTV(uint64 newLLTV) public {
+        newLLTV = uint64(bound(newLLTV, 0.5e18, WAD - 1));
+
+        vm.prank(OWNER_ADDRESS);
+        try accountant.setLLTV(newLLTV) {
+            assertEq(accountant.getState().lltvWAD, newLLTV);
+        } catch {
+            // Invalid config - acceptable
+        }
+    }
+
+    // =========================================================================
+    // setYDM Tests
+    // =========================================================================
+
+    function test_setYDM_success() public {
+        bytes memory ydmInitData = abi.encodeCall(AdaptiveCurveYDM.initializeYDMForMarket, (0.4e18, 0.8e18));
+
+        vm.prank(OWNER_ADDRESS);
+        accountant.setYDM(address(newYDM), ydmInitData);
+
+        assertEq(accountant.getState().ydm, address(newYDM), "YDM not updated");
+    }
+
+    // =========================================================================
+    // setSeniorTrancheProtocolFee Tests
+    // =========================================================================
+
+    function test_setSeniorTrancheProtocolFee_success() public {
+        uint64 newFee = 0.05e18;
+
+        vm.prank(OWNER_ADDRESS);
+        accountant.setSeniorTrancheProtocolFee(newFee);
+
+        assertEq(accountant.getState().stProtocolFeeWAD, newFee, "ST fee not updated");
+    }
+
+    function testFuzz_setSeniorTrancheProtocolFee(uint64 newFee) public {
+        newFee = uint64(bound(newFee, 0, MAX_PROTOCOL_FEE_WAD));
+
+        vm.prank(OWNER_ADDRESS);
+        accountant.setSeniorTrancheProtocolFee(newFee);
+
+        assertEq(accountant.getState().stProtocolFeeWAD, newFee);
+    }
+
+    function test_setSeniorTrancheProtocolFee_revert_exceedsMax() public {
+        uint64 invalidFee = uint64(MAX_PROTOCOL_FEE_WAD + 1);
+
+        vm.prank(OWNER_ADDRESS);
+        vm.expectRevert(IRoycoAccountant.MAX_PROTOCOL_FEE_EXCEEDED.selector);
+        accountant.setSeniorTrancheProtocolFee(invalidFee);
+    }
+
+    // =========================================================================
+    // setJuniorTrancheProtocolFee Tests
+    // =========================================================================
+
+    function test_setJuniorTrancheProtocolFee_success() public {
+        uint64 newFee = 0.08e18;
+
+        vm.prank(OWNER_ADDRESS);
+        accountant.setJuniorTrancheProtocolFee(newFee);
+
+        assertEq(accountant.getState().jtProtocolFeeWAD, newFee, "JT fee not updated");
+    }
+
+    function testFuzz_setJuniorTrancheProtocolFee(uint64 newFee) public {
+        newFee = uint64(bound(newFee, 0, MAX_PROTOCOL_FEE_WAD));
+
+        vm.prank(OWNER_ADDRESS);
+        accountant.setJuniorTrancheProtocolFee(newFee);
+
+        assertEq(accountant.getState().jtProtocolFeeWAD, newFee);
+    }
+
+    function test_setJuniorTrancheProtocolFee_revert_exceedsMax() public {
+        uint64 invalidFee = uint64(MAX_PROTOCOL_FEE_WAD + 1);
+
+        vm.prank(OWNER_ADDRESS);
+        vm.expectRevert(IRoycoAccountant.MAX_PROTOCOL_FEE_EXCEEDED.selector);
+        accountant.setJuniorTrancheProtocolFee(invalidFee);
+    }
+
+    // =========================================================================
+    // setFixedTermDuration Tests
+    // =========================================================================
+
+    function test_setFixedTermDuration_success() public {
+        uint24 newDuration = 14 days;
+
+        vm.prank(OWNER_ADDRESS);
+        accountant.setFixedTermDuration(newDuration);
+
+        assertEq(accountant.getState().fixedTermDurationSeconds, newDuration, "Duration not updated");
+    }
+
+    function test_setFixedTermDuration_zero_clearsCoverageIL() public {
+        // First create some coverage IL by creating ST loss
+        mockKernel.setNAVs(100e18, 50e18);
+        mockKernel.syncTrancheAccounting();
+
+        // Create ST loss to generate coverage IL
+        mockKernel.setNAVs(80e18, 50e18);
+        mockKernel.syncTrancheAccounting();
+
+        // Now set duration to 0 - should clear coverage IL
+        vm.prank(OWNER_ADDRESS);
+        accountant.setFixedTermDuration(0);
+
+        IRoycoAccountant.RoycoAccountantState memory state = accountant.getState();
+        assertEq(toUint256(state.lastJTCoverageImpermanentLoss), 0, "Coverage IL not cleared");
+        assertEq(uint8(state.lastMarketState), uint8(MarketState.PERPETUAL), "Not perpetual");
+    }
+
+    function testFuzz_setFixedTermDuration(uint24 newDuration) public {
+        vm.prank(OWNER_ADDRESS);
+        accountant.setFixedTermDuration(newDuration);
+
+        assertEq(accountant.getState().fixedTermDurationSeconds, newDuration);
+    }
+}
+
+// =============================================================================
+// EDGE CASE COVERAGE TESTS
+// =============================================================================
+
+contract RoycoAccountantEdgeCaseTest is BaseTest {
+    using Math for uint256;
+    using UnitsMathLib for NAV_UNIT;
+
+    RoycoAccountant internal accountantImpl;
+    IRoycoAccountant internal accountant;
+    AdaptiveCurveYDM internal adaptiveYDM;
+    AccessManager internal accessManager;
+
+    address internal MOCK_KERNEL;
+    uint64 internal LLTV_WAD = 0.95e18;
+
+    function setUp() public {
+        _setUpRoyco();
+
+        MOCK_KERNEL = makeAddr("MOCK_KERNEL");
+        accessManager = new AccessManager(OWNER_ADDRESS);
+        adaptiveYDM = new AdaptiveCurveYDM();
+        accountantImpl = new RoycoAccountant();
+
+        bytes memory ydmInitData = abi.encodeCall(AdaptiveCurveYDM.initializeYDMForMarket, (0.3e18, 0.9e18));
+
+        IRoycoAccountant.RoycoAccountantInitParams memory params = IRoycoAccountant.RoycoAccountantInitParams({
+            kernel: MOCK_KERNEL,
+            stProtocolFeeWAD: ST_PROTOCOL_FEE_WAD,
+            jtProtocolFeeWAD: JT_PROTOCOL_FEE_WAD,
+            coverageWAD: COVERAGE_WAD,
+            betaWAD: BETA_WAD,
+            ydm: address(adaptiveYDM),
+            ydmInitializationData: ydmInitData,
+            fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
+            lltvWAD: LLTV_WAD
+        });
+
+        bytes memory initData = abi.encodeCall(RoycoAccountant.initialize, (params, address(accessManager)));
+        address proxy = address(new ERC1967Proxy(address(accountantImpl), initData));
+        accountant = IRoycoAccountant(proxy);
+    }
+
+    function _nav(uint256 value) internal pure returns (NAV_UNIT) {
+        return NAV_UNIT.wrap(uint128(value));
+    }
+
+    // =========================================================================
+    // ST Withdrawal with JT Coverage AND JT Self IL (Line 176)
+    // =========================================================================
+
+    /// @notice Tests ST withdrawal when there's both JT coverage realization AND existing JT self IL
+    /// This covers line 176: proportional reduction of JT self IL during ST withdrawal
+    function test_stWithdrawal_withJTCoverageAndJTSelfIL() public {
+        // Initialize
+        vm.prank(MOCK_KERNEL);
+        accountant.preOpSyncTrancheAccounting(_nav(100e18), _nav(50e18));
+
+        vm.warp(block.timestamp + 1 days);
+
+        // Step 1: Create JT self IL via JT loss
+        vm.prank(MOCK_KERNEL);
+        accountant.preOpSyncTrancheAccounting(_nav(100e18), _nav(30e18)); // JT loses 20e18
+
+        IRoycoAccountant.RoycoAccountantState memory state1 = accountant.getState();
+        assertGt(toUint256(state1.lastJTSelfImpermanentLoss), 0, "JT self IL should exist");
+
+        // Step 2: Create ST loss (JT coverage) while JT self IL exists
+        vm.warp(block.timestamp + 1 days);
+        vm.prank(MOCK_KERNEL);
+        accountant.preOpSyncTrancheAccounting(_nav(80e18), _nav(30e18)); // ST loses 20e18
+
+        IRoycoAccountant.RoycoAccountantState memory state2 = accountant.getState();
+        uint256 jtSelfILBefore = toUint256(state2.lastJTSelfImpermanentLoss);
+
+        // Step 3: ST withdrawal that pulls JT coverage (deltaJT != 0)
+        // When ST withdraws and claims from JT (coverage), line 176 should be hit
+        uint256 stWithdrawAmount = 10e18;
+        uint256 jtCoverageAmount = 5e18; // JT provides coverage
+
+        vm.prank(MOCK_KERNEL);
+        accountant.postOpSyncTrancheAccounting(_nav(80e18 - stWithdrawAmount), _nav(30e18 - jtCoverageAmount), Operation.ST_DECREASE_NAV);
+
+        IRoycoAccountant.RoycoAccountantState memory state3 = accountant.getState();
+
+        // JT self IL should be proportionally reduced
+        if (jtSelfILBefore > 0) {
+            // newJTSelfIL = oldJTSelfIL * newJTRawNAV / oldJTRawNAV
+            uint256 expectedJTSelfIL = jtSelfILBefore * (30e18 - jtCoverageAmount) / 30e18;
+            assertApproxEqRel(toUint256(state3.lastJTSelfImpermanentLoss), expectedJTSelfIL, 0.01e18, "JT self IL not proportionally reduced");
+        }
+    }
+
+    /// @notice Fuzz test for ST withdrawal with JT coverage and JT self IL
+    function testFuzz_stWithdrawal_withJTCoverageAndJTSelfIL(
+        uint256 initialST,
+        uint256 initialJT,
+        uint256 jtLoss,
+        uint256 stLoss,
+        uint256 stWithdraw,
+        uint256 jtCoverage
+    )
+        public
+    {
+        initialST = bound(initialST, 50e18, 1000e18);
+        initialJT = bound(initialJT, initialST / 2, initialST);
+        jtLoss = bound(jtLoss, 1e18, initialJT / 2);
+        stLoss = bound(stLoss, 1e18, initialST / 4);
+        stWithdraw = bound(stWithdraw, 1e18, (initialST - stLoss) / 2);
+        jtCoverage = bound(jtCoverage, 1e16, (initialJT - jtLoss) / 4);
+
+        // Initialize
+        vm.prank(MOCK_KERNEL);
+        accountant.preOpSyncTrancheAccounting(_nav(initialST), _nav(initialJT));
+
+        vm.warp(block.timestamp + 1 days);
+
+        // Create JT self IL
+        vm.prank(MOCK_KERNEL);
+        accountant.preOpSyncTrancheAccounting(_nav(initialST), _nav(initialJT - jtLoss));
+
+        // Create ST loss (JT coverage)
+        vm.warp(block.timestamp + 1 days);
+        vm.prank(MOCK_KERNEL);
+        accountant.preOpSyncTrancheAccounting(_nav(initialST - stLoss), _nav(initialJT - jtLoss));
+
+        IRoycoAccountant.RoycoAccountantState memory stateBefore = accountant.getState();
+        uint256 jtSelfILBefore = toUint256(stateBefore.lastJTSelfImpermanentLoss);
+        uint256 jtRawBefore = toUint256(stateBefore.lastJTRawNAV);
+
+        // ST withdrawal with JT coverage
+        vm.prank(MOCK_KERNEL);
+        try accountant.postOpSyncTrancheAccounting(_nav(initialST - stLoss - stWithdraw), _nav(initialJT - jtLoss - jtCoverage), Operation.ST_DECREASE_NAV) {
+            if (jtSelfILBefore > 0 && jtCoverage > 0) {
+                IRoycoAccountant.RoycoAccountantState memory stateAfter = accountant.getState();
+                // JT self IL should be reduced when JT raw NAV decreases
+                assertLe(toUint256(stateAfter.lastJTSelfImpermanentLoss), jtSelfILBefore, "JT self IL should not increase");
+            }
+        } catch {
+            // Invalid state - acceptable
+        }
+    }
+
+    // =========================================================================
+    // maxSTDepositGivenCoverage Tests (Line 278)
+    // =========================================================================
+
+    function test_maxSTDepositGivenCoverage() public {
+        // Initialize
+        vm.prank(MOCK_KERNEL);
+        accountant.preOpSyncTrancheAccounting(_nav(100e18), _nav(100e18));
+
+        // Get max ST deposit given coverage
+        NAV_UNIT maxDeposit = accountant.maxSTDepositGivenCoverage(_nav(100e18), _nav(100e18));
+
+        // Should return some positive value for healthy coverage
+        assertGt(toUint256(maxDeposit), 0, "Max ST deposit should be positive");
+    }
+
+    function testFuzz_maxSTDepositGivenCoverage(uint256 stRaw, uint256 jtRaw) public {
+        stRaw = bound(stRaw, 1e18, 1000e18);
+        jtRaw = bound(jtRaw, stRaw / 4, stRaw * 2);
+
+        // Initialize
+        vm.prank(MOCK_KERNEL);
+        accountant.preOpSyncTrancheAccounting(_nav(stRaw), _nav(jtRaw));
+
+        // Get max ST deposit given coverage
+        NAV_UNIT maxDeposit = accountant.maxSTDepositGivenCoverage(_nav(stRaw), _nav(jtRaw));
+
+        // Max deposit should be bounded
+        assertLe(toUint256(maxDeposit), 1e40, "Max deposit unbounded");
+    }
+
+    // =========================================================================
+    // maxJTWithdrawalGivenCoverage Tests
+    // =========================================================================
+
+    function test_maxJTWithdrawalGivenCoverage() public {
+        // Initialize
+        vm.prank(MOCK_KERNEL);
+        accountant.preOpSyncTrancheAccounting(_nav(100e18), _nav(100e18));
+
+        // Get max JT withdrawal given coverage
+        // JT claims on ST and JT (simplified - equal split for balanced market)
+        (NAV_UNIT totalNAVClaimable, NAV_UNIT stClaimable, NAV_UNIT jtClaimable) =
+            accountant.maxJTWithdrawalGivenCoverage(_nav(100e18), _nav(100e18), _nav(50e18), _nav(50e18));
+
+        // Should return some positive value
+        assertGt(toUint256(totalNAVClaimable), 0, "Max JT withdrawal should be positive");
+        // Components should sum correctly
+        assertEq(toUint256(stClaimable) + toUint256(jtClaimable), toUint256(totalNAVClaimable), "Components should sum to total");
+    }
+}

@@ -484,7 +484,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
                     // Get the instantaneous YDM output and ensure that JT cannot earn more than 100% of senior appreciation
                     uint256 instantaneousJtYieldShareWAD =
                         IYDM($.ydm).previewJTYieldShare($.lastMarketState, $.lastSTRawNAV, $.lastJTRawNAV, $.betaWAD, $.coverageWAD, $.lastJTEffectiveNAV);
-                    instantaneousJtYieldShareWAD = (instantaneousJtYieldShareWAD > WAD) ? WAD : instantaneousJtYieldShareWAD;
+                    if (instantaneousJtYieldShareWAD > WAD) instantaneousJtYieldShareWAD = WAD;
                     jtGain = stGain.mulDiv(instantaneousJtYieldShareWAD, WAD, Math.Rounding.Floor);
                 } else {
                     jtGain = stGain.mulDiv(_twJTYieldShareAccruedWAD, elapsed * WAD, Math.Rounding.Floor);
@@ -565,7 +565,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         // Get the instantaneous JT yield share, scaled to WAD precision
         uint256 jtYieldShareWAD = IYDM($.ydm).jtYieldShare($.lastMarketState, $.lastSTRawNAV, $.lastJTRawNAV, $.betaWAD, $.coverageWAD, $.lastJTEffectiveNAV);
         // Ensure that JT cannot earn more than 100% of senior appreciation
-        jtYieldShareWAD = (jtYieldShareWAD > WAD) ? WAD : jtYieldShareWAD;
+        if (jtYieldShareWAD > WAD) jtYieldShareWAD = WAD;
 
         // Accrue the time-weighted yield share accrued to JT since the last tranche interaction
         /// forge-lint: disable-next-item(unsafe-typecast)
@@ -597,7 +597,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         uint256 jtYieldShareWAD =
             IYDM($.ydm).previewJTYieldShare($.lastMarketState, $.lastSTRawNAV, $.lastJTRawNAV, $.betaWAD, $.coverageWAD, $.lastJTEffectiveNAV);
         // Ensure that JT cannot earn more than 100% of senior appreciation
-        jtYieldShareWAD = (jtYieldShareWAD > WAD) ? WAD : jtYieldShareWAD;
+        if (jtYieldShareWAD > WAD) jtYieldShareWAD = WAD;
 
         // Apply the accural of JT yield share to the accumulator, weighted by the time elapsed
         /// forge-lint: disable-next-item(unsafe-typecast)

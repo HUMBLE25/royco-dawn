@@ -1,0 +1,2133 @@
+Warning: This is a nightly build of Foundry. It is recommended to use the latest stable version. To mute this warning set `FOUNDRY_DISABLE_NIGHTLY_WARNING` in your environment. 
+
+Warning: `--ir-minimum` enables `viaIR` with minimum optimization, which can result in inaccurate source mappings.
+Only use this flag as a workaround if you are experiencing "stack too deep" errors.
+Note that `viaIR` is production ready since Solidity 0.8.13 and above.
+See more: https://github.com/foundry-rs/foundry/issues/3357
+Compiling 145 files with Solc 0.8.31
+Solc 0.8.31 finished in 50.76s
+Compiler run successful with warnings:
+Warning (2519): This declaration shadows an existing declaration.
+   --> test/erc4626st-aavejt/BasicOperations.t.sol:247:13:
+    |
+247 |             AssetClaims memory convertToAssetsResult = ST.convertToAssets(shares);
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Note: The shadowed declaration is here:
+   --> test/erc4626st-aavejt/BasicOperations.t.sol:317:9:
+    |
+317 |         AssetClaims memory convertToAssetsResult = ST.convertToAssets(shares + stDepositorSharesBeforeDeposit);
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Warning (2519): This declaration shadows an existing declaration.
+   --> test/erc4626st-aavejt/BasicOperations.t.sol:253:13:
+    |
+253 |             AssetClaims memory previewRedeemResult = ST.previewRedeem(shares);
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Note: The shadowed declaration is here:
+   --> test/erc4626st-aavejt/BasicOperations.t.sol:323:9:
+    |
+323 |         AssetClaims memory previewRedeemResult = ST.previewRedeem(shares + stDepositorSharesBeforeDeposit);
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Warning (2519): This declaration shadows an existing declaration.
+   --> test/erc4626st-aavejt/BasicOperations.t.sol:259:13:
+    |
+259 |             uint256 maxRedeem = ST.maxRedeem(stDepositor);
+    |             ^^^^^^^^^^^^^^^^^
+Note: The shadowed declaration is here:
+   --> test/erc4626st-aavejt/BasicOperations.t.sol:329:9:
+    |
+329 |         uint256 maxRedeem = ST.maxRedeem(stDepositor);
+    |         ^^^^^^^^^^^^^^^^^
+
+Warning (2519): This declaration shadows an existing declaration.
+   --> test/erc4626st-aavejt/BasicOperations.t.sol:656:14:
+    |
+656 |             (uint256 requestId,) = JT.requestRedeem(jtShares, jtDepositor, jtDepositor);
+    |              ^^^^^^^^^^^^^^^^^
+Note: The shadowed declaration is here:
+   --> test/erc4626st-aavejt/BasicOperations.t.sol:686:9:
+    |
+686 |         uint256 requestId;
+    |         ^^^^^^^^^^^^^^^^^
+
+Warning (2519): This declaration shadows an existing declaration.
+    --> test/erc4626st-aavejt/KernelComprehensive.t.sol:1332:10:
+     |
+1332 |         (SyncedAccountingState memory stState,,) = KERNEL.previewSyncTrancheAccounting(TrancheType.SENIOR);
+     |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Note: The shadowed declaration is here:
+  --> test/erc4626st-aavejt/KernelComprehensive.t.sol:25:5:
+   |
+25 |     TrancheState internal stState;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Warning (2519): This declaration shadows an existing declaration.
+    --> test/erc4626st-aavejt/KernelComprehensive.t.sol:1333:10:
+     |
+1333 |         (SyncedAccountingState memory jtState,,) = KERNEL.previewSyncTrancheAccounting(TrancheType.JUNIOR);
+     |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Note: The shadowed declaration is here:
+  --> test/erc4626st-aavejt/KernelComprehensive.t.sol:26:5:
+   |
+26 |     TrancheState internal jtState;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Warning (2519): This declaration shadows an existing declaration.
+    --> test/erc4626st-aavejt/KernelComprehensive.t.sol:1884:10:
+     |
+1884 |         (SyncedAccountingState memory stState,,) = KERNEL.previewSyncTrancheAccounting(TrancheType.SENIOR);
+     |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Note: The shadowed declaration is here:
+  --> test/erc4626st-aavejt/KernelComprehensive.t.sol:25:5:
+   |
+25 |     TrancheState internal stState;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Warning (2519): This declaration shadows an existing declaration.
+    --> test/erc4626st-aavejt/KernelComprehensive.t.sol:1885:10:
+     |
+1885 |         (SyncedAccountingState memory jtState,,) = KERNEL.previewSyncTrancheAccounting(TrancheType.JUNIOR);
+     |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Note: The shadowed declaration is here:
+  --> test/erc4626st-aavejt/KernelComprehensive.t.sol:26:5:
+   |
+26 |     TrancheState internal jtState;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/StdStorage.sol:297:13:
+    |
+297 |             assembly {
+    |             ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/StdStorage.sol:404:9:
+    |
+404 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+  --> lib/forge-std/src/console.sol:11:9:
+   |
+11 |         assembly {
+   |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+  --> lib/forge-std/src/safeconsole.sol:15:9:
+   |
+15 |         assembly {
+   |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+  --> lib/forge-std/src/safeconsole.sol:23:9:
+   |
+23 |         assembly {
+   |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+  --> lib/forge-std/src/safeconsole.sol:32:9:
+   |
+32 |         assembly {
+   |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+  --> lib/forge-std/src/safeconsole.sol:40:9:
+   |
+40 |         assembly {
+   |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+  --> lib/forge-std/src/safeconsole.sol:52:13:
+   |
+52 |             assembly {
+   |             ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+  --> lib/forge-std/src/safeconsole.sol:63:13:
+   |
+63 |             assembly {
+   |             ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+  --> lib/forge-std/src/safeconsole.sol:75:13:
+   |
+75 |             assembly {
+   |             ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+  --> lib/forge-std/src/safeconsole.sol:82:13:
+   |
+82 |             assembly {
+   |             ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+  --> lib/forge-std/src/safeconsole.sol:91:13:
+   |
+91 |             assembly {
+   |             ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:103:9:
+    |
+103 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:112:9:
+    |
+112 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:122:9:
+    |
+122 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:131:9:
+    |
+131 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:141:9:
+    |
+141 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:150:9:
+    |
+150 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:162:9:
+    |
+162 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:181:9:
+    |
+181 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:194:9:
+    |
+194 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:205:9:
+    |
+205 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:217:9:
+    |
+217 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:228:9:
+    |
+228 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:240:9:
+    |
+240 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:251:9:
+    |
+251 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:265:9:
+    |
+265 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:286:9:
+    |
+286 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:300:9:
+    |
+300 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:311:9:
+    |
+311 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:323:9:
+    |
+323 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:334:9:
+    |
+334 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:346:9:
+    |
+346 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:357:9:
+    |
+357 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:371:9:
+    |
+371 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:392:9:
+    |
+392 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:406:9:
+    |
+406 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:417:9:
+    |
+417 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:429:9:
+    |
+429 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:440:9:
+    |
+440 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:452:9:
+    |
+452 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:463:9:
+    |
+463 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:477:9:
+    |
+477 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:498:9:
+    |
+498 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:514:9:
+    |
+514 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:535:9:
+    |
+535 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:551:9:
+    |
+551 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:572:9:
+    |
+572 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:588:9:
+    |
+588 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:609:9:
+    |
+609 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:627:9:
+    |
+627 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:651:9:
+    |
+651 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:668:9:
+    |
+668 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:681:9:
+    |
+681 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:695:9:
+    |
+695 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:708:9:
+    |
+708 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:722:9:
+    |
+722 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:735:9:
+    |
+735 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:751:9:
+    |
+751 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:774:9:
+    |
+774 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:790:9:
+    |
+790 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:803:9:
+    |
+803 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:817:9:
+    |
+817 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:830:9:
+    |
+830 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:844:9:
+    |
+844 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:857:9:
+    |
+857 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:873:9:
+    |
+873 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:896:9:
+    |
+896 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:912:9:
+    |
+912 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:925:9:
+    |
+925 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:939:9:
+    |
+939 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:952:9:
+    |
+952 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:966:9:
+    |
+966 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:979:9:
+    |
+979 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+   --> lib/forge-std/src/safeconsole.sol:995:9:
+    |
+995 |         assembly {
+    |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1018:9:
+     |
+1018 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1036:9:
+     |
+1036 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1059:9:
+     |
+1059 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1077:9:
+     |
+1077 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1100:9:
+     |
+1100 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1118:9:
+     |
+1118 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1141:9:
+     |
+1141 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1161:9:
+     |
+1161 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1187:9:
+     |
+1187 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1205:9:
+     |
+1205 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1218:9:
+     |
+1218 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1232:9:
+     |
+1232 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1245:9:
+     |
+1245 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1259:9:
+     |
+1259 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1272:9:
+     |
+1272 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1288:9:
+     |
+1288 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1311:9:
+     |
+1311 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1327:9:
+     |
+1327 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1340:9:
+     |
+1340 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1354:9:
+     |
+1354 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1367:9:
+     |
+1367 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1381:9:
+     |
+1381 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1394:9:
+     |
+1394 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1410:9:
+     |
+1410 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1433:9:
+     |
+1433 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1449:9:
+     |
+1449 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1462:9:
+     |
+1462 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1476:9:
+     |
+1476 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1489:9:
+     |
+1489 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1503:9:
+     |
+1503 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1516:9:
+     |
+1516 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1532:9:
+     |
+1532 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1555:9:
+     |
+1555 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1573:9:
+     |
+1573 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1596:9:
+     |
+1596 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1614:9:
+     |
+1614 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1637:9:
+     |
+1637 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1655:9:
+     |
+1655 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1678:9:
+     |
+1678 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1698:9:
+     |
+1698 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1724:9:
+     |
+1724 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1742:9:
+     |
+1742 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1755:9:
+     |
+1755 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1769:9:
+     |
+1769 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1782:9:
+     |
+1782 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1796:9:
+     |
+1796 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1809:9:
+     |
+1809 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1825:9:
+     |
+1825 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1848:9:
+     |
+1848 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1864:9:
+     |
+1864 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1877:9:
+     |
+1877 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1891:9:
+     |
+1891 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1904:9:
+     |
+1904 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1918:9:
+     |
+1918 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1931:9:
+     |
+1931 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1947:9:
+     |
+1947 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1970:9:
+     |
+1970 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1986:9:
+     |
+1986 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:1999:9:
+     |
+1999 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2013:9:
+     |
+2013 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2026:9:
+     |
+2026 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2040:9:
+     |
+2040 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2053:9:
+     |
+2053 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2069:9:
+     |
+2069 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2092:9:
+     |
+2092 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2110:9:
+     |
+2110 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2133:9:
+     |
+2133 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2151:9:
+     |
+2151 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2174:9:
+     |
+2174 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2192:9:
+     |
+2192 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2215:9:
+     |
+2215 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2235:9:
+     |
+2235 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2261:9:
+     |
+2261 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2281:9:
+     |
+2281 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2304:9:
+     |
+2304 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2322:9:
+     |
+2322 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2345:9:
+     |
+2345 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2363:9:
+     |
+2363 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2386:9:
+     |
+2386 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2406:9:
+     |
+2406 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2432:9:
+     |
+2432 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2452:9:
+     |
+2452 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2475:9:
+     |
+2475 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2493:9:
+     |
+2493 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2516:9:
+     |
+2516 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2534:9:
+     |
+2534 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2557:9:
+     |
+2557 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2577:9:
+     |
+2577 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2603:9:
+     |
+2603 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2623:9:
+     |
+2623 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2646:9:
+     |
+2646 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2664:9:
+     |
+2664 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2687:9:
+     |
+2687 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2705:9:
+     |
+2705 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2728:9:
+     |
+2728 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2748:9:
+     |
+2748 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2774:9:
+     |
+2774 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2796:9:
+     |
+2796 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2822:9:
+     |
+2822 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2844:9:
+     |
+2844 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2870:9:
+     |
+2870 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2892:9:
+     |
+2892 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2918:9:
+     |
+2918 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2942:9:
+     |
+2942 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2971:9:
+     |
+2971 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:2992:9:
+     |
+2992 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3007:9:
+     |
+3007 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3023:9:
+     |
+3023 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3038:9:
+     |
+3038 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3054:9:
+     |
+3054 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3069:9:
+     |
+3069 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3087:9:
+     |
+3087 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3112:9:
+     |
+3112 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3130:9:
+     |
+3130 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3145:9:
+     |
+3145 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3161:9:
+     |
+3161 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3176:9:
+     |
+3176 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3192:9:
+     |
+3192 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3207:9:
+     |
+3207 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3225:9:
+     |
+3225 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3250:9:
+     |
+3250 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3268:9:
+     |
+3268 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3283:9:
+     |
+3283 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3299:9:
+     |
+3299 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3314:9:
+     |
+3314 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3330:9:
+     |
+3330 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3345:9:
+     |
+3345 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3363:9:
+     |
+3363 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3388:9:
+     |
+3388 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3408:9:
+     |
+3408 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3433:9:
+     |
+3433 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3453:9:
+     |
+3453 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3478:9:
+     |
+3478 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3498:9:
+     |
+3498 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3523:9:
+     |
+3523 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3545:9:
+     |
+3545 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3573:9:
+     |
+3573 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3593:9:
+     |
+3593 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3608:9:
+     |
+3608 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3624:9:
+     |
+3624 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3639:9:
+     |
+3639 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3655:9:
+     |
+3655 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3670:9:
+     |
+3670 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3688:9:
+     |
+3688 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3713:9:
+     |
+3713 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3731:9:
+     |
+3731 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3746:9:
+     |
+3746 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3762:9:
+     |
+3762 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3777:9:
+     |
+3777 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3793:9:
+     |
+3793 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3808:9:
+     |
+3808 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3826:9:
+     |
+3826 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3851:9:
+     |
+3851 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3869:9:
+     |
+3869 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3884:9:
+     |
+3884 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3900:9:
+     |
+3900 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3915:9:
+     |
+3915 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3931:9:
+     |
+3931 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3946:9:
+     |
+3946 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3964:9:
+     |
+3964 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:3989:9:
+     |
+3989 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:4009:9:
+     |
+4009 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:4034:9:
+     |
+4034 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:4054:9:
+     |
+4054 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:4079:9:
+     |
+4079 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:4099:9:
+     |
+4099 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:4124:9:
+     |
+4124 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:4146:9:
+     |
+4146 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:4174:9:
+     |
+4174 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:4194:9:
+     |
+4194 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:4209:9:
+     |
+4209 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2424): Natspec memory-safe-assembly special comment for inline assembly is deprecated and scheduled for removal. Use the memory-safe block annotation instead.
+    --> lib/forge-std/src/safeconsole.sol:4225:9:
+     |
+4225 |         assembly {
+     |         ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (4591): There are more than 256 warnings. Ignoring the rest.
+Analysing contracts...
+Running tests...
+
+Ran 20 tests for test/accountant/RoycoAccountantComprehensiveTest.t.sol:RoycoAccountantRevertTest
+[PASS] testFuzz_revert_postOpSync_invalidState(uint256,uint256,uint256,uint256,uint8) (runs: 200, μ: 231594, ~: 233849)
+[PASS] testFuzz_revert_preOpSync_onlyKernel(address,uint256,uint256) (runs: 200, μ: 32623, ~: 32240)
+[PASS] test_revert_initialization_coverageAboveMax() (gas: 137560)
+[PASS] test_revert_initialization_coverageBelowMin() (gas: 138312)
+[PASS] test_revert_initialization_coverageBetaTooHigh() (gas: 139443)
+[PASS] test_revert_initialization_excessiveJTProtocolFee() (gas: 137460)
+[PASS] test_revert_initialization_excessiveSTProtocolFee() (gas: 136868)
+[PASS] test_revert_initialization_lltvTooHigh() (gas: 141041)
+[PASS] test_revert_initialization_lltvTooLow() (gas: 144330)
+[PASS] test_revert_initialization_nullYDM() (gas: 140514)
+[PASS] test_revert_postOpSyncAndEnforceCoverage_onlyKernel() (gas: 216241)
+[PASS] test_revert_postOpSyncAndEnforceCoverage_unsatisfied() (gas: 232938)
+[PASS] test_revert_postOpSync_jtDecreaseNAV_positiveDelta() (gas: 217339)
+[PASS] test_revert_postOpSync_jtDecreaseNAV_stPositiveDelta() (gas: 217972)
+[PASS] test_revert_postOpSync_jtIncreaseNAV_negativeDelta() (gas: 216424)
+[PASS] test_revert_postOpSync_onlyKernel() (gas: 216471)
+[PASS] test_revert_postOpSync_stDecreaseNAV_jtPositiveDelta() (gas: 217714)
+[PASS] test_revert_postOpSync_stDecreaseNAV_positiveDelta() (gas: 217403)
+[PASS] test_revert_postOpSync_stIncreaseNAV_negativeDelta() (gas: 215978)
+[PASS] test_revert_preOpSync_onlyKernel() (gas: 23884)
+Suite result: ok. 20 passed; 0 failed; 0 skipped; finished in 74.37ms (68.59ms CPU time)
+
+Ran 42 tests for test/ydm/StaticCurveYDM.t.sol:StaticCurveYDMTest
+[PASS] testFuzz_curveConfiguration_continuityAtTarget(uint64,uint64,uint64) (runs: 200, μ: 998103, ~: 998861)
+[PASS] testFuzz_curveConfiguration_invariants(uint64,uint64,uint64,uint256) (runs: 200, μ: 1001664, ~: 1001701)
+[PASS] testFuzz_curveConfiguration_monotonicity(uint64,uint64,uint64,uint256,uint256) (runs: 200, μ: 1013974, ~: 1013645)
+[PASS] testFuzz_initializeYDMForMarket_validParams(uint64,uint64,uint64) (runs: 200, μ: 991634, ~: 992392)
+[PASS] testFuzz_jtYieldShare_matchesPreview(uint128,uint128,uint128,uint128,uint128) (runs: 200, μ: 36760, ~: 37188)
+[PASS] testFuzz_previewJTYieldShare_firstLegFormula(uint256) (runs: 200, μ: 24947, ~: 24495)
+[PASS] testFuzz_previewJTYieldShare_largeNAVValues(uint128) (runs: 200, μ: 31586, ~: 32078)
+[PASS] testFuzz_previewJTYieldShare_monotonicWithUtilization(uint256,uint256) (runs: 200, μ: 38982, ~: 39712)
+[PASS] testFuzz_previewJTYieldShare_resultInValidRange(uint128,uint128,uint128,uint128,uint128) (runs: 200, μ: 26893, ~: 27268)
+[PASS] testFuzz_previewJTYieldShare_secondLegFormula(uint256) (runs: 200, μ: 30446, ~: 30490)
+[PASS] testFuzz_previewJTYieldShare_utilizationAboveOneReturnsWAD(uint128,uint128,uint128,uint128,uint128) (runs: 200, μ: 24230, ~: 17595)
+[PASS] test_differentAccountants_haveDifferentCurves() (gas: 1057245)
+[PASS] test_flatCurve_returnsConstantYield() (gas: 1019142)
+[PASS] test_flatFirstLeg_steepSecondLeg() (gas: 999723)
+[PASS] test_initializeYDMForMarket_allowsAllWAD() (gas: 988479)
+[PASS] test_initializeYDMForMarket_allowsAllZeros() (gas: 948315)
+[PASS] test_initializeYDMForMarket_allowsReinitialization() (gas: 46965)
+[PASS] test_initializeYDMForMarket_emitsEvent() (gas: 987306)
+[PASS] test_initializeYDMForMarket_revertsWhenY0GreaterThanYT() (gas: 928091)
+[PASS] test_initializeYDMForMarket_revertsWhenYFullGreaterThanWAD() (gas: 928792)
+[PASS] test_initializeYDMForMarket_revertsWhenYTGreaterThanYFull() (gas: 927268)
+[PASS] test_initializeYDMForMarket_setsCorrectCurveParams() (gas: 985377)
+[PASS] test_jtYieldShare_ignoresMarketState() (gas: 28625)
+[PASS] test_jtYieldShare_matchesPreview() (gas: 28300)
+[PASS] test_monotonicity_acrossEntireCurve() (gas: 1363603)
+[PASS] test_previewJTYieldShare_continuityAtBoundary() (gas: 3019)
+[PASS] test_previewJTYieldShare_differentBeta() (gas: 20626)
+[PASS] test_previewJTYieldShare_differentCoverage() (gas: 20151)
+[PASS] test_previewJTYieldShare_ignoresMarketState() (gas: 27929)
+[PASS] test_previewJTYieldShare_knownPoints() (gas: 79850)
+[PASS] test_previewJTYieldShare_maxUint128Values() (gas: 19305)
+[PASS] test_previewJTYieldShare_utilizationAboveOne() (gas: 19388)
+[PASS] test_previewJTYieldShare_utilizationAtOne() (gas: 19650)
+[PASS] test_previewJTYieldShare_utilizationAtTarget() (gas: 19031)
+[PASS] test_previewJTYieldShare_utilizationJustAboveTarget() (gas: 18747)
+[PASS] test_previewJTYieldShare_utilizationJustBelowOne() (gas: 19538)
+[PASS] test_previewJTYieldShare_utilizationJustBelowTarget() (gas: 21863)
+[PASS] test_previewJTYieldShare_utilizationZero() (gas: 14546)
+[PASS] test_previewJTYieldShare_zeroBeta() (gas: 20742)
+[PASS] test_previewJTYieldShare_zeroJTEffectiveNAV() (gas: 15189)
+[PASS] test_steepFirstLeg_flatSecondLeg() (gas: 998835)
+[PASS] test_uninitializedAccountant_returnsZero() (gas: 935975)
+Suite result: ok. 42 passed; 0 failed; 0 skipped; finished in 234.26ms (233.67ms CPU time)
+
+Ran 51 tests for test/ydm/AdaptiveCurveYDM.t.sol:AdaptiveCurveYDMTest
+[PASS] testFuzz_adaptation_clampingWorks(uint256,bool) (runs: 200, μ: 2114447, ~: 2091318)
+[PASS] testFuzz_adaptation_directionCorrect(uint256,uint256) (runs: 200, μ: 88683, ~: 89695)
+[PASS] testFuzz_curveConfiguration_invariants(uint64,uint64,uint256) (runs: 200, μ: 1798136, ~: 1797828)
+[PASS] testFuzz_initializeYDMForMarket_validParams(uint64,uint64) (runs: 200, μ: 1768491, ~: 1768770)
+[PASS] testFuzz_jtYieldShare_matchesPreview(uint128,uint128,uint128,uint128,uint128) (runs: 200, μ: 114215, ~: 114758)
+[PASS] testFuzz_monotonicity_acrossUtilization(uint256,uint256) (runs: 200, μ: 70489, ~: 70705)
+[PASS] testFuzz_previewJTYieldShare_resultInValidRange(uint128,uint128,uint128,uint128,uint128) (runs: 200, μ: 46394, ~: 46821)
+[PASS] test_adaptation_clampsToMaximum() (gas: 2101463)
+[PASS] test_adaptation_clampsToMinimum() (gas: 1804209)
+[PASS] test_adaptation_decreasesWithLowUtilization() (gas: 75154)
+[PASS] test_adaptation_emitsEvent() (gas: 78157)
+[PASS] test_adaptation_increasesWithHighUtilization() (gas: 81742)
+[PASS] test_adaptation_noAdaptationAtTargetUtilization() (gas: 81819)
+[PASS] test_adaptation_noAdaptationOnFirstCall() (gas: 1789016)
+[PASS] test_adaptation_updatesTimestamp() (gas: 82341)
+[PASS] test_adversarial_extremeUtilizationSwings() (gas: 327259)
+[PASS] test_adversarial_multipleAccountantsSimultaneous() (gas: 988446)
+[PASS] test_adversarial_rapidStateChanges() (gas: 265573)
+[PASS] test_adversarial_veryLargeNAVValues() (gas: 34448)
+[PASS] test_adversarial_verySmallNAVValues() (gas: 34531)
+[PASS] test_curveOutput_atFullUtilization() (gas: 35801)
+[PASS] test_curveOutput_atTargetUtilization() (gas: 36066)
+[PASS] test_curveOutput_atZeroUtilization() (gas: 36584)
+[PASS] test_curveOutput_cappedAtWAD() (gas: 3534597)
+[PASS] test_curveOutput_continuityAtTarget() (gas: 96966)
+[PASS] test_curveOutput_monotonicallyIncreasing() (gas: 146577)
+[PASS] test_curveOutput_utilizationAboveOneIsCapped() (gas: 63598)
+[PASS] test_differentAccountants_haveDifferentCurves() (gas: 49726)
+[PASS] test_edgeCase_differentBeta() (gas: 90400)
+[PASS] test_edgeCase_differentCoverage() (gas: 63554)
+[PASS] test_edgeCase_zeroBeta() (gas: 35297)
+[PASS] test_edgeCase_zeroJTEffectiveNAV() (gas: 58569)
+[PASS] test_initializeYDMForMarket_allowsMaxYT() (gas: 1758840)
+[PASS] test_initializeYDMForMarket_allowsMinYT() (gas: 1758261)
+[PASS] test_initializeYDMForMarket_allowsReinitialization() (gas: 21759)
+[PASS] test_initializeYDMForMarket_allowsYTEqualsYFull() (gas: 1758269)
+[PASS] test_initializeYDMForMarket_emitsEvent() (gas: 1761634)
+[PASS] test_initializeYDMForMarket_resetsTimestampOnReinit() (gas: 96783)
+[PASS] test_initializeYDMForMarket_revertsWhenYFullGreaterThanWAD() (gas: 1731786)
+[PASS] test_initializeYDMForMarket_revertsWhenYTAboveMax() (gas: 1730846)
+[PASS] test_initializeYDMForMarket_revertsWhenYTBelowMin() (gas: 1731496)
+[PASS] test_initializeYDMForMarket_revertsWhenYTGreaterThanYFull() (gas: 1730101)
+[PASS] test_initializeYDMForMarket_setsCorrectCurveParams() (gas: 1758799)
+[PASS] test_jtYieldShare_adaptsInPerpetualState() (gas: 82133)
+[PASS] test_jtYieldShare_doesNotAdaptInFixedTermState() (gas: 68505)
+[PASS] test_previewJTYieldShare_doesNotModifyState() (gas: 79959)
+[PASS] test_previewJTYieldShare_matchesJtYieldShare() (gas: 103002)
+[PASS] test_simpsonsRule_averageIsCorrect() (gas: 94247)
+[PASS] test_steepness_flatCurve() (gas: 1809390)
+[PASS] test_steepness_steepCurve() (gas: 1781635)
+[PASS] test_uninitializedAccountant_reverts() (gas: 37238)
+Suite result: ok. 51 passed; 0 failed; 0 skipped; finished in 444.90ms (435.82ms CPU time)
+
+Ran 33 tests for test/erc4626st-aavejt/Deployments.t.sol:DeploymentsTest
+[PASS] test_JuniorTrancheDeployment() (gas: 345204)
+[PASS] test_KernelAndAccountantDeployment() (gas: 194331)
+[PASS] test_SeniorTrancheDeployment() (gas: 345401)
+[PASS] test_deployMarket_revertsOnEmptyAccountantInitializationData() (gas: 212292)
+[PASS] test_deployMarket_revertsOnEmptyJuniorTrancheName() (gas: 209121)
+[PASS] test_deployMarket_revertsOnEmptyJuniorTrancheSymbol() (gas: 209734)
+[PASS] test_deployMarket_revertsOnEmptyKernelInitializationData() (gas: 212751)
+[PASS] test_deployMarket_revertsOnEmptySeniorTrancheName() (gas: 209481)
+[PASS] test_deployMarket_revertsOnEmptySeniorTrancheSymbol() (gas: 209908)
+[PASS] test_deployMarket_revertsOnFailedAccountantInitialization() (gas: 1239551)
+[PASS] test_deployMarket_revertsOnFailedJuniorTrancheInitialization() (gas: 980389)
+[PASS] test_deployMarket_revertsOnFailedKernelInitialization() (gas: 1437341)
+[PASS] test_deployMarket_revertsOnFailedSeniorTrancheInitialization() (gas: 709936)
+[PASS] test_deployMarket_revertsOnInvalidAccessManager() (gas: 1633049)
+[PASS] test_deployMarket_revertsOnInvalidAccessManagerForAccountant() (gas: 1627853)
+[PASS] test_deployMarket_revertsOnInvalidAccessManagerForJuniorTranche() (gas: 1636739)
+[PASS] test_deployMarket_revertsOnInvalidAccessManagerForKernel() (gas: 1638873)
+[PASS] test_deployMarket_revertsOnInvalidAccountantOnKernel() (gas: 1651157)
+[PASS] test_deployMarket_revertsOnInvalidKernelOnAccountant() (gas: 1674328)
+[PASS] test_deployMarket_revertsOnInvalidKernelOnJuniorTranche() (gas: 1643799)
+[PASS] test_deployMarket_revertsOnInvalidKernelOnSeniorTranche() (gas: 1639710)
+[PASS] test_deployMarket_revertsOnInvalidTarget() (gas: 1658359)
+[PASS] test_deployMarket_revertsOnInvalidTargetForRandomAddress() (gas: 1657992)
+[PASS] test_deployMarket_revertsOnRolesConfigurationLengthMismatch() (gas: 1657258)
+[PASS] test_deployMarket_revertsOnZeroAccountantImplementation() (gas: 212194)
+[PASS] test_deployMarket_revertsOnZeroAccountantProxyDeploymentSalt() (gas: 213409)
+[PASS] test_deployMarket_revertsOnZeroJuniorAsset() (gas: 211052)
+[PASS] test_deployMarket_revertsOnZeroJuniorTrancheProxyDeploymentSalt() (gas: 212380)
+[PASS] test_deployMarket_revertsOnZeroKernelImplementation() (gas: 211247)
+[PASS] test_deployMarket_revertsOnZeroKernelProxyDeploymentSalt() (gas: 213122)
+[PASS] test_deployMarket_revertsOnZeroMarketId() (gas: 210938)
+[PASS] test_deployMarket_revertsOnZeroSeniorAsset() (gas: 210354)
+[PASS] test_deployMarket_revertsOnZeroSeniorTrancheProxyDeploymentSalt() (gas: 212834)
+Suite result: ok. 33 passed; 0 failed; 0 skipped; finished in 512.92ms (113.85ms CPU time)
+
+Ran 42 tests for test/accountant/RoycoAccountantComprehensiveTest.t.sol:RoycoAccountantComprehensiveTest
+[PASS] testFuzz_deltaMatrix_allCombinations(uint256,uint256,int256,int256,uint256) (runs: 200, μ: 328183, ~: 320651)
+[PASS] testFuzz_ilRecovery_ordering(uint256,uint256,uint256,uint256,uint256) (runs: 200, μ: 325671, ~: 322961)
+[PASS] testFuzz_invariant_coverageConsistency(uint256,uint256) (runs: 200, μ: 260256, ~: 267382)
+[PASS] testFuzz_invariant_coverageILClearedOnPerpetual(uint256,uint256,uint256) (runs: 200, μ: 321407, ~: 321247)
+[PASS] testFuzz_invariant_feesBounded(uint256,uint256) (runs: 200, μ: 299550, ~: 300252)
+[PASS] testFuzz_invariant_jtYieldShareCapped(uint256,uint256) (runs: 200, μ: 308208, ~: 308101)
+[PASS] testFuzz_invariant_navConservation_comprehensive(uint256,uint256,int256,int256,uint256,uint8) (runs: 200, μ: 474871, ~: 453850)
+[PASS] testFuzz_invariant_nonNegativity(uint256,uint256,int256,int256) (runs: 200, μ: 322469, ~: 314305)
+[PASS] testFuzz_invariant_stILImpliesJTExhausted(uint256,uint256,uint256) (runs: 200, μ: 268431, ~: 274518)
+[PASS] testFuzz_maxJTWithdrawal(uint256,uint256,uint256,uint256) (runs: 200, μ: 250843, ~: 250557)
+[PASS] testFuzz_postOp_ilScaling(uint256,uint256,uint256,uint256,uint8) (runs: 200, μ: 297502, ~: 298315)
+[PASS] testFuzz_protocolFees_bounds(uint256,uint256,uint256) (runs: 200, μ: 304254, ~: 304149)
+[PASS] testFuzz_sequence_randomOperations(uint256,uint8) (runs: 200, μ: 668396, ~: 613976)
+[PASS] testFuzz_stateTransition(uint256,uint256,uint256,uint256,uint256) (runs: 200, μ: 337773, ~: 338243)
+[PASS] test_beta_one() (gas: 521077)
+[PASS] test_beta_zero() (gas: 514315)
+[PASS] test_deltaMatrix_bothGain() (gas: 291185)
+[PASS] test_deltaMatrix_bothLose() (gas: 306142)
+[PASS] test_deltaMatrix_jtGain_stFlat() (gas: 256671)
+[PASS] test_deltaMatrix_jtGain_stLoss() (gas: 287457)
+[PASS] test_deltaMatrix_jtLoss_stFlat() (gas: 273522)
+[PASS] test_deltaMatrix_jtLoss_stGain() (gas: 309326)
+[PASS] test_deltaMatrix_noChange() (gas: 252305)
+[PASS] test_deltaMatrix_stGain_jtFlat() (gas: 301631)
+[PASS] test_deltaMatrix_stLoss_jtFlat() (gas: 282963)
+[PASS] test_ilRecovery_jtCoverageILFromSTGain() (gas: 310643)
+[PASS] test_ilRecovery_jtSelfILSecondPriorityOnJTGain() (gas: 269597)
+[PASS] test_ilRecovery_multipleILTypesCoexist() (gas: 289975)
+[PASS] test_ilRecovery_partial() (gas: 324001)
+[PASS] test_ilRecovery_stILFirstPriorityOnJTGain() (gas: 275876)
+[PASS] test_maxJTWithdrawal_basic() (gas: 238361)
+[PASS] test_maxJTWithdrawal_zeroClaims() (gas: 227105)
+[PASS] test_postOp_jtDecreaseScalesJTSelfIL() (gas: 313412)
+[PASS] test_postOp_stDecreaseWithCoverageFromJT() (gas: 306235)
+[PASS] test_protocolFees_jtYield() (gas: 241356)
+[PASS] test_protocolFees_stYield() (gas: 287965)
+[PASS] test_sequence_realisticOperations() (gas: 529744)
+[PASS] test_stateTransition_allPaths() (gas: 405913)
+[PASS] test_stateTransition_lltvBreachTriggersPerpetual() (gas: 240895)
+[PASS] test_stateTransition_zeroDurationAlwaysPerpetual() (gas: 529720)
+[PASS] test_twAccumulator_multiDay() (gas: 591661)
+[PASS] test_twAccumulator_sameBlock() (gas: 338993)
+Suite result: ok. 42 passed; 0 failed; 0 skipped; finished in 1.39s (1.39s CPU time)
+
+Ran 134 tests for test/erc4626st-aavejt/KernelComprehensive.t.sol:KernelComprehensiveTest
+[PASS] testFuzz_conversion_roundTrip_noLoss(uint256) (runs: 200, μ: 22558, ~: 22154)
+[PASS] testFuzz_coverageRatio_alwaysRespected(uint256,uint256) (runs: 200, μ: 1007330, ~: 1007604)
+[PASS] testFuzz_invariant_coverage(uint256,uint256) (runs: 200, μ: 1010811, ~: 1010978)
+[PASS] testFuzz_invariant_navConservation(uint256,uint256,uint256) (runs: 200, μ: 1022130, ~: 1028065)
+[PASS] testFuzz_jtDepositRedeem_preservesValue(uint256) (runs: 200, μ: 954274, ~: 954474)
+[PASS] testFuzz_lossScenarios_maintainAccountingConsistency(uint256,uint256,uint256) (runs: 200, μ: 1035209, ~: 1035486)
+[PASS] testFuzz_sequentialOperations_maintainInvariants(uint256,uint256,uint256) (runs: 200, μ: 1650145, ~: 1650425)
+[PASS] test_accountantFlow_jtGainOnly() (gas: 973144)
+[PASS] test_accountantFlow_jtLossOnly() (gas: 972331)
+[PASS] test_accountantFlow_jtLoss_exceedsJTEffectiveNAV() (gas: 976968)
+[PASS] test_accountantFlow_stGainOnly() (gas: 1051461)
+[PASS] test_accountantFlow_stGain_jtGain() (gas: 1050718)
+[PASS] test_accountantFlow_stGain_jtLoss() (gas: 1056506)
+[PASS] test_accountantFlow_stLossOnly_withJTCoverage() (gas: 977946)
+[PASS] test_accountantFlow_stLoss_exceedsJTCoverage() (gas: 977532)
+[PASS] test_accountantFlow_stLoss_jtGain() (gas: 973922)
+[PASS] test_accountantFlow_stLoss_jtLoss() (gas: 973462)
+[PASS] test_balanceOf_correctValues() (gas: 870745)
+[PASS] test_conversion_oneUnit_correctScaling() (gas: 15600)
+[PASS] test_conversion_roundTrip_preservesValue() (gas: 89070)
+[PASS] test_conversion_stAndJt_consistentForSameAsset() (gas: 19888)
+[PASS] test_conversion_zeroUnits_returnsZero() (gas: 28723)
+[PASS] test_coverageEnforcement_preventsOverDeposit() (gas: 872080)
+[PASS] test_coverageRatio_exactlyAtBoundary() (gas: 997829)
+[PASS] test_depositRedeemDeposit_cycle() (gas: 1114780)
+[PASS] test_deposit_minimumAmount_oneWei_reverts() (gas: 303271)
+[PASS] test_deposit_smallValidAmount() (gas: 497547)
+[PASS] test_fixedTermDurationZero_marketStartsPerpetual() (gas: 1037860)
+[PASS] test_fixedTermDuration_returnsToPerpetualAfterTermElapse() (gas: 1076664)
+[PASS] test_getState_returnsConsistentValues() (gas: 32436)
+[PASS] test_ilRecovery_jtCoverageILFromSTGain() (gas: 1073741)
+[PASS] test_ilRecovery_multipleSequentialCycles() (gas: 1168578)
+[PASS] test_ilRecovery_navConservedThroughCycle() (gas: 1106520)
+[PASS] test_ilRecovery_stILFromSTGain() (gas: 1024127)
+[PASS] test_invariant_coverageRatioRespected() (gas: 1618173)
+[PASS] test_invariant_crossTrancheClaimsConsistent() (gas: 1136495)
+[PASS] test_invariant_impermanentLossesNonNegative() (gas: 972184)
+[PASS] test_invariant_marketStateTransitions() (gas: 1017136)
+[PASS] test_invariant_navConservation() (gas: 1385659)
+[PASS] test_invariant_protocolFeesOnlyOnGains() (gas: 1172280)
+[PASS] test_invariant_sharesValueLessThanOrEqualToAssets() (gas: 1085003)
+[PASS] test_jtAsset_correctAddress() (gas: 15468)
+[PASS] test_jtCancelRedemption_returnsShares() (gas: 787796)
+[PASS] test_jtConvertToAssets_correctClaims() (gas: 560837)
+[PASS] test_jtConvertToShares_correctValue() (gas: 560939)
+[PASS] test_jtDeposit_blockedInFixedTermState() (gas: 999062)
+[PASS] test_jtDeposit_blockedInFixedTermState_comprehensive() (gas: 997203)
+[PASS] test_jtGetRawNAV_correctValue() (gas: 603731)
+[PASS] test_jtKernel_correctAddress() (gas: 19741)
+[PASS] test_jtMaxDeposit_unlimited() (gas: 203469)
+[PASS] test_jtMaxRedeem_considersCoverage() (gas: 968224)
+[PASS] test_jtMaxRedeem_reducedWhenProvidingCoverage() (gas: 1114197)
+[PASS] test_jtMaxRedeem_returnsBalance() (gas: 617283)
+[PASS] test_jtPreviewDeposit_correctShares() (gas: 545877)
+[PASS] test_jtPreviewDeposit_matchesActualDeposit() (gas: 545403)
+[PASS] test_jtRedemption_claimableAtExactDelay() (gas: 1067853)
+[PASS] test_jtRedemption_fullClaim_deletesRequest() (gas: 1172433)
+[PASS] test_jtRedemption_notClaimableBeforeDelay() (gas: 1190762)
+[PASS] test_jtRedemption_partialClaim_updatesRemainingShares() (gas: 1137057)
+[PASS] test_jtRedemption_usesMinimumNAV_lossScenario() (gas: 1043589)
+[PASS] test_jtRedemption_usesMinimumNAV_noGainDuringDelay() (gas: 1125706)
+[PASS] test_jtRequestRedeem_createsPendingState() (gas: 1027990)
+[PASS] test_jtTotalAssets_correctValues() (gas: 613358)
+[PASS] test_jtTrancheType_isJunior() (gas: 13111)
+[PASS] test_ltvCalculation_accuracy() (gas: 951218)
+[PASS] test_ltv_approachesLLTV_withIncreasingLosses() (gas: 1160306)
+[PASS] test_ltv_nearLLTVThreshold() (gas: 971644)
+[PASS] test_marketState_fixedTermToPerpetual_termElapsed() (gas: 1073081)
+[PASS] test_marketState_perpetualToFixedTerm() (gas: 968782)
+[PASS] test_marketState_startsAsPerpetual() (gas: 47962)
+[PASS] test_marketState_staysPerpetual_lltvBreached() (gas: 986960)
+[PASS] test_marketState_staysPerpetual_noCoverageIL() (gas: 1044896)
+[PASS] test_marketState_staysPerpetual_stILExists() (gas: 986592)
+[PASS] test_marketState_transitionsToFixedTerm_whenJTProvidesCoverage() (gas: 1001905)
+[PASS] test_multipleJTDepositors_shareGainsProportionally() (gas: 845533)
+[PASS] test_multipleSTDepositors_respectMaxDeposit() (gas: 932008)
+[PASS] test_multipleSmallDeposits_noAccumulatedRoundingError() (gas: 15582940)
+[PASS] test_navConsistency_betweenTranches() (gas: 994321)
+[PASS] test_onlyJuniorTranche_blocksNonJTCaller() (gas: 25630)
+[PASS] test_onlySeniorTranche_blocksNonSTCaller() (gas: 26849)
+[PASS] test_permutation_alternatingGainsAndLosses() (gas: 1330626)
+[PASS] test_permutation_jtGain_stLoss_jtGain() (gas: 1180927)
+[PASS] test_permutation_simultaneousGains() (gas: 1035380)
+[PASS] test_permutation_stGain_jtLoss_stGain() (gas: 1265198)
+[PASS] test_postOpSync_jtDeposit() (gas: 559066)
+[PASS] test_postOpSync_jtRedeem() (gas: 1021645)
+[PASS] test_postOpSync_stDeposit() (gas: 916854)
+[PASS] test_postOpSync_stRedeem() (gas: 1086366)
+[PASS] test_previewSync_matchesActualSync() (gas: 1103058)
+[PASS] test_protocolFees_accrueOnGains() (gas: 640472)
+[PASS] test_protocolFees_accrueOnSTGain() (gas: 1058491)
+[PASS] test_protocolFees_noAccrualBelowHighWaterMark() (gas: 705437)
+[PASS] test_protocolFees_stateIsValid() (gas: 992210)
+[PASS] test_protocolFees_zeroOnLoss() (gas: 680010)
+[PASS] test_recoveryFromLoss_gainAfterLoss() (gas: 781153)
+[PASS] test_sequence_gainLossGain() (gas: 1216387)
+[PASS] test_sequence_interleavedSTAndJT() (gas: 1314220)
+[PASS] test_sequence_lossGainLoss() (gas: 1218505)
+[PASS] test_sequentialJTDeposits_accumulateCorrectly() (gas: 1929152)
+[PASS] test_setJTRedemptionDelay_unauthorizedFails() (gas: 39205)
+[PASS] test_setJuniorTrancheRedemptionDelay_updatesDelay() (gas: 51204)
+[PASS] test_setProtocolFeeRecipient_revertsOnZeroAddress() (gas: 40875)
+[PASS] test_setProtocolFeeRecipient_updatesRecipient() (gas: 62494)
+[PASS] test_stAsset_correctAddress() (gas: 16020)
+[PASS] test_stClaims_includeJTAssets_duringDeficit() (gas: 977964)
+[PASS] test_stConvertToAssets_correctClaims() (gas: 918923)
+[PASS] test_stConvertToShares_correctValue() (gas: 917657)
+[PASS] test_stDeposit_atExactMaxCoverage_succeeds() (gas: 930043)
+[PASS] test_stDeposit_exceedingMaxCoverageByOneWei_reverts() (gas: 873440)
+[PASS] test_stDeposit_revertsWithoutJTCoverage() (gas: 442652)
+[PASS] test_stGetRawNAV_correctValue() (gas: 961651)
+[PASS] test_stKernel_correctAddress() (gas: 19212)
+[PASS] test_stLoss_activatesJTCoverage() (gas: 1017323)
+[PASS] test_stMarketId_correctValue() (gas: 30922)
+[PASS] test_stMaxDeposit_equalsJTEffectiveNAVDividedByCoverage() (gas: 607978)
+[PASS] test_stMaxDeposit_respectsCoverage() (gas: 978991)
+[PASS] test_stMaxRedeem_correctValues() (gas: 1014190)
+[PASS] test_stMaxRedeem_equalsFullBalance() (gas: 977824)
+[PASS] test_stPreviewDeposit_correctShares() (gas: 915143)
+[PASS] test_stPreviewDeposit_matchesActualDeposit() (gas: 914482)
+[PASS] test_stPreviewRedeem_correctClaims() (gas: 1059789)
+[PASS] test_stProtocolFees_accrueOnSTGains() (gas: 1036252)
+[PASS] test_stRedeem_receivesJTAssets_whenSTVaultInDeficit() (gas: 975442)
+[PASS] test_stTotalAssets_correctValues() (gas: 1020657)
+[PASS] test_stTrancheType_isSenior() (gas: 13776)
+[PASS] test_sync_authorizedSucceeds() (gas: 562210)
+[PASS] test_sync_unauthorizedFails() (gas: 40955)
+[PASS] test_totalSupply_correctValues() (gas: 865538)
+[PASS] test_totalSupply_matchesSumOfBalances() (gas: 900373)
+[PASS] test_trancheDecimals_correct() (gas: 34207)
+[PASS] test_trancheNames_correct() (gas: 44455)
+[PASS] test_trancheSymbols_correct() (gas: 46157)
+[PASS] test_yieldDistribution_jtReceivesShare() (gas: 1110440)
+[PASS] test_yieldDistribution_stToJt() (gas: 1036120)
+Suite result: ok. 134 passed; 0 failed; 0 skipped; finished in 6.39s (6.66s CPU time)
+
+Ran 7 tests for test/erc4626st-aavejt/BasicOperations.t.sol:BasicOperationsTest
+[PASS] testFuzz_depositIntoJT(uint256) (runs: 200, μ: 1687771, ~: 1687971)
+[PASS] testFuzz_depositIntoST_verifyCoverageRequirementEnforcement(uint256,uint256) (runs: 200, μ: 3857926, ~: 3858190)
+[PASS] testFuzz_jtDeposit_allowsSTDeposit_thenSTRedeem_allowsJTExit_verifyVaultEmpty(uint256,uint256) (runs: 200, μ: 2786883, ~: 2787178)
+[PASS] testFuzz_jtDeposit_and_consecutive_jtWithdrawals(uint256,uint256) (runs: 200, μ: 8632435, ~: 8775121)
+[PASS] testFuzz_jtDeposit_and_parallel_jtWithdrawals(uint256,uint256) (runs: 200, μ: 7094141, ~: 7220025)
+[PASS] testFuzz_jtDeposit_and_requestWithdraw_thenCancelWithdrawal(uint256,uint256) (runs: 200, μ: 1795003, ~: 1795298)
+[PASS] testFuzz_multipleDepositsIntoJT(uint256,uint256) (runs: 200, μ: 7185509, ~: 7478105)
+Suite result: ok. 7 passed; 0 failed; 0 skipped; finished in 6.49s (24.75s CPU time)
+
+Ran 15 tests for test/erc4626st-aavejt/LossWaterfall.t.sol:LossWaterfall
+[PASS] testFuzz_jtGain(uint256,uint256) (runs: 200, μ: 760596, ~: 761104)
+[PASS] testFuzz_jtLoss(uint256) (runs: 200, μ: 824903, ~: 825088)
+[PASS] testFuzz_stGain(uint256,uint256) (runs: 200, μ: 1340181, ~: 1340405)
+[PASS] testFuzz_stLoss(uint256,uint256) (runs: 200, μ: 1254844, ~: 1255115)
+[PASS] test_jtGainThenLoss() (gas: 765437)
+[PASS] test_jtLossThenGain_recovery() (gas: 749657)
+[PASS] test_loss_entireSTDeposit() (gas: 1032990)
+[PASS] test_minimalLoss() (gas: 679454)
+[PASS] test_multipleSequentialSTLosses() (gas: 1079894)
+[PASS] test_protocolFees_onlyOnGains() (gas: 704308)
+[PASS] test_simultaneousJTAndSTLoss() (gas: 1350279)
+[PASS] test_stLossThenJtYieldRecovery() (gas: 1094811)
+[PASS] test_stLoss_impactOnJTDepositors() (gas: 1349880)
+[PASS] test_stateConsistency_afterLoss() (gas: 789088)
+[PASS] test_totalClaimsSum_equalsTotalNAV() (gas: 1118877)
+Suite result: ok. 15 passed; 0 failed; 0 skipped; finished in 6.49s (4.59s CPU time)
+
+Ran 67 tests for test/accountant/RoycoAccountantTest.t.sol:RoycoAccountantTest
+[PASS] testFuzz_initialization_validCoverageRange(uint64) (runs: 200, μ: 354971, ~: 355189)
+[PASS] testFuzz_invariant_coverageILClearedOnPerpetualTransition(uint256,uint256) (runs: 200, μ: 318763, ~: 319286)
+[PASS] testFuzz_invariant_effectiveNAVNonNegative(uint256,uint256,int256,int256) (runs: 200, μ: 318814, ~: 310563)
+[PASS] testFuzz_invariant_ilOrdering(uint256,uint256) (runs: 200, μ: 279917, ~: 287559)
+[PASS] testFuzz_invariant_lltvBreachRequiresJTExhaustion(uint256,uint256,uint256) (runs: 200, μ: 261898, ~: 253276)
+[PASS] testFuzz_invariant_lltvNotBreachedInPostOpIfNotInPreOp(uint256,uint256,uint256) (runs: 200, μ: 273145, ~: 273599)
+[PASS] testFuzz_invariant_navConservation(uint256,uint256,int256,int256) (runs: 200, μ: 319726, ~: 311475)
+[PASS] testFuzz_maxSTDepositGivenCoverage(uint256,uint256) (runs: 200, μ: 234045, ~: 234021)
+[PASS] testFuzz_preOpSync_allCombinations(int256,int256) (runs: 200, μ: 312185, ~: 304708)
+[PASS] testFuzz_preOpSync_navConservation(uint256,uint256) (runs: 200, μ: 217596, ~: 217442)
+[PASS] testFuzz_stateTransition_perpetualToFixedTerm(uint256,uint256,uint256) (runs: 200, μ: 291227, ~: 294345)
+[PASS] test_edgeCase_largeNumbers() (gas: 572974)
+[PASS] test_edgeCase_sameBlockMultipleSyncs() (gas: 361392)
+[PASS] test_edgeCase_zeroJTRawNAV() (gas: 239000)
+[PASS] test_edgeCase_zeroSTRawNAV() (gas: 222020)
+[PASS] test_initialization_initializesYDMCorrectly() (gas: 17718)
+[PASS] test_initialization_revertsOnExcessiveProtocolFee() (gas: 258394)
+[PASS] test_initialization_revertsOnInvalidCoverage() (gas: 260919)
+[PASS] test_initialization_revertsOnInvalidLLTV() (gas: 272966)
+[PASS] test_initialization_revertsOnNullYDM() (gas: 140138)
+[PASS] test_initialization_setsStateCorrectly() (gas: 63575)
+[PASS] test_invariant_lltvNotBreachedInPostOp_jtWithdrawal() (gas: 263872)
+[PASS] test_invariant_lltvNotBreachedInPostOp_stDeposit() (gas: 260511)
+[PASS] test_invariant_noLLTVBreachWithoutJTLoss() (gas: 239828)
+[PASS] test_invariant_stILRequiresJTExhaustion() (gas: 255234)
+[PASS] test_maxSTDepositGivenCoverage() (gas: 243309)
+[PASS] test_postOpSyncAndEnforceCoverage_passes() (gas: 244723)
+[PASS] test_postOpSyncAndEnforceCoverage_reverts() (gas: 233616)
+[PASS] test_postOpSync_jtDecreaseNAV() (gas: 249623)
+[PASS] test_postOpSync_jtIncreaseNAV() (gas: 246095)
+[PASS] test_postOpSync_jtWithdrawal_scalesJTCoverageIL() (gas: 323908)
+[PASS] test_postOpSync_onlyKernel() (gas: 20956)
+[PASS] test_postOpSync_revertsOnInvalidState() (gas: 247294)
+[PASS] test_postOpSync_stDecreaseNAV() (gas: 248805)
+[PASS] test_postOpSync_stIncreaseNAV() (gas: 247601)
+[PASS] test_postOpSync_stWithdrawal_scalesSTIL() (gas: 297383)
+[PASS] test_preOpSync_bothGain() (gas: 306026)
+[PASS] test_preOpSync_bothLose() (gas: 306387)
+[PASS] test_preOpSync_jtCoverageILRecovery_fromSTGain() (gas: 309622)
+[PASS] test_preOpSync_jtGain() (gas: 256303)
+[PASS] test_preOpSync_jtLoss() (gas: 274284)
+[PASS] test_preOpSync_jtSelfILRecovery_fromJTGain() (gas: 270163)
+[PASS] test_preOpSync_noChangeAfterInitialization() (gas: 250841)
+[PASS] test_preOpSync_onlyKernel() (gas: 21528)
+[PASS] test_preOpSync_rawNAVsSetCorrectly() (gas: 213876)
+[PASS] test_preOpSync_stGain_jtLoss() (gas: 323887)
+[PASS] test_preOpSync_stGain_yieldDistributed() (gas: 301620)
+[PASS] test_preOpSync_stILRecovery_fromJTGain() (gas: 287815)
+[PASS] test_preOpSync_stLoss_fullCoverage() (gas: 283647)
+[PASS] test_preOpSync_stLoss_jtGain() (gas: 287877)
+[PASS] test_preOpSync_stLoss_partialCoverage() (gas: 237213)
+[PASS] test_previewSync_matchesPreOpSync() (gas: 355725)
+[PASS] test_sequence_jtExhaustion_stIL_fullRecovery() (gas: 289939)
+[PASS] test_sequence_lossGainLoss() (gas: 375014)
+[PASS] test_sequence_timeWeightedYieldShare() (gas: 606443)
+[PASS] test_sequence_ydmAdaptation_adaptsThroughTime() (gas: 395809)
+[PASS] test_stateTransition_alwaysPerpetual_whenDurationZero() (gas: 528923)
+[PASS] test_stateTransition_exactlyAtExpiry() (gas: 311436)
+[PASS] test_stateTransition_fixedTermExpiry() (gas: 311955)
+[PASS] test_stateTransition_fixedTermToPerpetual_ilRecoveryBeforeExpiry() (gas: 310892)
+[PASS] test_stateTransition_fixedTermToPerpetual_stILCreated() (gas: 273204)
+[PASS] test_stateTransition_fullCycle() (gas: 415437)
+[PASS] test_stateTransition_multipleRapidTransitions() (gas: 457610)
+[PASS] test_stateTransition_perpetualToFixedTerm() (gas: 295523)
+[PASS] test_stateTransition_staysFixedTerm_partialRecovery() (gas: 325563)
+[PASS] test_ydmAdaptation_noChangeInFixedTerm() (gas: 304552)
+[PASS] test_ydmAdaptation_withTimeAndUtilization() (gas: 343820)
+Suite result: ok. 67 passed; 0 failed; 0 skipped; finished in 6.49s (820.17ms CPU time)
+
+Ran 8 tests for test/accountant/RoycoAccountantComprehensiveTest.t.sol:RoycoAccountantLLTVInvariantTest
+[PASS] testFuzz_lltv_fullSTDepositSequence(uint256,uint256,int256,int256,uint256) (runs: 200, μ: 356847, ~: 360513)
+[PASS] testFuzz_lltv_jtDeposit_cannotIncreaseLTV(uint256,uint256,uint256) (runs: 200, μ: 257951, ~: 258378)
+[PASS] testFuzz_lltv_jtWithdrawal_withCoverageEnforcement(uint256,uint256,uint256) (runs: 200, μ: 268540, ~: 268938)
+[PASS] testFuzz_lltv_multipleOperationsSequence(uint256,uint256,uint256,uint256) (runs: 200, μ: 304434, ~: 304990)
+[PASS] testFuzz_lltv_stDeposit_cannotBreachAfterSafePreOp(uint256,uint256,uint256) (runs: 200, μ: 258669, ~: 259074)
+[PASS] testFuzz_lltv_stWithdrawal_cannotBreachAfterSafePreOp(uint256,uint256,uint256) (runs: 200, μ: 261263, ~: 261653)
+[PASS] test_lltv_boundaryConditions() (gas: 246715)
+[PASS] test_lltv_noChangeOperations() (gas: 244686)
+Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 6.49s (477.95ms CPU time)
+
+Ran 6 tests for test/accountant/RoycoAccountantComprehensiveTest.t.sol:RoycoAccountantInvariantTest
+[PASS] invariant_ilBounds() (runs: 200, calls: 100000, reverts: 24)
+
+╭-------------------+------------------+-------+---------+----------╮
+| Contract          | Selector         | Calls | Reverts | Discards |
++===================================================================+
+| AccountantHandler | postOpJTDeposit  | 19750 | 0       | 0        |
+|-------------------+------------------+-------+---------+----------|
+| AccountantHandler | postOpJTWithdraw | 19844 | 0       | 0        |
+|-------------------+------------------+-------+---------+----------|
+| AccountantHandler | postOpSTDeposit  | 20019 | 11      | 0        |
+|-------------------+------------------+-------+---------+----------|
+| AccountantHandler | postOpSTWithdraw | 20340 | 13      | 0        |
+|-------------------+------------------+-------+---------+----------|
+| AccountantHandler | preOpSync        | 20047 | 0       | 0        |
+╰-------------------+------------------+-------+---------+----------╯
+
+[PASS] invariant_lltvMarketStateConsistency() (runs: 200, calls: 100000, reverts: 0)
+
+╭-------------------+------------------+-------+---------+----------╮
+| Contract          | Selector         | Calls | Reverts | Discards |
++===================================================================+
+| AccountantHandler | postOpJTDeposit  | 19750 | 0       | 0        |
+|-------------------+------------------+-------+---------+----------|
+| AccountantHandler | postOpJTWithdraw | 19844 | 0       | 0        |
+|-------------------+------------------+-------+---------+----------|
+| AccountantHandler | postOpSTDeposit  | 20019 | 0       | 0        |
+|-------------------+------------------+-------+---------+----------|
+| AccountantHandler | postOpSTWithdraw | 20340 | 0       | 0        |
+|-------------------+------------------+-------+---------+----------|
+| AccountantHandler | preOpSync        | 20047 | 0       | 0        |
+╰-------------------+------------------+-------+---------+----------╯
+
+[PASS] invariant_navBounds() (runs: 200, calls: 100000, reverts: 18)
+
+╭-------------------+------------------+-------+---------+----------╮
+| Contract          | Selector         | Calls | Reverts | Discards |
++===================================================================+
+| AccountantHandler | postOpJTDeposit  | 19750 | 0       | 0        |
+|-------------------+------------------+-------+---------+----------|
+| AccountantHandler | postOpJTWithdraw | 19844 | 0       | 0        |
+|-------------------+------------------+-------+---------+----------|
+| AccountantHandler | postOpSTDeposit  | 20019 | 8       | 0        |
+|-------------------+------------------+-------+---------+----------|
+| AccountantHandler | postOpSTWithdraw | 20340 | 10      | 0        |
+|-------------------+------------------+-------+---------+----------|
+| AccountantHandler | preOpSync        | 20047 | 0       | 0        |
+╰-------------------+------------------+-------+---------+----------╯
+
+[PASS] invariant_navConservation() (runs: 200, calls: 100000, reverts: 26)
+
+╭-------------------+------------------+-------+---------+----------╮
+| Contract          | Selector         | Calls | Reverts | Discards |
++===================================================================+
+| AccountantHandler | postOpJTDeposit  | 19750 | 0       | 0        |
+|-------------------+------------------+-------+---------+----------|
+| AccountantHandler | postOpJTWithdraw | 19844 | 0       | 0        |
+|-------------------+------------------+-------+---------+----------|
+| AccountantHandler | postOpSTDeposit  | 20019 | 14      | 0        |
+|-------------------+------------------+-------+---------+----------|
+| AccountantHandler | postOpSTWithdraw | 20340 | 12      | 0        |
+|-------------------+------------------+-------+---------+----------|
+| AccountantHandler | preOpSync        | 20047 | 0       | 0        |
+╰-------------------+------------------+-------+---------+----------╯
+
+[PASS] invariant_nonNegativity() (runs: 200, calls: 100000, reverts: 8)
+
+╭-------------------+------------------+-------+---------+----------╮
+| Contract          | Selector         | Calls | Reverts | Discards |
++===================================================================+
+| AccountantHandler | postOpJTDeposit  | 19750 | 0       | 0        |
+|-------------------+------------------+-------+---------+----------|
+| AccountantHandler | postOpJTWithdraw | 19844 | 0       | 0        |
+|-------------------+------------------+-------+---------+----------|
+| AccountantHandler | postOpSTDeposit  | 20019 | 3       | 0        |
+|-------------------+------------------+-------+---------+----------|
+| AccountantHandler | postOpSTWithdraw | 20340 | 5       | 0        |
+|-------------------+------------------+-------+---------+----------|
+| AccountantHandler | preOpSync        | 20047 | 0       | 0        |
+╰-------------------+------------------+-------+---------+----------╯
+
+[PASS] invariant_perpetualStateConsistency() (runs: 200, calls: 100000, reverts: 10)
+
+╭-------------------+------------------+-------+---------+----------╮
+| Contract          | Selector         | Calls | Reverts | Discards |
++===================================================================+
+| AccountantHandler | postOpJTDeposit  | 19750 | 0       | 0        |
+|-------------------+------------------+-------+---------+----------|
+| AccountantHandler | postOpJTWithdraw | 19844 | 0       | 0        |
+|-------------------+------------------+-------+---------+----------|
+| AccountantHandler | postOpSTDeposit  | 20019 | 4       | 0        |
+|-------------------+------------------+-------+---------+----------|
+| AccountantHandler | postOpSTWithdraw | 20340 | 6       | 0        |
+|-------------------+------------------+-------+---------+----------|
+| AccountantHandler | preOpSync        | 20047 | 0       | 0        |
+╰-------------------+------------------+-------+---------+----------╯
+
+Suite result: ok. 6 passed; 0 failed; 0 skipped; finished in 23.80s (133.68s CPU time)
+
+Ran 11 test suites in 23.80s (58.81s CPU time): 425 tests passed, 0 failed, 0 skipped (425 total tests)
+Wrote LCOV report.

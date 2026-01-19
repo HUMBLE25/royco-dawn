@@ -53,12 +53,12 @@ contract AdaptiveCurveYDM is IYDM {
     event AdaptiveCurveYdmInitialized(address indexed accountant, uint256 steepnessAfterTargetWAD, uint256 jtYieldShareAtTargetWAD);
 
     /**
-     * @notice Emitted when the JT yield share is updated and the curve is adapted
+     * @notice Emitted when the JT yield share is updated and the curve is adapted (in a PERPETUAL state)
      * @param accountant The accountant for the market that the yield share was updated for
-     * @param avgJtYieldShare The average JT yield share during the period since the last adaptation (returned to the accountant)
-     * @param newJtYieldShareAtTarget The new JT yield share at the target utilization after applying adaptations
+     * @param avgJtYieldShareWAD The average JT yield share during the period since the last adaptation (returned to the accountant)
+     * @param newJtYieldShareAtTargetWAD The new JT yield share at the target utilization after applying adaptations
      */
-    event YdmAdapted(address indexed accountant, uint256 avgJtYieldShare, uint256 newJtYieldShareAtTarget);
+    event YdmAdaptedOutput(address indexed accountant, uint256 avgJtYieldShareWAD, uint256 newJtYieldShareAtTargetWAD);
 
     /**
      * @notice Initializes the YDM curve for a particular Royco market
@@ -127,7 +127,7 @@ contract AdaptiveCurveYDM is IYDM {
         // forge-lint: disable-next-item(unsafe-typecast)
         curve.lastAdaptationTimestamp = uint32(block.timestamp);
 
-        emit YdmAdapted(msg.sender, jtYieldShareWAD, uint256(newJtYieldShareAtTargetWAD));
+        emit YdmAdaptedOutput(msg.sender, jtYieldShareWAD, uint256(newJtYieldShareAtTargetWAD));
     }
 
     /**
@@ -159,7 +159,7 @@ contract AdaptiveCurveYDM is IYDM {
     {
         // Compute the utilization of the market and bound it to 100%
         uint256 utilizationWAD = UtilsLib.computeUtilization(_stRawNAV, _jtRawNAV, _betaWAD, _coverageWAD, _jtEffectiveNAV);
-        utilizationWAD = utilizationWAD > WAD ? WAD : utilizationWAD;
+        if (utilizationWAD > WAD) utilizationWAD = WAD;
 
         // Compute the max delta from the target utilization in the region of the curve that the market is currently in (above or below the kink)
         uint256 maxDeltaFromTargetInRegionWAD = utilizationWAD > TARGET_UTILIZATION_WAD ? (WAD - TARGET_UTILIZATION_WAD) : TARGET_UTILIZATION_WAD;

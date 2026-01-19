@@ -384,9 +384,9 @@ contract AdaptiveCurveYDMTest is BaseTest {
 
         vm.warp(block.timestamp + 30 days);
 
-        // Expect YdmAdapted event
+        // Expect YdmAdaptedOutput event
         vm.expectEmit(true, false, false, false);
-        emit AdaptiveCurveYDM.YdmAdapted(address(this), 0, 0); // We don't check exact values
+        emit AdaptiveCurveYDM.YdmAdaptedOutput(address(this), 0, 0); // We don't check exact values
 
         ydm.jtYieldShare(MarketState.PERPETUAL, stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
     }
