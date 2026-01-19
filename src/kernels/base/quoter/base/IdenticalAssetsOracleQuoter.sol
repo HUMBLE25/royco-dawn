@@ -25,6 +25,12 @@ abstract contract IdenticalAssetsOracleQuoter is RoycoKernel {
     /// @notice A sentinel value for the conversion rate, indicating that the conversion rate should be queried in real time from the specified oracle
     uint256 internal constant SENTINEL_CONVERSION_RATE = 0;
 
+    /// @dev This mask is set on the cached tranche unit to NAV unit conversion rate to indicate that it is cached
+    uint256 internal constant CACHED_TRANCHE_UNIT_TO_NAV_UNIT_CONVERSION_RATE_MASK = 1 << 255;
+
+    /// @dev The cached tranche unit to NAV unit conversion rate
+    uint256 internal transient cachedTrancheUnitToNAVUnitConversionRate;
+
     /// @dev Storage state for the Royco identical assets overridable oracle quoter
     /// @custom:storage-location erc7201:Royco.storage.IdenticalAssetsOracleQuoterState
     struct IdenticalAssetsOracleQuoterState {
@@ -52,6 +58,25 @@ abstract contract IdenticalAssetsOracleQuoter is RoycoKernel {
         if (_initialConversionRateRAY == SENTINEL_CONVERSION_RATE) return;
         _getIdenticalAssetsOracleQuoterStorage().conversionRateRAY = _initialConversionRateRAY;
         emit ConversionRateUpdated(_initialConversionRateRAY);
+    }
+
+    /**
+     * @notice Initializes the quoter for a transaction
+     * @dev Should be called at the start of a transaction
+     * @dev This function is called at the start of a transaction to initialize the cached tranche unit to NAV unit conversion rate
+     */
+    function _initializeQuoterCache() internal virtual override {
+        // Get the tranche unit to NAV unit conversion rate and set the cached flag
+        cachedTrancheUnitToNAVUnitConversionRate = getTrancheUnitToNAVUnitConversionRate() | CACHED_TRANCHE_UNIT_TO_NAV_UNIT_CONVERSION_RATE_MASK;
+    }
+
+    /**
+     * @notice Clears the quoter cache
+     * @dev Should be called at the end of a transaction
+     * @dev This function is called at the end of a transaction to clear the cached tranche unit to NAV unit conversion rate
+     */
+    function _clearQuoterCache() internal virtual override {
+        cachedTrancheUnitToNAVUnitConversionRate = 0;
     }
 
     /// @inheritdoc RoycoKernel
@@ -102,6 +127,22 @@ abstract contract IdenticalAssetsOracleQuoter is RoycoKernel {
     }
 
     /**
+     * @notice Returns the cached tranche unit to NAV unit conversion rate
+     * @dev If the cache is set (indicated by the mask bit), returns the cached value.
+     *      Otherwise falls back to getTrancheUnitToNAVUnitConversionRate() for view function compatibility.
+     * @return The tranche unit to NAV unit conversion rate
+     */
+    function _getCachedTrancheUnitToNAVUnitConversionRateFromCache() internal view returns (uint256) {
+        uint256 _cachedTrancheUnitToNAVUnitConversionRate = cachedTrancheUnitToNAVUnitConversionRate;
+        // If the cache mask bit is set, use the cached value
+        if (_cachedTrancheUnitToNAVUnitConversionRate & CACHED_TRANCHE_UNIT_TO_NAV_UNIT_CONVERSION_RATE_MASK != 0) {
+            return _cachedTrancheUnitToNAVUnitConversionRate ^ CACHED_TRANCHE_UNIT_TO_NAV_UNIT_CONVERSION_RATE_MASK;
+        }
+        // Otherwise fall back to querying the rate directly (for view functions)
+        return getTrancheUnitToNAVUnitConversionRate();
+    }
+
+    /**
      * @notice Returns the tranche unit to NAV unit conversion rate, scaled to RAY precision
      * @dev This function should be overridden if the conversion rate needs to be fetched from an oracle
      * @return conversionRateRAY The conversion rate from tranche units to NAV units, scaled to RAY precision
@@ -110,12 +151,12 @@ abstract contract IdenticalAssetsOracleQuoter is RoycoKernel {
 
     /// @dev Converts tranche units to NAV units for both tranches since they use identical assets
     function _convertTrancheUnitsToNAVUnits(TRANCHE_UNIT _assets) internal view returns (NAV_UNIT) {
-        return toNAVUnits(toUint256(_assets.mulDiv(getTrancheUnitToNAVUnitConversionRate(), RAY, Math.Rounding.Floor)));
+        return toNAVUnits(toUint256(_assets.mulDiv(_getCachedTrancheUnitToNAVUnitConversionRateFromCache(), RAY, Math.Rounding.Floor)));
     }
 
     /// @dev Converts NAV units to tranche units for both tranches since they use identical assets
     function _convertNAVUnitsToTrancheUnits(NAV_UNIT _nav) internal view returns (TRANCHE_UNIT) {
-        return toTrancheUnits(toUint256(_nav.mulDiv(RAY, getTrancheUnitToNAVUnitConversionRate(), Math.Rounding.Floor)));
+        return toTrancheUnits(toUint256(_nav.mulDiv(RAY, _getCachedTrancheUnitToNAVUnitConversionRateFromCache(), Math.Rounding.Floor)));
     }
 
     /**

@@ -124,7 +124,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.seniorTrancheName = "";
 
         vm.expectRevert(IRoycoFactory.INVALID_NAME.selector);
-        vm.prank(address(DEPLOY_SCRIPT));
+        vm.prank(OWNER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -133,7 +133,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.seniorTrancheSymbol = "";
 
         vm.expectRevert(IRoycoFactory.INVALID_SYMBOL.selector);
-        vm.prank(address(DEPLOY_SCRIPT));
+        vm.prank(OWNER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -142,7 +142,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.juniorTrancheName = "";
 
         vm.expectRevert(IRoycoFactory.INVALID_NAME.selector);
-        vm.prank(address(DEPLOY_SCRIPT));
+        vm.prank(OWNER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -151,7 +151,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.juniorTrancheSymbol = "";
 
         vm.expectRevert(IRoycoFactory.INVALID_SYMBOL.selector);
-        vm.prank(address(DEPLOY_SCRIPT));
+        vm.prank(OWNER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -160,7 +160,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.seniorAsset = address(0);
 
         vm.expectRevert(IRoycoFactory.INVALID_ASSET.selector);
-        vm.prank(address(DEPLOY_SCRIPT));
+        vm.prank(OWNER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -169,7 +169,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.juniorAsset = address(0);
 
         vm.expectRevert(IRoycoFactory.INVALID_ASSET.selector);
-        vm.prank(address(DEPLOY_SCRIPT));
+        vm.prank(OWNER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -178,7 +178,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.marketId = bytes32(0);
 
         vm.expectRevert(IRoycoFactory.INVALID_MARKET_ID.selector);
-        vm.prank(address(DEPLOY_SCRIPT));
+        vm.prank(OWNER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -187,7 +187,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.kernelImplementation = IRoycoKernel(address(0));
 
         vm.expectRevert(IRoycoFactory.INVALID_KERNEL_IMPLEMENTATION.selector);
-        vm.prank(address(DEPLOY_SCRIPT));
+        vm.prank(OWNER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -196,7 +196,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.accountantImplementation = IRoycoAccountant(address(0));
 
         vm.expectRevert(IRoycoFactory.INVALID_ACCOUNTANT_IMPLEMENTATION.selector);
-        vm.prank(address(DEPLOY_SCRIPT));
+        vm.prank(OWNER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -205,7 +205,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.kernelInitializationData = "";
 
         vm.expectRevert(IRoycoFactory.INVALID_KERNEL_INITIALIZATION_DATA.selector);
-        vm.prank(address(DEPLOY_SCRIPT));
+        vm.prank(OWNER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -214,7 +214,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.accountantInitializationData = "";
 
         vm.expectRevert(IRoycoFactory.INVALID_ACCOUNTANT_INITIALIZATION_DATA.selector);
-        vm.prank(address(DEPLOY_SCRIPT));
+        vm.prank(OWNER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -223,7 +223,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.seniorTrancheProxyDeploymentSalt = bytes32(0);
 
         vm.expectRevert(IRoycoFactory.INVALID_SENIOR_TRANCHE_PROXY_DEPLOYMENT_SALT.selector);
-        vm.prank(address(DEPLOY_SCRIPT));
+        vm.prank(OWNER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -232,7 +232,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.juniorTrancheProxyDeploymentSalt = bytes32(0);
 
         vm.expectRevert(IRoycoFactory.INVALID_JUNIOR_TRANCHE_PROXY_DEPLOYMENT_SALT.selector);
-        vm.prank(address(DEPLOY_SCRIPT));
+        vm.prank(OWNER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -241,7 +241,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.kernelProxyDeploymentSalt = bytes32(0);
 
         vm.expectRevert(IRoycoFactory.INVALID_KERNEL_PROXY_DEPLOYMENT_SALT.selector);
-        vm.prank(address(DEPLOY_SCRIPT));
+        vm.prank(OWNER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -250,7 +250,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.accountantProxyDeploymentSalt = bytes32(0);
 
         vm.expectRevert(IRoycoFactory.INVALID_ACCOUNTANT_PROXY_DEPLOYMENT_SALT.selector);
-        vm.prank(address(DEPLOY_SCRIPT));
+        vm.prank(OWNER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -262,7 +262,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.seniorTrancheInitializationData = abi.encodeWithSignature("nonExistentFunction(address)", address(this));
 
         vm.expectRevert(abi.encodeWithSelector(IRoycoFactory.FAILED_TO_INITIALIZE_SENIOR_TRANCHE.selector, ""));
-        vm.prank(address(DEPLOY_SCRIPT));
+        vm.prank(OWNER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -274,7 +274,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.juniorTrancheInitializationData = abi.encodeWithSignature("nonExistentFunction(address)", address(this));
 
         vm.expectRevert(abi.encodeWithSelector(IRoycoFactory.FAILED_TO_INITIALIZE_JUNIOR_TRANCHE.selector, ""));
-        vm.prank(address(DEPLOY_SCRIPT));
+        vm.prank(OWNER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -286,7 +286,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.accountantInitializationData = abi.encodeWithSignature("nonExistentFunction(address)", address(this));
 
         vm.expectRevert(abi.encodeWithSelector(IRoycoFactory.FAILED_TO_INITIALIZE_ACCOUNTANT.selector, ""));
-        vm.prank(address(DEPLOY_SCRIPT));
+        vm.prank(OWNER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -298,7 +298,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.kernelInitializationData = abi.encodeWithSignature("nonExistentFunction(address)", address(this));
 
         vm.expectRevert(abi.encodeWithSelector(IRoycoFactory.FAILED_TO_INITIALIZE_KERNEL.selector, ""));
-        vm.prank(address(DEPLOY_SCRIPT));
+        vm.prank(OWNER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -320,7 +320,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         );
 
         vm.expectRevert(IRoycoFactory.INVALID_ACCESS_MANAGER.selector);
-        vm.prank(address(DEPLOY_SCRIPT));
+        vm.prank(OWNER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -350,7 +350,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         );
 
         vm.expectRevert(IRoycoFactory.INVALID_ACCESS_MANAGER.selector);
-        vm.prank(address(DEPLOY_SCRIPT));
+        vm.prank(OWNER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -374,7 +374,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         );
 
         vm.expectRevert(IRoycoFactory.INVALID_ACCESS_MANAGER.selector);
-        vm.prank(address(DEPLOY_SCRIPT));
+        vm.prank(OWNER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -396,7 +396,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         );
 
         vm.expectRevert(IRoycoFactory.INVALID_ACCESS_MANAGER.selector);
-        vm.prank(address(DEPLOY_SCRIPT));
+        vm.prank(OWNER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -420,7 +420,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
 
         // The deployment should revert due to inconsistent senior tranche kernel wiring
         vm.expectRevert(IRoycoFactory.INVALID_KERNEL_ON_SENIOR_TRANCHE.selector);
-        vm.prank(address(DEPLOY_SCRIPT));
+        vm.prank(OWNER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -444,7 +444,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
 
         // The deployment should revert due to inconsistent junior tranche kernel wiring
         vm.expectRevert(IRoycoFactory.INVALID_KERNEL_ON_JUNIOR_TRANCHE.selector);
-        vm.prank(address(DEPLOY_SCRIPT));
+        vm.prank(OWNER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -467,7 +467,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         );
 
         vm.expectRevert(IRoycoFactory.INVALID_ACCOUNTANT_ON_KERNEL.selector);
-        vm.prank(address(DEPLOY_SCRIPT));
+        vm.prank(OWNER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -495,7 +495,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         );
 
         vm.expectRevert(IRoycoFactory.INVALID_KERNEL_ON_ACCOUNTANT.selector);
-        vm.prank(address(DEPLOY_SCRIPT));
+        vm.prank(OWNER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -521,7 +521,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.roles = roles;
 
         vm.expectRevert(IRoycoFactory.ROLES_CONFIGURATION_LENGTH_MISMATCH.selector);
-        vm.prank(address(DEPLOY_SCRIPT));
+        vm.prank(OWNER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -546,7 +546,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.roles = roles;
 
         vm.expectRevert(abi.encodeWithSelector(IRoycoFactory.INVALID_TARGET.selector, address(0xdead)));
-        vm.prank(address(DEPLOY_SCRIPT));
+        vm.prank(OWNER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -572,7 +572,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.roles = roles;
 
         vm.expectRevert(abi.encodeWithSelector(IRoycoFactory.INVALID_TARGET.selector, invalidTarget));
-        vm.prank(address(DEPLOY_SCRIPT));
+        vm.prank(OWNER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 

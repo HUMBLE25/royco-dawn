@@ -64,6 +64,14 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         _;
     }
 
+    /// @dev Modifier to initialize and clear the quoter cache
+    /// @dev Should be placed on all functions that use the quoter cache
+    modifier withQuoterCache() {
+        _initializeQuoterCache();
+        _;
+        _clearQuoterCache();
+    }
+
     // =============================
     // Initializer and State Accessor Functions
     // =============================
@@ -226,7 +234,15 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     // =============================
 
     /// @inheritdoc IRoycoKernel
-    function syncTrancheAccounting() public virtual override(IRoycoKernel) restricted whenNotPaused returns (SyncedAccountingState memory state) {
+    function syncTrancheAccounting()
+        public
+        virtual
+        override(IRoycoKernel)
+        withQuoterCache
+        restricted
+        whenNotPaused
+        returns (SyncedAccountingState memory state)
+    {
         // Execute a pre-op accounting sync via the accountant
         return _preOpSyncTrancheAccounting();
     }
@@ -277,10 +293,11 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         address,
         uint256
     )
-        public
+        external
         virtual
         override(IRoycoKernel)
         whenNotPaused
+        withQuoterCache
         onlySeniorTranche
         returns (NAV_UNIT valueAllocated, NAV_UNIT navToMintAt, bytes memory)
     {
@@ -304,10 +321,11 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         address _receiver,
         uint256
     )
-        public
+        external
         virtual
         override(IRoycoKernel)
         whenNotPaused
+        withQuoterCache
         onlySeniorTranche
         returns (AssetClaims memory userAssetClaims, bytes memory)
     {
@@ -345,10 +363,11 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         address,
         uint256
     )
-        public
+        external
         virtual
         override(IRoycoKernel)
         whenNotPaused
+        withQuoterCache
         onlyJuniorTranche
         returns (NAV_UNIT valueAllocated, NAV_UNIT navToMintAt, bytes memory)
     {
@@ -380,11 +399,12 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         uint256 _shares,
         address _controller
     )
-        public
+        external
         virtual
         override(IRoycoKernel)
         whenNotPaused
         onlyJuniorTranche
+        withQuoterCache
         returns (uint256 requestId, bytes memory metadata)
     {
         // Execute a pre-op sync on accounting
@@ -430,10 +450,11 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         uint256 _requestId,
         address _controller
     )
-        public
+        external
         virtual
         override(IRoycoKernel)
         whenNotPaused
+        withQuoterCache
         onlyJuniorTranche
         checkJTRedemptionRequestId(_controller, _requestId)
     {
@@ -466,9 +487,10 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         uint256 _requestId,
         address _controller
     )
-        public
+        external
         virtual
         override(IRoycoKernel)
+        withQuoterCache
         whenNotPaused
         onlyJuniorTranche
         checkJTRedemptionRequestId(_controller, _requestId)
@@ -492,9 +514,10 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         address _receiver,
         uint256 _redemptionRequestId
     )
-        public
+        external
         virtual
         override(IRoycoKernel)
+        withQuoterCache
         whenNotPaused
         onlyJuniorTranche
         checkJTRedemptionRequestId(_controller, _redemptionRequestId)
@@ -864,4 +887,22 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
      * @param _receiver The receiver of the JT assets
      */
     function _jtWithdrawAssets(TRANCHE_UNIT _jtAssets, address _receiver) internal virtual;
+
+    // =============================
+    // Internal Quoter Functions
+    // =============================
+
+    /**
+     * @notice Initializes the quoter for a transaction
+     * @dev Should be called at the start of a transaction
+     * @dev Typically used to initialize the cached tranche unit to NAV unit conversion rate
+     */
+    function _initializeQuoterCache() internal virtual;
+
+    /**
+     * @notice Clears the quoter cache
+     * @dev Should be called at the end of a transaction
+     * @dev Typically used to clear the cached tranche unit to NAV unit conversion rate
+     */
+    function _clearQuoterCache() internal virtual;
 }
