@@ -17,6 +17,9 @@ import {
  * @dev https://docs.re.xyz/insurance-capital-layers/what-is-reusd
  */
 contract ReUSD_ST_ReUSD_JT_Kernel is YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsOracleQuoter_Kernel {
+    /// @notice The price multiplier to convert reUSD to the quote token (NAV units)
+    uint256 constant PRICE_MULTIPLIER = 10 ** 12;
+
     /// @notice The address of the reUSD token
     address public immutable REUSD;
 
@@ -61,6 +64,7 @@ contract ReUSD_ST_ReUSD_JT_Kernel is YieldBearingERC20_ST_YieldBearingERC20_JT_I
     function _getConversionRateFromOracle() internal view override returns (uint256) {
         // Convert 1e9 reUSD (reUSD has 18 decimals of precision) to the quote token (NAV units)
         // This ensures we maximize the precision of the NAV as compared to converting 1 reUSD to NAV units and scaling to RAY precision
-        return IInsuranceCapitalLayer(INSURANCE_CAPITAL_LAYER).convertFromShares(REUSD_USD_QUOTE_TOKEN, RAY);
+        // We multiply the resultant price by a price multiplier 10 ** 12 to compensate for the precision difference betwen USDC and reUSD
+        return IInsuranceCapitalLayer(INSURANCE_CAPITAL_LAYER).convertFromShares(REUSD_USD_QUOTE_TOKEN, RAY) * PRICE_MULTIPLIER;
     }
 }
