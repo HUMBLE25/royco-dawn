@@ -82,12 +82,12 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
 
         (
             address seniorTranche,
-            address stAsset,
+            ,
             address juniorTranche,
-            address jtAsset,
+            ,
             address protocolFeeRecipient,
             address accountant,
-            uint24 jtRedemptionDelayInSeconds
+
         ) = KERNEL.getState();
 
         // Tranche wiring
@@ -341,8 +341,6 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         (MarketDeploymentParams memory params,) = _buildValidMarketParamsForSalt(salt);
 
         // Rebuild only the kernel initialization data with an invalid authority
-        address expectedSeniorTrancheAddress = FACTORY.predictERC1967ProxyAddress(address(ST_IMPL), salt);
-        address expectedJuniorTrancheAddress = FACTORY.predictERC1967ProxyAddress(address(JT_IMPL), salt);
         address expectedAccountantAddress = FACTORY.predictERC1967ProxyAddress(address(ACCOUNTANT_IMPL), salt);
 
         params.kernelInitializationData = abi.encodeCall(
@@ -435,9 +433,6 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         (MarketDeploymentParams memory params,) = _buildValidMarketParamsForSalt(salt);
 
         // Use an incorrect accountant address in the kernel initialization params
-        address expectedSeniorTrancheAddress = FACTORY.predictERC1967ProxyAddress(address(ST_IMPL), salt);
-        address expectedJuniorTrancheAddress = FACTORY.predictERC1967ProxyAddress(address(JT_IMPL), salt);
-
         params.kernelInitializationData = abi.encodeCall(
             ERC4626_ST_AaveV3_JT_InKindAssets_Kernel.initialize,
             (RoycoKernelInitParams({

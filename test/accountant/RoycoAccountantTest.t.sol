@@ -464,8 +464,6 @@ contract RoycoAccountantTest is BaseTest {
 
     function test_preOpSync_stILRecovery_fromJTGain() public {
         _initializeAccountantState(100e18, 10e18);
-        IRoycoAccountant.RoycoAccountantState memory baseState = accountant.getState();
-        uint256 jtEffBefore = toUint256(baseState.lastJTEffectiveNAV);
 
         uint256 stLoss = 40e18;
         vm.prank(MOCK_KERNEL);
@@ -616,14 +614,12 @@ contract RoycoAccountantTest is BaseTest {
 
     function test_stateTransition_fixedTermToPerpetual_stILCreated() public {
         _initializeAccountantState(100e18, 20e18);
-        IRoycoAccountant.RoycoAccountantState memory baseState = accountant.getState();
-        uint256 jtEffBefore = toUint256(baseState.lastJTEffectiveNAV);
 
         vm.prank(MOCK_KERNEL);
         SyncedAccountingState memory state1 = accountant.preOpSyncTrancheAccounting(_nav(80e18), _nav(20e18));
         assertEq(uint8(state1.marketState), uint8(MarketState.FIXED_TERM));
 
-        uint256 massiveLoss = 100e18;
+        // Massive loss to 0 ST NAV
         vm.prank(MOCK_KERNEL);
         SyncedAccountingState memory state2 = accountant.preOpSyncTrancheAccounting(_nav(0), _nav(20e18));
 
@@ -968,8 +964,6 @@ contract RoycoAccountantTest is BaseTest {
 
     function test_sequence_lossGainLoss() public {
         _initializeAccountantState(100e18, 50e18);
-        IRoycoAccountant.RoycoAccountantState memory baseState = accountant.getState();
-        uint256 jtEffInitial = toUint256(baseState.lastJTEffectiveNAV);
 
         vm.prank(MOCK_KERNEL);
         SyncedAccountingState memory state1 = accountant.preOpSyncTrancheAccounting(_nav(80e18), _nav(50e18));
@@ -994,8 +988,6 @@ contract RoycoAccountantTest is BaseTest {
 
     function test_sequence_jtExhaustion_stIL_fullRecovery() public {
         _initializeAccountantState(100e18, 20e18);
-        IRoycoAccountant.RoycoAccountantState memory baseState = accountant.getState();
-        uint256 jtEffInitial = toUint256(baseState.lastJTEffectiveNAV);
 
         vm.prank(MOCK_KERNEL);
         SyncedAccountingState memory state1 = accountant.preOpSyncTrancheAccounting(_nav(60e18), _nav(20e18));
