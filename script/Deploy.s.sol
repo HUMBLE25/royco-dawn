@@ -929,6 +929,9 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
         // Grant ADMIN_ROLE to new admin (execution delay = 0 for immediate effect)
         IAccessManager(address(_factory)).grantRole(0, _newAdmin, 0);
 
+        // Revoke ADMIN_ROLE from old admin (the deploy script itself)
+        IAccessManager(address(_factory)).revokeRole(0, address(this));
+
         console2.log("Factory ownership transferred successfully");
         console2.log("New factory admin:", _newAdmin);
     }

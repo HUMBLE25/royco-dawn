@@ -62,4 +62,16 @@ abstract contract InKindAssetsQuoter is RoycoKernel {
     function jtConvertNAVUnitsToTrancheUnits(NAV_UNIT _nav) public view override(RoycoKernel) returns (TRANCHE_UNIT jtAssets) {
         return toTrancheUnits(toUint256(_nav) / JT_SCALE_FACTOR_TO_WAD);
     }
+
+    /**
+     * @notice Initializes the quoter for a transaction
+     * @dev Does nothing for this quoter
+     */
+    function _initializeQuoterCache() internal pure virtual override { }
+
+    /**
+     * @notice Clears the quoter cache
+     * @dev Does nothing for this quoter
+     */
+    function _clearQuoterCache() internal pure virtual override { }
 }

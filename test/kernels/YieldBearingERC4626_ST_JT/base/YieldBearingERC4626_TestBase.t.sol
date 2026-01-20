@@ -291,9 +291,8 @@ abstract contract YieldBearingERC4626_TestBase is AbstractKernelTestSuite {
         DeployScript.YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626AssetsKernelParams memory kernelParams =
             DeployScript.YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626AssetsKernelParams({ initialConversionRateWAD: initialConversionRate });
 
-        DeployScript.StaticCurveYDMParams memory ydmParams = DeployScript.StaticCurveYDMParams({
-            jtYieldShareAtZeroUtilWAD: 0.1e18, // 10% at 0% utilization
-            jtYieldShareAtTargetUtilWAD: 0.3e18, // 30% at 90% utilization
+        DeployScript.AdaptiveCurveYDMParams memory ydmParams = DeployScript.AdaptiveCurveYDMParams({
+            jtYieldShareAtTargetUtilWAD: 0.3e18, // 30% at target utilization
             jtYieldShareAtFullUtilWAD: 1e18 // 100% at 100% utilization
         });
 
@@ -317,7 +316,7 @@ abstract contract YieldBearingERC4626_TestBase is AbstractKernelTestSuite {
             betaWAD: 1e18, // Beta = 1 for identical assets
             lltvWAD: LLTV,
             fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
-            ydmType: DeployScript.YDMType.StaticCurve,
+            ydmType: DeployScript.YDMType.AdaptiveCurve,
             ydmSpecificParams: abi.encode(ydmParams),
             pauserAddress: PAUSER_ADDRESS,
             pauserExecutionDelay: 0,
