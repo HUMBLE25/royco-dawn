@@ -24,6 +24,9 @@ uint256 constant WAD_DECIMALS = 18;
 /// @dev Constant for the RAY scaling factor
 uint256 constant RAY = 1e27;
 
+/// @dev Constant for the number of decimals of precision a RAY denominated quantity has
+uint256 constant RAY_DECIMALS = 27;
+
 /**
  * @dev Constant for the target utilization (kink) of the junior tranche's loss capital (90%)
  * @dev Utilization = ((ST_RAW_NAV + (JT_RAW_NAV * β)) * COV) / JT_EFFECTIVE_NAV

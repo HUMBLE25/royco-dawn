@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
+import { IERC20Metadata } from "../../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/ERC20Upgradeable.sol";
 import { IInsuranceCapitalLayer } from "../interfaces/external/reUSD/IInsuranceCapitalLayer.sol";
-import { RAY } from "../libraries/Constants.sol";
+import { RAY_DECIMALS } from "../libraries/Constants.sol";
 import { RoycoKernelInitParams } from "../libraries/RoycoKernelStorageLib.sol";
 import { IdenticalAssetsOracleQuoter } from "./base/quoter/base/IdenticalAssetsOracleQuoter.sol";
 import {
@@ -17,14 +18,14 @@ import {
  * @dev https://docs.re.xyz/insurance-capital-layers/what-is-reusd
  */
 contract ReUSD_ST_ReUSD_JT_Kernel is YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsOracleQuoter_Kernel {
-    /// @notice The price multiplier to convert reUSD to the quote token (NAV units)
-    uint256 constant PRICE_MULTIPLIER = 10 ** 12;
-
     /// @notice The address of the reUSD token
     address public immutable REUSD;
 
     /// @notice The address of the token in which the NAV is expressed (typically USDC)
     address public immutable REUSD_USD_QUOTE_TOKEN;
+
+    /// @notice ICL input for reUSD exchange rate in quote tokens, scaled to RAY precision
+    uint256 public immutable REUSD_AMOUNT_FOR_RAY_PRECISION_CONVERSION_RATE;
 
     /// @notice The address of the reUSD insurance capital layer
     address public immutable INSURANCE_CAPITAL_LAYER;
@@ -48,6 +49,9 @@ contract ReUSD_ST_ReUSD_JT_Kernel is YieldBearingERC20_ST_YieldBearingERC20_JT_I
         require(_reusd != address(0) && _reusdUsdQuoteToken != address(0) && _insuranceCapitalLayer != address(0), NULL_ADDRESS());
         REUSD = _reusd;
         REUSD_USD_QUOTE_TOKEN = _reusdUsdQuoteToken;
+        // ICL output = input * rate * 10^(quote_dec - reUSD_dec), so input = 10^(RAY + reUSD_dec - quote_dec) yields rate * RAY
+        REUSD_AMOUNT_FOR_RAY_PRECISION_CONVERSION_RATE =
+            10 ** (RAY_DECIMALS + IERC20Metadata(_reusd).decimals() - IERC20Metadata(_reusdUsdQuoteToken).decimals());
         INSURANCE_CAPITAL_LAYER = _insuranceCapitalLayer;
     }
 
@@ -62,9 +66,8 @@ contract ReUSD_ST_ReUSD_JT_Kernel is YieldBearingERC20_ST_YieldBearingERC20_JT_I
 
     /// @inheritdoc IdenticalAssetsOracleQuoter
     function _getConversionRateFromOracle() internal view override returns (uint256) {
-        // Convert 1e9 reUSD (reUSD has 18 decimals of precision) to the quote token (NAV units)
-        // This ensures we maximize the precision of the NAV as compared to converting 1 reUSD to NAV units and scaling to RAY precision
-        // We multiply the resultant price by a price multiplier 10 ** 12 to compensate for the precision difference betwen USDC and reUSD
-        return IInsuranceCapitalLayer(INSURANCE_CAPITAL_LAYER).convertFromShares(REUSD_USD_QUOTE_TOKEN, RAY * PRICE_MULTIPLIER);
+        // ICL output = input * rate * 10^(quote_dec - reUSD_dec)
+        // With input = 10^(RAY + reUSD_dec - quote_dec), output = rate * 10^RAY
+        return IInsuranceCapitalLayer(INSURANCE_CAPITAL_LAYER).convertFromShares(REUSD_USD_QUOTE_TOKEN, REUSD_AMOUNT_FOR_RAY_PRECISION_CONVERSION_RATE);
     }
 }
