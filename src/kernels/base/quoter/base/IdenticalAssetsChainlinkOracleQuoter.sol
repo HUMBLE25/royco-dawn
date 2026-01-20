@@ -124,6 +124,9 @@ abstract contract IdenticalAssetsChainlinkOracleQuoter is IdenticalAssetsOracleQ
     /**
      * @notice Queries the chainlink oracle for the price
      * @dev The price is returned as the answer from the latest round
+     * @param _oracle The oracle to query
+     * @param _stalenessThresholdSeconds The staleness threshold in seconds
+     * @param _decimalPrecision The decimal precision of the price, typically Oracle.decimals()
      * @return price The price from the latest round
      * @return precision The precision of the price
      */
