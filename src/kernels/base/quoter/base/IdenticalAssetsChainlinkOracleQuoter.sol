@@ -95,7 +95,9 @@ abstract contract IdenticalAssetsChainlinkOracleQuoter is IdenticalAssetsOracleQ
         returns (uint256 trancheToNAVUnitConversionRateRAY)
     {
         // Fetch the Tranche Asset to the reference asset
-        (uint256 trancheAssetPriceInReferenceAsset, uint256 precision) = _queryChainlinkOracle();
+        IdenticalAssetsChainlinkOracleQuoterState storage $ = _getIdenticalAssetsChainlinkOracleQuoterStorage();
+        (uint256 trancheAssetPriceInReferenceAsset, uint256 precision) =
+            _queryChainlinkOracle($.trancheAssetToReferenceAssetOracle, $.stalenessThresholdSeconds, $.trancheAssetToReferenceAssetOracleDecimalPrecision);
 
         // Resolve the Reference Asset to NAV unit conversion rate
         uint256 referenceAssetToNAVUnitConversionRateRAY = getStoredConversionRateRAY();
@@ -125,19 +127,24 @@ abstract contract IdenticalAssetsChainlinkOracleQuoter is IdenticalAssetsOracleQ
      * @return price The price from the latest round
      * @return precision The precision of the price
      */
-    function _queryChainlinkOracle() internal view returns (uint256 price, uint256 precision) {
-        IdenticalAssetsChainlinkOracleQuoterState storage $ = _getIdenticalAssetsChainlinkOracleQuoterStorage();
+    function _queryChainlinkOracle(
+        address _oracle,
+        uint256 _stalenessThresholdSeconds,
+        uint256 _decimalPrecision
+    )
+        internal
+        view
+        returns (uint256 price, uint256 precision)
+    {
+        (uint80 roundId, int256 answer,, uint256 updatedAt, uint80 answeredInRound) = AggregatorV3Interface(_oracle).latestRoundData();
 
-        (uint80 roundId, int256 answer,, uint256 updatedAt, uint80 answeredInRound) =
-            AggregatorV3Interface($.trancheAssetToReferenceAssetOracle).latestRoundData();
-
-        require(updatedAt >= block.timestamp - $.stalenessThresholdSeconds, PRICE_STALE());
+        require(updatedAt >= block.timestamp - _stalenessThresholdSeconds, PRICE_STALE());
         require(answer > 0, PRICE_INVALID());
         require(answeredInRound >= roundId, PRICE_INCOMPLETE());
 
         // forge-lint: disable-next-item(unsafe-typecast)
         price = uint256(answer);
-        precision = 10 ** uint256($.trancheAssetToReferenceAssetOracleDecimalPrecision);
+        precision = 10 ** uint256(_decimalPrecision);
     }
 
     /**
