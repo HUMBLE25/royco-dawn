@@ -315,9 +315,13 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
 
         // Verify that ST.convertToAssets returns the correct amount
         AssetClaims memory convertToAssetsResultFinal = ST.convertToAssets(shares + stDepositorSharesBeforeDeposit);
-        assertApproxEqAbs(convertToAssetsResultFinal.stAssets, expectedMaxDeposit, AAVE_MAX_ABS_TRANCHE_UNIT_DELTA, "Convert to assets must return correct amount");
+        assertApproxEqAbs(
+            convertToAssetsResultFinal.stAssets, expectedMaxDeposit, AAVE_MAX_ABS_TRANCHE_UNIT_DELTA, "Convert to assets must return correct amount"
+        );
         assertEq(convertToAssetsResultFinal.jtAssets, ZERO_TRANCHE_UNITS, "Convert to assets must return 0 JT assets");
-        assertApproxEqAbs(convertToAssetsResultFinal.nav, _toSTValue(expectedMaxDeposit), AAVE_MAX_ABS_NAV_DELTA, "Convert to assets must return the correct NAV");
+        assertApproxEqAbs(
+            convertToAssetsResultFinal.nav, _toSTValue(expectedMaxDeposit), AAVE_MAX_ABS_NAV_DELTA, "Convert to assets must return the correct NAV"
+        );
 
         // Verify that ST.previewRedeem returns the correct amount
         AssetClaims memory previewRedeemResultFinal = ST.previewRedeem(shares + stDepositorSharesBeforeDeposit);

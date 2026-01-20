@@ -80,15 +80,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         // Basic wiring
         assertTrue(address(KERNEL) != address(0), "Kernel not deployed");
 
-        (
-            address seniorTranche,
-            ,
-            address juniorTranche,
-            ,
-            address protocolFeeRecipient,
-            address accountant,
-
-        ) = KERNEL.getState();
+        (address seniorTranche,, address juniorTranche,, address protocolFeeRecipient, address accountant,) = KERNEL.getState();
 
         // Tranche wiring
         assertEq(seniorTranche, address(ST), "Kernel ST mismatch");

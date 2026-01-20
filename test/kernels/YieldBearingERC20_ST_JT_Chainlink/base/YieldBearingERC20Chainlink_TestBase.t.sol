@@ -6,6 +6,7 @@ import { AggregatorV3Interface } from "../../../../src/interfaces/external/chain
 import {
     YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkOracleQuoter_Kernel
 } from "../../../../src/kernels/YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkOracleQuoter_Kernel.sol";
+import { IdenticalAssetsChainlinkOracleQuoter } from "../../../../src/kernels/base/quoter/IdenticalAssetsChainlinkOracleQuoter.sol";
 import { RAY, WAD } from "../../../../src/libraries/Constants.sol";
 import { NAV_UNIT, TRANCHE_UNIT, toNAVUnits, toTrancheUnits, toUint256 } from "../../../../src/libraries/Units.sol";
 
@@ -46,10 +47,11 @@ abstract contract YieldBearingERC20Chainlink_TestBase is AbstractKernelTestSuite
         return DEFAULT_STALENESS_THRESHOLD;
     }
 
-    /// @notice Returns the initial reference-asset-to-NAV conversion rate
-    /// For stablecoins where reference asset ≈ USD, this should be RAY * RAY (1e54)
+    /// @notice Returns the initial reference-asset-to-NAV conversion rate (in RAY precision)
+    /// @dev For stablecoins where reference asset ≈ USD, this should be RAY (1e27) for 1:1 conversion
     /// Override this for non-stablecoin assets where the reference asset has a different NAV
     function _getInitialConversionRate() internal view virtual returns (uint256) {
+        // Default: 1:1 conversion in RAY precision (for stablecoins)
         return RAY;
     }
 
@@ -86,12 +88,14 @@ abstract contract YieldBearingERC20Chainlink_TestBase is AbstractKernelTestSuite
 
     /// @notice Sets the conversion rate for ST (via chainlink mock)
     function setSTConversionRate(uint256 _priceScaled) public virtual {
+        // forge-lint: disable-next-item(unsafe-typecast)
         _mockChainlinkPrice(int256(_priceScaled));
     }
 
     /// @notice Sets the conversion rate for JT (via chainlink mock)
     /// @dev For identical assets, this is the same as ST
     function setJTConversionRate(uint256 _priceScaled) public virtual {
+        // forge-lint: disable-next-item(unsafe-typecast)
         _mockChainlinkPrice(int256(_priceScaled));
     }
 
@@ -125,6 +129,7 @@ abstract contract YieldBearingERC20Chainlink_TestBase is AbstractKernelTestSuite
     /// @param _percentageWAD The percentage increase in WAD (e.g., 0.05e18 = 5%)
     function simulateChainlinkPriceYield(uint256 _percentageWAD) public virtual {
         int256 currentPrice = _getCurrentChainlinkPrice();
+        // forge-lint: disable-next-item(unsafe-typecast)
         int256 newPrice = currentPrice * int256(WAD + _percentageWAD) / int256(WAD);
         _mockChainlinkPrice(newPrice);
     }
@@ -133,6 +138,7 @@ abstract contract YieldBearingERC20Chainlink_TestBase is AbstractKernelTestSuite
     /// @param _percentageWAD The percentage decrease in WAD (e.g., 0.05e18 = 5%)
     function simulateChainlinkPriceLoss(uint256 _percentageWAD) public virtual {
         int256 currentPrice = _getCurrentChainlinkPrice();
+        // forge-lint: disable-next-item(unsafe-typecast)
         int256 newPrice = currentPrice * int256(WAD - _percentageWAD) / int256(WAD);
         _mockChainlinkPrice(newPrice);
     }
@@ -176,6 +182,7 @@ abstract contract YieldBearingERC20Chainlink_TestBase is AbstractKernelTestSuite
     /// @param _percentageWAD The yield percentage in WAD (e.g., 0.05e18 = 5%)
     function _simulateChainlinkYield(uint256 _percentageWAD) internal {
         int256 currentPrice = _getCurrentChainlinkPrice();
+        // forge-lint: disable-next-item(unsafe-typecast)
         int256 newPrice = currentPrice * int256(WAD + _percentageWAD) / int256(WAD);
         _mockChainlinkPrice(newPrice);
     }
@@ -184,6 +191,7 @@ abstract contract YieldBearingERC20Chainlink_TestBase is AbstractKernelTestSuite
     /// @param _percentageWAD The loss percentage in WAD (e.g., 0.05e18 = 5%)
     function _simulateChainlinkLoss(uint256 _percentageWAD) internal {
         int256 currentPrice = _getCurrentChainlinkPrice();
+        // forge-lint: disable-next-item(unsafe-typecast)
         int256 newPrice = currentPrice * int256(WAD - _percentageWAD) / int256(WAD);
         _mockChainlinkPrice(newPrice);
     }
@@ -311,6 +319,181 @@ abstract contract YieldBearingERC20Chainlink_TestBase is AbstractKernelTestSuite
         KERNEL.syncTrancheAccounting();
 
         _assertNAVConservation();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // SET TRANCHE ASSET TO REFERENCE ASSET ORACLE TESTS
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// @notice Tests that setting a new oracle works with valid params
+    function test_setTrancheAssetToReferenceAssetOracle_success() external {
+        // Create mock oracle addresses
+        address newOracle = makeAddr("newOracle");
+        address anotherOracle = makeAddr("anotherOracle");
+        uint48 newStaleness = 2 days;
+
+        // Mock the decimals call on the new oracle
+        vm.mockCall(newOracle, abi.encodeWithSelector(AggregatorV3Interface.decimals.selector), abi.encode(uint8(18)));
+
+        vm.prank(OWNER_ADDRESS);
+        YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkOracleQuoter_Kernel(address(KERNEL))
+            .setTrancheAssetToReferenceAssetOracle(newOracle, newStaleness);
+
+        // Verify by checking that it doesn't revert when called again with different values
+        vm.mockCall(anotherOracle, abi.encodeWithSelector(AggregatorV3Interface.decimals.selector), abi.encode(uint8(8)));
+
+        vm.prank(OWNER_ADDRESS);
+        YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkOracleQuoter_Kernel(address(KERNEL))
+            .setTrancheAssetToReferenceAssetOracle(anotherOracle, 3 days);
+    }
+
+    /// @notice Tests that setting oracle with zero address reverts
+    function test_setTrancheAssetToReferenceAssetOracle_revertsOnZeroAddress() external {
+        vm.prank(OWNER_ADDRESS);
+        vm.expectRevert(IdenticalAssetsChainlinkOracleQuoter.INVALID_TRANCHE_ASSET_TO_REFERENCE_ASSET_ORACLE.selector);
+        YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkOracleQuoter_Kernel(address(KERNEL))
+            .setTrancheAssetToReferenceAssetOracle(address(0), 1 days);
+    }
+
+    /// @notice Tests that setting oracle with zero staleness reverts
+    function test_setTrancheAssetToReferenceAssetOracle_revertsOnZeroStaleness() external {
+        address newOracle = makeAddr("newOracleForZeroStaleness");
+
+        vm.mockCall(newOracle, abi.encodeWithSelector(AggregatorV3Interface.decimals.selector), abi.encode(uint8(18)));
+
+        vm.prank(OWNER_ADDRESS);
+        vm.expectRevert(IdenticalAssetsChainlinkOracleQuoter.INVALID_STALENESS_THRESHOLD_SECONDS.selector);
+        YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkOracleQuoter_Kernel(address(KERNEL))
+            .setTrancheAssetToReferenceAssetOracle(newOracle, 0);
+    }
+
+    /// @notice Tests that non-admin cannot set oracle
+    function test_setTrancheAssetToReferenceAssetOracle_revertsOnUnauthorized() external {
+        address newOracle = makeAddr("newOracleForUnauthorized");
+
+        vm.mockCall(newOracle, abi.encodeWithSelector(AggregatorV3Interface.decimals.selector), abi.encode(uint8(18)));
+
+        vm.prank(ALICE_ADDRESS);
+        vm.expectRevert(); // AccessManagerUnauthorizedAccount
+        YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkOracleQuoter_Kernel(address(KERNEL))
+            .setTrancheAssetToReferenceAssetOracle(newOracle, 1 days);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ORACLE VALIDATION TESTS (PRICE_STALE, PRICE_INVALID, PRICE_INCOMPLETE)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// @notice Tests that stale price causes PRICE_STALE revert
+    function test_oracleValidation_revertsOnStalePrice() external {
+        // Clear the mock to allow real call behavior
+        vm.clearMockedCalls();
+
+        // Mock a stale price (updatedAt is old)
+        uint256 staleTimestamp = block.timestamp - 400 days; // Very stale
+        vm.mockCall(
+            chainlinkOracle,
+            abi.encodeWithSelector(AggregatorV3Interface.latestRoundData.selector),
+            abi.encode(
+                uint80(1), // roundId
+                int256(1e18), // answer (positive)
+                staleTimestamp, // startedAt
+                staleTimestamp, // updatedAt (stale!)
+                uint80(1) // answeredInRound
+            )
+        );
+
+        // Try to get conversion rate - should revert with PRICE_STALE
+        vm.expectRevert(IdenticalAssetsChainlinkOracleQuoter.PRICE_STALE.selector);
+        YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkOracleQuoter_Kernel(address(KERNEL)).getTrancheUnitToNAVUnitConversionRate();
+    }
+
+    /// @notice Tests that zero/negative price causes PRICE_INVALID revert
+    function test_oracleValidation_revertsOnZeroPrice() external {
+        // Clear the mock
+        vm.clearMockedCalls();
+
+        // Mock a zero price
+        vm.mockCall(
+            chainlinkOracle,
+            abi.encodeWithSelector(AggregatorV3Interface.latestRoundData.selector),
+            abi.encode(
+                uint80(1), // roundId
+                int256(0), // answer (ZERO - invalid!)
+                block.timestamp, // startedAt
+                block.timestamp, // updatedAt
+                uint80(1) // answeredInRound
+            )
+        );
+
+        vm.expectRevert(IdenticalAssetsChainlinkOracleQuoter.PRICE_INVALID.selector);
+        YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkOracleQuoter_Kernel(address(KERNEL)).getTrancheUnitToNAVUnitConversionRate();
+    }
+
+    /// @notice Tests that negative price causes PRICE_INVALID revert
+    function test_oracleValidation_revertsOnNegativePrice() external {
+        // Clear the mock
+        vm.clearMockedCalls();
+
+        // Mock a negative price
+        vm.mockCall(
+            chainlinkOracle,
+            abi.encodeWithSelector(AggregatorV3Interface.latestRoundData.selector),
+            abi.encode(
+                uint80(1), // roundId
+                int256(-1e18), // answer (NEGATIVE - invalid!)
+                block.timestamp, // startedAt
+                block.timestamp, // updatedAt
+                uint80(1) // answeredInRound
+            )
+        );
+
+        vm.expectRevert(IdenticalAssetsChainlinkOracleQuoter.PRICE_INVALID.selector);
+        YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkOracleQuoter_Kernel(address(KERNEL)).getTrancheUnitToNAVUnitConversionRate();
+    }
+
+    /// @notice Tests that incomplete round causes PRICE_INCOMPLETE revert
+    function test_oracleValidation_revertsOnIncompleteRound() external {
+        // Clear the mock
+        vm.clearMockedCalls();
+
+        // Mock an incomplete round (answeredInRound < roundId)
+        vm.mockCall(
+            chainlinkOracle,
+            abi.encodeWithSelector(AggregatorV3Interface.latestRoundData.selector),
+            abi.encode(
+                uint80(10), // roundId
+                int256(1e18), // answer (positive)
+                block.timestamp, // startedAt
+                block.timestamp, // updatedAt
+                uint80(5) // answeredInRound (LESS than roundId - incomplete!)
+            )
+        );
+
+        vm.expectRevert(IdenticalAssetsChainlinkOracleQuoter.PRICE_INCOMPLETE.selector);
+        YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkOracleQuoter_Kernel(address(KERNEL)).getTrancheUnitToNAVUnitConversionRate();
+    }
+
+    /// @notice Tests that valid oracle data passes all checks
+    function test_oracleValidation_passesWithValidData() external {
+        // Clear and set valid mock
+        vm.clearMockedCalls();
+
+        vm.mockCall(
+            chainlinkOracle,
+            abi.encodeWithSelector(AggregatorV3Interface.latestRoundData.selector),
+            abi.encode(
+                uint80(10), // roundId
+                int256(1e18), // answer (positive)
+                block.timestamp, // startedAt
+                block.timestamp, // updatedAt (fresh)
+                uint80(10) // answeredInRound (== roundId - complete)
+            )
+        );
+
+        // Should not revert
+        uint256 rate =
+            YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkOracleQuoter_Kernel(address(KERNEL)).getTrancheUnitToNAVUnitConversionRate();
+        assertGt(rate, 0, "Conversion rate should be positive");
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
