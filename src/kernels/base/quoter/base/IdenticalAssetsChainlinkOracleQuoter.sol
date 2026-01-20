@@ -8,9 +8,8 @@ import { IdenticalAssetsOracleQuoter } from "./IdenticalAssetsOracleQuoter.sol";
 
 /**
  * @title IdenticalAssetsChainlinkOracleQuoter
- * @notice Quoter for markets where both tranches use the same tranche asset
- * @dev The NAV unit is calculated as tranche unit * Chainlink Oracle Price * Conversion Rate (from storage or another oracle)
- * @dev For Example: tranche unit: PT-cUSD, NAV unit: USD where x tranche unit = x * PT-cUSD price in SY-cUSD * SY-cUSD price in USD
+ * @notice Quoter to convert tranche units to/from NAV units using a Chainlink (compatible) oracle to convert tranche units to reference assets which uses an admin or oracle set rate to convert to NAV units
+ * @dev Use case: Convert PT-USDE (Tranche unit) to USDE (Reference asset) using a Pendle oracle and convert USDE to USD (NAV unit) using an admin or oracle set rate
  */
 abstract contract IdenticalAssetsChainlinkOracleQuoter is IdenticalAssetsOracleQuoter {
     using Math for uint256;

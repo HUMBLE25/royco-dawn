@@ -11,7 +11,7 @@ import { RoycoKernel } from "../../RoycoKernel.sol";
  * @dev The quoter reads the conversion rate from the specified oracle in RAY precision.
  *      The kernel admin can optionally override the conversion rate with a fixed value.
  *      Supported use-cases include:
- *      - Identical Yield Bearing ERC20 for ST And JT: Yield Bearing ERC20 and Tranche Unit (sACRED, reUSD, etc.), NAV Unit (USD)
+ *      - Identical Yield Bearing ERC20 for ST And JT: Yield Bearing ERC20 and Tranche Unit (FalconXUSDC, reUSD, etc.), NAV Unit (USD)
  */
 abstract contract IdenticalAssetsOracleQuoter is RoycoKernel {
     using UnitsMathLib for NAV_UNIT;

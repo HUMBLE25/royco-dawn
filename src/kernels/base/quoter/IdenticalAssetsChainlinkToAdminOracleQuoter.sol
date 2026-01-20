@@ -8,7 +8,7 @@ import { IdenticalAssetsOracleQuoter } from "./base/IdenticalAssetsOracleQuoter.
 /**
  * @title IdenticalAssetsChainlinkToAdminOracleQuoter
  * @notice Quoter to convert tranche units to/from NAV units using a Chainlink (compatible) oracle to convert tranche units to reference assets which uses an admin controlled oracle to convert to NAV units
- * @dev Use case: Convert PT-USDE (Tranche unit) to USDE (Reference asset) using a Pendle oracle and convert USDE to USD (NAV unit) using an admin set rate
+ * @dev Use case: Convert PT-USDe (Tranche unit) to USDe (Reference asset) using a Pendle oracle and convert USDe to USD (NAV unit) using an admin set rate
  */
 abstract contract IdenticalAssetsChainlinkToAdminOracleQuoter is IdenticalAssetsChainlinkOracleQuoter, IdenticalAssetsAdminOracleQuoter {
     /**

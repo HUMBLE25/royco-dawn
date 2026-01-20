@@ -9,7 +9,7 @@ import { IdenticalERC4626SharesOracleQuoter } from "./base/IdenticalERC4626Share
  * @title IdenticalERC4626SharesAdminOracleQuoter
  * @notice Quoter to convert tranche units (ERC4626 vault shares) to/from NAV units by converting the shares to base assets and converting base assets to NAV units using an admin controlled oracle
  * @dev The senior and junior tranches must have the same ERC4626 vault share as its tranche unit
- * @dev Use case: Convert sUSDE (Tranche unit) to USDE (base assets) using ERC4626's convertToAssets and convert USDE to USD (NAV unit) using an admin set rate
+ * @dev Use case: Convert sUSDe (Tranche unit) to USDe (base assets) using ERC4626's convertToAssets and convert USDe to USD (NAV unit) using an admin set rate
  */
 abstract contract IdenticalERC4626SharesAdminOracleQuoter is IdenticalERC4626SharesOracleQuoter, IdenticalAssetsAdminOracleQuoter {
     /**
