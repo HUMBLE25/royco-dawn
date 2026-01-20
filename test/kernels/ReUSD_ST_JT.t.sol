@@ -104,8 +104,7 @@ contract reUSD_Test is AbstractKernelTestSuite {
 
     /// @notice Returns the JT redemption delay
     function _getJTRedemptionDelay() internal pure virtual override returns (uint24) {
-        return 7 days;
-        // return 1;
+        return 3600;
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -244,10 +243,6 @@ contract reUSD_Test is AbstractKernelTestSuite {
     function _deployKernelAndMarket() internal override returns (DeployScript.DeploymentResult memory) {
         ProtocolConfig memory cfg = getProtocolConfig();
 
-        // Mock the ICL before deployment to ensure consistent pricing
-        uint256 initialRate = IInsuranceCapitalLayer(ICL).convertFromShares(USDC, RAY);
-        _mockICLConversionRate(initialRate);
-
         bytes32 marketId = keccak256(abi.encodePacked(cfg.name, "-", cfg.name, "-", vm.getBlockTimestamp()));
 
         DeployScript.ReUSDSTReUSDJTKernelParams memory kernelParams =
@@ -293,5 +288,14 @@ contract reUSD_Test is AbstractKernelTestSuite {
         });
 
         return DEPLOY_SCRIPT.deploy(params);
+    }
+
+    bytes data =
+        hex"00a78f740000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000160ab64ec587acacde1c427aa5";
+    bytes data2 =
+        hex"00a78f74000000000000000000000000000000000000000000000000000000000000000200000000000220099f84552298f08da5b37fba96f228cd9de9c8c4135d67b6d30000000000000000000000000000000000000000000000000000000000000001";
+
+    function testShit() external {
+        address(this).call(data2);
     }
 }
