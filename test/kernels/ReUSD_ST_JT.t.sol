@@ -2,10 +2,10 @@
 pragma solidity ^0.8.28;
 
 import { IERC20Metadata } from "../../lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-
 import { DeployScript } from "../../script/Deploy.s.sol";
 import { IInsuranceCapitalLayer } from "../../src/interfaces/external/reUSD/IInsuranceCapitalLayer.sol";
 import { ReUSD_ST_ReUSD_JT_Kernel } from "../../src/kernels/ReUSD_ST_ReUSD_JT_Kernel.sol";
+import { IdenticalAssetsOracleQuoter } from "../../src/kernels/base/quoter/base/IdenticalAssetsOracleQuoter.sol";
 import { RAY, WAD } from "../../src/libraries/Constants.sol";
 import { NAV_UNIT, TRANCHE_UNIT, toNAVUnits, toTrancheUnits, toUint256 } from "../../src/libraries/Units.sol";
 
@@ -105,6 +105,7 @@ contract reUSD_Test is AbstractKernelTestSuite {
     /// @notice Returns the JT redemption delay
     function _getJTRedemptionDelay() internal pure virtual override returns (uint24) {
         return 7 days;
+        // return 1;
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -116,13 +117,13 @@ contract reUSD_Test is AbstractKernelTestSuite {
         if (mockedICLConversionRate != 0) {
             return mockedICLConversionRate;
         }
-        return IInsuranceCapitalLayer(ICL).convertFromShares(USDC, RAY);
+        return IdenticalAssetsOracleQuoter(address(KERNEL)).getTrancheUnitToNAVUnitConversionRate();
     }
 
     /// @notice Mocks the convertFromShares function on the ICL
     function _mockICLConversionRate(uint256 _newRateRAY) internal {
         mockedICLConversionRate = _newRateRAY;
-        vm.mockCall(ICL, abi.encodeWithSelector(IInsuranceCapitalLayer.convertFromShares.selector, USDC, RAY), abi.encode(_newRateRAY));
+        vm.mockCall(ICL, IInsuranceCapitalLayer.convertFromShares.selector, abi.encode(_newRateRAY));
     }
 
     /// @notice Simulates yield by increasing the ICL conversion rate
@@ -247,7 +248,7 @@ contract reUSD_Test is AbstractKernelTestSuite {
         uint256 initialRate = IInsuranceCapitalLayer(ICL).convertFromShares(USDC, RAY);
         _mockICLConversionRate(initialRate);
 
-        bytes32 marketId = keccak256(abi.encodePacked(cfg.name, "-", cfg.name, "-", block.timestamp));
+        bytes32 marketId = keccak256(abi.encodePacked(cfg.name, "-", cfg.name, "-", vm.getBlockTimestamp()));
 
         DeployScript.ReUSDSTReUSDJTKernelParams memory kernelParams =
             DeployScript.ReUSDSTReUSDJTKernelParams({ reusd: REUSD, reusdUsdQuoteToken: USDC, insuranceCapitalLayer: ICL });

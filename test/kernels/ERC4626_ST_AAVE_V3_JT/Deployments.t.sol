@@ -555,7 +555,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
     /// @dev Helper to construct a valid set of market deployment params for a specific salt
     /// @dev Use this when you need to actually deploy contracts (to avoid Create2 collisions)
     function _buildValidMarketParamsForSalt(bytes32 salt) internal view returns (MarketDeploymentParams memory params, bytes32 marketId) {
-        marketId = keccak256(abi.encodePacked(SENIOR_TRANCHE_NAME, JUNIOR_TRANCHE_NAME, block.timestamp));
+        marketId = keccak256(abi.encodePacked(SENIOR_TRANCHE_NAME, JUNIOR_TRANCHE_NAME, vm.getBlockTimestamp()));
 
         // Precompute the expected addresses of the kernel and accountant
         address expectedSeniorTrancheAddress = FACTORY.predictERC1967ProxyAddress(address(ST_IMPL), salt);

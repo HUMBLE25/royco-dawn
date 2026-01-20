@@ -85,7 +85,7 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
     }
 
     function _deployMarketWithKernel() internal returns (DeployScript.DeploymentResult memory) {
-        bytes32 marketID = keccak256(abi.encodePacked(SENIOR_TRANCHE_NAME, JUNIOR_TRANCHE_NAME, block.timestamp));
+        bytes32 marketID = keccak256(abi.encodePacked(SENIOR_TRANCHE_NAME, JUNIOR_TRANCHE_NAME, vm.getBlockTimestamp()));
 
         // Build kernel-specific params
         DeployScript.ERC4626STAaveV3JTInKindAssetsKernelParams memory kernelParams = DeployScript.ERC4626STAaveV3JTInKindAssetsKernelParams({

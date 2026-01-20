@@ -78,7 +78,7 @@ contract UpgradabilityTestSuite is BaseTest {
     }
 
     function _deployMarket() internal returns (DeployScript.DeploymentResult memory) {
-        bytes32 marketId = keccak256(abi.encodePacked("UpgradabilityTest", block.timestamp));
+        bytes32 marketId = keccak256(abi.encodePacked("UpgradabilityTest", vm.getBlockTimestamp()));
 
         DeployScript.YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626SharesAdminOracleQuoterKernelParams memory kernelParams =
             DeployScript.YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626SharesAdminOracleQuoterKernelParams({ initialConversionRateWAD: RAY });

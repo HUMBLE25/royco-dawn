@@ -269,7 +269,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         vm.stopPrank();
 
         // Warp to 1 second before delay expires
-        vm.warp(block.timestamp + JT_REDEMPTION_DELAY_SECONDS - 1);
+        vm.warp(vm.getBlockTimestamp() + JT_REDEMPTION_DELAY_SECONDS - 1);
 
         // Should still be pending, not claimable
         assertEq(JT.pendingRedeemRequest(requestId, jtDepositor), shares, "Request must still be pending");
@@ -286,7 +286,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         // Setup and request
         address jtDepositor = ALICE_ADDRESS;
         uint256 jtAmount = 100_000e6;
-        uint256 requestTimestamp = block.timestamp;
+        uint256 requestTimestamp = vm.getBlockTimestamp();
 
         vm.startPrank(jtDepositor);
         USDC.approve(address(JT), jtAmount);
@@ -322,7 +322,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         (uint256 requestId,) = JT.requestRedeem(shares, jtDepositor, jtDepositor);
 
         // Simulate NAV increase by waiting (Aave accrues interest)
-        vm.warp(block.timestamp + JT_REDEMPTION_DELAY_SECONDS + 365 days);
+        vm.warp(vm.getBlockTimestamp() + JT_REDEMPTION_DELAY_SECONDS + 365 days);
 
         // NAV should have increased
         NAV_UNIT navAtClaim = JT.totalAssets().nav;
@@ -367,7 +367,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         AUSDC.transfer(BOB_ADDRESS, lossAmount);
 
         // Wait for delay
-        vm.warp(block.timestamp + JT_REDEMPTION_DELAY_SECONDS);
+        vm.warp(vm.getBlockTimestamp() + JT_REDEMPTION_DELAY_SECONDS);
 
         // Claims at claim time should be lower
         AssetClaims memory claimsAtClaim = JT.convertToAssets(shares);
@@ -394,7 +394,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         vm.stopPrank();
 
         // Wait for delay
-        vm.warp(block.timestamp + JT_REDEMPTION_DELAY_SECONDS);
+        vm.warp(vm.getBlockTimestamp() + JT_REDEMPTION_DELAY_SECONDS);
 
         // Partial redeem (50%)
         uint256 partialShares = shares / 2;
@@ -419,7 +419,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         vm.stopPrank();
 
         // Wait for delay
-        vm.warp(block.timestamp + JT_REDEMPTION_DELAY_SECONDS);
+        vm.warp(vm.getBlockTimestamp() + JT_REDEMPTION_DELAY_SECONDS);
 
         // Full redeem
         vm.prank(jtDepositor);
@@ -783,7 +783,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
             assertEq(toUint256(JT.maxDeposit(CHARLIE_ADDRESS)), 0, "JT deposits blocked in FIXED_TERM");
 
             // Step 4: Wait for fixed term to expire
-            vm.warp(block.timestamp + FIXED_TERM_DURATION_SECONDS + 1);
+            vm.warp(vm.getBlockTimestamp() + FIXED_TERM_DURATION_SECONDS + 1);
 
             vm.prank(OWNER_ADDRESS);
             KERNEL.syncTrancheAccounting();
@@ -1028,7 +1028,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         vm.stopPrank();
 
         // Wait for delay
-        vm.warp(block.timestamp + JT_REDEMPTION_DELAY_SECONDS);
+        vm.warp(vm.getBlockTimestamp() + JT_REDEMPTION_DELAY_SECONDS);
 
         // Redeem
         vm.prank(jtDepositor);
@@ -1187,7 +1187,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         vm.stopPrank();
 
         // Wait for delay
-        vm.warp(block.timestamp + JT_REDEMPTION_DELAY_SECONDS);
+        vm.warp(vm.getBlockTimestamp() + JT_REDEMPTION_DELAY_SECONDS);
 
         // Redeem
         vm.prank(depositor);
@@ -1980,7 +1980,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
             vm.stopPrank();
 
             // Wait and redeem
-            vm.warp(block.timestamp + JT_REDEMPTION_DELAY_SECONDS);
+            vm.warp(vm.getBlockTimestamp() + JT_REDEMPTION_DELAY_SECONDS);
             vm.prank(jtDepositor);
             JT.redeem(jtWithdrawShares, jtDepositor, jtDepositor, requestId);
         }
@@ -2266,7 +2266,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         // If it entered FIXED_TERM, verify it returns to PERPETUAL after duration elapses
         if (uint256(state1.marketState) == uint256(MarketState.FIXED_TERM)) {
             // Warp past the fixed term duration
-            vm.warp(block.timestamp + FIXED_TERM_DURATION_SECONDS + 1);
+            vm.warp(vm.getBlockTimestamp() + FIXED_TERM_DURATION_SECONDS + 1);
 
             vm.prank(OWNER_ADDRESS);
             SyncedAccountingState memory state2 = KERNEL.syncTrancheAccounting();
@@ -3058,7 +3058,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         SyncedAccountingState memory fixedTermState = KERNEL.syncTrancheAccounting();
 
         // Wait for fixed term to elapse
-        vm.warp(block.timestamp + FIXED_TERM_DURATION_SECONDS);
+        vm.warp(vm.getBlockTimestamp() + FIXED_TERM_DURATION_SECONDS);
 
         vm.prank(OWNER_ADDRESS);
         SyncedAccountingState memory afterTermState = KERNEL.syncTrancheAccounting();
@@ -3138,7 +3138,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         uint256 jtEffNAVBefore = toUint256(beforeState.jtEffectiveNAV);
 
         // Wait some time for yield accrual
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(vm.getBlockTimestamp() + 1 days);
 
         // Apply ST gain
         uint256 stGain = 10_000e6;
@@ -3159,7 +3159,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         _depositST(50_000e6, BOB_ADDRESS);
 
         // Wait for time to pass
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(vm.getBlockTimestamp() + 1 days);
 
         // Apply ST gain
         vm.prank(CHARLIE_ADDRESS);
@@ -3181,7 +3181,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         _depositST(50_000e6, BOB_ADDRESS);
 
         // Wait for Aave yield to accrue (rebasing)
-        vm.warp(block.timestamp + 30 days);
+        vm.warp(vm.getBlockTimestamp() + 30 days);
 
         vm.prank(OWNER_ADDRESS);
         SyncedAccountingState memory state = KERNEL.syncTrancheAccounting();
@@ -3250,7 +3250,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         (uint256 requestId,) = JT.requestRedeem(jtShares / 2, ALICE_ADDRESS, ALICE_ADDRESS);
 
         // Wait for delay (during which Aave yield accrues)
-        vm.warp(block.timestamp + JT_REDEMPTION_DELAY_SECONDS);
+        vm.warp(vm.getBlockTimestamp() + JT_REDEMPTION_DELAY_SECONDS);
 
         // Execute JT redeem
         vm.prank(ALICE_ADDRESS);
@@ -3337,7 +3337,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         _verifyNAVConservation(s1, "interleaved: ST gain");
 
         // Step 2: Wait for Aave yield accrual (simulates JT change from rebasing)
-        vm.warp(block.timestamp + 30 days);
+        vm.warp(vm.getBlockTimestamp() + 30 days);
         vm.prank(OWNER_ADDRESS);
         SyncedAccountingState memory s2 = KERNEL.syncTrancheAccounting();
         _verifyNAVConservation(s2, "interleaved: ST gain -> time passes");
@@ -3502,7 +3502,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         vm.stopPrank();
 
         // Warp past the redemption delay
-        vm.warp(block.timestamp + JT_REDEMPTION_DELAY_SECONDS + 1);
+        vm.warp(vm.getBlockTimestamp() + JT_REDEMPTION_DELAY_SECONDS + 1);
 
         // Check claimable after delay
         uint256 claimableShares = KERNEL.jtClaimableRedeemRequest(requestId, ALICE_ADDRESS);
@@ -3590,7 +3590,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         uint256 initialTotalNAV = toUint256(state1.stRawNAV) + toUint256(state1.jtRawNAV);
 
         // Warp to accrue yield
-        vm.warp(block.timestamp + 365 days);
+        vm.warp(vm.getBlockTimestamp() + 365 days);
 
         // Sync accounting
         (SyncedAccountingState memory state2,,) = KERNEL.previewSyncTrancheAccounting(TrancheType.SENIOR);
@@ -3622,7 +3622,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         vm.stopPrank();
 
         // Warp to exactly 1 second before delay expires
-        vm.warp(block.timestamp + JT_REDEMPTION_DELAY_SECONDS - 1);
+        vm.warp(vm.getBlockTimestamp() + JT_REDEMPTION_DELAY_SECONDS - 1);
 
         // Should still be pending
         uint256 pendingShares = KERNEL.jtPendingRedeemRequest(requestId, ALICE_ADDRESS);
@@ -3632,7 +3632,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         assertEq(claimableShares, 0, "Should not be claimable before delay");
 
         // Warp to exactly the delay boundary
-        vm.warp(block.timestamp + 1);
+        vm.warp(vm.getBlockTimestamp() + 1);
 
         // Should now be claimable
         claimableShares = KERNEL.jtClaimableRedeemRequest(requestId, ALICE_ADDRESS);
@@ -3651,7 +3651,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         uint256 jtEffectiveT0 = toUint256(stateT0.jtEffectiveNAV);
 
         // Warp 1 day - Aave accrues yield
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(vm.getBlockTimestamp() + 1 days);
 
         // Sync to distribute yield
         (SyncedAccountingState memory stateT1,,) = KERNEL.previewSyncTrancheAccounting(TrancheType.SENIOR);
@@ -3694,7 +3694,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         assertTrue(KERNEL.jtPendingRedeemRequest(requestId3, ALICE_ADDRESS) > 0, "Request 3 pending");
 
         // Warp past delay
-        vm.warp(block.timestamp + JT_REDEMPTION_DELAY_SECONDS + 1);
+        vm.warp(vm.getBlockTimestamp() + JT_REDEMPTION_DELAY_SECONDS + 1);
 
         // Claim request 2 first (out of order)
         vm.startPrank(ALICE_ADDRESS);
@@ -3821,7 +3821,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         uint256 initialTotalNAV = toUint256(state1.stRawNAV) + toUint256(state1.jtRawNAV);
 
         // Warp 1 year
-        vm.warp(block.timestamp + 365 days);
+        vm.warp(vm.getBlockTimestamp() + 365 days);
 
         (SyncedAccountingState memory state2,,) = KERNEL.previewSyncTrancheAccounting(TrancheType.SENIOR);
         uint256 finalTotalNAV = toUint256(state2.stRawNAV) + toUint256(state2.jtRawNAV);

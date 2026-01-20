@@ -167,8 +167,8 @@ abstract contract YieldBearingERC20Chainlink_TestBase is AbstractKernelTestSuite
             abi.encode(
                 uint80(1), // roundId
                 _newPrice, // answer
-                block.timestamp, // startedAt
-                block.timestamp, // updatedAt (current time to avoid staleness)
+                vm.getBlockTimestamp(), // startedAt
+                vm.getBlockTimestamp(), // updatedAt (current time to avoid staleness)
                 uint80(1) // answeredInRound (>= roundId to avoid incomplete)
             )
         );
@@ -293,7 +293,7 @@ abstract contract YieldBearingERC20Chainlink_TestBase is AbstractKernelTestSuite
         simulateChainlinkPriceYield(_yieldPercentage * 1e16);
 
         // Warp time for yield distribution
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(vm.getBlockTimestamp() + 1 days);
 
         // Trigger sync
         vm.prank(OWNER_ADDRESS);
@@ -389,7 +389,7 @@ abstract contract YieldBearingERC20Chainlink_TestBase is AbstractKernelTestSuite
         vm.clearMockedCalls();
 
         // Mock a stale price (updatedAt is old)
-        uint256 staleTimestamp = block.timestamp - 400 days; // Very stale
+        uint256 staleTimestamp = vm.getBlockTimestamp() - 400 days; // Very stale
         vm.mockCall(
             chainlinkOracle,
             abi.encodeWithSelector(AggregatorV3Interface.latestRoundData.selector),
@@ -419,8 +419,8 @@ abstract contract YieldBearingERC20Chainlink_TestBase is AbstractKernelTestSuite
             abi.encode(
                 uint80(1), // roundId
                 int256(0), // answer (ZERO - invalid!)
-                block.timestamp, // startedAt
-                block.timestamp, // updatedAt
+                vm.getBlockTimestamp(), // startedAt
+                vm.getBlockTimestamp(), // updatedAt
                 uint80(1) // answeredInRound
             )
         );
@@ -441,8 +441,8 @@ abstract contract YieldBearingERC20Chainlink_TestBase is AbstractKernelTestSuite
             abi.encode(
                 uint80(1), // roundId
                 int256(-1e18), // answer (NEGATIVE - invalid!)
-                block.timestamp, // startedAt
-                block.timestamp, // updatedAt
+                vm.getBlockTimestamp(), // startedAt
+                vm.getBlockTimestamp(), // updatedAt
                 uint80(1) // answeredInRound
             )
         );
@@ -463,8 +463,8 @@ abstract contract YieldBearingERC20Chainlink_TestBase is AbstractKernelTestSuite
             abi.encode(
                 uint80(10), // roundId
                 int256(1e18), // answer (positive)
-                block.timestamp, // startedAt
-                block.timestamp, // updatedAt
+                vm.getBlockTimestamp(), // startedAt
+                vm.getBlockTimestamp(), // updatedAt
                 uint80(5) // answeredInRound (LESS than roundId - incomplete!)
             )
         );
@@ -484,8 +484,8 @@ abstract contract YieldBearingERC20Chainlink_TestBase is AbstractKernelTestSuite
             abi.encode(
                 uint80(10), // roundId
                 int256(1e18), // answer (positive)
-                block.timestamp, // startedAt
-                block.timestamp, // updatedAt (fresh)
+                vm.getBlockTimestamp(), // startedAt
+                vm.getBlockTimestamp(), // updatedAt (fresh)
                 uint80(10) // answeredInRound (== roundId - complete)
             )
         );
@@ -513,7 +513,7 @@ abstract contract YieldBearingERC20Chainlink_TestBase is AbstractKernelTestSuite
         (, int256 initialPrice,,,) = AggregatorV3Interface(chainlinkOracle).latestRoundData();
         _mockChainlinkPrice(initialPrice);
 
-        bytes32 marketId = keccak256(abi.encodePacked(cfg.name, "-", cfg.name, "-", block.timestamp));
+        bytes32 marketId = keccak256(abi.encodePacked(cfg.name, "-", cfg.name, "-", vm.getBlockTimestamp()));
 
         // Get initial conversion rate (reference asset to NAV, in RAY precision)
         uint256 initialConversionRate = _getInitialConversionRate();

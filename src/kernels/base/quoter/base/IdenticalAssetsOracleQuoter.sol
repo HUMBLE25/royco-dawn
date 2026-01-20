@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import { RAY } from "../../../../libraries/Constants.sol";
 import { Math, NAV_UNIT, TRANCHE_UNIT, UnitsMathLib, toNAVUnits, toTrancheUnits, toUint256 } from "../../../../libraries/Units.sol";
 import { RoycoKernel } from "../../RoycoKernel.sol";
+import { console2 } from "forge-std/console2.sol";
 
 /**
  * @title IdenticalAssetsOracleQuoter
@@ -65,6 +66,7 @@ abstract contract IdenticalAssetsOracleQuoter is RoycoKernel {
      * @dev This function is called at the start of a transaction to initialize the cached tranche unit to NAV unit conversion rate
      */
     function _initializeQuoterCache() internal virtual override {
+        console2.log("initializeQuoterCache");
         // Get the tranche unit to NAV unit conversion rate and set the cached flag
         cachedTrancheUnitToNAVUnitConversionRate = getTrancheUnitToNAVUnitConversionRate() | CACHED_TRANCHE_UNIT_TO_NAV_UNIT_CONVERSION_RATE_MASK;
     }
@@ -75,6 +77,7 @@ abstract contract IdenticalAssetsOracleQuoter is RoycoKernel {
      * @dev This function is called at the end of a transaction to clear the cached tranche unit to NAV unit conversion rate
      */
     function _clearQuoterCache() internal virtual override {
+        console2.log("clearQuoterCache");
         cachedTrancheUnitToNAVUnitConversionRate = 0;
     }
 
@@ -135,9 +138,11 @@ abstract contract IdenticalAssetsOracleQuoter is RoycoKernel {
         uint256 _cachedTrancheUnitToNAVUnitConversionRate = cachedTrancheUnitToNAVUnitConversionRate;
         // If the cache mask bit is set, use the cached value
         if (_cachedTrancheUnitToNAVUnitConversionRate & CACHED_TRANCHE_UNIT_TO_NAV_UNIT_CONVERSION_RATE_MASK != 0) {
+            console2.log("cache hit");
             return _cachedTrancheUnitToNAVUnitConversionRate ^ CACHED_TRANCHE_UNIT_TO_NAV_UNIT_CONVERSION_RATE_MASK;
         }
         // Otherwise fall back to querying the rate directly (for view functions)
+        console2.log("cache miss");
         return getTrancheUnitToNAVUnitConversionRate();
     }
 

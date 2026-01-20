@@ -247,7 +247,7 @@ abstract contract YieldBearingERC4626_TestBase is AbstractKernelTestSuite {
         simulateVaultSharePriceYield(_yieldPercentage * 1e16);
 
         // Warp time for yield distribution
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(vm.getBlockTimestamp() + 1 days);
 
         // Trigger sync
         vm.prank(OWNER_ADDRESS);
@@ -283,7 +283,7 @@ abstract contract YieldBearingERC4626_TestBase is AbstractKernelTestSuite {
     function _deployKernelAndMarket() internal override returns (DeployScript.DeploymentResult memory) {
         ProtocolConfig memory cfg = getProtocolConfig();
 
-        bytes32 marketId = keccak256(abi.encodePacked(cfg.name, "-", cfg.name, "-", block.timestamp));
+        bytes32 marketId = keccak256(abi.encodePacked(cfg.name, "-", cfg.name, "-", vm.getBlockTimestamp()));
 
         // Get initial conversion rate (vault asset to NAV, in RAY precision)
         uint256 initialConversionRate = _getInitialConversionRate();

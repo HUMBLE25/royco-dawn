@@ -55,7 +55,7 @@ contract PausabilityTestSuite is BaseTest {
     }
 
     function _deployMarket() internal returns (DeployScript.DeploymentResult memory) {
-        bytes32 marketId = keccak256(abi.encodePacked("PausabilityTest", block.timestamp));
+        bytes32 marketId = keccak256(abi.encodePacked("PausabilityTest", vm.getBlockTimestamp()));
 
         DeployScript.YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626SharesAdminOracleQuoterKernelParams memory kernelParams =
             DeployScript.YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626SharesAdminOracleQuoterKernelParams({ initialConversionRateWAD: RAY });

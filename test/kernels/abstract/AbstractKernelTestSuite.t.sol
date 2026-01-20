@@ -472,7 +472,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         assertEq(JT.pendingRedeemRequest(requestId, ALICE_ADDRESS), maxRedeem, "Should be pending");
 
         // Warp past delay
-        vm.warp(block.timestamp + _getJTRedemptionDelay() + 1);
+        vm.warp(vm.getBlockTimestamp() + _getJTRedemptionDelay() + 1);
 
         // Now should be claimable
         assertEq(JT.claimableRedeemRequest(requestId, ALICE_ADDRESS), maxRedeem, "Should be claimable after delay");
@@ -551,7 +551,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         }
 
         // Warp past delay
-        vm.warp(block.timestamp + _getJTRedemptionDelay() + 1);
+        vm.warp(vm.getBlockTimestamp() + _getJTRedemptionDelay() + 1);
 
         // Claim all requests
         uint256 totalAssetsReceived = 0;
@@ -690,7 +690,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         simulateSTYield(_yieldPercentage * 1e16);
 
         // Warp time for yield distribution
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(vm.getBlockTimestamp() + 1 days);
 
         // Trigger sync
         vm.prank(OWNER_ADDRESS);
@@ -714,7 +714,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         simulateJTYield(_yieldPercentage * 1e16);
 
         // Warp time
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(vm.getBlockTimestamp() + 1 days);
 
         // Trigger sync
         vm.prank(OWNER_ADDRESS);
@@ -922,7 +922,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         // Step 3: Simulate yield
         simulateJTYield(_yieldPercentage * 1e16);
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(vm.getBlockTimestamp() + 1 days);
         vm.prank(OWNER_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
@@ -942,7 +942,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
             vm.prank(ALICE_ADDRESS);
             (uint256 requestId,) = JT.requestRedeem(jtMaxRedeem, ALICE_ADDRESS, ALICE_ADDRESS);
 
-            vm.warp(block.timestamp + _getJTRedemptionDelay() + 1);
+            vm.warp(vm.getBlockTimestamp() + _getJTRedemptionDelay() + 1);
 
             uint256 jtBalanceBefore = IERC20(config.jtAsset).balanceOf(ALICE_ADDRESS);
             vm.prank(ALICE_ADDRESS);
@@ -1116,7 +1116,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         NAV_UNIT jtNavBeforeYield = JT.totalAssets().nav;
 
         simulateJTYield(_yieldPercentage * 1e16);
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(vm.getBlockTimestamp() + 1 days);
 
         vm.prank(OWNER_ADDRESS);
         KERNEL.syncTrancheAccounting();
@@ -1177,7 +1177,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         assertEq(JT.claimableRedeemRequest(requestId, ALICE_ADDRESS), 0, "Should not be claimable yet");
 
         // Warp past delay
-        vm.warp(block.timestamp + _getJTRedemptionDelay() + 1);
+        vm.warp(vm.getBlockTimestamp() + _getJTRedemptionDelay() + 1);
 
         // Verify claimable
         assertEq(JT.claimableRedeemRequest(requestId, ALICE_ADDRESS), jtMaxRedeem, "Should be claimable after delay");
@@ -1352,7 +1352,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
             NAV_UNIT jtNavBeforeYield = JT.totalAssets().nav;
 
             simulateJTYield(_yieldPercentage * 1e16);
-            vm.warp(block.timestamp + 1 days);
+            vm.warp(vm.getBlockTimestamp() + 1 days);
 
             vm.prank(OWNER_ADDRESS);
             KERNEL.syncTrancheAccounting();
@@ -1434,7 +1434,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         // STEP 3: Warp past redemption delay
         // ═══════════════════════════════════════════════════════════════════════════
 
-        vm.warp(block.timestamp + _getJTRedemptionDelay() + 1);
+        vm.warp(vm.getBlockTimestamp() + _getJTRedemptionDelay() + 1);
 
         // ═══════════════════════════════════════════════════════════════════════════
         // STEP 4: Verify all requests are claimable
@@ -2276,7 +2276,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         (uint256 requestId,) = JT.requestRedeem(maxRedeemableBefore, ALICE_ADDRESS, ALICE_ADDRESS);
 
         // Warp past redemption delay so shares become claimable
-        vm.warp(block.timestamp + _getJTRedemptionDelay() + 1);
+        vm.warp(vm.getBlockTimestamp() + _getJTRedemptionDelay() + 1);
 
         // Verify initially claimable equals requested
         uint256 claimableBefore = JT.claimableRedeemRequest(requestId, ALICE_ADDRESS);
@@ -2322,7 +2322,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         (uint256 requestId,) = JT.requestRedeem(jtShares, ALICE_ADDRESS, ALICE_ADDRESS);
 
         // Warp past delay
-        vm.warp(block.timestamp + _getJTRedemptionDelay() + 1);
+        vm.warp(vm.getBlockTimestamp() + _getJTRedemptionDelay() + 1);
 
         // Initially all should be claimable
         uint256 claimableInitial = JT.claimableRedeemRequest(requestId, ALICE_ADDRESS);
@@ -2366,7 +2366,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         (uint256 requestId,) = JT.requestRedeem(jtShares, ALICE_ADDRESS, ALICE_ADDRESS);
 
         // Warp past delay
-        vm.warp(block.timestamp + _getJTRedemptionDelay() + 1);
+        vm.warp(vm.getBlockTimestamp() + _getJTRedemptionDelay() + 1);
 
         // Deposit ST to tighten coverage
         TRANCHE_UNIT stMaxDeposit = ST.maxDeposit(BOB_ADDRESS);
@@ -2513,7 +2513,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         // Simulate yield
         simulateJTYield(_yieldPercentage * 1e16);
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(vm.getBlockTimestamp() + 1 days);
         vm.prank(OWNER_ADDRESS);
         KERNEL.syncTrancheAccounting();
 

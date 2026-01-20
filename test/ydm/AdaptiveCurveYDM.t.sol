@@ -178,7 +178,7 @@ contract AdaptiveCurveYDMTest is BaseTest {
         assertGt(timestamp1, 0, "Timestamp should be set after first call");
 
         // Advance time significantly
-        vm.warp(block.timestamp + 30 days);
+        vm.warp(vm.getBlockTimestamp() + 30 days);
 
         // Re-initialize should reset timestamp to 0
         ydm.initializeYDMForMarket(0.5e18, 0.8e18);
@@ -206,7 +206,7 @@ contract AdaptiveCurveYDMTest is BaseTest {
         (uint64 ytBefore,,) = ydm.accountantToCurve(address(this));
 
         // Advance time
-        vm.warp(block.timestamp + 30 days);
+        vm.warp(vm.getBlockTimestamp() + 30 days);
 
         // Second call should adapt the curve upward (high utilization)
         ydm.jtYieldShare(MarketState.PERPETUAL, stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
@@ -225,7 +225,7 @@ contract AdaptiveCurveYDMTest is BaseTest {
         (uint64 ytBefore,,) = ydm.accountantToCurve(address(this));
 
         // Advance time
-        vm.warp(block.timestamp + 30 days);
+        vm.warp(vm.getBlockTimestamp() + 30 days);
 
         // Call in FIXED_TERM state - should not adapt
         ydm.jtYieldShare(MarketState.FIXED_TERM, stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
@@ -245,7 +245,7 @@ contract AdaptiveCurveYDMTest is BaseTest {
 
         (uint64 ytBefore, uint32 timestampBefore,) = ydm.accountantToCurve(address(this));
 
-        vm.warp(block.timestamp + 30 days);
+        vm.warp(vm.getBlockTimestamp() + 30 days);
 
         // Preview should not modify state
         ydm.previewJTYieldShare(MarketState.PERPETUAL, stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
@@ -262,7 +262,7 @@ contract AdaptiveCurveYDMTest is BaseTest {
         // Set initial timestamp
         ydm.jtYieldShare(MarketState.PERPETUAL, stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
 
-        vm.warp(block.timestamp + 10 days);
+        vm.warp(vm.getBlockTimestamp() + 10 days);
 
         // Preview and actual should return the same value
         uint256 preview = ydm.previewJTYieldShare(MarketState.PERPETUAL, stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
@@ -300,7 +300,7 @@ contract AdaptiveCurveYDMTest is BaseTest {
 
         (uint64 ytBefore,,) = ydm.accountantToCurve(address(this));
 
-        vm.warp(block.timestamp + 365 days);
+        vm.warp(vm.getBlockTimestamp() + 365 days);
 
         // At target utilization, normalized delta = 0, so adaptation speed = 0
         ydm.jtYieldShare(MarketState.PERPETUAL, stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
@@ -316,7 +316,7 @@ contract AdaptiveCurveYDMTest is BaseTest {
         ydm.jtYieldShare(MarketState.PERPETUAL, stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
         (uint64 ytBefore,,) = ydm.accountantToCurve(address(this));
 
-        vm.warp(block.timestamp + 30 days);
+        vm.warp(vm.getBlockTimestamp() + 30 days);
 
         ydm.jtYieldShare(MarketState.PERPETUAL, stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
         (uint64 ytAfter,,) = ydm.accountantToCurve(address(this));
@@ -330,7 +330,7 @@ contract AdaptiveCurveYDMTest is BaseTest {
         ydm.jtYieldShare(MarketState.PERPETUAL, stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
         (uint64 ytBefore,,) = ydm.accountantToCurve(address(this));
 
-        vm.warp(block.timestamp + 30 days);
+        vm.warp(vm.getBlockTimestamp() + 30 days);
 
         ydm.jtYieldShare(MarketState.PERPETUAL, stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
         (uint64 ytAfter,,) = ydm.accountantToCurve(address(this));
@@ -348,7 +348,7 @@ contract AdaptiveCurveYDMTest is BaseTest {
         minYdm.jtYieldShare(MarketState.PERPETUAL, stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
 
         // Advance a very long time with low utilization
-        vm.warp(block.timestamp + 3650 days); // 10 years
+        vm.warp(vm.getBlockTimestamp() + 3650 days); // 10 years
 
         minYdm.jtYieldShare(MarketState.PERPETUAL, stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
         (uint64 yT,,) = minYdm.accountantToCurve(address(this));
@@ -367,7 +367,7 @@ contract AdaptiveCurveYDMTest is BaseTest {
 
         // Advance in multiple steps to avoid exp overflow (100 days each, 10 iterations)
         for (uint256 i = 0; i < 10; i++) {
-            vm.warp(block.timestamp + 100 days);
+            vm.warp(vm.getBlockTimestamp() + 100 days);
             maxYdm.jtYieldShare(MarketState.PERPETUAL, stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
         }
 
@@ -382,7 +382,7 @@ contract AdaptiveCurveYDMTest is BaseTest {
         // First call to set timestamp
         ydm.jtYieldShare(MarketState.PERPETUAL, stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
 
-        vm.warp(block.timestamp + 30 days);
+        vm.warp(vm.getBlockTimestamp() + 30 days);
 
         // Expect YdmAdaptedOutput event
         vm.expectEmit(true, false, false, false);
@@ -399,7 +399,7 @@ contract AdaptiveCurveYDMTest is BaseTest {
         (, uint32 timestamp1,) = ydm.accountantToCurve(address(this));
 
         // Advance time
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(vm.getBlockTimestamp() + 1 days);
 
         // Second call
         ydm.jtYieldShare(MarketState.PERPETUAL, stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
@@ -595,7 +595,7 @@ contract AdaptiveCurveYDMTest is BaseTest {
         (uint64 initialYT,,) = ydm.accountantToCurve(address(this));
 
         uint256 elapsed = 30 days;
-        vm.warp(block.timestamp + elapsed);
+        vm.warp(vm.getBlockTimestamp() + elapsed);
 
         // Get the returned yield share (which is the average)
         uint256 avgYieldShare = ydm.previewJTYieldShare(MarketState.PERPETUAL, stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
@@ -718,7 +718,7 @@ contract AdaptiveCurveYDMTest is BaseTest {
         ydm.jtYieldShare(MarketState.PERPETUAL, stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
         (uint64 ytBefore,,) = ydm.accountantToCurve(address(this));
 
-        vm.warp(block.timestamp + _elapsed);
+        vm.warp(vm.getBlockTimestamp() + _elapsed);
 
         ydm.jtYieldShare(MarketState.PERPETUAL, stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
         (uint64 ytAfter,,) = ydm.accountantToCurve(address(this));
@@ -768,7 +768,7 @@ contract AdaptiveCurveYDMTest is BaseTest {
         // Set initial timestamp
         ydm.jtYieldShare(MarketState.PERPETUAL, stRawNAV, jtRawNAV, _betaWAD, _coverageWAD, jtEffectiveNAV);
 
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(vm.getBlockTimestamp() + 1 days);
 
         uint256 preview = ydm.previewJTYieldShare(MarketState.PERPETUAL, stRawNAV, jtRawNAV, _betaWAD, _coverageWAD, jtEffectiveNAV);
         uint256 actual = ydm.jtYieldShare(MarketState.PERPETUAL, stRawNAV, jtRawNAV, _betaWAD, _coverageWAD, jtEffectiveNAV);
@@ -820,7 +820,7 @@ contract AdaptiveCurveYDMTest is BaseTest {
 
         // Apply adaptation in multiple steps to avoid exp overflow
         for (uint256 i = 0; i < _numSteps; i++) {
-            vm.warp(block.timestamp + 30 days);
+            vm.warp(vm.getBlockTimestamp() + 30 days);
             testYdm.jtYieldShare(MarketState.PERPETUAL, stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
         }
 
@@ -839,7 +839,7 @@ contract AdaptiveCurveYDMTest is BaseTest {
 
         // Rapid back-and-forth between PERPETUAL and FIXED_TERM
         for (uint256 i = 0; i < 10; i++) {
-            vm.warp(block.timestamp + 1 days);
+            vm.warp(vm.getBlockTimestamp() + 1 days);
             MarketState state = i % 2 == 0 ? MarketState.PERPETUAL : MarketState.FIXED_TERM;
             ydm.jtYieldShare(state, stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
         }
@@ -856,7 +856,7 @@ contract AdaptiveCurveYDMTest is BaseTest {
             uint256 util = i % 2 == 0 ? 0 : WAD;
             (NAV_UNIT stRawNAV, NAV_UNIT jtRawNAV, uint256 betaWAD, uint256 coverageWAD, NAV_UNIT jtEffectiveNAV) = _createInputsForUtilization(util);
 
-            vm.warp(block.timestamp + 1 days);
+            vm.warp(vm.getBlockTimestamp() + 1 days);
             ydm.jtYieldShare(MarketState.PERPETUAL, stRawNAV, jtRawNAV, betaWAD, coverageWAD, jtEffectiveNAV);
         }
 
@@ -876,7 +876,7 @@ contract AdaptiveCurveYDMTest is BaseTest {
 
         // All accountants call in rapid succession
         for (uint256 round = 0; round < 5; round++) {
-            vm.warp(block.timestamp + 1 days);
+            vm.warp(vm.getBlockTimestamp() + 1 days);
             for (uint256 i = 0; i < 5; i++) {
                 uint256 util = (i * 0.25e18);
                 (NAV_UNIT stRawNAV, NAV_UNIT jtRawNAV, uint256 betaWAD, uint256 coverageWAD, NAV_UNIT jtEffectiveNAV) = _createInputsForUtilization(util);

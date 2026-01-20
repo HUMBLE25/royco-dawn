@@ -299,7 +299,7 @@ contract RoycoAccountantTest is BaseTest {
         uint256 stEffBefore = toUint256(baseState.lastSTEffectiveNAV);
         uint256 jtEffBefore = toUint256(baseState.lastJTEffectiveNAV);
 
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(vm.getBlockTimestamp() + 1 days);
 
         uint256 stGain = 10e18;
         vm.prank(MOCK_KERNEL);
@@ -381,7 +381,7 @@ contract RoycoAccountantTest is BaseTest {
         IRoycoAccountant.RoycoAccountantState memory baseState = accountant.getState();
         uint256 totalEffBefore = toUint256(baseState.lastSTEffectiveNAV) + toUint256(baseState.lastJTEffectiveNAV);
 
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(vm.getBlockTimestamp() + 1 days);
 
         uint256 stGain = 10e18;
         uint256 jtGain = 5e18;
@@ -416,7 +416,7 @@ contract RoycoAccountantTest is BaseTest {
         IRoycoAccountant.RoycoAccountantState memory baseState = accountant.getState();
         uint256 jtEffBefore = toUint256(baseState.lastJTEffectiveNAV);
 
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(vm.getBlockTimestamp() + 1 days);
 
         uint256 stGain = 10e18;
         uint256 jtLoss = 5e18;
@@ -449,7 +449,7 @@ contract RoycoAccountantTest is BaseTest {
         stDelta = bound(stDelta, -int256(100e18), int256(100e18));
         jtDelta = bound(jtDelta, -int256(50e18), int256(50e18));
 
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(vm.getBlockTimestamp() + 1 days);
 
         vm.prank(MOCK_KERNEL);
         SyncedAccountingState memory state =
@@ -489,7 +489,7 @@ contract RoycoAccountantTest is BaseTest {
 
         assertEq(toUint256(state1.jtCoverageImpermanentLoss), stLoss, "JT coverage IL created");
 
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(vm.getBlockTimestamp() + 1 days);
         uint256 stGain = 30e18;
         vm.prank(MOCK_KERNEL);
         SyncedAccountingState memory state2 = accountant.preOpSyncTrancheAccounting(_nav(100e18 - stLoss + stGain), _nav(50e18));
@@ -530,7 +530,7 @@ contract RoycoAccountantTest is BaseTest {
 
         assertEq(uint8(state.marketState), uint8(MarketState.FIXED_TERM), "transitioned to FIXED_TERM");
         assertGt(toUint256(state.jtCoverageImpermanentLoss), 0, "JT coverage IL exists");
-        assertGt(accountant.getState().fixedTermEndTimestamp, block.timestamp, "fixed term end set");
+        assertGt(accountant.getState().fixedTermEndTimestamp, vm.getBlockTimestamp(), "fixed term end set");
     }
 
     function test_stateTransition_fixedTermExpiry() public {
@@ -580,7 +580,7 @@ contract RoycoAccountantTest is BaseTest {
         SyncedAccountingState memory state1 = accountant.preOpSyncTrancheAccounting(_nav(80e18), _nav(50e18));
         assertEq(uint8(state1.marketState), uint8(MarketState.FIXED_TERM));
 
-        vm.warp(block.timestamp + 1 weeks);
+        vm.warp(vm.getBlockTimestamp() + 1 weeks);
         vm.prank(MOCK_KERNEL);
         SyncedAccountingState memory state2 = accountant.preOpSyncTrancheAccounting(_nav(80e18), _nav(50e18));
         assertEq(uint8(state2.marketState), uint8(MarketState.FIXED_TERM));
@@ -604,7 +604,7 @@ contract RoycoAccountantTest is BaseTest {
         assertEq(uint8(state1.marketState), uint8(MarketState.FIXED_TERM));
         assertGt(toUint256(state1.jtCoverageImpermanentLoss), 0, "IL exists");
 
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(vm.getBlockTimestamp() + 1 days);
         vm.prank(MOCK_KERNEL);
         SyncedAccountingState memory state2 = accountant.preOpSyncTrancheAccounting(_nav(110e18), _nav(50e18));
 
@@ -635,7 +635,7 @@ contract RoycoAccountantTest is BaseTest {
         assertEq(uint8(state1.marketState), uint8(MarketState.FIXED_TERM));
         uint256 initialIL = toUint256(state1.jtCoverageImpermanentLoss);
 
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(vm.getBlockTimestamp() + 1 days);
         vm.prank(MOCK_KERNEL);
         SyncedAccountingState memory state2 = accountant.preOpSyncTrancheAccounting(_nav(90e18), _nav(50e18));
 
@@ -668,7 +668,7 @@ contract RoycoAccountantTest is BaseTest {
         SyncedAccountingState memory s1 = accountant.preOpSyncTrancheAccounting(_nav(80e18), _nav(50e18));
         assertEq(uint8(s1.marketState), uint8(MarketState.FIXED_TERM));
 
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(vm.getBlockTimestamp() + 1 days);
         vm.prank(MOCK_KERNEL);
         SyncedAccountingState memory s2 = accountant.preOpSyncTrancheAccounting(_nav(110e18), _nav(50e18));
         assertEq(uint8(s2.marketState), uint8(MarketState.PERPETUAL));
@@ -897,7 +897,7 @@ contract RoycoAccountantTest is BaseTest {
         (uint64 initialYT,,) = adaptiveYDM.accountantToCurve(address(accountant));
         assertEq(initialYT, YDM_JT_YIELD_AT_TARGET, "initial YT is at target");
 
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(vm.getBlockTimestamp() + 1 days);
 
         vm.prank(MOCK_KERNEL);
         accountant.preOpSyncTrancheAccounting(_nav(10e18), _nav(200e18));
@@ -905,7 +905,7 @@ contract RoycoAccountantTest is BaseTest {
         (, uint32 timestampAfterSecondSync,) = adaptiveYDM.accountantToCurve(address(accountant));
         assertGt(timestampAfterSecondSync, 0, "timestamp set after second sync");
 
-        vm.warp(block.timestamp + 365 days);
+        vm.warp(vm.getBlockTimestamp() + 365 days);
 
         vm.prank(MOCK_KERNEL);
         accountant.preOpSyncTrancheAccounting(_nav(10e18), _nav(200e18));
@@ -923,7 +923,7 @@ contract RoycoAccountantTest is BaseTest {
         if (uint8(state1.marketState) == uint8(MarketState.FIXED_TERM)) {
             (uint64 ytBefore,,) = adaptiveYDM.accountantToCurve(address(accountant));
 
-            vm.warp(block.timestamp + 30 days);
+            vm.warp(vm.getBlockTimestamp() + 30 days);
 
             vm.prank(MOCK_KERNEL);
             accountant.preOpSyncTrancheAccounting(_nav(80e18), _nav(50e18));
@@ -941,7 +941,7 @@ contract RoycoAccountantTest is BaseTest {
     function test_previewSync_matchesPreOpSync() public {
         _initializeAccountantState(100e18, 50e18);
 
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(vm.getBlockTimestamp() + 1 days);
 
         NAV_UNIT newStRaw = _nav(110e18);
         NAV_UNIT newJtRaw = _nav(55e18);
@@ -972,7 +972,7 @@ contract RoycoAccountantTest is BaseTest {
         assertEq(uint8(state1.marketState), uint8(MarketState.FIXED_TERM), "in FIXED_TERM");
         _assertNAVConservation(state1);
 
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(vm.getBlockTimestamp() + 1 days);
         vm.prank(MOCK_KERNEL);
         SyncedAccountingState memory state2 = accountant.preOpSyncTrancheAccounting(_nav(95e18), _nav(50e18));
 
@@ -1007,7 +1007,7 @@ contract RoycoAccountantTest is BaseTest {
         _initializeAccountantState(100e18, 50e18);
 
         for (uint256 i = 0; i < 5; i++) {
-            vm.warp(block.timestamp + 1 days);
+            vm.warp(vm.getBlockTimestamp() + 1 days);
             vm.prank(MOCK_KERNEL);
             accountant.preOpSyncTrancheAccounting(_nav(100e18), _nav(50e18));
         }
@@ -1015,7 +1015,7 @@ contract RoycoAccountantTest is BaseTest {
         IRoycoAccountant.RoycoAccountantState memory baseState = accountant.getState();
         uint256 jtEffBefore = toUint256(baseState.lastJTEffectiveNAV);
 
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(vm.getBlockTimestamp() + 1 days);
         uint256 stGain = 10e18;
         vm.prank(MOCK_KERNEL);
         SyncedAccountingState memory state = accountant.preOpSyncTrancheAccounting(_nav(100e18 + stGain), _nav(50e18));
@@ -1029,18 +1029,18 @@ contract RoycoAccountantTest is BaseTest {
 
         (uint64 yt0,,) = adaptiveYDM.accountantToCurve(address(accountant));
 
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(vm.getBlockTimestamp() + 1 days);
         vm.prank(MOCK_KERNEL);
         accountant.preOpSyncTrancheAccounting(_nav(10e18), _nav(200e18));
 
-        vm.warp(block.timestamp + 365 days);
+        vm.warp(vm.getBlockTimestamp() + 365 days);
         vm.prank(MOCK_KERNEL);
         accountant.preOpSyncTrancheAccounting(_nav(10e18), _nav(200e18));
 
         (uint64 yt1,,) = adaptiveYDM.accountantToCurve(address(accountant));
         assertLt(yt1, yt0, "YT decreased with low utilization");
 
-        vm.warp(block.timestamp + 365 days);
+        vm.warp(vm.getBlockTimestamp() + 365 days);
         vm.prank(MOCK_KERNEL);
         accountant.preOpSyncTrancheAccounting(_nav(10e18), _nav(200e18));
 
@@ -1062,7 +1062,7 @@ contract RoycoAccountantTest is BaseTest {
         stDelta = bound(stDelta, -int256(stRaw), int256(stRaw));
         jtDelta = bound(jtDelta, -int256(jtRaw), int256(jtRaw));
 
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(vm.getBlockTimestamp() + 1 days);
 
         vm.prank(MOCK_KERNEL);
         SyncedAccountingState memory state =
@@ -1097,7 +1097,7 @@ contract RoycoAccountantTest is BaseTest {
         stDelta = bound(stDelta, -int256(stRaw), int256(stRaw));
         jtDelta = bound(jtDelta, -int256(jtRaw), int256(jtRaw));
 
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(vm.getBlockTimestamp() + 1 days);
 
         vm.prank(MOCK_KERNEL);
         SyncedAccountingState memory state =
@@ -1289,7 +1289,7 @@ contract RoycoAccountantTest is BaseTest {
 
         _assertNAVConservation(state1);
 
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(vm.getBlockTimestamp() + 1 days);
         vm.prank(MOCK_KERNEL);
         SyncedAccountingState memory state2 = largeAccountant.preOpSyncTrancheAccounting(_nav(largeNav * 2), _nav(largeNav / 2));
 
