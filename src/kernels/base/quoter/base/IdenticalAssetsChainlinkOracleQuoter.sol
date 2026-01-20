@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import { Math } from "../../../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
-import { AggregatorV3Interface } from "../../../interfaces/external/chainlink/AggregatorV3Interface.sol";
-import { RAY } from "../../../libraries/Constants.sol";
-import { IdenticalAssetsOracleQuoter } from "./base/IdenticalAssetsOracleQuoter.sol";
+import { Math } from "../../../../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
+import { AggregatorV3Interface } from "../../../../interfaces/external/chainlink/AggregatorV3Interface.sol";
+import { RAY } from "../../../../libraries/Constants.sol";
+import { IdenticalAssetsOracleQuoter } from "./IdenticalAssetsOracleQuoter.sol";
 
 /**
  * @title IdenticalAssetsChainlinkOracleQuoter
@@ -50,11 +50,29 @@ abstract contract IdenticalAssetsChainlinkOracleQuoter is IdenticalAssetsOracleQ
     error PRICE_INCOMPLETE();
 
     /**
-     * @notice Initializes the identical assets chainlink oracle quoter
+     * @notice Initializes the identical assets chainlink oracle quoter and the base identical assets oracle quoter
+     * @param _initialConversionRateRAY The initial conversion rate as defined by the oracle, scaled to RAY precision
      * @param _trancheAssetToReferenceAssetOracle The tranche asset to reference asset oracle
-     * @param _stalenessThresholdSeconds The staleness threshold seconds
+     * @param _stalenessThresholdSeconds The staleness threshold in seconds
      */
     function __IdenticalAssetsChainlinkOracleQuoter_init(
+        uint256 _initialConversionRateRAY,
+        address _trancheAssetToReferenceAssetOracle,
+        uint48 _stalenessThresholdSeconds
+    )
+        internal
+        onlyInitializing
+    {
+        __IdenticalAssetsOracleQuoter_init_unchained(_initialConversionRateRAY);
+        __IdenticalAssetsChainlinkOracleQuoter_init_unchained(_trancheAssetToReferenceAssetOracle, _stalenessThresholdSeconds);
+    }
+
+    /**
+     * @notice Initializes the identical assets chainlink oracle quoter
+     * @param _trancheAssetToReferenceAssetOracle The tranche asset to reference asset oracle
+     * @param _stalenessThresholdSeconds The staleness threshold in seconds
+     */
+    function __IdenticalAssetsChainlinkOracleQuoter_init_unchained(
         address _trancheAssetToReferenceAssetOracle,
         uint48 _stalenessThresholdSeconds
     )
@@ -70,7 +88,13 @@ abstract contract IdenticalAssetsChainlinkOracleQuoter is IdenticalAssetsOracleQ
      *      NAV units = Tranche Asset Price in Reference Asset * Reference Asset Price in NAV units
      * @return trancheToNAVUnitConversionRateRAY The conversion rate from tranche token units to NAV units, scaled to RAY precision
      */
-    function getTrancheUnitToNAVUnitConversionRate() public view override returns (uint256 trancheToNAVUnitConversionRateRAY) {
+    function getTrancheUnitToNAVUnitConversionRate()
+        public
+        view
+        virtual
+        override(IdenticalAssetsOracleQuoter)
+        returns (uint256 trancheToNAVUnitConversionRateRAY)
+    {
         // Fetch the Tranche Asset to the reference asset
         (uint256 trancheAssetPriceInReferenceAsset, uint256 precision) = _queryChainlinkOracle();
 

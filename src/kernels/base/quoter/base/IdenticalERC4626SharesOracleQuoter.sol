@@ -1,17 +1,18 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import { IERC4626 } from "../../../../lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
-import { Math } from "../../../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
-import { RAY } from "../../../libraries/Constants.sol";
-import { IdenticalAssetsOracleQuoter } from "./base/IdenticalAssetsOracleQuoter.sol";
+import { IERC4626 } from "../../../../../lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
+import { Math } from "../../../../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
+import { RAY } from "../../../../libraries/Constants.sol";
+import { IdenticalAssetsOracleQuoter } from "./IdenticalAssetsOracleQuoter.sol";
 
 /**
- * @title IdenticalERC4626AssetsOracleQuoter
+ * @title IdenticalERC4626SharesOracleQuoter
  * @notice Quoter for markets where both tranches use the same ERC4626 compliant tranche asset and the NAV is represented in the tranche's share's value in some reference asset
+ * @dev The senior and junior tranches must have the same ERC4626 vault share as its tranche unit
  * @dev Example: Tranche Unit of sUSDe, NAV Unit of USD where x Tranche Unit = x * sUSDe share price in USDe * USDe price in USD
  */
-abstract contract IdenticalERC4626AssetsOracleQuoter is IdenticalAssetsOracleQuoter {
+abstract contract IdenticalERC4626SharesOracleQuoter is IdenticalAssetsOracleQuoter {
     using Math for uint256;
 
     /**
@@ -20,7 +21,13 @@ abstract contract IdenticalERC4626AssetsOracleQuoter is IdenticalAssetsOracleQuo
      * @dev The conversion rate is calculated as value_of_vault_share_in_vault_asset * value_of_vault_asset_in_NAV_units, scaled to RAY precision
      * @return trancheToNAVUnitConversionRateRAY The conversion rate from tranche token units to NAV units, scaled to RAY precision
      */
-    function getTrancheUnitToNAVUnitConversionRate() public view override returns (uint256 trancheToNAVUnitConversionRateRAY) {
+    function getTrancheUnitToNAVUnitConversionRate()
+        public
+        view
+        virtual
+        override(IdenticalAssetsOracleQuoter)
+        returns (uint256 trancheToNAVUnitConversionRateRAY)
+    {
         // Fetch the conversion rate from the vault asset (ERC4626) to it's underlying asset, scaled to RAY precision
         uint256 trancheUnitToVaultAssetsConversionRateRAY = IERC4626(ST_ASSET).convertToAssets(RAY);
 

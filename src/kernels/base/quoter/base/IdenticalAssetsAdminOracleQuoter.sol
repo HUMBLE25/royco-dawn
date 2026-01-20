@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import { IdenticalAssetsOracleQuoter } from "./base/IdenticalAssetsOracleQuoter.sol";
+import { IdenticalAssetsOracleQuoter } from "./IdenticalAssetsOracleQuoter.sol";
 
 /**
  * @title IdenticalAssetsAdminOracleQuoter
@@ -18,7 +18,7 @@ abstract contract IdenticalAssetsAdminOracleQuoter is IdenticalAssetsOracleQuote
     /**
      * @notice Initializes the identical assets admin oracle quoter
      * @dev The conversion rate cannot be set to the sentinel value (0)
-     * @param _initialConversionRateRAY The initial tranche unit to NAV unit conversion rate, scaled to RAY precision
+     * @param _initialConversionRateRAY The initial reference asset to NAV unit conversion rate, scaled to RAY precision, scaled to RAY precision
      */
     function __IdenticalAssetsAdminOracleQuoter_init(uint256 _initialConversionRateRAY) internal onlyInitializing {
         // Validate the conversion rate
@@ -29,11 +29,11 @@ abstract contract IdenticalAssetsAdminOracleQuoter is IdenticalAssetsOracleQuote
 
     /// @inheritdoc IdenticalAssetsOracleQuoter
     /// @dev The conversion rate cannot be set to the sentinel value (0)
-    function setConversionRate(uint256 _conversionRateRAY) public override(IdenticalAssetsOracleQuoter) restricted {
+    function setConversionRate(uint256 _conversionRateRAY) public virtual override(IdenticalAssetsOracleQuoter) restricted {
         // Validate the conversion rate
         require(_conversionRateRAY != SENTINEL_CONVERSION_RATE, INVALID_CONVERSION_RATE());
         // Update the oracle quoter with the initial admin set rate
-        super.setConversionRate(_conversionRateRAY);
+        IdenticalAssetsOracleQuoter.setConversionRate(_conversionRateRAY);
     }
 
     /// @inheritdoc IdenticalAssetsOracleQuoter

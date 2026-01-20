@@ -25,11 +25,11 @@ abstract contract YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsOracl
     /**
      * @notice Initializes the Royco Kernel
      * @param _params The standard initialization parameters for the Royco Kernel
-     * @param _initialConversionRateWAD The initial tranche unit to NAV unit conversion rate
+     * @param _initialConversionRateRAY The initial reference asset to NAV unit conversion rate, scaled to RAY precision
      */
     function __YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsOracleQuoter_Kernel_init(
         RoycoKernelInitParams calldata _params,
-        uint256 _initialConversionRateWAD
+        uint256 _initialConversionRateRAY
     )
         internal
         onlyInitializing
@@ -37,6 +37,6 @@ abstract contract YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsOracl
         // Initialize the base kernel state
         __RoycoKernel_init(_params);
         // Initialize the overridable NAV oracle identical assets quoter
-        __IdenticalAssetsOracleQuoter_init_unchained(_initialConversionRateWAD);
+        __IdenticalAssetsOracleQuoter_init_unchained(_initialConversionRateRAY);
     }
 }

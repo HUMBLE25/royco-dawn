@@ -1735,8 +1735,8 @@ end_of_record
 TN:
 SF:src/kernels/base/quoter/IdenticalAssetsChainlinkOracleQuoter.sol
 DA:57,0
-FN:57,IdenticalAssetsChainlinkOracleQuoter.__IdenticalAssetsChainlinkOracleQuoter_init
-FNDA:0,IdenticalAssetsChainlinkOracleQuoter.__IdenticalAssetsChainlinkOracleQuoter_init
+FN:57,IdenticalAssetsChainlinkOracleQuoter.__IdenticalAssetsChainlinkOracleQuoter_init_unchained
+FNDA:0,IdenticalAssetsChainlinkOracleQuoter.__IdenticalAssetsChainlinkOracleQuoter_init_unchained
 DA:64,0
 DA:73,0
 FN:73,IdenticalAssetsChainlinkOracleQuoter.getTrancheUnitToNAVUnitConversionRate
@@ -1793,10 +1793,10 @@ BRF:11
 BRH:0
 end_of_record
 TN:
-SF:src/kernels/base/quoter/IdenticalERC4626AssetsOracleQuoter.sol
+SF:src/kernels/base/quoter/IdenticalERC4626SharesOracleQuoter.sol
 DA:23,1006036
-FN:23,IdenticalERC4626AssetsOracleQuoter.getTrancheUnitToNAVUnitConversionRate
-FNDA:1006036,IdenticalERC4626AssetsOracleQuoter.getTrancheUnitToNAVUnitConversionRate
+FN:23,IdenticalERC4626SharesOracleQuoter.getTrancheUnitToNAVUnitConversionRate
+FNDA:1006036,IdenticalERC4626SharesOracleQuoter.getTrancheUnitToNAVUnitConversionRate
 DA:25,1006036
 DA:28,1006036
 DA:29,1006036
