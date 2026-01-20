@@ -3527,7 +3527,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
     // ============================================
 
     /// @notice Test rounding consistency in deposit/withdraw cycle - no arbitrage opportunity
-    function test_audit_depositWithdrawCycle_noArbitrage() public {
+    function test_depositWithdrawCycle_noArbitrage() public {
         _depositJT(1_000_000e6, ALICE_ADDRESS);
 
         uint256 depositAmount = 100_000e6;
@@ -3553,7 +3553,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
     }
 
     /// @notice Test multiple small deposits vs single large deposit - accumulation error check
-    function test_audit_multipleSmallDeposits_noAccumulationError() public {
+    function test_multipleSmallDeposits_noAccumulationError() public {
         _depositJT(10_000_000e6, ALICE_ADDRESS);
 
         uint256 smallAmount = 100e6; // 100 USDC
@@ -3581,7 +3581,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
     }
 
     /// @notice Test fee calculation precision - no value leakage over time
-    function test_audit_feeCalculation_noValueLeakage() public {
+    function test_feeCalculation_noValueLeakage() public {
         _depositJT(1_000_000e6, ALICE_ADDRESS);
         _depositST(500_000e6, BOB_ADDRESS);
 
@@ -3611,7 +3611,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
     // ============================================
 
     /// @notice Test redemption claim exactly at delay boundary - timing edge case
-    function test_audit_redemptionClaimAtExactBoundary() public {
+    function test_redemptionClaimAtExactBoundary() public {
         _depositJT(1_000_000e6, ALICE_ADDRESS);
 
         uint256 jtShares = JT.balanceOf(ALICE_ADDRESS);
@@ -3641,7 +3641,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
 
     /// @notice Test that cross-block yield accrual differs from same-block
     /// @dev Verifies time-weighted yield share accumulation works correctly
-    function test_audit_crossBlockYieldAccrual_differsFromSameBlock() public {
+    function test_crossBlockYieldAccrual_differsFromSameBlock() public {
         // Setup: JT and ST deposits
         _depositJT(1_000_000e6, ALICE_ADDRESS);
         _depositST(500_000e6, BOB_ADDRESS);
@@ -3675,7 +3675,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
     }
 
     /// @notice Test redemption request ordering - out-of-order claiming
-    function test_audit_multipleRedemptionRequests_independentClaiming() public {
+    function test_multipleRedemptionRequests_independentClaiming() public {
         _depositJT(1_000_000e6, ALICE_ADDRESS);
 
         uint256 jtShares = JT.balanceOf(ALICE_ADDRESS);
@@ -3716,7 +3716,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
     // ============================================
 
     /// @notice Test all operations allowed in PERPETUAL state
-    function test_audit_perpetualStateOperations() public {
+    function test_perpetualStateOperations() public {
         _depositJT(1_000_000e6, ALICE_ADDRESS);
         _depositST(500_000e6, BOB_ADDRESS);
 
@@ -3748,7 +3748,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
     }
 
     /// @notice Test max operations reflect state correctly
-    function test_audit_maxOperationsReflectState() public {
+    function test_maxOperationsReflectState() public {
         _depositJT(1_000_000e6, ALICE_ADDRESS);
         _depositST(500_000e6, BOB_ADDRESS);
 
@@ -3766,7 +3766,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
     }
 
     /// @notice Test utilization computation at boundary conditions
-    function test_audit_utilizationBoundaries() public {
+    function test_utilizationBoundaries() public {
         // Empty market - no utilization
         uint256 emptyUtil = KERNEL.currentMarketUtilization();
         assertEq(emptyUtil, 0, "Empty market should have 0 utilization");
@@ -3788,7 +3788,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
     }
 
     /// @notice Test rapid deposit/withdraw cycles maintain state consistency
-    function test_audit_rapidDepositWithdrawCycles() public {
+    function test_rapidDepositWithdrawCycles() public {
         _depositJT(10_000_000e6, ALICE_ADDRESS);
 
         // Rapid ST deposit/withdraw cycles
@@ -3813,7 +3813,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
     }
 
     /// @notice Test yield accrual over extended time period
-    function test_audit_extendedYieldAccrual() public {
+    function test_extendedYieldAccrual() public {
         _depositJT(1_000_000e6, ALICE_ADDRESS);
         _depositST(500_000e6, BOB_ADDRESS);
 
@@ -3834,7 +3834,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
     }
 
     /// @notice Test redemption request cancellation timing
-    function test_audit_redemptionCancellationTiming() public {
+    function test_redemptionCancellationTiming() public {
         _depositJT(1_000_000e6, ALICE_ADDRESS);
 
         uint256 jtShares = JT.balanceOf(ALICE_ADDRESS);

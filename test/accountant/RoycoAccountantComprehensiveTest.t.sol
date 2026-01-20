@@ -2623,7 +2623,7 @@ contract RoycoAccountantEdgeCaseTest is BaseTest {
 
     /// @notice Test that K_S + K_J rounding doesn't cause dust accumulation
     /// @dev K_S and K_J both use Floor rounding, so kS + kJ could be < WAD
-    function test_audit_kSkJSumRounding_noDustAccumulation() public {
+    function test_kSkJSumRounding_noDustAccumulation() public {
         // Initialize
         vm.prank(MOCK_KERNEL);
         accountant.preOpSyncTrancheAccounting(_nav(100e18), _nav(100e18));
@@ -2677,7 +2677,7 @@ contract RoycoAccountantEdgeCaseTest is BaseTest {
     }
 
     /// @notice Test edge case where claims are extremely imbalanced
-    function test_audit_kSkJRounding_extremeImbalance() public {
+    function test_kSkJRounding_extremeImbalance() public {
         vm.prank(MOCK_KERNEL);
         accountant.preOpSyncTrancheAccounting(_nav(100e18), _nav(100e18));
 
@@ -2698,7 +2698,7 @@ contract RoycoAccountantEdgeCaseTest is BaseTest {
     }
 
     /// @notice Test IL rescaling consistency across multiple syncs
-    function test_audit_ilRescalingConsistency() public {
+    function test_ilRescalingConsistency() public {
         // Initialize
         vm.prank(MOCK_KERNEL);
         accountant.preOpSyncTrancheAccounting(_nav(100e18), _nav(50e18));
@@ -2737,7 +2737,7 @@ contract RoycoAccountantEdgeCaseTest is BaseTest {
     }
 
     /// @notice Test that repeated small operations don't accumulate rounding errors
-    function test_audit_repeatedOpsNoAccumulatedRoundingError() public {
+    function test_repeatedOpsNoAccumulatedRoundingError() public {
         vm.prank(MOCK_KERNEL);
         accountant.preOpSyncTrancheAccounting(_nav(100e18), _nav(50e18));
 
