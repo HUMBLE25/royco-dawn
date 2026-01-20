@@ -5,15 +5,15 @@ import { IERC4626 } from "../../../../lib/openzeppelin-contracts/contracts/inter
 
 import { DeployScript } from "../../../../script/Deploy.s.sol";
 import {
-    YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626Assets_Kernel
-} from "../../../../src/kernels/YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626Assets_Kernel.sol";
+    YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter_Kernel
+} from "../../../../src/kernels/YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter_Kernel.sol";
 import { RAY, WAD } from "../../../../src/libraries/Constants.sol";
 import { NAV_UNIT, TRANCHE_UNIT, toNAVUnits, toTrancheUnits, toUint256 } from "../../../../src/libraries/Units.sol";
 
 import { AbstractKernelTestSuite } from "../../abstract/AbstractKernelTestSuite.t.sol";
 
 /// @title YieldBearingERC4626_TestBase
-/// @notice Base test contract for YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626Assets_Kernel
+/// @notice Base test contract for YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter_Kernel
 /// @dev Implements the test hooks for yield-bearing ERC4626 assets where ST and JT use identical assets
 ///
 /// IMPORTANT: This kernel stores the `vaultAsset-to-NAV` conversion rate (e.g., NUSD->USD for sNUSD).
@@ -170,14 +170,14 @@ abstract contract YieldBearingERC4626_TestBase is AbstractKernelTestSuite {
 
     /// @notice Gets the current conversion rate using the kernel's getter (in RAY precision)
     function _getConversionRate() internal view returns (uint256) {
-        return YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626Assets_Kernel(address(KERNEL)).getStoredConversionRateRAY();
+        return YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter_Kernel(address(KERNEL)).getStoredConversionRateRAY();
     }
 
     /// @notice Sets the conversion rate using the kernel's setter (in RAY precision)
     /// @dev Requires ORACLE_QUOTER_ADMIN_ROLE, which is granted to OWNER_ADDRESS
     function _setConversionRate(uint256 _newRateRAY) internal {
         vm.prank(OWNER_ADDRESS);
-        YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626Assets_Kernel(address(KERNEL)).setConversionRate(_newRateRAY);
+        YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter_Kernel(address(KERNEL)).setConversionRate(_newRateRAY);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -288,8 +288,10 @@ abstract contract YieldBearingERC4626_TestBase is AbstractKernelTestSuite {
         // Get initial conversion rate (vault asset to NAV, in RAY precision)
         uint256 initialConversionRate = _getInitialConversionRate();
 
-        DeployScript.YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626AssetsKernelParams memory kernelParams =
-            DeployScript.YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626AssetsKernelParams({ initialConversionRateWAD: initialConversionRate });
+        DeployScript.YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626SharesAdminOracleQuoterKernelParams memory kernelParams =
+            DeployScript.YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626SharesAdminOracleQuoterKernelParams({
+                initialConversionRateWAD: initialConversionRate
+            });
 
         DeployScript.AdaptiveCurveYDMParams memory ydmParams = DeployScript.AdaptiveCurveYDMParams({
             jtYieldShareAtTargetUtilWAD: 0.3e18, // 30% at target utilization
@@ -306,7 +308,7 @@ abstract contract YieldBearingERC4626_TestBase is AbstractKernelTestSuite {
             juniorTrancheSymbol: string(abi.encodePacked("RJ-", cfg.name)),
             seniorAsset: cfg.stAsset,
             juniorAsset: cfg.jtAsset,
-            kernelType: DeployScript.KernelType.YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626Assets,
+            kernelType: DeployScript.KernelType.YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter,
             kernelSpecificParams: abi.encode(kernelParams),
             protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS,
             jtRedemptionDelayInSeconds: _getJTRedemptionDelay(),

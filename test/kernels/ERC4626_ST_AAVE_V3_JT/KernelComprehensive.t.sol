@@ -1472,12 +1472,12 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         vm.stopPrank();
 
         // Get states from both tranches
-        (SyncedAccountingState memory stState,,) = KERNEL.previewSyncTrancheAccounting(TrancheType.SENIOR);
-        (SyncedAccountingState memory jtState,,) = KERNEL.previewSyncTrancheAccounting(TrancheType.JUNIOR);
+        (SyncedAccountingState memory stSyncedState,,) = KERNEL.previewSyncTrancheAccounting(TrancheType.SENIOR);
+        (SyncedAccountingState memory jtSyncedState,,) = KERNEL.previewSyncTrancheAccounting(TrancheType.JUNIOR);
 
         // States should be consistent
-        assertEq(toUint256(stState.stRawNAV), toUint256(jtState.stRawNAV), "ST raw NAV must be consistent");
-        assertEq(toUint256(stState.jtRawNAV), toUint256(jtState.jtRawNAV), "JT raw NAV must be consistent");
+        assertEq(toUint256(stSyncedState.stRawNAV), toUint256(jtSyncedState.stRawNAV), "ST raw NAV must be consistent");
+        assertEq(toUint256(stSyncedState.jtRawNAV), toUint256(jtSyncedState.jtRawNAV), "JT raw NAV must be consistent");
     }
 
     // ============================================
@@ -2024,12 +2024,12 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         }
 
         // Verify accounting consistency
-        (SyncedAccountingState memory stState,,) = KERNEL.previewSyncTrancheAccounting(TrancheType.SENIOR);
-        (SyncedAccountingState memory jtState,,) = KERNEL.previewSyncTrancheAccounting(TrancheType.JUNIOR);
+        (SyncedAccountingState memory stSyncedState,,) = KERNEL.previewSyncTrancheAccounting(TrancheType.SENIOR);
+        (SyncedAccountingState memory jtSyncedState,,) = KERNEL.previewSyncTrancheAccounting(TrancheType.JUNIOR);
 
         // States should be consistent across tranche views
-        assertEq(toUint256(stState.stRawNAV), toUint256(jtState.stRawNAV), "ST raw NAV must be consistent");
-        assertEq(toUint256(stState.jtRawNAV), toUint256(jtState.jtRawNAV), "JT raw NAV must be consistent");
+        assertEq(toUint256(stSyncedState.stRawNAV), toUint256(jtSyncedState.stRawNAV), "ST raw NAV must be consistent");
+        assertEq(toUint256(stSyncedState.jtRawNAV), toUint256(jtSyncedState.jtRawNAV), "JT raw NAV must be consistent");
     }
 
     // ============================================

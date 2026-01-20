@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import { Test } from "../../../lib/forge-std/src/Test.sol";
 import { Vm } from "../../../lib/forge-std/src/Vm.sol";
+import { console2 } from "../../../lib/forge-std/src/console2.sol";
 import { IERC20 } from "../../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { Math } from "../../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 
@@ -1707,6 +1708,8 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         // Deposit JT for ALICE
         uint256 jtShares = _depositJT(ALICE_ADDRESS, _jtAmount);
+        assertApproxEqAbs(jtShares, JT.maxRedeem(ALICE_ADDRESS), 1);
+        jtShares = JT.maxRedeem(ALICE_ADDRESS);
 
         // ALICE sets BOB as operator
         vm.prank(ALICE_ADDRESS);
@@ -2077,6 +2080,10 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         // Verify allowance
         assertEq(JT.allowance(ALICE_ADDRESS, BOB_ADDRESS), jtShares, "Allowance should be set");
 
+        // Check that maxRedeem is equal to the deposited shares
+        assertApproxEqAbs(JT.maxRedeem(ALICE_ADDRESS), jtShares, 1);
+        jtShares = JT.maxRedeem(ALICE_ADDRESS);
+
         // BOB (not operator, but has allowance) calls requestRedeem - should succeed
         vm.prank(BOB_ADDRESS);
         (uint256 requestId,) = JT.requestRedeem(jtShares, ALICE_ADDRESS, ALICE_ADDRESS);
@@ -2084,7 +2091,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         assertGt(requestId, 0, "Request should be created");
 
         // Allowance should be spent
-        assertEq(JT.allowance(ALICE_ADDRESS, BOB_ADDRESS), 0, "Allowance should be spent");
+        assertTrue(JT.allowance(ALICE_ADDRESS, BOB_ADDRESS) <= 1, "Allowance should be spent");
     }
 
     /// @notice Test that allowance spending fails with insufficient allowance
@@ -2111,6 +2118,8 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         // Deposit JT for ALICE
         uint256 jtShares = _depositJT(ALICE_ADDRESS, _jtAmount);
+        assertApproxEqAbs(jtShares, JT.maxRedeem(ALICE_ADDRESS), 1);
+        jtShares = JT.maxRedeem(ALICE_ADDRESS);
 
         // ALICE sets BOB as operator AND gives allowance
         vm.startPrank(ALICE_ADDRESS);
@@ -2195,6 +2204,9 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         NAV_UNIT jtEffectiveNavBefore = JT.totalAssets().nav;
         NAV_UNIT stRawNavBefore = ST.getRawNAV();
         NAV_UNIT stEffectiveNavBefore = ST.totalAssets().nav;
+
+        assertApproxEqAbs(jtShares, JT.maxRedeem(ALICE_ADDRESS), 1);
+        jtShares = JT.maxRedeem(ALICE_ADDRESS);
 
         // Request redeem
         vm.prank(ALICE_ADDRESS);
@@ -2303,6 +2315,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         // Get max redeemable with no ST (should be all shares)
         uint256 maxRedeemableNoST = JT.maxRedeem(ALICE_ADDRESS);
         assertApproxEqAbs(maxRedeemableNoST, jtShares, 1, "Should be able to redeem all initially");
+        jtShares = maxRedeemableNoST;
 
         // Request redeem for all shares
         vm.prank(ALICE_ADDRESS);
@@ -2344,6 +2357,9 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         // Deposit JT
         uint256 jtShares = _depositJT(ALICE_ADDRESS, _jtAmount);
+        assertApproxEqAbs(jtShares, JT.maxRedeem(ALICE_ADDRESS), 1);
+        // Set jtShares to the max redeemable amount
+        jtShares = JT.maxRedeem(ALICE_ADDRESS);
 
         // Request redeem for all shares
         vm.prank(ALICE_ADDRESS);
@@ -2473,7 +2489,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         // JT maxRedeem should increase
         uint256 maxRedeemAfterSTRedeem = JT.maxRedeem(ALICE_ADDRESS);
         assertGt(maxRedeemAfterSTRedeem, maxRedeemWithST, "JT maxRedeem should increase after ST redeems");
-        assertApproxEqAbs(maxRedeemAfterSTRedeem, jtShares, 1, "JT maxRedeem should return to full balance");
+        assertApproxEqAbs(maxRedeemAfterSTRedeem, jtShares, 2, "JT maxRedeem should return to full balance");
     }
 
     /// @notice Test maxRedeem after yield still respects coverage

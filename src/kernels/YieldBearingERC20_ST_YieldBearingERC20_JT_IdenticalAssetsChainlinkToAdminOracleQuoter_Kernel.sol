@@ -8,12 +8,12 @@ import { IdenticalAssetsChainlinkToAdminOracleQuoter } from "./base/quoter/Ident
 import { YieldBearingERC20_ST_Kernel } from "./base/senior/YieldBearingERC20_ST_Kernel.sol";
 
 /**
- * @title YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkOracleQuoter_Kernel
+ * @title YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel
  * @author Waymont
  * @notice The senior and junior tranches transfer in the same yield bearing asset
  * @notice The kernel uses a Chainlink oracle to convert tranche token units to NAV units, allowing NAVs to sync based on underlying PNL
  */
-contract YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkOracleQuoter_Kernel is
+contract YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel is
     YieldBearingERC20_ST_Kernel,
     YieldBearingERC20_JT_Kernel,
     IdenticalAssetsChainlinkToAdminOracleQuoter

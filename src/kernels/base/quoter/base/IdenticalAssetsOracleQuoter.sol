@@ -142,7 +142,8 @@ abstract contract IdenticalAssetsOracleQuoter is RoycoKernel {
     }
 
     /**
-     * @notice Returns the tranche unit to NAV unit conversion rate, scaled to RAY precision
+     * @notice Returns the conversion rate, scaled to RAY precision
+     * @dev Depending on the concrete implementation, this may return the value of 1 tranche unit in NAV Units or an intermediate reference asset
      * @dev This function should be overridden if the conversion rate needs to be fetched from an oracle
      * @return conversionRateRAY The conversion rate from tranche units to NAV units, scaled to RAY precision
      */

@@ -1,0 +1,571 @@
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.28;
+
+import { DeployScript } from "../../../../script/Deploy.s.sol";
+import { AggregatorV3Interface } from "../../../../src/interfaces/external/chainlink/AggregatorV3Interface.sol";
+import {
+    YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel
+} from "../../../../src/kernels/YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel.sol";
+import { IdenticalAssetsChainlinkOracleQuoter } from "../../../../src/kernels/base/quoter/base/IdenticalAssetsChainlinkOracleQuoter.sol";
+import { RAY, WAD } from "../../../../src/libraries/Constants.sol";
+import { NAV_UNIT, TRANCHE_UNIT, toNAVUnits, toTrancheUnits, toUint256 } from "../../../../src/libraries/Units.sol";
+
+import { AbstractKernelTestSuite } from "../../abstract/AbstractKernelTestSuite.t.sol";
+
+/// @title YieldBearingERC20Chainlink_TestBase
+/// @notice Base test contract for YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel
+/// @dev Implements the test hooks for yield-bearing ERC20 assets using Chainlink oracle for pricing
+///
+/// IMPORTANT: This kernel uses two conversion rates:
+///   1. Chainlink oracle price: tranche asset -> reference asset (e.g., PT-cUSD -> SY-cUSD)
+///   2. Stored conversion rate: reference asset -> NAV (e.g., SY-cUSD -> USD)
+/// The final conversion: trancheToNAV = chainlinkPrice * storedRate / precision
+abstract contract YieldBearingERC20Chainlink_TestBase is AbstractKernelTestSuite {
+    // ═══════════════════════════════════════════════════════════════════════════
+    // STATE FOR MOCKED CHAINLINK ORACLE
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// @notice Tracks the mocked chainlink price
+    /// @dev When non-zero, this value is used to mock latestRoundData() calls
+    int256 internal mockedChainlinkPrice;
+
+    /// @notice The chainlink oracle address (set by concrete implementations)
+    address internal chainlinkOracle;
+
+    /// @notice The staleness threshold for the chainlink oracle
+    uint48 internal constant DEFAULT_STALENESS_THRESHOLD = 1 days;
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // CONFIGURATION (To be overridden by protocol-specific implementations)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// @notice Returns the chainlink oracle address for the protocol
+    function _getChainlinkOracle() internal view virtual returns (address);
+
+    /// @notice Returns the staleness threshold for the chainlink oracle
+    function _getStalenessThreshold() internal view virtual returns (uint48) {
+        return DEFAULT_STALENESS_THRESHOLD;
+    }
+
+    /// @notice Returns the initial reference-asset-to-NAV conversion rate (in RAY precision)
+    /// @dev For stablecoins where reference asset ≈ USD, this should be RAY (1e27) for 1:1 conversion
+    /// Override this for non-stablecoin assets where the reference asset has a different NAV
+    function _getInitialConversionRate() internal view virtual returns (uint256) {
+        // Default: 1:1 conversion in RAY precision (for stablecoins)
+        return RAY;
+    }
+
+    /// @notice Returns the JT redemption delay
+    function _getJTRedemptionDelay() internal view virtual override returns (uint24) {
+        return 7 days;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // NAV MANIPULATION HOOKS IMPLEMENTATION
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// @notice Simulates yield for ST by increasing the chainlink oracle price
+    function simulateSTYield(uint256 _percentageWAD) public virtual override {
+        _simulateChainlinkYield(_percentageWAD);
+    }
+
+    /// @notice Simulates yield for JT by increasing the chainlink oracle price
+    /// @dev For identical assets, ST and JT share the same conversion rate
+    function simulateJTYield(uint256 _percentageWAD) public virtual override {
+        _simulateChainlinkYield(_percentageWAD);
+    }
+
+    /// @notice Simulates loss for ST by decreasing the chainlink oracle price
+    function simulateSTLoss(uint256 _percentageWAD) public virtual override {
+        _simulateChainlinkLoss(_percentageWAD);
+    }
+
+    /// @notice Simulates loss for JT by decreasing the chainlink oracle price
+    /// @dev For identical assets, ST and JT share the same conversion rate
+    function simulateJTLoss(uint256 _percentageWAD) public virtual override {
+        _simulateChainlinkLoss(_percentageWAD);
+    }
+
+    /// @notice Sets the conversion rate for ST (via chainlink mock)
+    function setSTConversionRate(uint256 _priceScaled) public virtual {
+        // forge-lint: disable-next-item(unsafe-typecast)
+        _mockChainlinkPrice(int256(_priceScaled));
+    }
+
+    /// @notice Sets the conversion rate for JT (via chainlink mock)
+    /// @dev For identical assets, this is the same as ST
+    function setJTConversionRate(uint256 _priceScaled) public virtual {
+        // forge-lint: disable-next-item(unsafe-typecast)
+        _mockChainlinkPrice(int256(_priceScaled));
+    }
+
+    /// @notice Deals ST asset to an address
+    function dealSTAsset(address _to, uint256 _amount) public virtual override {
+        deal(config.stAsset, _to, _amount);
+    }
+
+    /// @notice Deals JT asset to an address
+    function dealJTAsset(address _to, uint256 _amount) public virtual override {
+        deal(config.jtAsset, _to, _amount);
+    }
+
+    /// @notice Returns max tranche unit delta for comparisons
+    function maxTrancheUnitDelta() public view virtual override returns (TRANCHE_UNIT) {
+        // Default: 1e12 tolerance (good for 18 decimal tokens)
+        return toTrancheUnits(uint256(1e12));
+    }
+
+    /// @notice Returns max NAV delta for comparisons
+    function maxNAVDelta() public view virtual override returns (NAV_UNIT) {
+        // Default: 1e12 tolerance
+        return toNAVUnits(uint256(1e12));
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // CHAINLINK ORACLE PRICE MANIPULATION
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// @notice Simulates yield by increasing the chainlink oracle price
+    /// @param _percentageWAD The percentage increase in WAD (e.g., 0.05e18 = 5%)
+    function simulateChainlinkPriceYield(uint256 _percentageWAD) public virtual {
+        int256 currentPrice = _getCurrentChainlinkPrice();
+        // forge-lint: disable-next-item(unsafe-typecast)
+        int256 newPrice = currentPrice * int256(WAD + _percentageWAD) / int256(WAD);
+        _mockChainlinkPrice(newPrice);
+    }
+
+    /// @notice Simulates loss by decreasing the chainlink oracle price
+    /// @param _percentageWAD The percentage decrease in WAD (e.g., 0.05e18 = 5%)
+    function simulateChainlinkPriceLoss(uint256 _percentageWAD) public virtual {
+        int256 currentPrice = _getCurrentChainlinkPrice();
+        // forge-lint: disable-next-item(unsafe-typecast)
+        int256 newPrice = currentPrice * int256(WAD - _percentageWAD) / int256(WAD);
+        _mockChainlinkPrice(newPrice);
+    }
+
+    /// @notice Gets the current chainlink price (either mocked or from the actual oracle)
+    /// @return The chainlink price
+    function _getCurrentChainlinkPrice() internal view returns (int256) {
+        if (mockedChainlinkPrice != 0) {
+            return mockedChainlinkPrice;
+        }
+        // Get the actual price from the oracle
+        (, int256 answer,,,) = AggregatorV3Interface(chainlinkOracle).latestRoundData();
+        return answer;
+    }
+
+    /// @notice Mocks the latestRoundData function on the chainlink oracle
+    /// @param _newPrice The new price to return
+    function _mockChainlinkPrice(int256 _newPrice) internal {
+        mockedChainlinkPrice = _newPrice;
+
+        // Mock latestRoundData() to return the new price with valid round data
+        // Returns: (roundId, answer, startedAt, updatedAt, answeredInRound)
+        vm.mockCall(
+            chainlinkOracle,
+            abi.encodeWithSelector(AggregatorV3Interface.latestRoundData.selector),
+            abi.encode(
+                uint80(1), // roundId
+                _newPrice, // answer
+                block.timestamp, // startedAt
+                block.timestamp, // updatedAt (current time to avoid staleness)
+                uint80(1) // answeredInRound (>= roundId to avoid incomplete)
+            )
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // INTERNAL HELPERS (CHAINLINK PRICE MANIPULATION)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// @notice Simulates yield by increasing the chainlink oracle price
+    /// @param _percentageWAD The yield percentage in WAD (e.g., 0.05e18 = 5%)
+    function _simulateChainlinkYield(uint256 _percentageWAD) internal {
+        int256 currentPrice = _getCurrentChainlinkPrice();
+        // forge-lint: disable-next-item(unsafe-typecast)
+        int256 newPrice = currentPrice * int256(WAD + _percentageWAD) / int256(WAD);
+        _mockChainlinkPrice(newPrice);
+    }
+
+    /// @notice Simulates loss by decreasing the chainlink oracle price
+    /// @param _percentageWAD The loss percentage in WAD (e.g., 0.05e18 = 5%)
+    function _simulateChainlinkLoss(uint256 _percentageWAD) internal {
+        int256 currentPrice = _getCurrentChainlinkPrice();
+        // forge-lint: disable-next-item(unsafe-typecast)
+        int256 newPrice = currentPrice * int256(WAD - _percentageWAD) / int256(WAD);
+        _mockChainlinkPrice(newPrice);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // STORED CONVERSION RATE HELPERS
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// @notice Gets the stored conversion rate (reference asset to NAV) in RAY precision
+    function _getStoredConversionRate() internal view returns (uint256) {
+        return YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel(address(KERNEL)).getStoredConversionRateRAY();
+    }
+
+    /// @notice Sets the stored conversion rate (reference asset to NAV) in RAY precision
+    /// @dev Requires ORACLE_QUOTER_ADMIN_ROLE, which is granted to OWNER_ADDRESS
+    function _setStoredConversionRate(uint256 _newRateRAY) internal {
+        vm.prank(OWNER_ADDRESS);
+        YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel(address(KERNEL)).setConversionRate(_newRateRAY);
+    }
+
+    /// @notice Simulates yield in the stored conversion rate
+    /// @param _percentageWAD The yield percentage in WAD (e.g., 0.05e18 = 5%)
+    function simulateStoredRateYield(uint256 _percentageWAD) public virtual {
+        uint256 currentRate = _getStoredConversionRate();
+        uint256 newRate = currentRate * (WAD + _percentageWAD) / WAD;
+        _setStoredConversionRate(newRate);
+    }
+
+    /// @notice Simulates loss in the stored conversion rate
+    /// @param _percentageWAD The loss percentage in WAD (e.g., 0.05e18 = 5%)
+    function simulateStoredRateLoss(uint256 _percentageWAD) public virtual {
+        uint256 currentRate = _getStoredConversionRate();
+        uint256 newRate = currentRate * (WAD - _percentageWAD) / WAD;
+        _setStoredConversionRate(newRate);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // CHAINLINK PRICE TESTS
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// @notice Tests that chainlink price yield increases NAV
+    function testFuzz_chainlinkPrice_yield_updatesNAV(uint256 _jtAmount, uint256 _yieldPercentage) external {
+        _jtAmount = bound(_jtAmount, _minDepositAmount(), config.initialFunding / 2);
+        _yieldPercentage = bound(_yieldPercentage, 1, 50); // 1-50% yield
+
+        _depositJT(ALICE_ADDRESS, _jtAmount);
+
+        NAV_UNIT navBefore = JT.totalAssets().nav;
+
+        // Simulate chainlink price yield (mocks latestRoundData)
+        simulateChainlinkPriceYield(_yieldPercentage * 1e16); // Convert to WAD
+
+        // Trigger sync
+        vm.prank(OWNER_ADDRESS);
+        KERNEL.syncTrancheAccounting();
+
+        NAV_UNIT navAfter = JT.totalAssets().nav;
+        assertGt(navAfter, navBefore, "NAV should increase after chainlink price yield");
+    }
+
+    /// @notice Tests that chainlink price loss decreases NAV
+    function testFuzz_chainlinkPrice_loss_updatesNAV(uint256 _jtAmount, uint256 _lossPercentage) external {
+        _jtAmount = bound(_jtAmount, _minDepositAmount(), config.initialFunding / 2);
+        _lossPercentage = bound(_lossPercentage, 1, 30); // 1-30% loss
+
+        _depositJT(ALICE_ADDRESS, _jtAmount);
+
+        NAV_UNIT navBefore = JT.totalAssets().nav;
+
+        // Simulate chainlink price loss (mocks latestRoundData)
+        simulateChainlinkPriceLoss(_lossPercentage * 1e16); // Convert to WAD
+
+        // Trigger sync
+        vm.prank(OWNER_ADDRESS);
+        KERNEL.syncTrancheAccounting();
+
+        NAV_UNIT navAfter = JT.totalAssets().nav;
+        assertLt(navAfter, navBefore, "NAV should decrease after chainlink price loss");
+    }
+
+    /// @notice Tests that chainlink price yield with ST deposits distributes correctly
+    function testFuzz_chainlinkPrice_yield_distributesToJT(uint256 _jtAmount, uint256 _stPercentage, uint256 _yieldPercentage) external {
+        _jtAmount = bound(_jtAmount, _minDepositAmount(), config.initialFunding / 2);
+        _stPercentage = bound(_stPercentage, 10, 50);
+        _yieldPercentage = bound(_yieldPercentage, 1, 20);
+
+        _depositJT(ALICE_ADDRESS, _jtAmount);
+
+        TRANCHE_UNIT maxSTDeposit = ST.maxDeposit(BOB_ADDRESS);
+        uint256 stAmount = toUint256(maxSTDeposit) * _stPercentage / 100;
+
+        if (stAmount < _minDepositAmount()) return;
+
+        _depositST(BOB_ADDRESS, stAmount);
+
+        NAV_UNIT jtNavBefore = JT.totalAssets().nav;
+
+        // Simulate chainlink price yield
+        simulateChainlinkPriceYield(_yieldPercentage * 1e16);
+
+        // Warp time for yield distribution
+        vm.warp(block.timestamp + 1 days);
+
+        // Trigger sync
+        vm.prank(OWNER_ADDRESS);
+        KERNEL.syncTrancheAccounting();
+
+        NAV_UNIT jtNavAfter = JT.totalAssets().nav;
+
+        // JT should receive portion of yield based on YDM
+        assertGe(jtNavAfter, jtNavBefore, "JT NAV should increase or stay same from chainlink price yield");
+    }
+
+    /// @notice Tests NAV conservation after chainlink price changes
+    function testFuzz_chainlinkPrice_NAVConservation(uint256 _jtAmount, uint256 _yieldPercentage) external {
+        _jtAmount = bound(_jtAmount, _minDepositAmount(), config.initialFunding / 2);
+        _yieldPercentage = bound(_yieldPercentage, 1, 30);
+
+        _depositJT(ALICE_ADDRESS, _jtAmount);
+
+        // Simulate chainlink price yield
+        simulateChainlinkPriceYield(_yieldPercentage * 1e16);
+
+        vm.prank(OWNER_ADDRESS);
+        KERNEL.syncTrancheAccounting();
+
+        _assertNAVConservation();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // SET TRANCHE ASSET TO REFERENCE ASSET ORACLE TESTS
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// @notice Tests that setting a new oracle works with valid params
+    function test_setTrancheAssetToReferenceAssetOracle_success() external {
+        // Create mock oracle addresses
+        address newOracle = makeAddr("newOracle");
+        address anotherOracle = makeAddr("anotherOracle");
+        uint48 newStaleness = 2 days;
+
+        // Mock the decimals call on the new oracle
+        vm.mockCall(newOracle, abi.encodeWithSelector(AggregatorV3Interface.decimals.selector), abi.encode(uint8(18)));
+
+        vm.prank(OWNER_ADDRESS);
+        YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel(address(KERNEL))
+            .setTrancheAssetToReferenceAssetOracle(newOracle, newStaleness);
+
+        // Verify by checking that it doesn't revert when called again with different values
+        vm.mockCall(anotherOracle, abi.encodeWithSelector(AggregatorV3Interface.decimals.selector), abi.encode(uint8(8)));
+
+        vm.prank(OWNER_ADDRESS);
+        YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel(address(KERNEL))
+            .setTrancheAssetToReferenceAssetOracle(anotherOracle, 3 days);
+    }
+
+    /// @notice Tests that setting oracle with zero address reverts
+    function test_setTrancheAssetToReferenceAssetOracle_revertsOnZeroAddress() external {
+        vm.prank(OWNER_ADDRESS);
+        vm.expectRevert(IdenticalAssetsChainlinkOracleQuoter.INVALID_TRANCHE_ASSET_TO_REFERENCE_ASSET_ORACLE.selector);
+        YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel(address(KERNEL))
+            .setTrancheAssetToReferenceAssetOracle(address(0), 1 days);
+    }
+
+    /// @notice Tests that setting oracle with zero staleness reverts
+    function test_setTrancheAssetToReferenceAssetOracle_revertsOnZeroStaleness() external {
+        address newOracle = makeAddr("newOracleForZeroStaleness");
+
+        vm.mockCall(newOracle, abi.encodeWithSelector(AggregatorV3Interface.decimals.selector), abi.encode(uint8(18)));
+
+        vm.prank(OWNER_ADDRESS);
+        vm.expectRevert(IdenticalAssetsChainlinkOracleQuoter.INVALID_STALENESS_THRESHOLD_SECONDS.selector);
+        YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel(address(KERNEL))
+            .setTrancheAssetToReferenceAssetOracle(newOracle, 0);
+    }
+
+    /// @notice Tests that non-admin cannot set oracle
+    function test_setTrancheAssetToReferenceAssetOracle_revertsOnUnauthorized() external {
+        address newOracle = makeAddr("newOracleForUnauthorized");
+
+        vm.mockCall(newOracle, abi.encodeWithSelector(AggregatorV3Interface.decimals.selector), abi.encode(uint8(18)));
+
+        vm.prank(ALICE_ADDRESS);
+        vm.expectRevert(); // AccessManagerUnauthorizedAccount
+        YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel(address(KERNEL))
+            .setTrancheAssetToReferenceAssetOracle(newOracle, 1 days);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ORACLE VALIDATION TESTS (PRICE_STALE, PRICE_INVALID, PRICE_INCOMPLETE)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// @notice Tests that stale price causes PRICE_STALE revert
+    function test_oracleValidation_revertsOnStalePrice() external {
+        // Clear the mock to allow real call behavior
+        vm.clearMockedCalls();
+
+        // Mock a stale price (updatedAt is old)
+        uint256 staleTimestamp = block.timestamp - 400 days; // Very stale
+        vm.mockCall(
+            chainlinkOracle,
+            abi.encodeWithSelector(AggregatorV3Interface.latestRoundData.selector),
+            abi.encode(
+                uint80(1), // roundId
+                int256(1e18), // answer (positive)
+                staleTimestamp, // startedAt
+                staleTimestamp, // updatedAt (stale!)
+                uint80(1) // answeredInRound
+            )
+        );
+
+        // Try to get conversion rate - should revert with PRICE_STALE
+        vm.expectRevert(IdenticalAssetsChainlinkOracleQuoter.PRICE_STALE.selector);
+        YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel(address(KERNEL)).getTrancheUnitToNAVUnitConversionRate();
+    }
+
+    /// @notice Tests that zero/negative price causes PRICE_INVALID revert
+    function test_oracleValidation_revertsOnZeroPrice() external {
+        // Clear the mock
+        vm.clearMockedCalls();
+
+        // Mock a zero price
+        vm.mockCall(
+            chainlinkOracle,
+            abi.encodeWithSelector(AggregatorV3Interface.latestRoundData.selector),
+            abi.encode(
+                uint80(1), // roundId
+                int256(0), // answer (ZERO - invalid!)
+                block.timestamp, // startedAt
+                block.timestamp, // updatedAt
+                uint80(1) // answeredInRound
+            )
+        );
+
+        vm.expectRevert(IdenticalAssetsChainlinkOracleQuoter.PRICE_INVALID.selector);
+        YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel(address(KERNEL)).getTrancheUnitToNAVUnitConversionRate();
+    }
+
+    /// @notice Tests that negative price causes PRICE_INVALID revert
+    function test_oracleValidation_revertsOnNegativePrice() external {
+        // Clear the mock
+        vm.clearMockedCalls();
+
+        // Mock a negative price
+        vm.mockCall(
+            chainlinkOracle,
+            abi.encodeWithSelector(AggregatorV3Interface.latestRoundData.selector),
+            abi.encode(
+                uint80(1), // roundId
+                int256(-1e18), // answer (NEGATIVE - invalid!)
+                block.timestamp, // startedAt
+                block.timestamp, // updatedAt
+                uint80(1) // answeredInRound
+            )
+        );
+
+        vm.expectRevert(IdenticalAssetsChainlinkOracleQuoter.PRICE_INVALID.selector);
+        YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel(address(KERNEL)).getTrancheUnitToNAVUnitConversionRate();
+    }
+
+    /// @notice Tests that incomplete round causes PRICE_INCOMPLETE revert
+    function test_oracleValidation_revertsOnIncompleteRound() external {
+        // Clear the mock
+        vm.clearMockedCalls();
+
+        // Mock an incomplete round (answeredInRound < roundId)
+        vm.mockCall(
+            chainlinkOracle,
+            abi.encodeWithSelector(AggregatorV3Interface.latestRoundData.selector),
+            abi.encode(
+                uint80(10), // roundId
+                int256(1e18), // answer (positive)
+                block.timestamp, // startedAt
+                block.timestamp, // updatedAt
+                uint80(5) // answeredInRound (LESS than roundId - incomplete!)
+            )
+        );
+
+        vm.expectRevert(IdenticalAssetsChainlinkOracleQuoter.PRICE_INCOMPLETE.selector);
+        YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel(address(KERNEL)).getTrancheUnitToNAVUnitConversionRate();
+    }
+
+    /// @notice Tests that valid oracle data passes all checks
+    function test_oracleValidation_passesWithValidData() external {
+        // Clear and set valid mock
+        vm.clearMockedCalls();
+
+        vm.mockCall(
+            chainlinkOracle,
+            abi.encodeWithSelector(AggregatorV3Interface.latestRoundData.selector),
+            abi.encode(
+                uint80(10), // roundId
+                int256(1e18), // answer (positive)
+                block.timestamp, // startedAt
+                block.timestamp, // updatedAt (fresh)
+                uint80(10) // answeredInRound (== roundId - complete)
+            )
+        );
+
+        // Should not revert
+        uint256 rate = YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel(address(KERNEL))
+            .getTrancheUnitToNAVUnitConversionRate();
+        assertGt(rate, 0, "Conversion rate should be positive");
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // DEPLOYMENT
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// @notice Deploys the YieldBearingERC20 Chainlink kernel and market
+    function _deployKernelAndMarket() internal override returns (DeployScript.DeploymentResult memory) {
+        ProtocolConfig memory cfg = getProtocolConfig();
+
+        // Store the chainlink oracle address for mocking
+        chainlinkOracle = _getChainlinkOracle();
+
+        // IMPORTANT: Mock the chainlink oracle before deployment to ensure consistent pricing
+        // The Pendle TWAP oracle can return slightly different values between calls,
+        // which causes issues with maxRedeem calculations due to rounding
+        (, int256 initialPrice,,,) = AggregatorV3Interface(chainlinkOracle).latestRoundData();
+        _mockChainlinkPrice(initialPrice);
+
+        bytes32 marketId = keccak256(abi.encodePacked(cfg.name, "-", cfg.name, "-", block.timestamp));
+
+        // Get initial conversion rate (reference asset to NAV, in RAY precision)
+        uint256 initialConversionRate = _getInitialConversionRate();
+
+        DeployScript.YieldBearingERC20STYieldBearingERC20JTIdenticalAssetsChainlinkOracleQuoterKernelParams memory kernelParams =
+            DeployScript.YieldBearingERC20STYieldBearingERC20JTIdenticalAssetsChainlinkOracleQuoterKernelParams({
+                trancheAssetToReferenceAssetOracle: chainlinkOracle,
+                stalenessThresholdSeconds: _getStalenessThreshold(),
+                initialConversionRateWAD: initialConversionRate
+            });
+
+        DeployScript.AdaptiveCurveYDMParams memory ydmParams = DeployScript.AdaptiveCurveYDMParams({
+            jtYieldShareAtTargetUtilWAD: 0.3e18, // 30% at target utilization
+            jtYieldShareAtFullUtilWAD: 1e18 // 100% at 100% utilization
+        });
+
+        DeployScript.DeploymentParams memory params = DeployScript.DeploymentParams({
+            factoryAdmin: address(DEPLOY_SCRIPT),
+            factoryOwnerAddress: OWNER_ADDRESS,
+            marketId: marketId,
+            seniorTrancheName: string(abi.encodePacked("Royco Senior ", cfg.name)),
+            seniorTrancheSymbol: string(abi.encodePacked("RS-", cfg.name)),
+            juniorTrancheName: string(abi.encodePacked("Royco Junior ", cfg.name)),
+            juniorTrancheSymbol: string(abi.encodePacked("RJ-", cfg.name)),
+            seniorAsset: cfg.stAsset,
+            juniorAsset: cfg.jtAsset,
+            kernelType: DeployScript.KernelType.YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkOracleQuoter,
+            kernelSpecificParams: abi.encode(kernelParams),
+            protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS,
+            jtRedemptionDelayInSeconds: _getJTRedemptionDelay(),
+            stProtocolFeeWAD: ST_PROTOCOL_FEE_WAD,
+            jtProtocolFeeWAD: JT_PROTOCOL_FEE_WAD,
+            coverageWAD: COVERAGE_WAD,
+            betaWAD: 1e18, // Beta = 1 for identical assets
+            lltvWAD: LLTV,
+            fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
+            ydmType: DeployScript.YDMType.AdaptiveCurve,
+            ydmSpecificParams: abi.encode(ydmParams),
+            pauserAddress: PAUSER_ADDRESS,
+            pauserExecutionDelay: 0,
+            upgraderAddress: UPGRADER_ADDRESS,
+            upgraderExecutionDelay: 0,
+            lpRoleAddress: OWNER_ADDRESS,
+            lpRoleExecutionDelay: 0,
+            syncRoleAddress: OWNER_ADDRESS,
+            syncRoleExecutionDelay: 0,
+            kernelAdminRoleAddress: OWNER_ADDRESS,
+            kernelAdminRoleExecutionDelay: 0,
+            oracleQuoterAdminRoleAddress: OWNER_ADDRESS,
+            oracleQuoterAdminRoleExecutionDelay: 0
+        });
+
+        return DEPLOY_SCRIPT.deploy(params);
+    }
+}

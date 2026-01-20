@@ -17,11 +17,11 @@ import { ERC4626_ST_AaveV3_JT_InKindAssets_Kernel } from "../src/kernels/ERC4626
 import { ERC4626_ST_ERC4626_JT_InKindAssets_Kernel } from "../src/kernels/ERC4626_ST_ERC4626_JT_InKindAssets_Kernel.sol";
 import { ReUSD_ST_ReUSD_JT_Kernel } from "../src/kernels/ReUSD_ST_ReUSD_JT_Kernel.sol";
 import {
-    YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkOracleQuoter_Kernel
-} from "../src/kernels/YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkOracleQuoter_Kernel.sol";
+    YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel
+} from "../src/kernels/YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel.sol";
 import {
-    YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626Assets_Kernel
-} from "../src/kernels/YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626Assets_Kernel.sol";
+    YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter_Kernel
+} from "../src/kernels/YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter_Kernel.sol";
 import { RoycoKernelInitParams } from "../src/libraries/RoycoKernelStorageLib.sol";
 import { AssetClaims, MarketDeploymentParams, RolesConfiguration, RoycoMarket, TrancheDeploymentParams } from "../src/libraries/Types.sol";
 import { TRANCHE_UNIT } from "../src/libraries/Units.sol";
@@ -60,7 +60,7 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
         ERC4626_ST_ERC4626_JT_InKindAssets,
         ReUSD_ST_ReUSD_JT,
         YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkOracleQuoter,
-        YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626Assets
+        YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter
     }
 
     /// @notice Enum for YDM types
@@ -88,15 +88,15 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
         address insuranceCapitalLayer;
     }
 
-    /// @notice Deployment parameters for YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkOracleQuoter_Kernel
+    /// @notice Deployment parameters for YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel
     struct YieldBearingERC20STYieldBearingERC20JTIdenticalAssetsChainlinkOracleQuoterKernelParams {
         address trancheAssetToReferenceAssetOracle;
         uint48 stalenessThresholdSeconds;
         uint256 initialConversionRateWAD;
     }
 
-    /// @notice Deployment parameters for YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626Assets_Kernel
-    struct YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626AssetsKernelParams {
+    /// @notice Deployment parameters for YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter_Kernel
+    struct YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626SharesAdminOracleQuoterKernelParams {
         uint256 initialConversionRateWAD;
     }
 
@@ -506,9 +506,9 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
                     initialConversionRateWAD: vm.envUint("INITIAL_CONVERSION_RATE_WAD")
                 });
             kernelSpecificParams = abi.encode(kernelParams);
-        } else if (kernelType == KernelType.YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626Assets) {
-            YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626AssetsKernelParams memory kernelParams =
-                YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626AssetsKernelParams({
+        } else if (kernelType == KernelType.YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter) {
+            YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626SharesAdminOracleQuoterKernelParams memory kernelParams =
+                YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626SharesAdminOracleQuoterKernelParams({
                     initialConversionRateWAD: vm.envUint("INITIAL_CONVERSION_RATE_WAD")
                 });
             kernelSpecificParams = abi.encode(kernelParams);
@@ -680,8 +680,8 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
             return address(_deployReUSDSTReUSDJTKernelImpl(constructionParams, _kernelSpecificParams));
         } else if (_kernelType == KernelType.YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkOracleQuoter) {
             return address(_deployYieldBearingERC20STYieldBearingERC20JTIdenticalAssetsChainlinkOracleQuoterKernelImpl(constructionParams));
-        } else if (_kernelType == KernelType.YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626Assets) {
-            return address(_deployYieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626AssetsKernelImpl(constructionParams));
+        } else if (_kernelType == KernelType.YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter) {
+            return address(_deployYieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626SharesAdminOracleQuoterKernelImpl(constructionParams));
         } else {
             revert UnsupportedKernelType(_kernelType);
         }
@@ -758,10 +758,10 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
         IRoycoKernel.RoycoKernelConstructionParams memory _constructionParams
     )
         internal
-        returns (YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkOracleQuoter_Kernel)
+        returns (YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel)
     {
         bytes memory creationCode = abi.encodePacked(
-            type(YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkOracleQuoter_Kernel).creationCode, abi.encode(_constructionParams)
+            type(YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel).creationCode, abi.encode(_constructionParams)
         );
 
         (address addr, bool alreadyDeployed) = deployWithSanityChecks(KERNEL_IMPL_SALT, creationCode, false);
@@ -770,17 +770,17 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
         } else {
             console2.log("Kernel implementation deployed at:", addr);
         }
-        return YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkOracleQuoter_Kernel(addr);
+        return YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel(addr);
     }
 
-    function _deployYieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626AssetsKernelImpl(
+    function _deployYieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626SharesAdminOracleQuoterKernelImpl(
         IRoycoKernel.RoycoKernelConstructionParams memory _constructionParams
     )
         internal
-        returns (YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626Assets_Kernel)
+        returns (YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter_Kernel)
     {
         bytes memory creationCode = abi.encodePacked(
-            type(YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626Assets_Kernel).creationCode, abi.encode(_constructionParams)
+            type(YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter_Kernel).creationCode, abi.encode(_constructionParams)
         );
 
         (address addr, bool alreadyDeployed) = deployWithSanityChecks(KERNEL_IMPL_SALT, creationCode, false);
@@ -789,7 +789,7 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
         } else {
             console2.log("Kernel implementation deployed at:", addr);
         }
-        return YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626Assets_Kernel(addr);
+        return YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter_Kernel(addr);
     }
 
     function _buildKernelInitializationData(
@@ -820,7 +820,7 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
             YieldBearingERC20STYieldBearingERC20JTIdenticalAssetsChainlinkOracleQuoterKernelParams memory kernelParams2 =
                 abi.decode(_kernelSpecificParams, (YieldBearingERC20STYieldBearingERC20JTIdenticalAssetsChainlinkOracleQuoterKernelParams));
             return abi.encodeCall(
-                YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkOracleQuoter_Kernel.initialize,
+                YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel.initialize,
                 (
                     kernelParams,
                     kernelParams2.trancheAssetToReferenceAssetOracle,
@@ -828,11 +828,12 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
                     kernelParams2.initialConversionRateWAD
                 )
             );
-        } else if (_kernelType == KernelType.YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626Assets) {
-            YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626AssetsKernelParams memory kernelParams2 =
-                abi.decode(_kernelSpecificParams, (YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626AssetsKernelParams));
+        } else if (_kernelType == KernelType.YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter) {
+            YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626SharesAdminOracleQuoterKernelParams memory kernelParams2 =
+                abi.decode(_kernelSpecificParams, (YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626SharesAdminOracleQuoterKernelParams));
             return abi.encodeCall(
-                YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626Assets_Kernel.initialize, (kernelParams, kernelParams2.initialConversionRateWAD)
+                YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter_Kernel.initialize,
+                (kernelParams, kernelParams2.initialConversionRateWAD)
             );
         } else {
             revert UnsupportedKernelType(_kernelType);

@@ -531,7 +531,7 @@ contract RoycoAccountantComprehensiveTest is BaseTest {
         uint256 stLoss = (initialST * lossPercent) / 100;
         uint256 newST = initialST - stLoss;
         vm.prank(MOCK_KERNEL);
-        SyncedAccountingState memory lossState = accountant.preOpSyncTrancheAccounting(_nav(newST), _nav(initialJT));
+        accountant.preOpSyncTrancheAccounting(_nav(newST), _nav(initialJT));
 
         // Warp time
         vm.warp(block.timestamp + timeElapsed);
@@ -1056,7 +1056,6 @@ contract RoycoAccountantComprehensiveTest is BaseTest {
         for (uint8 i = 0; i < numOps; i++) {
             // Use seed to generate pseudo-random operations
             uint256 opSeed = uint256(keccak256(abi.encode(seed, i)));
-            uint8 opType = uint8(opSeed % 4);
 
             vm.warp(block.timestamp + (opSeed % 7 days));
 
@@ -2553,7 +2552,6 @@ contract RoycoAccountantEdgeCaseTest is BaseTest {
 
         IRoycoAccountant.RoycoAccountantState memory stateBefore = accountant.getState();
         uint256 jtSelfILBefore = toUint256(stateBefore.lastJTSelfImpermanentLoss);
-        uint256 jtRawBefore = toUint256(stateBefore.lastJTRawNAV);
 
         // ST withdrawal with JT coverage
         vm.prank(MOCK_KERNEL);
@@ -2713,7 +2711,6 @@ contract RoycoAccountantEdgeCaseTest is BaseTest {
 
         IRoycoAccountant.RoycoAccountantState memory state1 = accountant.getState();
         uint256 jtSelfIL1 = toUint256(state1.lastJTSelfImpermanentLoss);
-        uint256 jtRaw1 = toUint256(state1.lastJTRawNAV);
 
         // IL should be proportional to loss
         assertEq(jtSelfIL1, 10e18, "JT self IL should equal 10e18 loss");
@@ -2743,9 +2740,6 @@ contract RoycoAccountantEdgeCaseTest is BaseTest {
     function test_audit_repeatedOpsNoAccumulatedRoundingError() public {
         vm.prank(MOCK_KERNEL);
         accountant.preOpSyncTrancheAccounting(_nav(100e18), _nav(50e18));
-
-        IRoycoAccountant.RoycoAccountantState memory initialState = accountant.getState();
-        uint256 initialTotal = toUint256(initialState.lastSTRawNAV) + toUint256(initialState.lastJTRawNAV);
 
         // Perform many small syncs with tiny changes
         for (uint256 i = 0; i < 100; i++) {

@@ -314,20 +314,24 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         assertEq(JT.maxRedeem(jtDepositor), 0, "Max redeem must decrease to 0");
 
         // Verify that ST.convertToAssets returns the correct amount
-        AssetClaims memory convertToAssetsResult = ST.convertToAssets(shares + stDepositorSharesBeforeDeposit);
-        assertApproxEqAbs(convertToAssetsResult.stAssets, expectedMaxDeposit, AAVE_MAX_ABS_TRANCHE_UNIT_DELTA, "Convert to assets must return correct amount");
-        assertEq(convertToAssetsResult.jtAssets, ZERO_TRANCHE_UNITS, "Convert to assets must return 0 JT assets");
-        assertApproxEqAbs(convertToAssetsResult.nav, _toSTValue(expectedMaxDeposit), AAVE_MAX_ABS_NAV_DELTA, "Convert to assets must return the correct NAV");
+        AssetClaims memory convertToAssetsResultFinal = ST.convertToAssets(shares + stDepositorSharesBeforeDeposit);
+        assertApproxEqAbs(
+            convertToAssetsResultFinal.stAssets, expectedMaxDeposit, AAVE_MAX_ABS_TRANCHE_UNIT_DELTA, "Convert to assets must return correct amount"
+        );
+        assertEq(convertToAssetsResultFinal.jtAssets, ZERO_TRANCHE_UNITS, "Convert to assets must return 0 JT assets");
+        assertApproxEqAbs(
+            convertToAssetsResultFinal.nav, _toSTValue(expectedMaxDeposit), AAVE_MAX_ABS_NAV_DELTA, "Convert to assets must return the correct NAV"
+        );
 
         // Verify that ST.previewRedeem returns the correct amount
-        AssetClaims memory previewRedeemResult = ST.previewRedeem(shares + stDepositorSharesBeforeDeposit);
-        assertApproxEqAbs(previewRedeemResult.stAssets, expectedMaxDeposit, AAVE_MAX_ABS_TRANCHE_UNIT_DELTA, "Preview redeem must return correct amount");
-        assertEq(previewRedeemResult.jtAssets, ZERO_TRANCHE_UNITS, "Preview redeem must return 0 JT assets");
-        assertApproxEqAbs(previewRedeemResult.nav, _toSTValue(expectedMaxDeposit), AAVE_MAX_ABS_NAV_DELTA, "Preview redeem must return the correct NAV");
+        AssetClaims memory previewRedeemResultFinal = ST.previewRedeem(shares + stDepositorSharesBeforeDeposit);
+        assertApproxEqAbs(previewRedeemResultFinal.stAssets, expectedMaxDeposit, AAVE_MAX_ABS_TRANCHE_UNIT_DELTA, "Preview redeem must return correct amount");
+        assertEq(previewRedeemResultFinal.jtAssets, ZERO_TRANCHE_UNITS, "Preview redeem must return 0 JT assets");
+        assertApproxEqAbs(previewRedeemResultFinal.nav, _toSTValue(expectedMaxDeposit), AAVE_MAX_ABS_NAV_DELTA, "Preview redeem must return the correct NAV");
 
         // Verify that ST.maxRedeem returns the correct amount
-        uint256 maxRedeem = ST.maxRedeem(stDepositor);
-        assertEq(maxRedeem, shares + stDepositorSharesBeforeDeposit, "Max redeem must return correct amount");
+        uint256 maxRedeemFinal = ST.maxRedeem(stDepositor);
+        assertEq(maxRedeemFinal, shares + stDepositorSharesBeforeDeposit, "Max redeem must return correct amount");
     }
 
     function testFuzz_jtDeposit_and_consecutive_jtWithdrawals(uint256 _jtAssets, uint256 _totalWithdrawalRequests) external {
@@ -653,7 +657,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
 
             vm.startPrank(jtDepositor);
             vm.expectRevert(abi.encodeWithSelector(IRoycoVaultTranche.MUST_REQUEST_WITHIN_MAX_REDEEM_AMOUNT.selector));
-            (uint256 requestId,) = JT.requestRedeem(jtShares, jtDepositor, jtDepositor);
+            JT.requestRedeem(jtShares, jtDepositor, jtDepositor);
             vm.stopPrank();
 
             vm.revertToState(snapshot);
@@ -698,7 +702,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         // Claim the redeem
         uint256 jtDepositorBalanceBeforeRedeem = USDC.balanceOf(jtDepositor);
         vm.prank(jtDepositor);
-        (AssetClaims memory jtRedeemResult,) = JT.redeem(jtMaxRedeemAfterSTRedeem, jtDepositor, jtDepositor, requestId);
+        JT.redeem(jtMaxRedeemAfterSTRedeem, jtDepositor, jtDepositor, requestId);
 
         // Verify JT received assets
         assertApproxEqRel(
