@@ -163,6 +163,10 @@ abstract contract IdenticalAssetsChainlinkOracleQuoter is IdenticalAssetsOracleQ
         $.trancheAssetToReferenceAssetOracle = _trancheAssetToReferenceAssetOracle;
         $.trancheAssetToReferenceAssetOracleDecimalPrecision = AggregatorV3Interface(_trancheAssetToReferenceAssetOracle).decimals();
         $.stalenessThresholdSeconds = _stalenessThresholdSeconds;
+
+        emit IdenticalAssetsChainlinkOracleUpdated(
+            _trancheAssetToReferenceAssetOracle, $.trancheAssetToReferenceAssetOracleDecimalPrecision, _stalenessThresholdSeconds
+        );
     }
 
     /**
