@@ -83,8 +83,8 @@ abstract contract IdenticalAssetsChainlinkOracleQuoter is IdenticalAssetsOracleQ
         }
 
         // Calculate the conversion rate from tranche token units to NAV units, scaled to RAY precision
-        trancheToNAVUnitConversionRateRAY =
-            trancheAssetPriceInReferenceAsset.mulDiv(referenceAssetToNAVUnitConversionRateRAY, precision * RAY, Math.Rounding.Floor);
+        // referenceAssetToNAVUnitConversionRateRAY is already scaled to RAY precision
+        trancheToNAVUnitConversionRateRAY = trancheAssetPriceInReferenceAsset.mulDiv(referenceAssetToNAVUnitConversionRateRAY, precision, Math.Rounding.Floor);
     }
 
     /**
