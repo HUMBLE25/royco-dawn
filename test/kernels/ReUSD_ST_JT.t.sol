@@ -122,11 +122,7 @@ contract reUSD_Test is AbstractKernelTestSuite {
     /// @notice Mocks the convertFromShares function on the ICL
     function _mockICLConversionRate(uint256 _newRateRAY) internal {
         mockedICLConversionRate = _newRateRAY;
-        vm.mockCall(
-            ICL,
-            abi.encodeWithSelector(IInsuranceCapitalLayer.convertFromShares.selector, USDC, RAY),
-            abi.encode(_newRateRAY)
-        );
+        vm.mockCall(ICL, abi.encodeWithSelector(IInsuranceCapitalLayer.convertFromShares.selector, USDC, RAY), abi.encode(_newRateRAY));
     }
 
     /// @notice Simulates yield by increasing the ICL conversion rate
@@ -253,16 +249,11 @@ contract reUSD_Test is AbstractKernelTestSuite {
 
         bytes32 marketId = keccak256(abi.encodePacked(cfg.name, "-", cfg.name, "-", block.timestamp));
 
-        DeployScript.ReUSDSTReUSDJTKernelParams memory kernelParams = DeployScript.ReUSDSTReUSDJTKernelParams({
-            reusd: REUSD,
-            reusdUsdQuoteToken: USDC,
-            insuranceCapitalLayer: ICL
-        });
+        DeployScript.ReUSDSTReUSDJTKernelParams memory kernelParams =
+            DeployScript.ReUSDSTReUSDJTKernelParams({ reusd: REUSD, reusdUsdQuoteToken: USDC, insuranceCapitalLayer: ICL });
 
-        DeployScript.AdaptiveCurveYDMParams memory ydmParams = DeployScript.AdaptiveCurveYDMParams({
-            jtYieldShareAtTargetUtilWAD: 0.3e18,
-            jtYieldShareAtFullUtilWAD: 1e18
-        });
+        DeployScript.AdaptiveCurveYDMParams memory ydmParams =
+            DeployScript.AdaptiveCurveYDMParams({ jtYieldShareAtTargetUtilWAD: 0.3e18, jtYieldShareAtFullUtilWAD: 1e18 });
 
         DeployScript.DeploymentParams memory params = DeployScript.DeploymentParams({
             factoryAdmin: address(DEPLOY_SCRIPT),
