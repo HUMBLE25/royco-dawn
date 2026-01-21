@@ -52,9 +52,9 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
     }
 
     /**
-     * @notice Modifier to ensure caller is either the specified address or an approved operator
+     * @notice Modifier to ensure caller is either the specified account or an approved operator
+     * @dev Reverts if caller is neither the specified account nor an approved operator
      * @param _account The address that the caller should match or have operator approval for
-     * @dev Reverts if caller is neither the address nor an approved operator
      */
     /// forge-lint: disable-next-item(unwrapped-modifier-logic)
     modifier onlyCallerOrOperator(address _account) {
@@ -288,6 +288,9 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
 
     /// @inheritdoc IRoycoAsyncVault
     function setOperator(address _operator, bool _approved) external virtual override(IRoycoAsyncVault) whenNotPaused returns (bool) {
+        // Cannot set the null address as an operator
+        require(_operator != address(0), NULL_ADDRESS());
+
         // Set the operator's approval status for the caller
         RoycoTrancheStorageLib._getRoycoTrancheStorage().isOperator[msg.sender][_operator] = _approved;
         emit OperatorSet(msg.sender, _operator, _approved);

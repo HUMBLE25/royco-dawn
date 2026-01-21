@@ -21,6 +21,8 @@ interface IRoycoAccountant {
      * @custom:field ydmInitializationData - The data used to initialize the YDM for this market
      * @custom:field fixedTermDurationSeconds - The duration of a fixed term for this market in seconds
      * @custom:field lltvWAD - The liquidation loan to value (LLTV) for this market, scaled to WAD precision
+     * @custom:field minJtCoverageILToEnterFixedTermState - The minimum amount of ST loss that must be covered by JT before transitioning to a fixed term state
+     *               Primarily used for rounding discrepancies in NAVs, and can be safely set to 0 if ST's underlying investment doesn't exhibit this behavior
      */
     struct RoycoAccountantInitParams {
         address kernel;
@@ -32,6 +34,7 @@ interface IRoycoAccountant {
         bytes ydmInitializationData;
         uint24 fixedTermDurationSeconds;
         uint64 lltvWAD;
+        NAV_UNIT minJtCoverageILToEnterFixedTermState;
     }
 
     /**
@@ -61,6 +64,8 @@ interface IRoycoAccountant {
      * @custom:field twJTYieldShareAccruedWAD - The time-weighted junior tranche yield share (YDM output) since the last yield distribution, scaled to WAD precision
      * @custom:field lastAccrualTimestamp - The timestamp at which the time-weighted JT yield share accumulator was last updated
      * @custom:field lastDistributionTimestamp - The timestamp at which the last ST yield distribution occurred
+     * @custom:field minJtCoverageILToEnterFixedTermState - The minimum amount of ST loss that must be covered by JT before transitioning to a fixed term state
+     *               Primarily used for rounding discrepancies in NAVs, and can be safely set to 0 if ST's underlying investment doesn't exhibit this behavior
      */
     struct RoycoAccountantState {
         address kernel;
@@ -83,6 +88,7 @@ interface IRoycoAccountant {
         uint192 twJTYieldShareAccruedWAD;
         uint32 lastAccrualTimestamp;
         uint32 lastDistributionTimestamp;
+        NAV_UNIT minJtCoverageILToEnterFixedTermState;
     }
 
     /**
@@ -153,6 +159,12 @@ interface IRoycoAccountant {
      * @param fixedTermDurationSeconds The new fixed term duration for this market in seconds
      */
     event FixedTermDurationUpdated(uint24 fixedTermDurationSeconds);
+
+    /**
+     * @notice Emitted when the minimum amount of ST loss that must be covered by JT before transitioning to a fixed term state is updated
+     * @param minJtCoverageILToEnterFixedTermState The new minimum JT coverage IL required before transitioning to a fixed term state
+     */
+    event MinJtCoverageILToEnterFixedTermStateUpdated(NAV_UNIT minJtCoverageILToEnterFixedTermState);
 
     /// @notice Thrown when the accountant's coverage config is invalid
     error INVALID_COVERAGE_CONFIG();

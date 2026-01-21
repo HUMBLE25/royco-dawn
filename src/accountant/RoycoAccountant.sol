@@ -72,6 +72,8 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         emit BetaUpdated(_params.betaWAD);
         $.ydm = _params.ydm;
         emit YDMUpdated(_params.ydm);
+        $.minJtCoverageILToEnterFixedTermState = _params.minJtCoverageILToEnterFixedTermState;
+        emit MinJtCoverageILToEnterFixedTermStateUpdated(_params.minJtCoverageILToEnterFixedTermState);
     }
 
     /// @inheritdoc IRoycoAccountant
@@ -473,7 +475,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
             /// @dev STEP_JT_COVERAGE_IMPERMANENT_LOSS_RECOVERY: Second, recover any JT coverage inflicted impermanent losses (second claim on ST appreciation)
             impermanentLossRecovery = UnitsMathLib.min(stGain, jtCoverageImpermanentLoss);
             if (impermanentLossRecovery != ZERO_NAV_UNITS) {
-                // Recover as much of the JT self impermanent loss as possible
+                // Recover as much of the JT coverage impermanent loss as possible
                 jtCoverageImpermanentLoss = (jtCoverageImpermanentLoss - impermanentLossRecovery);
                 // Apply the JT coverage IL recovery
                 jtEffectiveNAV = (jtEffectiveNAV + impermanentLossRecovery);
@@ -513,17 +515,21 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         require((_stRawNAV + _jtRawNAV) == (stEffectiveNAV + jtEffectiveNAV), NAV_CONSERVATION_VIOLATION());
 
         // Determine the resulting market state:
-        // 1. Perpetual: There is no existant JT IL in the system, LLTV has been breached, ST IL exists, or the fixed term duration is set to 0
-        // 2. Fixed term: There is JT IL in the protocol, but LLTV has not been breached, ST IL does not exist, and the fixed term duration is not set to 0
+        // 1. Perpetual: The minimum JT coverage IL to enter a fixed term state hasn't been incurred, LLTV has been breached, ST IL exists, or the fixed term duration is set to 0
+        // 2. Fixed term: The minimum JT coverage IL to enter a fixed term state has been incurred but LLTV has not been breached, ST IL does not exist, and the fixed term duration is not set to 0
         MarketState resultingMarketState;
-        if (jtCoverageImpermanentLoss == ZERO_NAV_UNITS) {
+        if (jtCoverageImpermanentLoss < $.minJtCoverageILToEnterFixedTermState) {
+            // JT coverage IL is either non-existant or can be attributed to dust losses (eg. rounding in the underlying NAV)
             resultingMarketState = MarketState.PERPETUAL;
         } else if (
             UtilsLib.computeLTV(stEffectiveNAV, stImpermanentLoss, jtEffectiveNAV) >= $.lltvWAD || stImpermanentLoss != ZERO_NAV_UNITS
                 || $.fixedTermDurationSeconds == 0
         ) {
             resultingMarketState = MarketState.PERPETUAL;
-            // JT coverage impermanent loss has to be explicitly cleared to ensure that the market is in a perpetual state
+            // JT coverage impermanent loss has to be explicitly cleared in this branch:
+            // If LLTV has been breached without existant ST IL, the market is approaching an uncollateralized state: ST needs to be able to withdraw to avoid losses and the YDM needs to kick in to reinstate proper collateralization
+            // If ST IL exists, the market is in a distressed state: STs need to be able to book losses and any future appreciation will go to making ST whole again
+            // If the fixed term duration is 0, the market is permanently in a perpetual state and never incurs any JT coverage IL
             jtCoverageImpermanentLoss = ZERO_NAV_UNITS;
         } else {
             resultingMarketState = MarketState.FIXED_TERM;
