@@ -22,7 +22,7 @@ contract ReUSD_ST_ReUSD_JT_Kernel is YieldBearingERC20_ST_YieldBearingERC20_JT_I
     address public immutable REUSD;
 
     /// @notice The address of the token in which the NAV is expressed (typically USDC)
-    address public immutable REUSD_USD_QUOTE_TOKEN;
+    address public immutable REUSD_QUOTE_TOKEN;
 
     /// @notice ICL input for reUSD exchange rate in quote tokens, scaled to RAY precision
     uint256 public immutable REUSD_AMOUNT_FOR_RAY_PRECISION_CONVERSION_RATE;
@@ -48,7 +48,7 @@ contract ReUSD_ST_ReUSD_JT_Kernel is YieldBearingERC20_ST_YieldBearingERC20_JT_I
         // Set the reUSD specific state
         require(_reusd != address(0) && _reusdUsdQuoteToken != address(0) && _insuranceCapitalLayer != address(0), NULL_ADDRESS());
         REUSD = _reusd;
-        REUSD_USD_QUOTE_TOKEN = _reusdUsdQuoteToken;
+        REUSD_QUOTE_TOKEN = _reusdUsdQuoteToken;
         // ICL output = input * rate * 10^(quote_dec - reUSD_dec), so input = 10^(RAY + reUSD_dec - quote_dec) yields rate * RAY
         REUSD_AMOUNT_FOR_RAY_PRECISION_CONVERSION_RATE =
             10 ** (RAY_DECIMALS + IERC20Metadata(_reusd).decimals() - IERC20Metadata(_reusdUsdQuoteToken).decimals());
@@ -60,7 +60,7 @@ contract ReUSD_ST_ReUSD_JT_Kernel is YieldBearingERC20_ST_YieldBearingERC20_JT_I
      * @param _params The standard initialization parameters for the Royco Kernel
      */
     function initialize(RoycoKernelInitParams calldata _params) external initializer {
-        // The initial conversion rate is set to the sentinel value so that the reUSD -> REUSD_USD_QUOTE_TOKEN conversion rate is queried directly from the insurance capital layer
+        // The initial conversion rate is set to the sentinel value so that the reUSD -> REUSD_QUOTE_TOKEN conversion rate is queried directly from the insurance capital layer
         __YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsOracleQuoter_Kernel_init(_params, SENTINEL_CONVERSION_RATE);
     }
 
@@ -68,6 +68,6 @@ contract ReUSD_ST_ReUSD_JT_Kernel is YieldBearingERC20_ST_YieldBearingERC20_JT_I
     function _getConversionRateFromOracle() internal view override returns (uint256) {
         // ICL output = input * rate * 10^(quote_dec - reUSD_dec)
         // With input = 10^(RAY + reUSD_dec - quote_dec), output = rate * 10^RAY
-        return IInsuranceCapitalLayer(INSURANCE_CAPITAL_LAYER).convertFromShares(REUSD_USD_QUOTE_TOKEN, REUSD_AMOUNT_FOR_RAY_PRECISION_CONVERSION_RATE);
+        return IInsuranceCapitalLayer(INSURANCE_CAPITAL_LAYER).convertFromShares(REUSD_QUOTE_TOKEN, REUSD_AMOUNT_FOR_RAY_PRECISION_CONVERSION_RATE);
     }
 }
