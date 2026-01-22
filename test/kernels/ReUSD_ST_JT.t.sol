@@ -261,6 +261,7 @@ contract reUSD_Test is AbstractKernelTestSuite {
             juniorTrancheSymbol: string(abi.encodePacked("RJ-", cfg.name)),
             seniorAsset: cfg.stAsset,
             juniorAsset: cfg.jtAsset,
+            minJtCoverageILToEnterFixedTermStateWAD: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE,
             kernelType: DeployScript.KernelType.ReUSD_ST_ReUSD_JT,
             kernelSpecificParams: abi.encode(kernelParams),
             protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS,

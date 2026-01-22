@@ -14,7 +14,7 @@ import { IYDM } from "../../src/interfaces/IYDM.sol";
 import { IRoycoKernel } from "../../src/interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoVaultTranche } from "../../src/interfaces/tranche/IRoycoVaultTranche.sol";
 import { AssetClaims, MarketState, TrancheType } from "../../src/libraries/Types.sol";
-import { NAV_UNIT, TRANCHE_UNIT, toUint256 } from "../../src/libraries/Units.sol";
+import { NAV_UNIT, TRANCHE_UNIT, toNAVUnits, toUint256 } from "../../src/libraries/Units.sol";
 import { RoycoJuniorTranche } from "../../src/tranches/RoycoJuniorTranche.sol";
 import { RoycoSeniorTranche } from "../../src/tranches/RoycoSeniorTranche.sol";
 import { Assertions } from "./Assertions.t.sol";
@@ -102,6 +102,7 @@ abstract contract BaseTest is Test, RoycoRoles, Assertions {
     uint64 internal JT_PROTOCOL_FEE_WAD = 0.1e18; // 10% protocol fee
     uint64 internal LLTV = 0.97e18; // 95% LLTV
     uint24 internal FIXED_TERM_DURATION_SECONDS = 2 weeks; // 2 weeks in seconds
+    NAV_UNIT internal MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE = toNAVUnits(uint256(2)); // 2 Wei
 
     /// -----------------------------------------
     /// Mainnet Fork Addresses

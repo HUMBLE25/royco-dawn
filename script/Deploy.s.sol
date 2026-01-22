@@ -24,7 +24,7 @@ import {
 } from "../src/kernels/YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter_Kernel.sol";
 import { RoycoKernelInitParams } from "../src/libraries/RoycoKernelStorageLib.sol";
 import { AssetClaims, MarketDeploymentParams, RolesConfiguration, RoycoMarket, TrancheDeploymentParams } from "../src/libraries/Types.sol";
-import { TRANCHE_UNIT } from "../src/libraries/Units.sol";
+import { NAV_UNIT, TRANCHE_UNIT, toNAVUnits } from "../src/libraries/Units.sol";
 import { RoycoJuniorTranche } from "../src/tranches/RoycoJuniorTranche.sol";
 import { RoycoSeniorTranche } from "../src/tranches/RoycoSeniorTranche.sol";
 import { AdaptiveCurveYDM } from "../src/ydm/AdaptiveCurveYDM.sol";
@@ -141,6 +141,7 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
         string juniorTrancheSymbol;
         address seniorAsset;
         address juniorAsset;
+        NAV_UNIT minJtCoverageILToEnterFixedTermStateWAD;
         // Kernel params
         KernelType kernelType;
         bytes kernelSpecificParams; // Encoded kernel-specific params
@@ -534,6 +535,7 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
             betaWAD: uint96(vm.envUint("BETA_WAD")),
             lltvWAD: uint64(vm.envUint("LLTV_WAD")),
             fixedTermDurationSeconds: uint24(vm.envUint("FIXED_TERM_DURATION_SECONDS")),
+            minJtCoverageILToEnterFixedTermStateWAD: toNAVUnits(vm.envUint("MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE_WAD")),
             ydmType: YDMType(vm.envUint("YDM_TYPE")),
             ydmSpecificParams: _readYDMParamsFromEnv(YDMType(vm.envUint("YDM_TYPE"))),
             pauserAddress: vm.envAddress("PAUSER_ADDRESS"),
@@ -879,7 +881,8 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
             lltvWAD: _params.lltvWAD,
             ydm: _ydmAddress,
             ydmInitializationData: _buildYDMInitializationData(_params.ydmType, _params.ydmSpecificParams),
-            fixedTermDurationSeconds: _params.fixedTermDurationSeconds
+            fixedTermDurationSeconds: _params.fixedTermDurationSeconds,
+            minJtCoverageILToEnterFixedTermState: _params.minJtCoverageILToEnterFixedTermStateWAD
         });
 
         return abi.encodeCall(RoycoAccountant.initialize, (accountantParams, _factoryAddress));
