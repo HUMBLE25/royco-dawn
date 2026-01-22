@@ -805,27 +805,18 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
      * @param _claims The ST and JT assets to withdraw and transfer to the specified receiver
      * @param _receiver The receiver of the tranche asset claims
      */
-    function _withdrawAssets(
-        AssetClaims memory _claims,
-        address _receiver
-    )
-        internal
-        virtual
-        returns (NAV_UNIT stRedeemPreOpNAV, NAV_UNIT jtRedeemPreOpNAV)
-    {
+    function _withdrawAssets(AssetClaims memory _claims, address _receiver) internal virtual returns (NAV_UNIT stRedeemPreOpNAV, NAV_UNIT jtRedeemPreOpNAV) {
         // Cache the individual tranche claims
         TRANCHE_UNIT stAssetsToClaim = _claims.stAssets;
         TRANCHE_UNIT jtAssetsToClaim = _claims.jtAssets;
 
-        // Get the pre-op NAVs to be withdrawn and Withdraw the ST and JT assets from each tranche if non-zero
-        if (stAssetsToClaim != ZERO_TRANCHE_UNITS) {
-            stRedeemPreOpNAV = stConvertTrancheUnitsToNAVUnits(stAssetsToClaim);
-            _stWithdrawAssets(stAssetsToClaim, _receiver);
-        }
-        if (jtAssetsToClaim != ZERO_TRANCHE_UNITS) {
-            jtRedeemPreOpNAV = jtConvertTrancheUnitsToNAVUnits(jtAssetsToClaim);
-            _jtWithdrawAssets(jtAssetsToClaim, _receiver);
-        }
+        // Get the pre-op NAVs to be withdrawn before processing any withdrawal if non-zero
+        if (stAssetsToClaim != ZERO_TRANCHE_UNITS) stRedeemPreOpNAV = stConvertTrancheUnitsToNAVUnits(stAssetsToClaim);
+        if (jtAssetsToClaim != ZERO_TRANCHE_UNITS) jtRedeemPreOpNAV = jtConvertTrancheUnitsToNAVUnits(jtAssetsToClaim);
+
+        // Withdraw the ST and JT assets from each tranche if non-zero
+        if (stAssetsToClaim != ZERO_TRANCHE_UNITS) _stWithdrawAssets(stAssetsToClaim, _receiver);
+        if (jtAssetsToClaim != ZERO_TRANCHE_UNITS) _jtWithdrawAssets(jtAssetsToClaim, _receiver);
     }
 
     /**
