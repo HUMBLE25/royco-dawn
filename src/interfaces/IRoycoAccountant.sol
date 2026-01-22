@@ -345,6 +345,14 @@ interface IRoycoAccountant {
     function setFixedTermDuration(uint24 _fixedTermDurationSeconds) external;
 
     /**
+     * @notice Updates the minimum amount of ST loss that must be covered by JT before transitioning to a fixed term state
+     * @dev Primarily used for rounding discrepancies in NAVs, and can be safely set to 0 if ST's underlying investment doesn't exhibit this behavior
+     * @dev Only callable by a designated admin
+     * @param _minJtCoverageILToEnterFixedTermState The new minimum JT coverage IL threshold before entering a fixed term state
+     */
+    function setMinJtCoverageILToEnterFixedTermState(NAV_UNIT _minJtCoverageILToEnterFixedTermState) external;
+
+    /**
      * @notice Returns the state of the accountant
      * @return state The state of the accountant
      */

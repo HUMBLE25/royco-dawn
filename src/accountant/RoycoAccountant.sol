@@ -72,7 +72,6 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         emit BetaUpdated(_params.betaWAD);
         $.ydm = _params.ydm;
         emit YDMUpdated(_params.ydm);
-        // TODO: Add admin setter
         $.minJtCoverageILToEnterFixedTermState = _params.minJtCoverageILToEnterFixedTermState;
         emit MinJtCoverageILToEnterFixedTermStateUpdated(_params.minJtCoverageILToEnterFixedTermState);
     }
@@ -236,7 +235,6 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         if (totalNAVDelta != 0) return preOpSyncTrancheAccounting(_stPostOpRawNAV, _jtPostOpRawNAV);
 
         // NAV conservation is preserved: marshal the sync packet and return
-        // Construct the synced NAVs state
         state = SyncedAccountingState({
             // No state transition is possible in this branch since there is no PNL and NAV changes enforce coverage (ensuring LLTV can't be breached if it wasn't already in pre-op sync)
             marketState: $.lastMarketState,
@@ -707,6 +705,17 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
             $.lastMarketState = MarketState.PERPETUAL;
         }
         emit FixedTermDurationUpdated(_fixedTermDurationSeconds);
+    }
+
+    /// @inheritdoc IRoycoAccountant
+    function setMinJtCoverageILToEnterFixedTermState(NAV_UNIT _minJtCoverageILToEnterFixedTermState)
+        external
+        override(IRoycoAccountant)
+        restricted
+        withSyncedAccounting
+    {
+        _getRoycoAccountantStorage().minJtCoverageILToEnterFixedTermState = _minJtCoverageILToEnterFixedTermState;
+        emit MinJtCoverageILToEnterFixedTermStateUpdated(_minJtCoverageILToEnterFixedTermState);
     }
 
     /// @inheritdoc IRoycoAccountant
