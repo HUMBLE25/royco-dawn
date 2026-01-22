@@ -122,6 +122,11 @@ abstract contract ERC4626_ST_Kernel is RoycoKernel {
         }
     }
 
+    /**
+     * @notice Helper function to preview the deposit of assets into the underlying investment vault and convert the allocated assets to NAV units
+     * @param _stAssets The amount of assets to deposit, denominated in the senior tranche's tranche units
+     * @return stDepositPreOpNAV The value of the assets deposited, denominated in the kernel's NAV units before the deposit is made
+     */
     function _stPreviewDepositAllocatedNAV(TRANCHE_UNIT _stAssets) internal view returns (NAV_UNIT) {
         // Simulate the deposit of the assets into the underlying investment vault
         uint256 stVaultSharesMinted = IERC4626(ST_VAULT).previewDeposit(toUint256(_stAssets));

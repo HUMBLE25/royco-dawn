@@ -113,6 +113,11 @@ abstract contract ERC4626_JT_Kernel is RoycoKernel {
         }
     }
 
+    /**
+     * @notice Helper function to preview the deposit of assets into the underlying investment vault and convert the allocated assets to NAV units
+     * @param _jtAssets The amount of assets to deposit, denominated in the junior tranche's tranche units
+     * @return jtDepositPreOpNAV The value of the assets deposited, denominated in the kernel's NAV units before the deposit is made
+     */
     function _jtPreviewDepositAllocatedNAV(TRANCHE_UNIT _jtAssets) internal view returns (NAV_UNIT) {
         // Simulate the deposit of the assets into the underlying investment vault
         uint256 jtVaultSharesMinted = IERC4626(JT_VAULT).previewDeposit(toUint256(_jtAssets));
