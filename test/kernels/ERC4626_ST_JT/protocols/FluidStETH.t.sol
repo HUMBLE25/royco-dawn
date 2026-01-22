@@ -76,10 +76,10 @@ contract FluidStETH_Test is ERC4626_TestBase {
     // For now, yield/loss simulation is a no-op. Tests requiring yield/loss
     // simulation will not produce meaningful results with the real Fluid vault.
 
-    function simulateSTYield(uint256) public pure override {}
-    function simulateJTYield(uint256) public pure override {}
-    function simulateSTLoss(uint256) public pure override {}
-    function simulateJTLoss(uint256) public pure override {}
+    function simulateSTYield(uint256) public pure override { }
+    function simulateJTYield(uint256) public pure override { }
+    function simulateSTLoss(uint256) public pure override { }
+    function simulateJTLoss(uint256) public pure override { }
 
     // ═══════════════════════════════════════════════════════════════════════════
     // TOLERANCE OVERRIDES (stETH has 1-2 wei rounding per operation)
@@ -120,7 +120,7 @@ contract FluidStETH_Test is ERC4626_TestBase {
     /// This is the root cause of NAV_CONSERVATION_VIOLATION - not stETH rebasing
     function test_POC_fluidVaultSharePriceChange() external {
         // The JT vault shares held by kernel
-        uint256 jtVaultShares = 439520349737079033628;
+        uint256 jtVaultShares = 439_520_349_737_079_033_628;
 
         emit log_named_uint("Testing with JT vault shares", jtVaultShares);
 

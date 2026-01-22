@@ -120,22 +120,14 @@ abstract contract ERC4626_TestBase is AbstractKernelTestSuite {
     function _mockSTConvertToAssets(uint256 _newSharePrice) internal {
         mockedSTSharePrice = _newSharePrice;
         // Mock convertToAssets for any input to return proportional value
-        vm.mockCall(
-            _getSTVault(),
-            abi.encodeWithSelector(IERC4626.convertToAssets.selector),
-            abi.encode(_newSharePrice)
-        );
+        vm.mockCall(_getSTVault(), abi.encodeWithSelector(IERC4626.convertToAssets.selector), abi.encode(_newSharePrice));
     }
 
     /// @notice Mocks the JT vault's convertToAssets function
     function _mockJTConvertToAssets(uint256 _newSharePrice) internal {
         mockedJTSharePrice = _newSharePrice;
         // Mock convertToAssets for any input to return proportional value
-        vm.mockCall(
-            _getJTVault(),
-            abi.encodeWithSelector(IERC4626.convertToAssets.selector),
-            abi.encode(_newSharePrice)
-        );
+        vm.mockCall(_getJTVault(), abi.encodeWithSelector(IERC4626.convertToAssets.selector), abi.encode(_newSharePrice));
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -236,10 +228,7 @@ abstract contract ERC4626_TestBase is AbstractKernelTestSuite {
         bytes32 marketId = keccak256(abi.encodePacked(cfg.name, "-", cfg.name, "-", vm.getBlockTimestamp()));
 
         DeployScript.ERC4626STERC4626JTInKindAssetsKernelParams memory kernelParams =
-            DeployScript.ERC4626STERC4626JTInKindAssetsKernelParams({
-                stVault: _getSTVault(),
-                jtVault: _getJTVault()
-            });
+            DeployScript.ERC4626STERC4626JTInKindAssetsKernelParams({ stVault: _getSTVault(), jtVault: _getJTVault() });
 
         DeployScript.AdaptiveCurveYDMParams memory ydmParams = DeployScript.AdaptiveCurveYDMParams({
             jtYieldShareAtTargetUtilWAD: 0.3e18, // 30% at target utilization

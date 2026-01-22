@@ -267,9 +267,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         returns (SyncedAccountingState memory state)
     {
         // Execute a post-op NAV synchronization
-        state = postOpSyncTrancheAccounting(
-            _op, _stPostOpRawNAV, _jtPostOpRawNAV, _stDepositPreOpNAV, _jtDepositPreOpNAV, _stRedeemPreOpNAV, _jtRedeemPreOpNAV
-        );
+        state = postOpSyncTrancheAccounting(_op, _stPostOpRawNAV, _jtPostOpRawNAV, _stDepositPreOpNAV, _jtDepositPreOpNAV, _stRedeemPreOpNAV, _jtRedeemPreOpNAV);
         // Enforce the market's coverage requirement
         require(isCoverageRequirementSatisfied(), COVERAGE_REQUIREMENT_UNSATISFIED());
     }

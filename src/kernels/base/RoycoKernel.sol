@@ -805,14 +805,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
      * @param _claims The ST and JT assets to withdraw and transfer to the specified receiver
      * @param _receiver The receiver of the tranche asset claims
      */
-    function _withdrawAssets(
-        AssetClaims memory _claims,
-        address _receiver
-    )
-        internal
-        virtual
-        returns (NAV_UNIT stRedeemPreOpNAV, NAV_UNIT jtRedeemPreOpNAV)
-    {
+    function _withdrawAssets(AssetClaims memory _claims, address _receiver) internal virtual returns (NAV_UNIT stRedeemPreOpNAV, NAV_UNIT jtRedeemPreOpNAV) {
         // Cache the individual tranche claims
         TRANCHE_UNIT stAssetsToClaim = _claims.stAssets;
         TRANCHE_UNIT jtAssetsToClaim = _claims.jtAssets;
