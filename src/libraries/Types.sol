@@ -73,6 +73,21 @@ struct SyncedAccountingState {
 }
 
 /**
+ * @title Operation
+ * @dev Defines the type of operation being executed by the user
+ * @custom:type ST_DEPOSIT - A senior tranche deposit that increases ST's effective NAV
+ * @custom:type ST_REDEEM - A senior tranche redemption that decreases ST's effective NAV
+ * @custom:type JT_DEPOSIT - A junior tranche deposit that increases JT's effective NAV
+ * @custom:type JT_REDEEM - A junior tranche redemption that decreases JT's effective NAV
+ */
+enum Operation {
+    ST_DEPOSIT,
+    ST_REDEEM,
+    JT_DEPOSIT,
+    JT_REDEEM
+}
+
+/**
  * @title Action
  * @dev Defines the action being executed by the user
  * @custom:type DEPOSIT - Depositing assets for shares into the tranche

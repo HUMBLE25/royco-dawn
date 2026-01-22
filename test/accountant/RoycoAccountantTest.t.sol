@@ -716,7 +716,7 @@ contract RoycoAccountantTest is BaseTest {
 
     function test_postOpSync_onlyKernel() public {
         vm.expectRevert(IRoycoAccountant.ONLY_ROYCO_KERNEL.selector);
-        accountant.postOpSyncTrancheAccounting(_nav(100e18), _nav(50e18), Operation.ST_INCREASE_NAV);
+        accountant.postOpSyncTrancheAccounting(_nav(100e18), _nav(50e18), Operation.ST_DEPOSIT);
     }
 
     function test_postOpSync_stIncreaseNAV() public {
@@ -727,7 +727,7 @@ contract RoycoAccountantTest is BaseTest {
 
         uint256 deposit = 20e18;
         vm.prank(MOCK_KERNEL);
-        SyncedAccountingState memory state = accountant.postOpSyncTrancheAccounting(_nav(100e18 + deposit), _nav(50e18), Operation.ST_INCREASE_NAV);
+        SyncedAccountingState memory state = accountant.postOpSyncTrancheAccounting(_nav(100e18 + deposit), _nav(50e18), Operation.ST_DEPOSIT);
 
         assertEq(toUint256(state.stEffectiveNAV), stEffBefore + deposit, "ST effective increased");
         assertEq(toUint256(state.jtEffectiveNAV), jtEffBefore, "JT unchanged");
@@ -743,7 +743,7 @@ contract RoycoAccountantTest is BaseTest {
 
         uint256 deposit = 20e18;
         vm.prank(MOCK_KERNEL);
-        SyncedAccountingState memory state = accountant.postOpSyncTrancheAccounting(_nav(100e18), _nav(50e18 + deposit), Operation.JT_INCREASE_NAV);
+        SyncedAccountingState memory state = accountant.postOpSyncTrancheAccounting(_nav(100e18), _nav(50e18 + deposit), Operation.JT_DEPOSIT);
 
         assertEq(toUint256(state.jtEffectiveNAV), jtEffBefore + deposit, "JT effective increased");
         assertEq(toUint256(state.stEffectiveNAV), stEffBefore, "ST unchanged");
@@ -758,7 +758,7 @@ contract RoycoAccountantTest is BaseTest {
 
         uint256 withdrawal = 20e18;
         vm.prank(MOCK_KERNEL);
-        SyncedAccountingState memory state = accountant.postOpSyncTrancheAccounting(_nav(100e18 - withdrawal), _nav(50e18), Operation.ST_DECREASE_NAV);
+        SyncedAccountingState memory state = accountant.postOpSyncTrancheAccounting(_nav(100e18 - withdrawal), _nav(50e18), Operation.ST_REDEEM);
 
         assertEq(toUint256(state.stEffectiveNAV), stEffBefore - withdrawal, "ST effective decreased");
         assertEq(toUint256(state.jtEffectiveNAV), jtEffBefore, "JT unchanged");
@@ -773,7 +773,7 @@ contract RoycoAccountantTest is BaseTest {
 
         uint256 withdrawal = 20e18;
         vm.prank(MOCK_KERNEL);
-        SyncedAccountingState memory state = accountant.postOpSyncTrancheAccounting(_nav(100e18), _nav(50e18 - withdrawal), Operation.JT_DECREASE_NAV);
+        SyncedAccountingState memory state = accountant.postOpSyncTrancheAccounting(_nav(100e18), _nav(50e18 - withdrawal), Operation.JT_REDEEM);
 
         assertEq(toUint256(state.jtEffectiveNAV), jtEffBefore - withdrawal, "JT effective decreased");
         assertEq(toUint256(state.stEffectiveNAV), stEffBefore, "ST unchanged");
@@ -784,20 +784,20 @@ contract RoycoAccountantTest is BaseTest {
         _initializeAccountantState(100e18, 50e18);
 
         vm.prank(MOCK_KERNEL);
-        vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.INVALID_POST_OP_NAVS.selector, Operation.ST_INCREASE_NAV));
-        accountant.postOpSyncTrancheAccounting(_nav(90e18), _nav(50e18), Operation.ST_INCREASE_NAV);
+        vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.INVALID_POST_OP_NAVS.selector, Operation.ST_DEPOSIT));
+        accountant.postOpSyncTrancheAccounting(_nav(90e18), _nav(50e18), Operation.ST_DEPOSIT);
 
         vm.prank(MOCK_KERNEL);
-        vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.INVALID_POST_OP_NAVS.selector, Operation.JT_INCREASE_NAV));
-        accountant.postOpSyncTrancheAccounting(_nav(100e18), _nav(40e18), Operation.JT_INCREASE_NAV);
+        vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.INVALID_POST_OP_NAVS.selector, Operation.JT_DEPOSIT));
+        accountant.postOpSyncTrancheAccounting(_nav(100e18), _nav(40e18), Operation.JT_DEPOSIT);
 
         vm.prank(MOCK_KERNEL);
-        vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.INVALID_POST_OP_NAVS.selector, Operation.ST_DECREASE_NAV));
-        accountant.postOpSyncTrancheAccounting(_nav(110e18), _nav(50e18), Operation.ST_DECREASE_NAV);
+        vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.INVALID_POST_OP_NAVS.selector, Operation.ST_REDEEM));
+        accountant.postOpSyncTrancheAccounting(_nav(110e18), _nav(50e18), Operation.ST_REDEEM);
 
         vm.prank(MOCK_KERNEL);
-        vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.INVALID_POST_OP_NAVS.selector, Operation.JT_DECREASE_NAV));
-        accountant.postOpSyncTrancheAccounting(_nav(100e18), _nav(60e18), Operation.JT_DECREASE_NAV);
+        vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.INVALID_POST_OP_NAVS.selector, Operation.JT_REDEEM));
+        accountant.postOpSyncTrancheAccounting(_nav(100e18), _nav(60e18), Operation.JT_REDEEM);
     }
 
     function test_postOpSync_stWithdrawal_scalesSTIL() public {
@@ -811,7 +811,7 @@ contract RoycoAccountantTest is BaseTest {
         uint256 stEffBefore = toUint256(stateBefore.lastSTEffectiveNAV);
 
         vm.prank(MOCK_KERNEL);
-        accountant.postOpSyncTrancheAccounting(_nav(25e18), _nav(10e18), Operation.ST_DECREASE_NAV);
+        accountant.postOpSyncTrancheAccounting(_nav(25e18), _nav(10e18), Operation.ST_REDEEM);
 
         IRoycoAccountant.RoycoAccountantState memory stateAfter = accountant.getState();
         uint256 stILAfter = toUint256(stateAfter.lastSTImpermanentLoss);
@@ -832,7 +832,7 @@ contract RoycoAccountantTest is BaseTest {
         uint256 jtEffBefore = toUint256(stateBefore.lastJTEffectiveNAV);
 
         vm.prank(MOCK_KERNEL);
-        accountant.postOpSyncTrancheAccounting(_nav(80e18), _nav(25e18), Operation.JT_DECREASE_NAV);
+        accountant.postOpSyncTrancheAccounting(_nav(80e18), _nav(25e18), Operation.JT_REDEEM);
 
         IRoycoAccountant.RoycoAccountantState memory stateAfter = accountant.getState();
         uint256 jtCovILAfter = toUint256(stateAfter.lastJTCoverageImpermanentLoss);
@@ -850,7 +850,7 @@ contract RoycoAccountantTest is BaseTest {
         _initializeAccountantState(100e18, 50e18);
 
         vm.prank(MOCK_KERNEL);
-        SyncedAccountingState memory state = accountant.postOpSyncTrancheAccountingAndEnforceCoverage(_nav(105e18), _nav(50e18), Operation.ST_INCREASE_NAV);
+        SyncedAccountingState memory state = accountant.postOpSyncTrancheAccountingAndEnforceCoverage(_nav(105e18), _nav(50e18), Operation.ST_DEPOSIT);
 
         assertTrue(accountant.isCoverageRequirementSatisfied(), "coverage satisfied");
         _assertNAVConservation(state);
@@ -861,7 +861,7 @@ contract RoycoAccountantTest is BaseTest {
 
         vm.prank(MOCK_KERNEL);
         vm.expectRevert(IRoycoAccountant.COVERAGE_REQUIREMENT_UNSATISFIED.selector);
-        accountant.postOpSyncTrancheAccountingAndEnforceCoverage(_nav(200e18), _nav(20e18), Operation.ST_INCREASE_NAV);
+        accountant.postOpSyncTrancheAccountingAndEnforceCoverage(_nav(200e18), _nav(20e18), Operation.ST_DEPOSIT);
     }
 
     function test_maxSTDepositGivenCoverage() public {
@@ -1142,8 +1142,7 @@ contract RoycoAccountantTest is BaseTest {
 
         if (ltvAfterPreOp < LLTV_WAD) {
             vm.prank(MOCK_KERNEL);
-            SyncedAccountingState memory postOpState =
-                accountant.postOpSyncTrancheAccounting(_nav(stRaw + depositAmount), _nav(jtRaw), Operation.ST_INCREASE_NAV);
+            SyncedAccountingState memory postOpState = accountant.postOpSyncTrancheAccounting(_nav(stRaw + depositAmount), _nav(jtRaw), Operation.ST_DEPOSIT);
 
             uint256 ltvAfterPostOp = UtilsLib.computeLTV(postOpState.stEffectiveNAV, postOpState.stImpermanentLoss, postOpState.jtEffectiveNAV);
 
@@ -1161,7 +1160,7 @@ contract RoycoAccountantTest is BaseTest {
         assertLt(ltvBefore, LLTV_WAD, "LLTV not breached before");
 
         vm.prank(MOCK_KERNEL);
-        SyncedAccountingState memory postOpState = accountant.postOpSyncTrancheAccounting(_nav(150e18), _nav(50e18), Operation.ST_INCREASE_NAV);
+        SyncedAccountingState memory postOpState = accountant.postOpSyncTrancheAccounting(_nav(150e18), _nav(50e18), Operation.ST_DEPOSIT);
 
         uint256 ltvAfter = UtilsLib.computeLTV(postOpState.stEffectiveNAV, postOpState.stImpermanentLoss, postOpState.jtEffectiveNAV);
         assertLt(ltvAfter, LLTV_WAD, "LLTV not breached after ST deposit");
@@ -1177,7 +1176,7 @@ contract RoycoAccountantTest is BaseTest {
         assertLt(ltvBefore, LLTV_WAD, "LLTV not breached before");
 
         vm.prank(MOCK_KERNEL);
-        SyncedAccountingState memory postOpState = accountant.postOpSyncTrancheAccounting(_nav(100e18), _nav(80e18), Operation.JT_DECREASE_NAV);
+        SyncedAccountingState memory postOpState = accountant.postOpSyncTrancheAccounting(_nav(100e18), _nav(80e18), Operation.JT_REDEEM);
 
         uint256 ltvAfter = UtilsLib.computeLTV(postOpState.stEffectiveNAV, postOpState.stImpermanentLoss, postOpState.jtEffectiveNAV);
         assertLt(ltvAfter, LLTV_WAD, "LLTV not breached after JT withdrawal");
@@ -1258,7 +1257,7 @@ contract RoycoAccountantTest is BaseTest {
         SyncedAccountingState memory state1 = accountant.preOpSyncTrancheAccounting(_nav(105e18), _nav(50e18));
 
         vm.prank(MOCK_KERNEL);
-        SyncedAccountingState memory state2 = accountant.postOpSyncTrancheAccounting(_nav(110e18), _nav(50e18), Operation.ST_INCREASE_NAV);
+        SyncedAccountingState memory state2 = accountant.postOpSyncTrancheAccounting(_nav(110e18), _nav(50e18), Operation.ST_DEPOSIT);
 
         vm.prank(MOCK_KERNEL);
         SyncedAccountingState memory state3 = accountant.preOpSyncTrancheAccounting(_nav(112e18), _nav(50e18));

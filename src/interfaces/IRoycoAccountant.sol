@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import { MarketState, SyncedAccountingState } from "../libraries/Types.sol";
+import { MarketState, Operation, SyncedAccountingState } from "../libraries/Types.sol";
 import { NAV_UNIT } from "../libraries/Units.sol";
 
 /**
@@ -180,8 +180,8 @@ interface IRoycoAccountant {
     /// @notice Thrown when the sum of the raw NAVs don't equal the sum of the effective NAVs of both tranches
     error NAV_CONSERVATION_VIOLATION();
 
-    /// @notice Thrown when the NAV values passed into post-op sync are invalid
-    error INVALID_POST_OP_NAVS();
+    /// @notice Thrown when the operation and NAVs passed to post-op lead to an invalid state
+    error INVALID_POST_OP_STATE(Operation _op);
 
     /// @notice Thrown when the market's coverage requirement is unsatisfied
     error COVERAGE_REQUIREMENT_UNSATISFIED();
@@ -209,21 +209,23 @@ interface IRoycoAccountant {
      * @notice Applies post-operation (deposit and withdrawal) raw NAV deltas to effective NAV checkpoints
      * @dev Interprets deltas strictly as deposits/withdrawals with no yield or coverage logic
      * @dev Exactly one of the following must be true: ST deposited, JT deposited, or withdrawal occurred
+     * @param _op The operation being executed in between the pre and post synchronizations
      * @param _stPostOpRawNAV The post-op senior tranche's raw NAV
      * @param _jtPostOpRawNAV The post-op junior tranche's raw NAV
      * @param _stDepositPreOpNAV The pre-op NAV deposited into the senior tranche (0 if not a ST deposit)
      * @param _jtDepositPreOpNAV The pre-op NAV deposited into the junior tranche (0 if not a JT deposit)
-     * @param _stWithdrawPreOpNAV The pre-op NAV withdrawn from the senior tranche's raw NAV
-     * @param _jtWithdrawPreOpNAV The pre-op NAV withdrawn from the junior tranche's raw NAV
+     * @param _stRedeemPreOpNAV The pre-op NAV withdrawn from the senior tranche's raw NAV (0 if not a redeem)
+     * @param _jtRedeemPreOpNAV The pre-op NAV withdrawn from the junior tranche's raw NAV (0 if not a redeem)
      * @return state The synced NAV, impermanent loss, and fee accounting containing all mark to market accounting data
      */
     function postOpSyncTrancheAccounting(
+        Operation _op,
         NAV_UNIT _stPostOpRawNAV,
         NAV_UNIT _jtPostOpRawNAV,
         NAV_UNIT _stDepositPreOpNAV,
         NAV_UNIT _jtDepositPreOpNAV,
-        NAV_UNIT _stWithdrawPreOpNAV,
-        NAV_UNIT _jtWithdrawPreOpNAV
+        NAV_UNIT _stRedeemPreOpNAV,
+        NAV_UNIT _jtRedeemPreOpNAV
     )
         external
         returns (SyncedAccountingState memory state);
@@ -233,21 +235,23 @@ interface IRoycoAccountant {
      * @dev Interprets deltas strictly as deposits/withdrawals with no yield or coverage logic
      * @dev Reverts if the coverage requirement is unsatisfied
      * @dev Exactly one of the following must be true: ST deposited, JT deposited, or withdrawal occurred
+     * @param _op The operation being executed in between the pre and post synchronizations
      * @param _stPostOpRawNAV The post-op senior tranche's raw NAV
      * @param _jtPostOpRawNAV The post-op junior tranche's raw NAV
      * @param _stDepositPreOpNAV The pre-op NAV deposited into the senior tranche (0 if not a ST deposit)
      * @param _jtDepositPreOpNAV The pre-op NAV deposited into the junior tranche (0 if not a JT deposit)
-     * @param _stWithdrawPreOpNAV The pre-op NAV withdrawn from the senior tranche's raw NAV
-     * @param _jtWithdrawPreOpNAV The pre-op NAV withdrawn from the junior tranche's raw NAV
+     * @param _stRedeemPreOpNAV The pre-op NAV withdrawn from the senior tranche's raw NAV
+     * @param _jtRedeemPreOpNAV The pre-op NAV withdrawn from the junior tranche's raw NAV
      * @return state The synced NAV, impermanent loss, and fee accounting containing all mark to market accounting data
      */
     function postOpSyncTrancheAccountingAndEnforceCoverage(
+        Operation _op,
         NAV_UNIT _stPostOpRawNAV,
         NAV_UNIT _jtPostOpRawNAV,
         NAV_UNIT _stDepositPreOpNAV,
         NAV_UNIT _jtDepositPreOpNAV,
-        NAV_UNIT _stWithdrawPreOpNAV,
-        NAV_UNIT _jtWithdrawPreOpNAV
+        NAV_UNIT _stRedeemPreOpNAV,
+        NAV_UNIT _jtRedeemPreOpNAV
     )
         external
         returns (SyncedAccountingState memory state);

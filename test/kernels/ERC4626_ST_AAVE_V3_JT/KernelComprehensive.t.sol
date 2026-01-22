@@ -3211,7 +3211,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         _verifyNAVConservation(state, "post-op ST deposit");
     }
 
-    /// @notice Test post-op sync after JT deposit (JT_INCREASE_NAV)
+    /// @notice Test post-op sync after JT deposit (JT_DEPOSIT)
     function test_postOpSync_jtDeposit() public {
         // JT deposit triggers pre-op sync then post-op sync
         _depositJT(100_000e6, ALICE_ADDRESS);

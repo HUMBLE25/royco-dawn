@@ -568,7 +568,7 @@ contract RoycoAccountantComprehensiveTest is BaseTest {
         // ST withdrawal - the JT raw NAV also decreases proportionally
         // This tests that the post-op correctly handles the coverage scaling
         vm.prank(MOCK_KERNEL);
-        SyncedAccountingState memory state = accountant.postOpSyncTrancheAccounting(_nav(60e18), _nav(40e18), Operation.ST_DECREASE_NAV);
+        SyncedAccountingState memory state = accountant.postOpSyncTrancheAccounting(_nav(60e18), _nav(40e18), Operation.ST_REDEEM);
 
         // JT effective should decrease or stay same (coverage IL may be scaled)
         assertLe(toUint256(state.jtEffectiveNAV), jtEffBefore, "JT effective not increased");
@@ -592,7 +592,7 @@ contract RoycoAccountantComprehensiveTest is BaseTest {
         // JT withdrawal
         uint256 newJTRaw = 30e18;
         vm.prank(MOCK_KERNEL);
-        accountant.postOpSyncTrancheAccounting(_nav(100e18), _nav(newJTRaw), Operation.JT_DECREASE_NAV);
+        accountant.postOpSyncTrancheAccounting(_nav(100e18), _nav(newJTRaw), Operation.JT_REDEEM);
 
         IRoycoAccountant.RoycoAccountantState memory after_ = accountant.getState();
         uint256 jtSelfILAfter = toUint256(after_.lastJTSelfImpermanentLoss);
@@ -627,7 +627,7 @@ contract RoycoAccountantComprehensiveTest is BaseTest {
 
             if (stILBefore > 0 && stEffBefore > stWithdraw) {
                 vm.prank(MOCK_KERNEL);
-                accountant.postOpSyncTrancheAccounting(_nav(initialST - stLoss - stWithdraw), _nav(initialJT), Operation.ST_DECREASE_NAV);
+                accountant.postOpSyncTrancheAccounting(_nav(initialST - stLoss - stWithdraw), _nav(initialJT), Operation.ST_REDEEM);
 
                 IRoycoAccountant.RoycoAccountantState memory after_ = accountant.getState();
                 uint256 stEffAfter = toUint256(after_.lastSTEffectiveNAV);
@@ -997,7 +997,7 @@ contract RoycoAccountantComprehensiveTest is BaseTest {
         if (satisfied && toUint256(maxDeposit) > 0) {
             // Depositing max should still satisfy coverage
             vm.prank(MOCK_KERNEL);
-            accountant.postOpSyncTrancheAccountingAndEnforceCoverage(_nav(stNav + toUint256(maxDeposit)), _nav(jtNav), Operation.ST_INCREASE_NAV);
+            accountant.postOpSyncTrancheAccountingAndEnforceCoverage(_nav(stNav + toUint256(maxDeposit)), _nav(jtNav), Operation.ST_DEPOSIT);
             // If we get here without revert, coverage is satisfied
             assertTrue(true);
         }
@@ -1013,7 +1013,7 @@ contract RoycoAccountantComprehensiveTest is BaseTest {
 
         // Day 1: ST deposit
         vm.prank(MOCK_KERNEL);
-        accountant.postOpSyncTrancheAccounting(_nav(1100e18), _nav(500e18), Operation.ST_INCREASE_NAV);
+        accountant.postOpSyncTrancheAccounting(_nav(1100e18), _nav(500e18), Operation.ST_DEPOSIT);
 
         // Day 2: Market gains
         vm.warp(vm.getBlockTimestamp() + 1 days);
@@ -1022,7 +1022,7 @@ contract RoycoAccountantComprehensiveTest is BaseTest {
 
         // Day 3: JT deposit
         vm.prank(MOCK_KERNEL);
-        accountant.postOpSyncTrancheAccounting(_nav(1150e18), _nav(620e18), Operation.JT_INCREASE_NAV);
+        accountant.postOpSyncTrancheAccounting(_nav(1150e18), _nav(620e18), Operation.JT_DEPOSIT);
 
         // Day 4: Market crash
         vm.warp(vm.getBlockTimestamp() + 1 days);
@@ -1041,7 +1041,7 @@ contract RoycoAccountantComprehensiveTest is BaseTest {
 
         // Day 6: ST withdrawal
         vm.prank(MOCK_KERNEL);
-        SyncedAccountingState memory state3 = accountant.postOpSyncTrancheAccounting(_nav(900e18), _nav(520e18), Operation.ST_DECREASE_NAV);
+        SyncedAccountingState memory state3 = accountant.postOpSyncTrancheAccounting(_nav(900e18), _nav(520e18), Operation.ST_REDEEM);
         _assertNAVConservation(state3);
     }
 
@@ -1202,7 +1202,7 @@ contract RoycoAccountantRevertTest is BaseTest {
         // Then try to call postOpSync as non-kernel
         vm.prank(NON_KERNEL);
         vm.expectRevert(IRoycoAccountant.ONLY_ROYCO_KERNEL.selector);
-        accountant.postOpSyncTrancheAccounting(_nav(100e18), _nav(50e18), Operation.ST_INCREASE_NAV);
+        accountant.postOpSyncTrancheAccounting(_nav(100e18), _nav(50e18), Operation.ST_DEPOSIT);
     }
 
     /// @notice Test postOpSyncTrancheAccountingAndEnforceCoverage reverts when called by non-kernel
@@ -1212,7 +1212,7 @@ contract RoycoAccountantRevertTest is BaseTest {
 
         vm.prank(NON_KERNEL);
         vm.expectRevert(IRoycoAccountant.ONLY_ROYCO_KERNEL.selector);
-        accountant.postOpSyncTrancheAccountingAndEnforceCoverage(_nav(100e18), _nav(50e18), Operation.ST_INCREASE_NAV);
+        accountant.postOpSyncTrancheAccountingAndEnforceCoverage(_nav(100e18), _nav(50e18), Operation.ST_DEPOSIT);
     }
 
     // =========================================================================
@@ -1226,19 +1226,19 @@ contract RoycoAccountantRevertTest is BaseTest {
 
         // Try to do ST_INCREASE_NAV with decreasing ST
         vm.prank(MOCK_KERNEL);
-        vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.INVALID_POST_OP_NAVS.selector, Operation.ST_INCREASE_NAV));
-        accountant.postOpSyncTrancheAccounting(_nav(90e18), _nav(50e18), Operation.ST_INCREASE_NAV);
+        vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.INVALID_POST_OP_NAVS.selector, Operation.ST_DEPOSIT));
+        accountant.postOpSyncTrancheAccounting(_nav(90e18), _nav(50e18), Operation.ST_DEPOSIT);
     }
 
-    /// @notice Test JT_INCREASE_NAV reverts when deltaJT < 0
+    /// @notice Test JT_DEPOSIT reverts when deltaJT < 0
     function test_revert_postOpSync_jtIncreaseNAV_negativeDelta() public {
         vm.prank(MOCK_KERNEL);
         accountant.preOpSyncTrancheAccounting(_nav(100e18), _nav(50e18));
 
-        // Try to do JT_INCREASE_NAV with decreasing JT
+        // Try to do JT_DEPOSIT with decreasing JT
         vm.prank(MOCK_KERNEL);
-        vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.INVALID_POST_OP_NAVS.selector, Operation.JT_INCREASE_NAV));
-        accountant.postOpSyncTrancheAccounting(_nav(100e18), _nav(40e18), Operation.JT_INCREASE_NAV);
+        vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.INVALID_POST_OP_NAVS.selector, Operation.JT_DEPOSIT));
+        accountant.postOpSyncTrancheAccounting(_nav(100e18), _nav(40e18), Operation.JT_DEPOSIT);
     }
 
     /// @notice Test ST_DECREASE_NAV reverts when deltaST > 0
@@ -1248,8 +1248,8 @@ contract RoycoAccountantRevertTest is BaseTest {
 
         // Try to do ST_DECREASE_NAV with increasing ST
         vm.prank(MOCK_KERNEL);
-        vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.INVALID_POST_OP_NAVS.selector, Operation.ST_DECREASE_NAV));
-        accountant.postOpSyncTrancheAccounting(_nav(110e18), _nav(50e18), Operation.ST_DECREASE_NAV);
+        vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.INVALID_POST_OP_NAVS.selector, Operation.ST_REDEEM));
+        accountant.postOpSyncTrancheAccounting(_nav(110e18), _nav(50e18), Operation.ST_REDEEM);
     }
 
     /// @notice Test ST_DECREASE_NAV reverts when deltaJT > 0
@@ -1259,8 +1259,8 @@ contract RoycoAccountantRevertTest is BaseTest {
 
         // ST_DECREASE_NAV requires both deltas <= 0
         vm.prank(MOCK_KERNEL);
-        vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.INVALID_POST_OP_NAVS.selector, Operation.ST_DECREASE_NAV));
-        accountant.postOpSyncTrancheAccounting(_nav(90e18), _nav(60e18), Operation.ST_DECREASE_NAV);
+        vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.INVALID_POST_OP_NAVS.selector, Operation.ST_REDEEM));
+        accountant.postOpSyncTrancheAccounting(_nav(90e18), _nav(60e18), Operation.ST_REDEEM);
     }
 
     /// @notice Test JT_DECREASE_NAV reverts when deltaJT > 0
@@ -1270,8 +1270,8 @@ contract RoycoAccountantRevertTest is BaseTest {
 
         // Try to do JT_DECREASE_NAV with increasing JT
         vm.prank(MOCK_KERNEL);
-        vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.INVALID_POST_OP_NAVS.selector, Operation.JT_DECREASE_NAV));
-        accountant.postOpSyncTrancheAccounting(_nav(100e18), _nav(60e18), Operation.JT_DECREASE_NAV);
+        vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.INVALID_POST_OP_NAVS.selector, Operation.JT_REDEEM));
+        accountant.postOpSyncTrancheAccounting(_nav(100e18), _nav(60e18), Operation.JT_REDEEM);
     }
 
     /// @notice Test JT_DECREASE_NAV reverts when deltaST > 0
@@ -1281,8 +1281,8 @@ contract RoycoAccountantRevertTest is BaseTest {
 
         // JT_DECREASE_NAV requires both deltas <= 0
         vm.prank(MOCK_KERNEL);
-        vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.INVALID_POST_OP_NAVS.selector, Operation.JT_DECREASE_NAV));
-        accountant.postOpSyncTrancheAccounting(_nav(110e18), _nav(40e18), Operation.JT_DECREASE_NAV);
+        vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.INVALID_POST_OP_NAVS.selector, Operation.JT_REDEEM));
+        accountant.postOpSyncTrancheAccounting(_nav(110e18), _nav(40e18), Operation.JT_REDEEM);
     }
 
     // =========================================================================
@@ -1300,7 +1300,7 @@ contract RoycoAccountantRevertTest is BaseTest {
         // Adding more ST would violate the requirement
         vm.prank(MOCK_KERNEL);
         vm.expectRevert(IRoycoAccountant.COVERAGE_REQUIREMENT_UNSATISFIED.selector);
-        accountant.postOpSyncTrancheAccountingAndEnforceCoverage(_nav(600e18), _nav(100e18), Operation.ST_INCREASE_NAV);
+        accountant.postOpSyncTrancheAccountingAndEnforceCoverage(_nav(600e18), _nav(100e18), Operation.ST_DEPOSIT);
     }
 
     // =========================================================================
@@ -1511,10 +1511,10 @@ contract RoycoAccountantRevertTest is BaseTest {
         Operation op = Operation(opType);
         bool shouldRevert = false;
 
-        if (op == Operation.ST_INCREASE_NAV && newST < initialST) shouldRevert = true;
-        if (op == Operation.JT_INCREASE_NAV && newJT < initialJT) shouldRevert = true;
-        if (op == Operation.ST_DECREASE_NAV && (newST > initialST || newJT > initialJT)) shouldRevert = true;
-        if (op == Operation.JT_DECREASE_NAV && (newJT > initialJT || newST > initialST)) shouldRevert = true;
+        if (op == Operation.ST_DEPOSIT && newST < initialST) shouldRevert = true;
+        if (op == Operation.JT_DEPOSIT && newJT < initialJT) shouldRevert = true;
+        if (op == Operation.ST_REDEEM && (newST > initialST || newJT > initialJT)) shouldRevert = true;
+        if (op == Operation.JT_REDEEM && (newJT > initialJT || newST > initialST)) shouldRevert = true;
 
         if (shouldRevert) {
             vm.prank(MOCK_KERNEL);
@@ -1742,7 +1742,7 @@ contract AccountantHandler is BaseTest {
         if (newSTNav > MAX_NAV) return;
 
         vm.prank(kernel);
-        try accountant.postOpSyncTrancheAccounting(NAV_UNIT.wrap(uint128(newSTNav)), NAV_UNIT.wrap(uint128(currentJTNav)), Operation.ST_INCREASE_NAV) {
+        try accountant.postOpSyncTrancheAccounting(NAV_UNIT.wrap(uint128(newSTNav)), NAV_UNIT.wrap(uint128(currentJTNav)), Operation.ST_DEPOSIT) {
             currentSTNav = newSTNav;
             _lastOpWasPreOp = false;
         } catch {
@@ -1758,7 +1758,7 @@ contract AccountantHandler is BaseTest {
         if (newJTNav > MAX_NAV) return;
 
         vm.prank(kernel);
-        try accountant.postOpSyncTrancheAccounting(NAV_UNIT.wrap(uint128(currentSTNav)), NAV_UNIT.wrap(uint128(newJTNav)), Operation.JT_INCREASE_NAV) {
+        try accountant.postOpSyncTrancheAccounting(NAV_UNIT.wrap(uint128(currentSTNav)), NAV_UNIT.wrap(uint128(newJTNav)), Operation.JT_DEPOSIT) {
             currentJTNav = newJTNav;
             _lastOpWasPreOp = false;
         } catch {
@@ -1777,7 +1777,7 @@ contract AccountantHandler is BaseTest {
         uint256 newJTNav = currentJTNav;
 
         vm.prank(kernel);
-        try accountant.postOpSyncTrancheAccounting(NAV_UNIT.wrap(uint128(newSTNav)), NAV_UNIT.wrap(uint128(newJTNav)), Operation.ST_DECREASE_NAV) {
+        try accountant.postOpSyncTrancheAccounting(NAV_UNIT.wrap(uint128(newSTNav)), NAV_UNIT.wrap(uint128(newJTNav)), Operation.ST_REDEEM) {
             currentSTNav = newSTNav;
             currentJTNav = newJTNav;
             _lastOpWasPreOp = false;
@@ -1794,7 +1794,7 @@ contract AccountantHandler is BaseTest {
         if (newJTNav < MIN_NAV) return;
 
         vm.prank(kernel);
-        try accountant.postOpSyncTrancheAccounting(NAV_UNIT.wrap(uint128(currentSTNav)), NAV_UNIT.wrap(uint128(newJTNav)), Operation.JT_DECREASE_NAV) {
+        try accountant.postOpSyncTrancheAccounting(NAV_UNIT.wrap(uint128(currentSTNav)), NAV_UNIT.wrap(uint128(newJTNav)), Operation.JT_REDEEM) {
             currentJTNav = newJTNav;
             _lastOpWasPreOp = false;
         } catch {
@@ -1899,7 +1899,7 @@ contract RoycoAccountantLLTVInvariantTest is BaseTest {
 
         // Execute ST deposit via postOpSync
         vm.prank(MOCK_KERNEL);
-        try accountant.postOpSyncTrancheAccounting(_nav(initialST + depositAmount), _nav(initialJT), Operation.ST_INCREASE_NAV) returns (
+        try accountant.postOpSyncTrancheAccounting(_nav(initialST + depositAmount), _nav(initialJT), Operation.ST_DEPOSIT) returns (
             SyncedAccountingState memory postOpState
         ) {
             // Calculate post-op LTV
@@ -1929,7 +1929,7 @@ contract RoycoAccountantLLTVInvariantTest is BaseTest {
         // Execute JT deposit
         vm.prank(MOCK_KERNEL);
         SyncedAccountingState memory postOpState =
-            accountant.postOpSyncTrancheAccounting(_nav(initialST), _nav(initialJT + depositAmount), Operation.JT_INCREASE_NAV);
+            accountant.postOpSyncTrancheAccounting(_nav(initialST), _nav(initialJT + depositAmount), Operation.JT_DEPOSIT);
 
         uint256 postOpLTV = _computeLTV(toUint256(postOpState.stEffectiveNAV), toUint256(postOpState.stImpermanentLoss), toUint256(postOpState.jtEffectiveNAV));
 
@@ -1956,7 +1956,7 @@ contract RoycoAccountantLLTVInvariantTest is BaseTest {
 
         // Execute ST withdrawal
         vm.prank(MOCK_KERNEL);
-        try accountant.postOpSyncTrancheAccounting(_nav(initialST - withdrawAmount), _nav(initialJT), Operation.ST_DECREASE_NAV) returns (
+        try accountant.postOpSyncTrancheAccounting(_nav(initialST - withdrawAmount), _nav(initialJT), Operation.ST_REDEEM) returns (
             SyncedAccountingState memory postOpState
         ) {
             uint256 postOpLTV =
@@ -1987,7 +1987,7 @@ contract RoycoAccountantLLTVInvariantTest is BaseTest {
 
         // Execute JT withdrawal with coverage enforcement
         vm.prank(MOCK_KERNEL);
-        try accountant.postOpSyncTrancheAccountingAndEnforceCoverage(_nav(initialST), _nav(initialJT - withdrawAmount), Operation.JT_DECREASE_NAV) returns (
+        try accountant.postOpSyncTrancheAccountingAndEnforceCoverage(_nav(initialST), _nav(initialJT - withdrawAmount), Operation.JT_REDEEM) returns (
             SyncedAccountingState memory postOpState
         ) {
             uint256 postOpLTV =
@@ -2032,7 +2032,7 @@ contract RoycoAccountantLLTVInvariantTest is BaseTest {
 
             // Now execute ST deposit
             vm.prank(MOCK_KERNEL);
-            try accountant.postOpSyncTrancheAccountingAndEnforceCoverage(_nav(newSTRaw + depositAmount), _nav(newJTRaw), Operation.ST_INCREASE_NAV) returns (
+            try accountant.postOpSyncTrancheAccountingAndEnforceCoverage(_nav(newSTRaw + depositAmount), _nav(newJTRaw), Operation.ST_DEPOSIT) returns (
                 SyncedAccountingState memory postOpState
             ) {
                 uint256 postOpLTV =
@@ -2059,7 +2059,7 @@ contract RoycoAccountantLLTVInvariantTest is BaseTest {
 
         // Operation 1: ST deposit
         vm.prank(MOCK_KERNEL);
-        try accountant.postOpSyncTrancheAccountingAndEnforceCoverage(_nav(initialST + stDeposit), _nav(initialJT), Operation.ST_INCREASE_NAV) {
+        try accountant.postOpSyncTrancheAccountingAndEnforceCoverage(_nav(initialST + stDeposit), _nav(initialJT), Operation.ST_DEPOSIT) {
             // Check LTV after ST deposit
             IRoycoAccountant.RoycoAccountantState memory state1 = accountant.getState();
             uint256 ltv1 = _computeLTV(toUint256(state1.lastSTEffectiveNAV), toUint256(state1.lastSTImpermanentLoss), toUint256(state1.lastJTEffectiveNAV));
@@ -2067,7 +2067,7 @@ contract RoycoAccountantLLTVInvariantTest is BaseTest {
 
             // Operation 2: JT deposit (should improve LTV)
             vm.prank(MOCK_KERNEL);
-            accountant.postOpSyncTrancheAccounting(_nav(initialST + stDeposit), _nav(initialJT + jtDeposit), Operation.JT_INCREASE_NAV);
+            accountant.postOpSyncTrancheAccounting(_nav(initialST + stDeposit), _nav(initialJT + jtDeposit), Operation.JT_DEPOSIT);
 
             IRoycoAccountant.RoycoAccountantState memory state2 = accountant.getState();
             uint256 ltv2 = _computeLTV(toUint256(state2.lastSTEffectiveNAV), toUint256(state2.lastSTImpermanentLoss), toUint256(state2.lastJTEffectiveNAV));
@@ -2102,7 +2102,7 @@ contract RoycoAccountantLLTVInvariantTest is BaseTest {
 
         // Try a small JT deposit - should improve LTV
         vm.prank(MOCK_KERNEL);
-        SyncedAccountingState memory postState = accountant.postOpSyncTrancheAccounting(_nav(stNav), _nav(jtNav + 1e18), Operation.JT_INCREASE_NAV);
+        SyncedAccountingState memory postState = accountant.postOpSyncTrancheAccounting(_nav(stNav), _nav(jtNav + 1e18), Operation.JT_DEPOSIT);
 
         uint256 finalLTV = _computeLTV(toUint256(postState.stEffectiveNAV), toUint256(postState.stImpermanentLoss), toUint256(postState.jtEffectiveNAV));
 
@@ -2122,7 +2122,7 @@ contract RoycoAccountantLLTVInvariantTest is BaseTest {
 
         // Deposit 0 should have no effect (or revert, which is fine)
         vm.prank(MOCK_KERNEL);
-        try accountant.postOpSyncTrancheAccounting(_nav(stNav), _nav(jtNav), Operation.ST_INCREASE_NAV) returns (SyncedAccountingState memory postState) {
+        try accountant.postOpSyncTrancheAccounting(_nav(stNav), _nav(jtNav), Operation.ST_DEPOSIT) returns (SyncedAccountingState memory postState) {
             uint256 finalLTV = _computeLTV(toUint256(postState.stEffectiveNAV), toUint256(postState.stImpermanentLoss), toUint256(postState.jtEffectiveNAV));
             assertEq(finalLTV, initialLTV, "Zero deposit changed LTV");
         } catch {
@@ -2505,7 +2505,7 @@ contract RoycoAccountantEdgeCaseTest is BaseTest {
         uint256 jtCoverageAmount = 5e18; // JT provides coverage
 
         vm.prank(MOCK_KERNEL);
-        accountant.postOpSyncTrancheAccounting(_nav(80e18 - stWithdrawAmount), _nav(30e18 - jtCoverageAmount), Operation.ST_DECREASE_NAV);
+        accountant.postOpSyncTrancheAccounting(_nav(80e18 - stWithdrawAmount), _nav(30e18 - jtCoverageAmount), Operation.ST_REDEEM);
 
         IRoycoAccountant.RoycoAccountantState memory state3 = accountant.getState();
 
@@ -2555,7 +2555,7 @@ contract RoycoAccountantEdgeCaseTest is BaseTest {
 
         // ST withdrawal with JT coverage
         vm.prank(MOCK_KERNEL);
-        try accountant.postOpSyncTrancheAccounting(_nav(initialST - stLoss - stWithdraw), _nav(initialJT - jtLoss - jtCoverage), Operation.ST_DECREASE_NAV) {
+        try accountant.postOpSyncTrancheAccounting(_nav(initialST - stLoss - stWithdraw), _nav(initialJT - jtLoss - jtCoverage), Operation.ST_REDEEM) {
             if (jtSelfILBefore > 0 && jtCoverage > 0) {
                 IRoycoAccountant.RoycoAccountantState memory stateAfter = accountant.getState();
                 // JT self IL should be reduced when JT raw NAV decreases
@@ -3072,7 +3072,7 @@ contract RoycoAccountantBranchCoverageTest is BaseTest {
         // Try to withdraw too much JT (violating coverage)
         vm.prank(MOCK_KERNEL);
         vm.expectRevert(IRoycoAccountant.COVERAGE_REQUIREMENT_UNSATISFIED.selector);
-        accountant.postOpSyncTrancheAccountingAndEnforceCoverage(_nav(100e18), _nav(10e18), Operation.JT_DECREASE_NAV);
+        accountant.postOpSyncTrancheAccountingAndEnforceCoverage(_nav(100e18), _nav(10e18), Operation.JT_REDEEM);
     }
 
     // =========================================================================
@@ -3324,20 +3324,20 @@ contract RoycoAccountantAdditionalBranchTests is BaseTest {
 
         // ST_INCREASE_NAV with positive delta
         vm.prank(address(mockKernel));
-        SyncedAccountingState memory state = accountant.postOpSyncTrancheAccounting(_nav(110e18), _nav(50e18), Operation.ST_INCREASE_NAV);
+        SyncedAccountingState memory state = accountant.postOpSyncTrancheAccounting(_nav(110e18), _nav(50e18), Operation.ST_DEPOSIT);
 
         assertEq(toUint256(state.stRawNAV), 110e18, "ST NAV should increase");
     }
 
-    /// @notice Test JT_INCREASE_NAV with valid delta (line 150 success path)
+    /// @notice Test JT_DEPOSIT with valid delta (line 150 success path)
     function test_postOp_jtIncreaseNAV_validDelta() public {
         // Initialize
         vm.prank(address(mockKernel));
         accountant.preOpSyncTrancheAccounting(_nav(100e18), _nav(50e18));
 
-        // JT_INCREASE_NAV with positive delta
+        // JT_DEPOSIT with positive delta
         vm.prank(address(mockKernel));
-        SyncedAccountingState memory state = accountant.postOpSyncTrancheAccounting(_nav(100e18), _nav(60e18), Operation.JT_INCREASE_NAV);
+        SyncedAccountingState memory state = accountant.postOpSyncTrancheAccounting(_nav(100e18), _nav(60e18), Operation.JT_DEPOSIT);
 
         assertEq(toUint256(state.jtRawNAV), 60e18, "JT NAV should increase");
     }
@@ -3350,7 +3350,7 @@ contract RoycoAccountantAdditionalBranchTests is BaseTest {
 
         // ST_DECREASE_NAV with negative ST delta
         vm.prank(address(mockKernel));
-        SyncedAccountingState memory state = accountant.postOpSyncTrancheAccounting(_nav(90e18), _nav(50e18), Operation.ST_DECREASE_NAV);
+        SyncedAccountingState memory state = accountant.postOpSyncTrancheAccounting(_nav(90e18), _nav(50e18), Operation.ST_REDEEM);
 
         assertEq(toUint256(state.stRawNAV), 90e18, "ST NAV should decrease");
     }
@@ -3363,7 +3363,7 @@ contract RoycoAccountantAdditionalBranchTests is BaseTest {
 
         // JT_DECREASE_NAV with negative JT delta
         vm.prank(address(mockKernel));
-        SyncedAccountingState memory state = accountant.postOpSyncTrancheAccounting(_nav(100e18), _nav(40e18), Operation.JT_DECREASE_NAV);
+        SyncedAccountingState memory state = accountant.postOpSyncTrancheAccounting(_nav(100e18), _nav(40e18), Operation.JT_REDEEM);
 
         assertEq(toUint256(state.jtRawNAV), 40e18, "JT NAV should decrease");
     }
@@ -3418,7 +3418,7 @@ contract RoycoAccountantAdditionalBranchTests is BaseTest {
 
         // Do a post-op with deposit
         vm.prank(address(mockKernel));
-        SyncedAccountingState memory state2 = accountant.postOpSyncTrancheAccounting(_nav(stNav + stDelta), _nav(jtNav), Operation.ST_INCREASE_NAV);
+        SyncedAccountingState memory state2 = accountant.postOpSyncTrancheAccounting(_nav(stNav + stDelta), _nav(jtNav), Operation.ST_DEPOSIT);
 
         assertEq(
             toUint256(state2.stRawNAV) + toUint256(state2.jtRawNAV),

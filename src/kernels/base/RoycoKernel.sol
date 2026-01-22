@@ -7,7 +7,7 @@ import { ExecutionModel, IRoycoKernel, SharesRedemptionModel } from "../../inter
 import { IRoycoVaultTranche } from "../../interfaces/tranche/IRoycoVaultTranche.sol";
 import { ZERO_NAV_UNITS, ZERO_TRANCHE_UNITS } from "../../libraries/Constants.sol";
 import { RedemptionRequest, RoycoKernelInitParams, RoycoKernelState, RoycoKernelStorageLib } from "../../libraries/RoycoKernelStorageLib.sol";
-import { ActionMetadataFormat, AssetClaims, MarketState, SyncedAccountingState, TrancheType } from "../../libraries/Types.sol";
+import { ActionMetadataFormat, AssetClaims, MarketState, Operation, SyncedAccountingState, TrancheType } from "../../libraries/Types.sol";
 import { Math, NAV_UNIT, TRANCHE_UNIT, UnitsMathLib } from "../../libraries/Units.sol";
 import { UtilsLib } from "../../libraries/UtilsLib.sol";
 
@@ -306,7 +306,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
 
         // Execute a post-op sync on accounting and enforce the market's coverage requirement
         NAV_UNIT stPostDepositNAV =
-        (_postOpSyncTrancheAccountingAndEnforceCoverage(stDepositPreOpNAV, ZERO_NAV_UNITS, ZERO_NAV_UNITS, ZERO_NAV_UNITS)).stEffectiveNAV;
+        (_postOpSyncTrancheAccountingAndEnforceCoverage(Operation.ST_DEPOSIT, stDepositPreOpNAV, ZERO_NAV_UNITS, ZERO_NAV_UNITS, ZERO_NAV_UNITS)).stEffectiveNAV;
         // The value allocated after any fees/slippage incurred on deposit
         valueAllocated = stPostDepositNAV - navToMintAt;
     }
@@ -343,10 +343,10 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         userAssetClaims = UtilsLib.scaleAssetClaims(userAssetClaims, _shares, totalTrancheShares);
 
         // Withdraw the asset claims from each tranche and transfer them to the receiver
-        (NAV_UNIT stWithdrawnPreOpNAV, NAV_UNIT jtWithdrawnPreOpNAV) = _withdrawAssets(userAssetClaims, _receiver);
+        (NAV_UNIT stRedeemPreOpNAV, NAV_UNIT jtRedeemPreOpNAV) = _withdrawAssets(userAssetClaims, _receiver);
 
         // Execute a post-op sync on accounting
-        _postOpSyncTrancheAccounting(ZERO_NAV_UNITS, ZERO_NAV_UNITS, stWithdrawnPreOpNAV, jtWithdrawnPreOpNAV);
+        _postOpSyncTrancheAccounting(Operation.ST_REDEEM, ZERO_NAV_UNITS, ZERO_NAV_UNITS, stRedeemPreOpNAV, jtRedeemPreOpNAV);
     }
 
     // =============================
@@ -380,7 +380,8 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         NAV_UNIT jtDepositPreOpNAV = _jtDepositAssets(_assets);
 
         // Execute a post-op sync on accounting and enforce the market's coverage requirement
-        NAV_UNIT jtPostDepositNAV = (_postOpSyncTrancheAccounting(ZERO_NAV_UNITS, jtDepositPreOpNAV, ZERO_NAV_UNITS, ZERO_NAV_UNITS)).jtEffectiveNAV;
+        NAV_UNIT jtPostDepositNAV =
+        (_postOpSyncTrancheAccounting(Operation.JT_DEPOSIT, ZERO_NAV_UNITS, jtDepositPreOpNAV, ZERO_NAV_UNITS, ZERO_NAV_UNITS)).jtEffectiveNAV;
         // The value allocated after any fees/slippage incurred on deposit
         valueAllocated = jtPostDepositNAV - navToMintAt;
     }
@@ -555,10 +556,10 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         userAssetClaims = UtilsLib.scaleAssetClaims(userAssetClaims, navOfSharesToRedeem, state.jtEffectiveNAV);
 
         // Withdraw the asset claims from each tranche and transfer them to the receiver
-        (NAV_UNIT stWithdrawnPreOpNAV, NAV_UNIT jtWithdrawnPreOpNAV) = _withdrawAssets(userAssetClaims, _receiver);
+        (NAV_UNIT stRedeemPreOpNAV, NAV_UNIT jtRedeemPreOpNAV) = _withdrawAssets(userAssetClaims, _receiver);
 
         // Execute a post-op sync on accounting and enforce the market's coverage requirement
-        _postOpSyncTrancheAccountingAndEnforceCoverage(ZERO_NAV_UNITS, ZERO_NAV_UNITS, stWithdrawnPreOpNAV, jtWithdrawnPreOpNAV);
+        _postOpSyncTrancheAccountingAndEnforceCoverage(Operation.JT_REDEEM, ZERO_NAV_UNITS, ZERO_NAV_UNITS, stRedeemPreOpNAV, jtRedeemPreOpNAV);
 
         return (userAssetClaims, "");
     }
@@ -653,17 +654,19 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     /**
      * @notice Invokes the accountant to do a post-operation (deposit and withdrawal) NAV sync
      * @dev Should be called on every NAV mutating user operation that doesn't require a coverage check
+     * @param _op The operation being executed in between the pre and post synchronizations
      * @param _stDepositPreOpNAV The pre-op NAV deposited into the senior tranche (0 if not a ST deposit)
      * @param _jtDepositPreOpNAV The pre-op NAV deposited into the junior tranche (0 if not a JT deposit)
-     * @param _stWithdrawPreOpNAV The pre-op NAV withdrawn from the senior tranche's raw NAV
-     * @param _jtWithdrawPreOpNAV The pre-op NAV withdrawn from the junior tranche's raw NAV
+     * @param _stRedeemPreOpNAV The pre-op NAV withdrawn from the senior tranche's raw NAV
+     * @param _jtRedeemPreOpNAV The pre-op NAV withdrawn from the junior tranche's raw NAV
      * @return state The synced NAV, impermanent loss, and fee accounting containing all mark to market accounting data
      */
     function _postOpSyncTrancheAccounting(
+        Operation _op,
         NAV_UNIT _stDepositPreOpNAV,
         NAV_UNIT _jtDepositPreOpNAV,
-        NAV_UNIT _stWithdrawPreOpNAV,
-        NAV_UNIT _jtWithdrawPreOpNAV
+        NAV_UNIT _stRedeemPreOpNAV,
+        NAV_UNIT _jtRedeemPreOpNAV
     )
         internal
         virtual
@@ -672,7 +675,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         // Execute the post-op sync on the accountant
         state = _accountant()
             .postOpSyncTrancheAccounting(
-                _getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV(), _stDepositPreOpNAV, _jtDepositPreOpNAV, _stWithdrawPreOpNAV, _jtWithdrawPreOpNAV
+                _op, _getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV(), _stDepositPreOpNAV, _jtDepositPreOpNAV, _stRedeemPreOpNAV, _jtRedeemPreOpNAV
             );
 
         // Collect any protocol fees accrued
@@ -682,17 +685,19 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     /**
      * @notice Invokes the accountant to do a post-operation (deposit and withdrawal) NAV sync and checks the market's coverage requirement is satisfied
      * @dev Should be called on every NAV mutating user operation that requires a coverage check: ST deposit and JT withdrawal
+     * @param _op The operation being executed in between the pre and post synchronizations
      * @param _stDepositPreOpNAV The pre-op NAV deposited into the senior tranche (0 if not a ST deposit)
      * @param _jtDepositPreOpNAV The pre-op NAV deposited into the junior tranche (0 if not a JT deposit)
-     * @param _stWithdrawPreOpNAV The pre-op NAV withdrawn from the senior tranche's raw NAV
-     * @param _jtWithdrawPreOpNAV The pre-op NAV withdrawn from the junior tranche's raw NAV
+     * @param _stRedeemPreOpNAV The pre-op NAV withdrawn from the senior tranche's raw NAV
+     * @param _jtRedeemPreOpNAV The pre-op NAV withdrawn from the junior tranche's raw NAV
      * @return state The synced NAV, impermanent loss, and fee accounting containing all mark to market accounting data
      */
     function _postOpSyncTrancheAccountingAndEnforceCoverage(
+        Operation _op,
         NAV_UNIT _stDepositPreOpNAV,
         NAV_UNIT _jtDepositPreOpNAV,
-        NAV_UNIT _stWithdrawPreOpNAV,
-        NAV_UNIT _jtWithdrawPreOpNAV
+        NAV_UNIT _stRedeemPreOpNAV,
+        NAV_UNIT _jtRedeemPreOpNAV
     )
         internal
         virtual
@@ -701,7 +706,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         // Execute the post-op sync on the accountant
         state = _accountant()
             .postOpSyncTrancheAccountingAndEnforceCoverage(
-                _getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV(), _stDepositPreOpNAV, _jtDepositPreOpNAV, _stWithdrawPreOpNAV, _jtWithdrawPreOpNAV
+                _op, _getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV(), _stDepositPreOpNAV, _jtDepositPreOpNAV, _stRedeemPreOpNAV, _jtRedeemPreOpNAV
             );
 
         // Collect any protocol fees accrued
@@ -806,7 +811,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
     )
         internal
         virtual
-        returns (NAV_UNIT stWithdrawnPreOpNAV, NAV_UNIT jtWithdrawnPreOpNAV)
+        returns (NAV_UNIT stRedeemPreOpNAV, NAV_UNIT jtRedeemPreOpNAV)
     {
         // Cache the individual tranche claims
         TRANCHE_UNIT stAssetsToClaim = _claims.stAssets;
@@ -814,11 +819,11 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
 
         // Get the pre-op NAVs to be withdrawn and Withdraw the ST and JT assets from each tranche if non-zero
         if (stAssetsToClaim != ZERO_TRANCHE_UNITS) {
-            stWithdrawnPreOpNAV = stConvertTrancheUnitsToNAVUnits(stAssetsToClaim);
+            stRedeemPreOpNAV = stConvertTrancheUnitsToNAVUnits(stAssetsToClaim);
             _stWithdrawAssets(stAssetsToClaim, _receiver);
         }
         if (jtAssetsToClaim != ZERO_TRANCHE_UNITS) {
-            jtWithdrawnPreOpNAV = jtConvertTrancheUnitsToNAVUnits(jtAssetsToClaim);
+            jtRedeemPreOpNAV = jtConvertTrancheUnitsToNAVUnits(jtAssetsToClaim);
             _jtWithdrawAssets(jtAssetsToClaim, _receiver);
         }
     }
