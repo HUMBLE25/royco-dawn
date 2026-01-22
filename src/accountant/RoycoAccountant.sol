@@ -153,7 +153,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         // For withdrawals, ST and JT NAV can be withdrawn (coverage applied, yield sharing, IL repayments, etc.)
         // A simultaneous deposit and withdrawal is impossible
         require(
-            (_stDepositedNAV > ZERO_NAV_UNITS ^ _jtDepositedNAV > ZERO_NAV_UNITS) ^ (_stWithdrawnNAV > ZERO_NAV_UNITS || _jtWithdrawnNAV > ZERO_NAV_UNITS),
+            ((_stDepositedNAV > ZERO_NAV_UNITS) ^ (_jtDepositedNAV > ZERO_NAV_UNITS)) ^ (_stWithdrawnNAV > ZERO_NAV_UNITS || _jtWithdrawnNAV > ZERO_NAV_UNITS),
             INVALID_POST_OP_STATE(_op)
         );
 
