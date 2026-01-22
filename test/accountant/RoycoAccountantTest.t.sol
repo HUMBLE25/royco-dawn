@@ -784,19 +784,19 @@ contract RoycoAccountantTest is BaseTest {
         _initializeAccountantState(100e18, 50e18);
 
         vm.prank(MOCK_KERNEL);
-        vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.INVALID_POST_OP_STATE.selector, Operation.ST_INCREASE_NAV));
+        vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.INVALID_POST_OP_NAVS.selector, Operation.ST_INCREASE_NAV));
         accountant.postOpSyncTrancheAccounting(_nav(90e18), _nav(50e18), Operation.ST_INCREASE_NAV);
 
         vm.prank(MOCK_KERNEL);
-        vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.INVALID_POST_OP_STATE.selector, Operation.JT_INCREASE_NAV));
+        vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.INVALID_POST_OP_NAVS.selector, Operation.JT_INCREASE_NAV));
         accountant.postOpSyncTrancheAccounting(_nav(100e18), _nav(40e18), Operation.JT_INCREASE_NAV);
 
         vm.prank(MOCK_KERNEL);
-        vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.INVALID_POST_OP_STATE.selector, Operation.ST_DECREASE_NAV));
+        vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.INVALID_POST_OP_NAVS.selector, Operation.ST_DECREASE_NAV));
         accountant.postOpSyncTrancheAccounting(_nav(110e18), _nav(50e18), Operation.ST_DECREASE_NAV);
 
         vm.prank(MOCK_KERNEL);
-        vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.INVALID_POST_OP_STATE.selector, Operation.JT_DECREASE_NAV));
+        vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.INVALID_POST_OP_NAVS.selector, Operation.JT_DECREASE_NAV));
         accountant.postOpSyncTrancheAccounting(_nav(100e18), _nav(60e18), Operation.JT_DECREASE_NAV);
     }
 

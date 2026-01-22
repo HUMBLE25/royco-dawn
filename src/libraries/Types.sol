@@ -73,21 +73,6 @@ struct SyncedAccountingState {
 }
 
 /**
- * @title Operation
- * @dev Defines the type of operation being executed by the user
- * @custom:type ST_INCREASE_NAV - An operation that will potentially increase the NAV of ST
- * @custom:type ST_DECREASE_NAV - An operation that will potentially decrease the NAV of ST
- * @custom:type JT_INCREASE_NAV - An operation that will potentially increase the NAV of JT
- * @custom:type JT_DECREASE_NAV - An operation that will potentially decrease the NAV of JT
- */
-enum Operation {
-    ST_INCREASE_NAV,
-    ST_DECREASE_NAV,
-    JT_INCREASE_NAV,
-    JT_DECREASE_NAV
-}
-
-/**
  * @title Action
  * @dev Defines the action being executed by the user
  * @custom:type DEPOSIT - Depositing assets for shares into the tranche

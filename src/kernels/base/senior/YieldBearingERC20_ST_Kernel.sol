@@ -29,10 +29,16 @@ abstract contract YieldBearingERC20_ST_Kernel is RoycoKernel {
     SharesRedemptionModel public constant ST_REQUEST_REDEEM_SHARES_BEHAVIOR = SharesRedemptionModel.BURN_ON_CLAIM_REDEEM;
 
     /// @inheritdoc IRoycoKernel
-    function stPreviewDeposit(TRANCHE_UNIT _assets) external view override returns (SyncedAccountingState memory stateBeforeDeposit, NAV_UNIT valueAllocated) {
-        // Convert the yield bearing assets deposited to NAV units and preview a sync to get the current NAV to mint shares at for the senior tranche
-        valueAllocated = stConvertTrancheUnitsToNAVUnits(_assets);
+    function stPreviewDeposit(TRANCHE_UNIT _stAssets)
+        external
+        view
+        override
+        returns (SyncedAccountingState memory stateBeforeDeposit, NAV_UNIT valueAllocated)
+    {
+        // Preview a sync to get the current NAV to mint shares at for the senior tranche
         stateBeforeDeposit = _previewSyncTrancheAccounting();
+        // Convert the yield bearing assets deposited to NAV units
+        valueAllocated = stConvertTrancheUnitsToNAVUnits(_stAssets);
     }
 
     /// @inheritdoc IRoycoKernel
@@ -65,7 +71,9 @@ abstract contract YieldBearingERC20_ST_Kernel is RoycoKernel {
     }
 
     /// @inheritdoc RoycoKernel
-    function _stDepositAssets(TRANCHE_UNIT _stAssets) internal override(RoycoKernel) {
+    function _stDepositAssets(TRANCHE_UNIT _stAssets) internal override(RoycoKernel) returns (NAV_UNIT stDepositPreOpNAV) {
+        // No fees or slippage involved in depositing
+        stDepositPreOpNAV = stConvertTrancheUnitsToNAVUnits(_stAssets);
         // The tranche vault has already transfered the assets to the kernel, so simply credit those assets to the senior tranche
         YieldBearingERC20KernelState storage $ = YieldBearingERC20KernelStorageLib._getYieldBearingERC20KernelStorage();
         $.stOwnedYieldBearingAssets = $.stOwnedYieldBearingAssets + _stAssets;

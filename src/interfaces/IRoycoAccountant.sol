@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import { MarketState, Operation, SyncedAccountingState } from "../libraries/Types.sol";
+import { MarketState, SyncedAccountingState } from "../libraries/Types.sol";
 import { NAV_UNIT } from "../libraries/Units.sol";
 
 /**
@@ -106,17 +106,10 @@ interface IRoycoAccountant {
     event FixedTermCommenced(uint32 fixedTermEndTimestamp);
 
     /**
-     * @notice Emitted when a pre-operation tranche accounting synchronization is executed
+     * @notice Emitted when a pre or post operation tranche accounting synchronization is executed
      * @param resultingState The resulting market state after synchronizing the tranche accounting
      */
-    event PreOpTrancheAccountingSynced(SyncedAccountingState resultingState);
-
-    /**
-     * @notice Emitted when a post-operation tranche accounting synchronization is executed
-     * @param op The operation executed right before this accounting synchronization
-     * @param resultingState The resulting market state after synchronizing the tranche accounting
-     */
-    event PostOpTrancheAccountingSynced(Operation op, SyncedAccountingState resultingState);
+    event TrancheAccountingSynced(SyncedAccountingState resultingState);
 
     /**
      * @notice Emitted when the YDM (Yield Distribution Model) address is updated
@@ -187,8 +180,8 @@ interface IRoycoAccountant {
     /// @notice Thrown when the sum of the raw NAVs don't equal the sum of the effective NAVs of both tranches
     error NAV_CONSERVATION_VIOLATION();
 
-    /// @notice Thrown when an operation results in an invalid NAV state in the post-operation synchronization
-    error INVALID_POST_OP_STATE(Operation _op);
+    /// @notice Thrown when the NAV values passed into post-op sync are invalid
+    error INVALID_POST_OP_NAVS();
 
     /// @notice Thrown when the market's coverage requirement is unsatisfied
     error COVERAGE_REQUIREMENT_UNSATISFIED();
@@ -215,26 +208,46 @@ interface IRoycoAccountant {
     /**
      * @notice Applies post-operation (deposit and withdrawal) raw NAV deltas to effective NAV checkpoints
      * @dev Interprets deltas strictly as deposits/withdrawals with no yield or coverage logic
-     * @param _stRawNAV The senior tranche's current raw NAV: the pure value of its invested assets
-     * @param _jtRawNAV The junior tranche's current raw NAV: the pure value of its invested assets
-     * @param _op The operation being executed in between the pre and post synchronizations
+     * @dev Exactly one of the following must be true: ST deposited, JT deposited, or withdrawal occurred
+     * @param _stPostOpRawNAV The post-op senior tranche's raw NAV
+     * @param _jtPostOpRawNAV The post-op junior tranche's raw NAV
+     * @param _stDepositPreOpNAV The pre-op NAV deposited into the senior tranche (0 if not a ST deposit)
+     * @param _jtDepositPreOpNAV The pre-op NAV deposited into the junior tranche (0 if not a JT deposit)
+     * @param _stWithdrawPreOpNAV The pre-op NAV withdrawn from the senior tranche's raw NAV
+     * @param _jtWithdrawPreOpNAV The pre-op NAV withdrawn from the junior tranche's raw NAV
      * @return state The synced NAV, impermanent loss, and fee accounting containing all mark to market accounting data
      */
-    function postOpSyncTrancheAccounting(NAV_UNIT _stRawNAV, NAV_UNIT _jtRawNAV, Operation _op) external returns (SyncedAccountingState memory state);
+    function postOpSyncTrancheAccounting(
+        NAV_UNIT _stPostOpRawNAV,
+        NAV_UNIT _jtPostOpRawNAV,
+        NAV_UNIT _stDepositPreOpNAV,
+        NAV_UNIT _jtDepositPreOpNAV,
+        NAV_UNIT _stWithdrawPreOpNAV,
+        NAV_UNIT _jtWithdrawPreOpNAV
+    )
+        external
+        returns (SyncedAccountingState memory state);
 
     /**
      * @notice Applies post-operation (deposit and withdrawal) raw NAV deltas to effective NAV checkpoints and enforces the coverage condition of the market
      * @dev Interprets deltas strictly as deposits/withdrawals with no yield or coverage logic
      * @dev Reverts if the coverage requirement is unsatisfied
-     * @param _stRawNAV The senior tranche's current raw NAV: the pure value of its invested assets
-     * @param _jtRawNAV The junior tranche's current raw NAV: the pure value of its invested assets
-     * @param _op The operation being executed in between the pre and post synchronizations
+     * @dev Exactly one of the following must be true: ST deposited, JT deposited, or withdrawal occurred
+     * @param _stPostOpRawNAV The post-op senior tranche's raw NAV
+     * @param _jtPostOpRawNAV The post-op junior tranche's raw NAV
+     * @param _stDepositPreOpNAV The pre-op NAV deposited into the senior tranche (0 if not a ST deposit)
+     * @param _jtDepositPreOpNAV The pre-op NAV deposited into the junior tranche (0 if not a JT deposit)
+     * @param _stWithdrawPreOpNAV The pre-op NAV withdrawn from the senior tranche's raw NAV
+     * @param _jtWithdrawPreOpNAV The pre-op NAV withdrawn from the junior tranche's raw NAV
      * @return state The synced NAV, impermanent loss, and fee accounting containing all mark to market accounting data
      */
     function postOpSyncTrancheAccountingAndEnforceCoverage(
-        NAV_UNIT _stRawNAV,
-        NAV_UNIT _jtRawNAV,
-        Operation _op
+        NAV_UNIT _stPostOpRawNAV,
+        NAV_UNIT _jtPostOpRawNAV,
+        NAV_UNIT _stDepositPreOpNAV,
+        NAV_UNIT _jtDepositPreOpNAV,
+        NAV_UNIT _stWithdrawPreOpNAV,
+        NAV_UNIT _jtWithdrawPreOpNAV
     )
         external
         returns (SyncedAccountingState memory state);

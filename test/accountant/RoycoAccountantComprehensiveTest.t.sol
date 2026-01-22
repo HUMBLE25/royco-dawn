@@ -1216,7 +1216,7 @@ contract RoycoAccountantRevertTest is BaseTest {
     }
 
     // =========================================================================
-    // INVALID_POST_OP_STATE REVERT TESTS
+    // INVALID_POST_OP_NAVS REVERT TESTS
     // =========================================================================
 
     /// @notice Test ST_INCREASE_NAV reverts when deltaST < 0
@@ -1226,7 +1226,7 @@ contract RoycoAccountantRevertTest is BaseTest {
 
         // Try to do ST_INCREASE_NAV with decreasing ST
         vm.prank(MOCK_KERNEL);
-        vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.INVALID_POST_OP_STATE.selector, Operation.ST_INCREASE_NAV));
+        vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.INVALID_POST_OP_NAVS.selector, Operation.ST_INCREASE_NAV));
         accountant.postOpSyncTrancheAccounting(_nav(90e18), _nav(50e18), Operation.ST_INCREASE_NAV);
     }
 
@@ -1237,7 +1237,7 @@ contract RoycoAccountantRevertTest is BaseTest {
 
         // Try to do JT_INCREASE_NAV with decreasing JT
         vm.prank(MOCK_KERNEL);
-        vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.INVALID_POST_OP_STATE.selector, Operation.JT_INCREASE_NAV));
+        vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.INVALID_POST_OP_NAVS.selector, Operation.JT_INCREASE_NAV));
         accountant.postOpSyncTrancheAccounting(_nav(100e18), _nav(40e18), Operation.JT_INCREASE_NAV);
     }
 
@@ -1248,7 +1248,7 @@ contract RoycoAccountantRevertTest is BaseTest {
 
         // Try to do ST_DECREASE_NAV with increasing ST
         vm.prank(MOCK_KERNEL);
-        vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.INVALID_POST_OP_STATE.selector, Operation.ST_DECREASE_NAV));
+        vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.INVALID_POST_OP_NAVS.selector, Operation.ST_DECREASE_NAV));
         accountant.postOpSyncTrancheAccounting(_nav(110e18), _nav(50e18), Operation.ST_DECREASE_NAV);
     }
 
@@ -1259,7 +1259,7 @@ contract RoycoAccountantRevertTest is BaseTest {
 
         // ST_DECREASE_NAV requires both deltas <= 0
         vm.prank(MOCK_KERNEL);
-        vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.INVALID_POST_OP_STATE.selector, Operation.ST_DECREASE_NAV));
+        vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.INVALID_POST_OP_NAVS.selector, Operation.ST_DECREASE_NAV));
         accountant.postOpSyncTrancheAccounting(_nav(90e18), _nav(60e18), Operation.ST_DECREASE_NAV);
     }
 
@@ -1270,7 +1270,7 @@ contract RoycoAccountantRevertTest is BaseTest {
 
         // Try to do JT_DECREASE_NAV with increasing JT
         vm.prank(MOCK_KERNEL);
-        vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.INVALID_POST_OP_STATE.selector, Operation.JT_DECREASE_NAV));
+        vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.INVALID_POST_OP_NAVS.selector, Operation.JT_DECREASE_NAV));
         accountant.postOpSyncTrancheAccounting(_nav(100e18), _nav(60e18), Operation.JT_DECREASE_NAV);
     }
 
@@ -1281,7 +1281,7 @@ contract RoycoAccountantRevertTest is BaseTest {
 
         // JT_DECREASE_NAV requires both deltas <= 0
         vm.prank(MOCK_KERNEL);
-        vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.INVALID_POST_OP_STATE.selector, Operation.JT_DECREASE_NAV));
+        vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.INVALID_POST_OP_NAVS.selector, Operation.JT_DECREASE_NAV));
         accountant.postOpSyncTrancheAccounting(_nav(110e18), _nav(40e18), Operation.JT_DECREASE_NAV);
     }
 
@@ -1518,7 +1518,7 @@ contract RoycoAccountantRevertTest is BaseTest {
 
         if (shouldRevert) {
             vm.prank(MOCK_KERNEL);
-            vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.INVALID_POST_OP_STATE.selector, op));
+            vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.INVALID_POST_OP_NAVS.selector, op));
             accountant.postOpSyncTrancheAccounting(_nav(newST), _nav(newJT), op);
         }
     }
