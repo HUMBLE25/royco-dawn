@@ -616,15 +616,27 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         address protocolFeeRecipient = $.protocolFeeRecipient;
         uint256 stTotalTrancheSharesAfterMintingFees;
         uint256 jtTotalTrancheSharesAfterMintingFees;
-        // If ST fees were accrued or we need to get total shares for ST, mint ST protocol fee shares to the protocol fee recipient
-        if (state.stProtocolFeeAccrued != ZERO_NAV_UNITS || _trancheType == TrancheType.SENIOR) {
-            (, stTotalTrancheSharesAfterMintingFees) =
-                IRoycoVaultTranche(SENIOR_TRANCHE).mintProtocolFeeShares(state.stProtocolFeeAccrued, state.stEffectiveNAV, protocolFeeRecipient);
+        // If the call needs to get total supply after (potentially) minting fees for the senior tranche
+        if (_trancheType == TrancheType.SENIOR) {
+            // If ST fees were accrued, mint ST protocol fee shares to the protocol fee recipient and get the resultant total supply
+            if (state.stProtocolFeeAccrued != ZERO_NAV_UNITS) {
+                (, stTotalTrancheSharesAfterMintingFees) =
+                    IRoycoVaultTranche(SENIOR_TRANCHE).mintProtocolFeeShares(state.stProtocolFeeAccrued, state.stEffectiveNAV, protocolFeeRecipient);
+                // Else, simply get the ST total supply since no fee shares need to be minted
+            } else {
+                stTotalTrancheSharesAfterMintingFees = IRoycoVaultTranche(SENIOR_TRANCHE).totalSupply();
+            }
         }
-        // If JT fees were accrued or we need to get total shares for JT, mint JT protocol fee shares to the protocol fee recipient
-        if (state.jtProtocolFeeAccrued != ZERO_NAV_UNITS || _trancheType == TrancheType.JUNIOR) {
-            (, jtTotalTrancheSharesAfterMintingFees) =
-                IRoycoVaultTranche(JUNIOR_TRANCHE).mintProtocolFeeShares(state.jtProtocolFeeAccrued, state.jtEffectiveNAV, protocolFeeRecipient);
+        // If the call needs to get total supply after (potentially) minting fees for the junior tranche
+        if (_trancheType == TrancheType.JUNIOR) {
+            // If JT fees were accrued, mint JT protocol fee shares to the protocol fee recipient and get the resultant total supply
+            if (state.jtProtocolFeeAccrued != ZERO_NAV_UNITS) {
+                (, jtTotalTrancheSharesAfterMintingFees) =
+                    IRoycoVaultTranche(JUNIOR_TRANCHE).mintProtocolFeeShares(state.jtProtocolFeeAccrued, state.jtEffectiveNAV, protocolFeeRecipient);
+                // Else, simply get the JT total supply since no fee shares need to be minted
+            } else {
+                jtTotalTrancheSharesAfterMintingFees = IRoycoVaultTranche(JUNIOR_TRANCHE).totalSupply();
+            }
         }
 
         // Set the total tranche shares to the specified tranche's shares after minting fees
