@@ -152,7 +152,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         // For deposits, either ST or JT can deposit and increase the NAV (not both)
         // For withdrawals, ST and JT NAV can be withdrawn (coverage applied, yield sharing, IL repayments, etc.)
         // A simultaneous deposit and withdrawal is impossible
-        require((_stDepositedNAV > 0 ^ _jtDepositedNAV > 0) ^ (_stWithdrawnNAV > 0 || _jtWithdrawnNAV > 0));
+        require((_stDepositedNAV > 0 ^ _jtDepositedNAV > 0) ^ (_stWithdrawnNAV > 0 || _jtWithdrawnNAV > 0), INVALID_POST_OP_STATE(_op));
 
         // Get the storage pointer to the accountant state
         RoycoAccountantState storage $ = _getRoycoAccountantStorage();
@@ -168,16 +168,20 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
 
         // Apply the effects of the actual operation that was executed (ST/JT deposit or withdrawal)
         if (_op == Operation.ST_INCREASE_NAV) {
+            require(_stDepositedNAV > 0, INVALID_POST_OP_STATE(_op));
             // The raw NAV is meant to be increased by the ST NAV deposited
             stRawNAV = stRawNAV + _stDepositedNAV;
             // New ST deposits are treated as an addition to the future ST exposure
             stEffectiveNAV = stEffectiveNAV + _stDepositedNAV;
         } else if (_op == Operation.JT_INCREASE_NAV) {
+            require(_jtDepositedNAV > 0, INVALID_POST_OP_STATE(_op));
             // The raw NAV is meant to be increased by the JT NAV deposited
             jtRawNAV = jtRawNAV + _jtDepositedNAV;
             // New JT deposits are treated as an addition to the future loss-absorption buffer
             jtEffectiveNAV = jtEffectiveNAV + _jtDepositedNAV;
         } else {
+            require(_stWithdrawnNAV > 0 || _jtWithdrawnNAV > 0, INVALID_POST_OP_STATE(_op));
+
             // The raw NAVs are meant to be decreased by the NAV withdrawn from each tranche
             if (_stWithdrawnNAV != ZERO_NAV_UNITS) stRawNAV = stRawNAV - _stWithdrawnNAV;
             if (_jtWithdrawnNAV != ZERO_NAV_UNITS) jtRawNAV = jtRawNAV - _jtWithdrawnNAV;
