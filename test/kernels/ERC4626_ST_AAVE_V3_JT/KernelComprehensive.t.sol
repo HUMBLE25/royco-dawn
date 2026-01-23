@@ -3757,7 +3757,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         assertEq(uint256(state.marketState), uint256(MarketState.PERPETUAL), "Should be in PERPETUAL");
 
         // Check max withdrawable
-        (NAV_UNIT maxSTWithdrawNAV,,,) = KERNEL.stMaxWithdrawable(BOB_ADDRESS);
+        (NAV_UNIT maxSTWithdrawNAV,,,,) = KERNEL.stMaxWithdrawable(BOB_ADDRESS);
         assertTrue(toUint256(maxSTWithdrawNAV) > 0, "Max ST withdraw should be positive in PERPETUAL");
 
         // Check max JT deposit

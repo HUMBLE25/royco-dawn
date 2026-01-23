@@ -173,11 +173,18 @@ interface IRoycoKernel {
      * @return claimOnJtNAV The notional claims on JT assets that the senior tranche has denominated in kernel's NAV units
      * @return stMaxWithdrawableNAV The maximum amount of assets that can be withdrawn from the senior tranche, denominated in the kernel's NAV units
      * @return jtMaxWithdrawableNAV The maximum amount of assets that can be withdrawn from the junior tranche, denominated in the kernel's NAV units
+     * @return totalTrancheSharesAfterMintingFees The total number of shares that exist in the senior tranche after minting any protocol fee shares post-sync
      */
     function stMaxWithdrawable(address _owner)
         external
         view
-        returns (NAV_UNIT claimOnStNAV, NAV_UNIT claimOnJtNAV, NAV_UNIT stMaxWithdrawableNAV, NAV_UNIT jtMaxWithdrawableNAV);
+        returns (
+            NAV_UNIT claimOnStNAV,
+            NAV_UNIT claimOnJtNAV,
+            NAV_UNIT stMaxWithdrawableNAV,
+            NAV_UNIT jtMaxWithdrawableNAV,
+            uint256 totalTrancheSharesAfterMintingFees
+        );
 
     /**
      * @notice Previews the deposit of a specified amount of assets into the senior tranche
@@ -225,7 +232,7 @@ interface IRoycoKernel {
      * @param _controller The controller that is allowed to operate the redemption
      * @param _receiver The address that is receiving the assets
      * @param _redemptionRequestId The redemption request identifier if the redemption is asynchronous. Ignore if the redemption is synchronous.
-     * @return claims The distribution of assets that were transferred to the receiver on redemption, denominated in the respective tranches' tranche units
+     * @return claims The distribution of assets that were transferred to the receiver on redemption, denominated in the respective tranches' tranche units, including virtual shares
      * @return metadata The format prefixed metadata of the redemption
      */
     function stRedeem(
@@ -251,11 +258,18 @@ interface IRoycoKernel {
      * @return claimOnJtNAV The notional claims on JT assets that the junior tranche has denominated in kernel's NAV units
      * @return stMaxWithdrawableNAV The maximum amount of assets that can be withdrawn from the senior tranche, denominated in the kernel's NAV units
      * @return jtMaxWithdrawableNAV The maximum amount of assets that can be withdrawn from the junior tranche, denominated in the kernel's NAV units
+     * @return totalTrancheSharesAfterMintingFees The total number of shares that exist in the junior tranche after minting any protocol fee shares post-sync, including virtual shares
      */
     function jtMaxWithdrawable(address _owner)
         external
         view
-        returns (NAV_UNIT claimOnStNAV, NAV_UNIT claimOnJtNAV, NAV_UNIT stMaxWithdrawableNAV, NAV_UNIT jtMaxWithdrawableNAV);
+        returns (
+            NAV_UNIT claimOnStNAV,
+            NAV_UNIT claimOnJtNAV,
+            NAV_UNIT stMaxWithdrawableNAV,
+            NAV_UNIT jtMaxWithdrawableNAV,
+            uint256 totalTrancheSharesAfterMintingFees
+        );
 
     /**
      * @notice Previews the deposit of a specified amount of assets into the junior tranche

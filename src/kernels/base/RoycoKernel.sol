@@ -170,13 +170,21 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         view
         virtual
         override(IRoycoKernel)
-        returns (NAV_UNIT claimOnStNAV, NAV_UNIT claimOnJtNAV, NAV_UNIT stMaxWithdrawableNAV, NAV_UNIT jtMaxWithdrawableNAV)
+        returns (
+            NAV_UNIT claimOnStNAV,
+            NAV_UNIT claimOnJtNAV,
+            NAV_UNIT stMaxWithdrawableNAV,
+            NAV_UNIT jtMaxWithdrawableNAV,
+            uint256 totalTrancheSharesAfterMintingFees
+        )
     {
-        (SyncedAccountingState memory state, AssetClaims memory stNotionalClaims,) = previewSyncTrancheAccounting(TrancheType.SENIOR);
+        SyncedAccountingState memory state;
+        AssetClaims memory stNotionalClaims;
+        (state, stNotionalClaims, totalTrancheSharesAfterMintingFees) = previewSyncTrancheAccounting(TrancheType.SENIOR);
 
         // If the market is in a state where ST withdrawals are not allowed, return zero claims
         if (state.marketState != MarketState.PERPETUAL) {
-            return (ZERO_NAV_UNITS, ZERO_NAV_UNITS, ZERO_NAV_UNITS, ZERO_NAV_UNITS);
+            return (ZERO_NAV_UNITS, ZERO_NAV_UNITS, ZERO_NAV_UNITS, ZERO_NAV_UNITS, 0);
         }
 
         // Get the total claims the senior tranche has on each tranche's assets
@@ -204,10 +212,18 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         view
         virtual
         override(IRoycoKernel)
-        returns (NAV_UNIT claimOnStNAV, NAV_UNIT claimOnJtNAV, NAV_UNIT stMaxWithdrawableNAV, NAV_UNIT jtMaxWithdrawableNAV)
+        returns (
+            NAV_UNIT claimOnStNAV,
+            NAV_UNIT claimOnJtNAV,
+            NAV_UNIT stMaxWithdrawableNAV,
+            NAV_UNIT jtMaxWithdrawableNAV,
+            uint256 totalTrancheSharesAfterMintingFees
+        )
     {
         // Get the total claims the junior tranche has on each tranche's assets
-        (SyncedAccountingState memory state, AssetClaims memory jtNotionalClaims,) = previewSyncTrancheAccounting(TrancheType.JUNIOR);
+        SyncedAccountingState memory state;
+        AssetClaims memory jtNotionalClaims;
+        (state, jtNotionalClaims, totalTrancheSharesAfterMintingFees) = previewSyncTrancheAccounting(TrancheType.JUNIOR);
 
         // Get the max withdrawable ST and JT assets in NAV units from the accountant consider coverage requirement
         (, NAV_UNIT stClaimableGivenCoverage, NAV_UNIT jtClaimableGivenCoverage) = _accountant()

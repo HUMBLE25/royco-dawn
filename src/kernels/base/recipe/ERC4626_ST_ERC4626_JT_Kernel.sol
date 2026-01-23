@@ -53,21 +53,29 @@ abstract contract ERC4626_ST_ERC4626_JT_Kernel is ERC4626_ST_Kernel, ERC4626_JT_
         view
         virtual
         override(RoycoKernel)
-        returns (NAV_UNIT claimOnStNAV, NAV_UNIT claimOnJtNAV, NAV_UNIT stMaxWithdrawableNAV, NAV_UNIT jtMaxWithdrawableNAV)
+        returns (
+            NAV_UNIT claimOnStNAV,
+            NAV_UNIT claimOnJtNAV,
+            NAV_UNIT stMaxWithdrawableNAV,
+            NAV_UNIT jtMaxWithdrawableNAV,
+            uint256 totalTrancheSharesAfterMintingFees
+        )
     {
         // If both tranches are in different ERC4626 vaults, double counting is not possible
         if (ST_VAULT != JT_VAULT) return super.stMaxWithdrawable(_owner);
 
-        (SyncedAccountingState memory state, AssetClaims memory stNotionalClaims,) = previewSyncTrancheAccounting(TrancheType.SENIOR);
+        SyncedAccountingState memory state;
+        AssetClaims memory stNotionalClaims;
+        (state, stNotionalClaims, totalTrancheSharesAfterMintingFees) = previewSyncTrancheAccounting(TrancheType.SENIOR);
 
         // If the market is not in a perpetual state, ST withdrawals are disabled
         if (state.marketState != MarketState.PERPETUAL) {
-            return (ZERO_NAV_UNITS, ZERO_NAV_UNITS, ZERO_NAV_UNITS, ZERO_NAV_UNITS);
+            return (ZERO_NAV_UNITS, ZERO_NAV_UNITS, ZERO_NAV_UNITS, ZERO_NAV_UNITS, 0);
         }
 
         // Get the total claims the senior tranche has on each tranche's assets
         NAV_UNIT stTotalClaimsNAV = stNotionalClaims.nav;
-        if (stTotalClaimsNAV == ZERO_NAV_UNITS) return (ZERO_NAV_UNITS, ZERO_NAV_UNITS, ZERO_NAV_UNITS, ZERO_NAV_UNITS);
+        if (stTotalClaimsNAV == ZERO_NAV_UNITS) return (ZERO_NAV_UNITS, ZERO_NAV_UNITS, ZERO_NAV_UNITS, ZERO_NAV_UNITS, 0);
         claimOnStNAV = stConvertTrancheUnitsToNAVUnits(stNotionalClaims.stAssets);
         claimOnJtNAV = jtConvertTrancheUnitsToNAVUnits(stNotionalClaims.jtAssets);
 
@@ -85,15 +93,23 @@ abstract contract ERC4626_ST_ERC4626_JT_Kernel is ERC4626_ST_Kernel, ERC4626_JT_
         view
         virtual
         override(RoycoKernel)
-        returns (NAV_UNIT claimOnStNAV, NAV_UNIT claimOnJtNAV, NAV_UNIT stMaxWithdrawableNAV, NAV_UNIT jtMaxWithdrawableNAV)
+        returns (
+            NAV_UNIT claimOnStNAV,
+            NAV_UNIT claimOnJtNAV,
+            NAV_UNIT stMaxWithdrawableNAV,
+            NAV_UNIT jtMaxWithdrawableNAV,
+            uint256 totalTrancheSharesAfterMintingFees
+        )
     {
         // If both tranches are in different ERC4626 vaults, double counting is not possible
         if (ST_VAULT != JT_VAULT) return super.jtMaxWithdrawable(_owner);
 
         // Get the total claims the junior tranche has on each tranche's assets
-        (SyncedAccountingState memory state, AssetClaims memory jtNotionalClaims,) = previewSyncTrancheAccounting(TrancheType.JUNIOR);
+        SyncedAccountingState memory state;
+        AssetClaims memory jtNotionalClaims;
+        (state, jtNotionalClaims, totalTrancheSharesAfterMintingFees) = previewSyncTrancheAccounting(TrancheType.JUNIOR);
         NAV_UNIT jtTotalClaimsNAV = jtNotionalClaims.nav;
-        if (jtTotalClaimsNAV == ZERO_NAV_UNITS) return (ZERO_NAV_UNITS, ZERO_NAV_UNITS, ZERO_NAV_UNITS, ZERO_NAV_UNITS);
+        if (jtTotalClaimsNAV == ZERO_NAV_UNITS) return (ZERO_NAV_UNITS, ZERO_NAV_UNITS, ZERO_NAV_UNITS, ZERO_NAV_UNITS, 0);
 
         // Get the max withdrawable ST and JT assets in NAV units from the accountant consider coverage requirement
         (, NAV_UNIT stClaimableGivenCoverage, NAV_UNIT jtClaimableGivenCoverage) = _accountant()

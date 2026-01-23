@@ -713,16 +713,15 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
      */
     function _maxRedeem(address _owner, uint256 _sharesOwned) internal view returns (uint256 shares) {
         // Get the notional claims and the max withdrawable assets for the tranche
-        (NAV_UNIT claimOnStNAV, NAV_UNIT claimOnJtNAV, NAV_UNIT stMaxWithdrawableNAV, NAV_UNIT jtMaxWithdrawableNAV) =
+        (NAV_UNIT claimOnStNAV, NAV_UNIT claimOnJtNAV, NAV_UNIT stMaxWithdrawableNAV, NAV_UNIT jtMaxWithdrawableNAV, uint256 totalSharesAfterMintingFees) =
             (TRANCHE_TYPE() == TrancheType.SENIOR ? IRoycoKernel(kernel()).stMaxWithdrawable(_owner) : IRoycoKernel(kernel()).jtMaxWithdrawable(_owner));
-        uint256 totalShares = _withVirtualShares(totalSupply());
 
         // Calculate the maximum amount of shares that can be redeemed based on the senior and junior constraints
         // If the notional claim of the tranche on the ST or JT assets is zero, ignore the constraints since the tranche has no claims on the assets
         uint256 sharesWithdrawableBasedOnSeniorConstraints =
-            claimOnStNAV == ZERO_NAV_UNITS ? _sharesOwned : totalShares.mulDiv(stMaxWithdrawableNAV, claimOnStNAV, Math.Rounding.Floor);
+            claimOnStNAV == ZERO_NAV_UNITS ? _sharesOwned : totalSharesAfterMintingFees.mulDiv(stMaxWithdrawableNAV, claimOnStNAV, Math.Rounding.Floor);
         uint256 sharesWithdrawableBasedOnJuniorConstraints =
-            claimOnJtNAV == ZERO_NAV_UNITS ? _sharesOwned : totalShares.mulDiv(jtMaxWithdrawableNAV, claimOnJtNAV, Math.Rounding.Floor);
+            claimOnJtNAV == ZERO_NAV_UNITS ? _sharesOwned : totalSharesAfterMintingFees.mulDiv(jtMaxWithdrawableNAV, claimOnJtNAV, Math.Rounding.Floor);
         shares = Math.min(_sharesOwned, Math.min(sharesWithdrawableBasedOnSeniorConstraints, sharesWithdrawableBasedOnJuniorConstraints));
     }
 

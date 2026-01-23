@@ -255,7 +255,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         _depositST(BOB_ADDRESS, stDeposit);
 
-        (NAV_UNIT claimOnST,,,) = KERNEL.stMaxWithdrawable(BOB_ADDRESS);
+        (NAV_UNIT claimOnST,,,,) = KERNEL.stMaxWithdrawable(BOB_ADDRESS);
 
         assertGt(claimOnST, ZERO_NAV_UNITS, "Should have claim on ST");
     }
@@ -265,7 +265,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         _depositJT(ALICE_ADDRESS, _jtDeposit);
 
-        (, NAV_UNIT claimOnJT,,) = KERNEL.jtMaxWithdrawable(ALICE_ADDRESS);
+        (, NAV_UNIT claimOnJT,,,) = KERNEL.jtMaxWithdrawable(ALICE_ADDRESS);
 
         assertGt(claimOnJT, ZERO_NAV_UNITS, "Should have claim on JT");
     }
