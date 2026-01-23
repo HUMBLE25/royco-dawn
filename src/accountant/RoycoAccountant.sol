@@ -519,7 +519,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
                 // If there was a net JT gain, reduce it by the amount of coverage applied and recalculate the protocol fee accrued on the true net gains
                 if (jtNetGain != ZERO_NAV_UNITS) {
                     jtNetGain = jtNetGain.saturatingSub(coverageApplied);
-                    if (jtNetGain != ZERO_NAV_UNITS) jtProtocolFeeAccrued = jtNetGain.mulDiv($.jtProtocolFeeWAD, WAD, Math.Rounding.Floor);
+                    jtProtocolFeeAccrued = jtNetGain.mulDiv($.jtProtocolFeeWAD, WAD, Math.Rounding.Floor);
                 }
                 // Apply the coverage to JT effective NAV
                 jtEffectiveNAV = (jtEffectiveNAV - coverageApplied);
