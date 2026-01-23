@@ -73,7 +73,7 @@ contract PausabilityTestSuite is BaseTest {
             juniorTrancheSymbol: "RJ-sNUSD",
             seniorAsset: SNUSD,
             juniorAsset: SNUSD,
-            minJtCoverageILToEnterFixedTermStateWAD: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE,
+            dustTolerance: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE,
             kernelType: DeployScript.KernelType.YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter,
             kernelSpecificParams: abi.encode(kernelParams),
             protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS,

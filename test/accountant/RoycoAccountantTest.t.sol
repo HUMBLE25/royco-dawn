@@ -61,7 +61,7 @@ contract RoycoAccountantTest is BaseTest {
         uint96 betaWAD,
         address ydm,
         uint24 fixedTermDuration,
-        NAV_UNIT minJtCoverageILToEnterFixedTermState,
+        NAV_UNIT dustTolerance,
         uint64 lltvWAD,
         uint64 jtYieldAtTarget,
         uint64 jtYieldAtFull
@@ -81,7 +81,7 @@ contract RoycoAccountantTest is BaseTest {
             ydmInitializationData: ydmInitData,
             fixedTermDurationSeconds: fixedTermDuration,
             lltvWAD: lltvWAD,
-            minJtCoverageILToEnterFixedTermState: minJtCoverageILToEnterFixedTermState
+            dustTolerance: dustTolerance
         });
 
         bytes memory initData = abi.encodeCall(RoycoAccountant.initialize, (params, address(accessManager)));
@@ -213,7 +213,7 @@ contract RoycoAccountantTest is BaseTest {
             ydmInitializationData: "",
             fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
             lltvWAD: LLTV_WAD,
-            minJtCoverageILToEnterFixedTermState: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
+            dustTolerance: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
         });
 
         bytes memory initData = abi.encodeCall(RoycoAccountant.initialize, (params, address(accessManager)));
@@ -1361,24 +1361,17 @@ contract RoycoAccountantTest is BaseTest {
     function _assertConfigFields(SyncedAccountingState memory state) internal view {
         IRoycoAccountant.RoycoAccountantState memory accountantState = accountant.getState();
 
-        // Verify fixed term fields
-        assertEq(state.fixedTermDurationSeconds, accountantState.fixedTermDurationSeconds, "fixedTermDurationSeconds mismatch");
-
-        // Verify LLTV and coverage fields
-        assertEq(state.lltvWAD, accountantState.lltvWAD, "lltvWAD mismatch");
-        assertEq(state.coverageWAD, accountantState.coverageWAD, "coverageWAD mismatch");
-
         // Verify LTV is computed correctly: LTV = stEffectiveNAV / (stEffectiveNAV + jtEffectiveNAV - stIL)
         uint256 stEff = toUint256(state.stEffectiveNAV);
         uint256 jtEff = toUint256(state.jtEffectiveNAV);
         uint256 stIL = toUint256(state.stImpermanentLoss);
         uint256 expectedLtv = UtilsLib.computeLTV(state.stEffectiveNAV, state.stImpermanentLoss, state.jtEffectiveNAV);
-        assertEq(state.currentLtvWad, expectedLtv, "currentLtvWad mismatch");
+        assertEq(state.ltvWAD, expectedLtv, "ltvWAD mismatch");
 
         // Verify utilization is computed correctly
         uint256 expectedUtil =
             UtilsLib.computeUtilization(state.stRawNAV, state.jtRawNAV, accountantState.betaWAD, accountantState.coverageWAD, state.jtEffectiveNAV);
-        assertEq(state.currentUtilizationWad, expectedUtil, "currentUtilizationWad mismatch");
+        assertEq(state.utilizationWAD, expectedUtil, "utilizationWAD mismatch");
 
         // Verify fixed term end timestamp based on market state
         if (state.marketState == MarketState.PERPETUAL) {

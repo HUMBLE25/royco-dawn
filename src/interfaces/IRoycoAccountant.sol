@@ -21,8 +21,8 @@ interface IRoycoAccountant {
      * @custom:field ydmInitializationData - The data used to initialize the YDM for this market
      * @custom:field fixedTermDurationSeconds - The duration of a fixed term for this market in seconds
      * @custom:field lltvWAD - The liquidation loan to value (LLTV) for this market, scaled to WAD precision
-     * @custom:field minJtCoverageILToEnterFixedTermState - The minimum amount of ST loss that must be covered by JT before transitioning to a fixed term state
-     *               Primarily used for rounding discrepancies in NAVs, and can be safely set to 0 if ST's underlying investment doesn't exhibit this behavior
+     * @custom:field dustTolerance - The dust tolerance in NAV units to account for miniscule deltas in the underlying protocol's NAV calculations
+     *               Primarily used for rounding in NAV calculations, and can be safely set to 0 if the underlying investments don't exhibit this behavior
      */
     struct RoycoAccountantInitParams {
         address kernel;
@@ -34,7 +34,7 @@ interface IRoycoAccountant {
         bytes ydmInitializationData;
         uint24 fixedTermDurationSeconds;
         uint64 lltvWAD;
-        NAV_UNIT minJtCoverageILToEnterFixedTermState;
+        NAV_UNIT dustTolerance;
     }
 
     /**
@@ -64,7 +64,7 @@ interface IRoycoAccountant {
      * @custom:field twJTYieldShareAccruedWAD - The time-weighted junior tranche yield share (YDM output) since the last yield distribution, scaled to WAD precision
      * @custom:field lastAccrualTimestamp - The timestamp at which the time-weighted JT yield share accumulator was last updated
      * @custom:field lastDistributionTimestamp - The timestamp at which the last ST yield distribution occurred
-     * @custom:field minJtCoverageILToEnterFixedTermState - The minimum amount of ST loss that must be covered by JT before transitioning to a fixed term state
+     * @custom:field dustTolerance - The minimum amount of ST loss that must be covered by JT before transitioning to a fixed term state
      *               Primarily used for rounding discrepancies in NAVs, and can be safely set to 0 if ST's underlying investment doesn't exhibit this behavior
      */
     struct RoycoAccountantState {
@@ -88,7 +88,7 @@ interface IRoycoAccountant {
         uint192 twJTYieldShareAccruedWAD;
         uint32 lastAccrualTimestamp;
         uint32 lastDistributionTimestamp;
-        NAV_UNIT minJtCoverageILToEnterFixedTermState;
+        NAV_UNIT dustTolerance;
     }
 
     /**
@@ -155,15 +155,15 @@ interface IRoycoAccountant {
 
     /**
      * @notice Emitted when the minimum amount of ST loss that must be covered by JT before transitioning to a fixed term state is updated
-     * @param minJtCoverageILToEnterFixedTermState The new minimum JT coverage IL required before transitioning to a fixed term state
+     * @param dustTolerance The new minimum JT coverage IL required before transitioning to a fixed term state
      */
-    event MinJtCoverageILToEnterFixedTermStateUpdated(NAV_UNIT minJtCoverageILToEnterFixedTermState);
+    event DustToleranceUpdated(NAV_UNIT dustTolerance);
 
     /**
      * @notice Emitted when JT's coverage loss is realized when transitioning from a fixed term state to a perpetual state
-     * @param jtCoverageLossErased The amount of JT coverage loss realized when transitioning from a fixed term state to a perpetual state
+     * @param jtCoverageILErased The amount of JT coverage loss erased when transitioning from a fixed term state to a perpetual state
      */
-    event JTCoverageLossErased(NAV_UNIT jtCoverageLossErased);
+    event JTCoverageImpermanentLossErased(NAV_UNIT jtCoverageILErased);
 
     /// @notice Thrown when the accountant's coverage config is invalid
     error INVALID_COVERAGE_CONFIG();
@@ -351,12 +351,12 @@ interface IRoycoAccountant {
     function setFixedTermDuration(uint24 _fixedTermDurationSeconds) external;
 
     /**
-     * @notice Updates the minimum amount of ST loss that must be covered by JT before transitioning to a fixed term state
-     * @dev Primarily used for rounding discrepancies in NAVs, and can be safely set to 0 if ST's underlying investment doesn't exhibit this behavior
+     * @notice Updates the dust tolerance in NAV units to account for miniscule deltas in the underlying protocol's NAV calculations, due to rounding
+     * @dev Can be safely set to 0 if the underlying investments do not exhibit rounding behavior
      * @dev Only callable by a designated admin
-     * @param _minJtCoverageILToEnterFixedTermState The new minimum JT coverage IL threshold before entering a fixed term state
+     * @param _dustTolerance The NAV tolerance for rounding discrepancies
      */
-    function setMinJtCoverageILToEnterFixedTermState(NAV_UNIT _minJtCoverageILToEnterFixedTermState) external;
+    function setDustTolerance(NAV_UNIT _dustTolerance) external;
 
     /**
      * @notice Returns the state of the accountant

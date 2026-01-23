@@ -96,7 +96,7 @@ contract RoycoAccountantComprehensiveTest is BaseTest {
         uint96 betaWAD,
         address ydm,
         uint24 fixedTermDuration,
-        NAV_UNIT minJtCoverageILToEnterFixedTermState,
+        NAV_UNIT dustTolerance,
         uint64 lltvWAD,
         uint64 jtYieldAtTarget,
         uint64 jtYieldAtFull
@@ -116,7 +116,7 @@ contract RoycoAccountantComprehensiveTest is BaseTest {
             ydmInitializationData: ydmInitData,
             fixedTermDurationSeconds: fixedTermDuration,
             lltvWAD: lltvWAD,
-            minJtCoverageILToEnterFixedTermState: minJtCoverageILToEnterFixedTermState
+            dustTolerance: dustTolerance
         });
 
         bytes memory initData = abi.encodeCall(RoycoAccountant.initialize, (params, address(accessManager)));
@@ -1163,21 +1163,14 @@ contract RoycoAccountantComprehensiveTest is BaseTest {
     function _assertConfigFields(SyncedAccountingState memory state) internal view {
         IRoycoAccountant.RoycoAccountantState memory accountantState = accountant.getState();
 
-        // Verify fixed term fields
-        assertEq(state.fixedTermDurationSeconds, accountantState.fixedTermDurationSeconds, "fixedTermDurationSeconds mismatch");
-
-        // Verify LLTV and coverage fields
-        assertEq(state.lltvWAD, accountantState.lltvWAD, "lltvWAD mismatch");
-        assertEq(state.coverageWAD, accountantState.coverageWAD, "coverageWAD mismatch");
-
         // Verify LTV is computed correctly
         uint256 expectedLtv = UtilsLib.computeLTV(state.stEffectiveNAV, state.stImpermanentLoss, state.jtEffectiveNAV);
-        assertEq(state.currentLtvWad, expectedLtv, "currentLtvWad mismatch");
+        assertEq(state.ltvWAD, expectedLtv, "ltvWAD mismatch");
 
         // Verify utilization is computed correctly
         uint256 expectedUtil =
             UtilsLib.computeUtilization(state.stRawNAV, state.jtRawNAV, accountantState.betaWAD, accountantState.coverageWAD, state.jtEffectiveNAV);
-        assertEq(state.currentUtilizationWad, expectedUtil, "currentUtilizationWad mismatch");
+        assertEq(state.utilizationWAD, expectedUtil, "utilizationWAD mismatch");
 
         // Verify fixed term end timestamp based on market state
         if (state.marketState == MarketState.PERPETUAL) {
@@ -1233,7 +1226,7 @@ contract RoycoAccountantRevertTest is BaseTest {
         uint96 betaWAD,
         address ydm,
         uint24 fixedTermDuration,
-        NAV_UNIT minJtCoverageILToEnterFixedTermState,
+        NAV_UNIT dustTolerance,
         uint64 lltvWAD
     )
         internal
@@ -1251,7 +1244,7 @@ contract RoycoAccountantRevertTest is BaseTest {
             ydmInitializationData: ydmInitData,
             fixedTermDurationSeconds: fixedTermDuration,
             lltvWAD: lltvWAD,
-            minJtCoverageILToEnterFixedTermState: minJtCoverageILToEnterFixedTermState
+            dustTolerance: dustTolerance
         });
 
         bytes memory initData = abi.encodeCall(RoycoAccountant.initialize, (params, address(accessManager)));
@@ -1406,7 +1399,7 @@ contract RoycoAccountantRevertTest is BaseTest {
             ydmInitializationData: ydmInitData,
             fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
             lltvWAD: LLTV_WAD,
-            minJtCoverageILToEnterFixedTermState: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
+            dustTolerance: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
         });
 
         bytes memory initData = abi.encodeCall(RoycoAccountant.initialize, (params, address(accessManager)));
@@ -1428,7 +1421,7 @@ contract RoycoAccountantRevertTest is BaseTest {
             ydmInitializationData: ydmInitData,
             fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
             lltvWAD: LLTV_WAD,
-            minJtCoverageILToEnterFixedTermState: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
+            dustTolerance: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
         });
 
         bytes memory initData = abi.encodeCall(RoycoAccountant.initialize, (params, address(accessManager)));
@@ -1450,7 +1443,7 @@ contract RoycoAccountantRevertTest is BaseTest {
             ydmInitializationData: ydmInitData,
             fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
             lltvWAD: LLTV_WAD,
-            minJtCoverageILToEnterFixedTermState: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
+            dustTolerance: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
         });
 
         bytes memory initData = abi.encodeCall(RoycoAccountant.initialize, (params, address(accessManager)));
@@ -1472,7 +1465,7 @@ contract RoycoAccountantRevertTest is BaseTest {
             ydmInitializationData: ydmInitData,
             fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
             lltvWAD: LLTV_WAD,
-            minJtCoverageILToEnterFixedTermState: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
+            dustTolerance: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
         });
 
         bytes memory initData = abi.encodeCall(RoycoAccountant.initialize, (params, address(accessManager)));
@@ -1494,7 +1487,7 @@ contract RoycoAccountantRevertTest is BaseTest {
             ydmInitializationData: ydmInitData,
             fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
             lltvWAD: LLTV_WAD,
-            minJtCoverageILToEnterFixedTermState: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
+            dustTolerance: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
         });
 
         bytes memory initData = abi.encodeCall(RoycoAccountant.initialize, (params, address(accessManager)));
@@ -1522,7 +1515,7 @@ contract RoycoAccountantRevertTest is BaseTest {
             ydmInitializationData: ydmInitData,
             fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
             lltvWAD: uint64(maxLTV), // LLTV <= maxLTV is invalid
-            minJtCoverageILToEnterFixedTermState: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
+            dustTolerance: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
         });
 
         bytes memory initData = abi.encodeCall(RoycoAccountant.initialize, (params, address(accessManager)));
@@ -1544,7 +1537,7 @@ contract RoycoAccountantRevertTest is BaseTest {
             ydmInitializationData: ydmInitData,
             fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
             lltvWAD: uint64(WAD), // LLTV >= WAD is invalid
-            minJtCoverageILToEnterFixedTermState: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
+            dustTolerance: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
         });
 
         bytes memory initData = abi.encodeCall(RoycoAccountant.initialize, (params, address(accessManager)));
@@ -1567,7 +1560,7 @@ contract RoycoAccountantRevertTest is BaseTest {
             ydmInitializationData: ydmInitData,
             fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
             lltvWAD: LLTV_WAD,
-            minJtCoverageILToEnterFixedTermState: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
+            dustTolerance: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
         });
 
         bytes memory initData = abi.encodeCall(RoycoAccountant.initialize, (params, address(accessManager)));
@@ -1661,7 +1654,7 @@ contract RoycoAccountantInvariantTest is BaseTest {
             ydmInitializationData: ydmInitData,
             fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
             lltvWAD: LLTV_WAD,
-            minJtCoverageILToEnterFixedTermState: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
+            dustTolerance: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
         });
 
         bytes memory initData = abi.encodeCall(RoycoAccountant.initialize, (params, address(accessManager)));
@@ -1987,7 +1980,7 @@ contract RoycoAccountantLLTVInvariantTest is BaseTest {
             ydmInitializationData: ydmInitData,
             fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
             lltvWAD: LLTV_WAD,
-            minJtCoverageILToEnterFixedTermState: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
+            dustTolerance: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
         });
 
         bytes memory initData = abi.encodeCall(RoycoAccountant.initialize, (params, address(accessManager)));
@@ -2356,7 +2349,7 @@ contract RoycoAccountantAdminTest is BaseTest {
             ydmInitializationData: ydmInitData,
             fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
             lltvWAD: LLTV_WAD,
-            minJtCoverageILToEnterFixedTermState: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
+            dustTolerance: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
         });
 
         bytes memory initData = abi.encodeCall(RoycoAccountant.initialize, (params, address(accessManager)));
@@ -2619,7 +2612,7 @@ contract RoycoAccountantEdgeCaseTest is BaseTest {
             ydmInitializationData: ydmInitData,
             fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
             lltvWAD: LLTV_WAD,
-            minJtCoverageILToEnterFixedTermState: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
+            dustTolerance: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
         });
 
         bytes memory initData = abi.encodeCall(RoycoAccountant.initialize, (params, address(accessManager)));
@@ -2991,7 +2984,7 @@ contract RoycoAccountantBranchCoverageTest is BaseTest {
         uint96 betaWAD,
         address ydm,
         uint24 fixedTermDuration,
-        NAV_UNIT minJtCoverageILToEnterFixedTermState,
+        NAV_UNIT dustTolerance,
         uint64 lltvWAD,
         uint64 jtYieldAtTarget,
         uint64 jtYieldAtFull
@@ -3011,7 +3004,7 @@ contract RoycoAccountantBranchCoverageTest is BaseTest {
             ydmInitializationData: ydmInitData,
             fixedTermDurationSeconds: fixedTermDuration,
             lltvWAD: lltvWAD,
-            minJtCoverageILToEnterFixedTermState: minJtCoverageILToEnterFixedTermState
+            dustTolerance: dustTolerance
         });
 
         bytes memory initData = abi.encodeCall(RoycoAccountant.initialize, (params, address(accessManager)));
@@ -3030,7 +3023,7 @@ contract RoycoAccountantBranchCoverageTest is BaseTest {
             ydmInitializationData: ydmInitData,
             fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
             lltvWAD: LLTV_WAD,
-            minJtCoverageILToEnterFixedTermState: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
+            dustTolerance: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
         });
 
         bytes memory initData = abi.encodeCall(RoycoAccountant.initialize, (params, address(accessManager)));
@@ -3283,7 +3276,7 @@ contract RoycoAccountantBranchCoverageTest is BaseTest {
             ydmInitializationData: ydmInitData,
             fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
             lltvWAD: invalidLLTV,
-            minJtCoverageILToEnterFixedTermState: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
+            dustTolerance: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
         });
         bytes memory initData = abi.encodeCall(RoycoAccountant.initialize, (params, address(accessManager)));
 
@@ -3306,7 +3299,7 @@ contract RoycoAccountantBranchCoverageTest is BaseTest {
             ydmInitializationData: ydmInitData,
             fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
             lltvWAD: invalidLLTV,
-            minJtCoverageILToEnterFixedTermState: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
+            dustTolerance: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
         });
         bytes memory initData = abi.encodeCall(RoycoAccountant.initialize, (params, address(accessManager)));
 
@@ -3407,7 +3400,7 @@ contract RoycoAccountantAdditionalBranchTests is BaseTest {
             ydmInitializationData: ydmInitData,
             fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
             lltvWAD: LLTV_WAD,
-            minJtCoverageILToEnterFixedTermState: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
+            dustTolerance: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
         });
 
         bytes memory initData = abi.encodeCall(RoycoAccountant.initialize, (params, address(accessManager)));
@@ -3444,7 +3437,7 @@ contract RoycoAccountantAdditionalBranchTests is BaseTest {
             ydmInitializationData: ydmInitData,
             fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
             lltvWAD: LLTV_WAD,
-            minJtCoverageILToEnterFixedTermState: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
+            dustTolerance: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
         });
         bytes memory initData = abi.encodeCall(RoycoAccountant.initialize, (params, address(accessManager)));
 
@@ -3467,7 +3460,7 @@ contract RoycoAccountantAdditionalBranchTests is BaseTest {
             ydmInitializationData: ydmInitData,
             fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
             lltvWAD: LLTV_WAD,
-            minJtCoverageILToEnterFixedTermState: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
+            dustTolerance: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
         });
         bytes memory initData = abi.encodeCall(RoycoAccountant.initialize, (params, address(accessManager)));
 
@@ -3493,7 +3486,7 @@ contract RoycoAccountantAdditionalBranchTests is BaseTest {
             ydmInitializationData: ydmInitData,
             fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
             lltvWAD: 0.99e18, // High LLTV to pass that check
-            minJtCoverageILToEnterFixedTermState: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
+            dustTolerance: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
         });
         bytes memory initData = abi.encodeCall(RoycoAccountant.initialize, (params, address(accessManager)));
 
