@@ -188,7 +188,7 @@ contract FluidStETH_Test is ERC4626_TestBase {
             juniorTrancheSymbol: string(abi.encodePacked("RJ-", cfg.name)),
             seniorAsset: cfg.stAsset,
             juniorAsset: cfg.jtAsset,
-            minJtCoverageILToEnterFixedTermStateWAD: toNAVUnits(uint256(10)), // 10 wei for ~250 cycle headroom
+            dustTolerance: toNAVUnits(uint256(10)), // 10 wei for ~250 cycle headroom
             kernelType: DeployScript.KernelType.ERC4626_ST_ERC4626_JT_InKindAssets,
             kernelSpecificParams: abi.encode(kernelParams),
             protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS,
