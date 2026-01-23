@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
+import { console2 } from "../../../lib/forge-std/src/console2.sol";
 import { ERC20Upgradeable, IERC20, IERC20Metadata } from "../../../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/ERC20Upgradeable.sol";
 import { ERC20PausableUpgradeable } from "../../../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/ERC20PausableUpgradeable.sol";
 import { ERC20PermitUpgradeable } from "../../../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
@@ -134,6 +135,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
     /// @inheritdoc IRoycoVaultTranche
     function maxRedeem(address _owner) public view virtual override(IRoycoVaultTranche) returns (uint256 shares) {
         shares = _maxRedeem(_owner, balanceOf(_owner));
+        console2.log("maxRedeem", shares);
     }
 
     /// @inheritdoc IRoycoVaultTranche
