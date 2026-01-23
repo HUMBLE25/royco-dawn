@@ -13,6 +13,11 @@ via_ir = true
 deny = "never"
 fs_permissions = [{ access = "read", path = "./out" }]
 
+
+[profile.development]
+optimizer = true
+optimizer_runs = 100
+
 [profile.default.optimizer_details]
 constantOptimizer = true
 yul = true

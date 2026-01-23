@@ -39,7 +39,7 @@ contract sNUSD_sNUSD_Test is YieldBearingERC4626_TestBase {
             jtAsset: SNUSD,
             stDecimals: 18,
             jtDecimals: 18,
-            initialFunding: 1_000_000e18 // 1M sNUSD
+            initialFunding: 10_000_000e18 // 10M sNUSD
         });
     }
 
