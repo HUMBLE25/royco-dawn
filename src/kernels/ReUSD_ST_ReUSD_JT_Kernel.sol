@@ -67,7 +67,7 @@ contract ReUSD_ST_ReUSD_JT_Kernel is YieldBearingERC20_ST_YieldBearingERC20_JT_I
     /// @inheritdoc IdenticalAssetsOracleQuoter
     function _getConversionRateFromOracle() internal view override returns (uint256) {
         // ICL output = input * rate * 10^(quote_dec - reUSD_dec)
-        // With input = 10^(RAY + reUSD_dec - quote_dec), output = rate * 10^RAY
+        // With input = 10^(RAY + reUSD_dec - quote_dec), output = rate * RAY
         return IInsuranceCapitalLayer(INSURANCE_CAPITAL_LAYER).convertFromShares(REUSD_QUOTE_TOKEN, REUSD_AMOUNT_FOR_RAY_PRECISION_CONVERSION_RATE);
     }
 }

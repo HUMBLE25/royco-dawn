@@ -275,7 +275,7 @@ abstract contract ERC4626_TestBase is AbstractKernelTestSuite {
     // ═══════════════════════════════════════════════════════════════════════════
 
     /// @notice Deploys the ERC4626 kernel and market
-    function _deployKernelAndMarket() internal override returns (DeployScript.DeploymentResult memory) {
+    function _deployKernelAndMarket() internal virtual override returns (DeployScript.DeploymentResult memory) {
         ProtocolConfig memory cfg = getProtocolConfig();
 
         bytes32 marketId = keccak256(abi.encodePacked(cfg.name, "-", cfg.name, "-", vm.getBlockTimestamp()));
