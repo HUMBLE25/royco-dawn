@@ -159,6 +159,12 @@ interface IRoycoAccountant {
      */
     event MinJtCoverageILToEnterFixedTermStateUpdated(NAV_UNIT minJtCoverageILToEnterFixedTermState);
 
+    /**
+     * @notice Emitted when JT's coverage loss is realized when transitioning from a fixed term state to a perpetual state
+     * @param jtCoverageLossErased The amount of JT coverage loss realized when transitioning from a fixed term state to a perpetual state
+     */
+    event JTCoverageLossErased(NAV_UNIT jtCoverageLossErased);
+
     /// @notice Thrown when the accountant's coverage config is invalid
     error INVALID_COVERAGE_CONFIG();
 

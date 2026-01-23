@@ -748,6 +748,7 @@ contract RoycoAccountantTest is BaseTest {
         assertEq(toUint256(state.jtEffectiveNAV), jtEffBefore, "JT unchanged");
         assertEq(toUint256(state.stProtocolFeeAccrued), 0, "no fee on post-op");
         _assertNAVConservation(state);
+        _assertConfigFields(state);
     }
 
     function test_postOpSync_jtIncreaseNAV() public {
@@ -765,6 +766,7 @@ contract RoycoAccountantTest is BaseTest {
         assertEq(toUint256(state.jtEffectiveNAV), jtEffBefore + deposit, "JT effective increased");
         assertEq(toUint256(state.stEffectiveNAV), stEffBefore, "ST unchanged");
         _assertNAVConservation(state);
+        _assertConfigFields(state);
     }
 
     function test_postOpSync_stDecreaseNAV() public {
@@ -782,6 +784,7 @@ contract RoycoAccountantTest is BaseTest {
         assertEq(toUint256(state.stEffectiveNAV), stEffBefore - withdrawal, "ST effective decreased");
         assertEq(toUint256(state.jtEffectiveNAV), jtEffBefore, "JT unchanged");
         _assertNAVConservation(state);
+        _assertConfigFields(state);
     }
 
     function test_postOpSync_jtDecreaseNAV() public {
@@ -799,6 +802,7 @@ contract RoycoAccountantTest is BaseTest {
         assertEq(toUint256(state.jtEffectiveNAV), jtEffBefore - withdrawal, "JT effective decreased");
         assertEq(toUint256(state.stEffectiveNAV), stEffBefore, "ST unchanged");
         _assertNAVConservation(state);
+        _assertConfigFields(state);
     }
 
     function test_postOpSync_revertsOnInvalidState() public {
@@ -1352,6 +1356,33 @@ contract RoycoAccountantTest is BaseTest {
         uint256 rawSum = toUint256(state.stRawNAV) + toUint256(state.jtRawNAV);
         uint256 effectiveSum = toUint256(state.stEffectiveNAV) + toUint256(state.jtEffectiveNAV);
         assertEq(rawSum, effectiveSum, "NAV conservation violated");
+    }
+
+    function _assertConfigFields(SyncedAccountingState memory state) internal view {
+        IRoycoAccountant.RoycoAccountantState memory accountantState = accountant.getState();
+
+        // Verify fixed term fields
+        assertEq(state.fixedTermDurationSeconds, accountantState.fixedTermDurationSeconds, "fixedTermDurationSeconds mismatch");
+
+        // Verify LLTV and coverage fields
+        assertEq(state.lltvWAD, accountantState.lltvWAD, "lltvWAD mismatch");
+        assertEq(state.coverageWAD, accountantState.coverageWAD, "coverageWAD mismatch");
+
+        // Verify LTV is computed correctly: LTV = stEffectiveNAV / (stEffectiveNAV + jtEffectiveNAV - stIL)
+        uint256 stEff = toUint256(state.stEffectiveNAV);
+        uint256 jtEff = toUint256(state.jtEffectiveNAV);
+        uint256 stIL = toUint256(state.stImpermanentLoss);
+        uint256 expectedLtv = UtilsLib.computeLTV(state.stEffectiveNAV, state.stImpermanentLoss, state.jtEffectiveNAV);
+        assertEq(state.currentLtvWad, expectedLtv, "currentLtvWad mismatch");
+
+        // Verify utilization is computed correctly
+        uint256 expectedUtil = UtilsLib.computeUtilization(state.stRawNAV, state.jtRawNAV, accountantState.betaWAD, accountantState.coverageWAD, state.jtEffectiveNAV);
+        assertEq(state.currentUtilizationWad, expectedUtil, "currentUtilizationWad mismatch");
+
+        // Verify fixed term end timestamp based on market state
+        if (state.marketState == MarketState.PERPETUAL) {
+            assertEq(state.fixedTermEndTimestamp, 0, "fixedTermEndTimestamp should be 0 in perpetual state");
+        }
     }
 
     function _computeMaxInitialLTV(uint64 coverageWAD, uint96 betaWAD) internal pure returns (uint256) {

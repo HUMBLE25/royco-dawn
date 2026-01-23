@@ -143,6 +143,7 @@ contract RoycoAccountantComprehensiveTest is BaseTest {
         assertEq(toUint256(state.jtCoverageImpermanentLoss), 0, "no JT coverage IL");
         assertEq(toUint256(state.jtSelfImpermanentLoss), 0, "no JT self IL");
         _assertNAVConservation(state);
+        _assertConfigFields(state);
     }
 
     /// @notice Test Case 2: deltaJT = 0, deltaST < 0 (ST loss, JT flat)
@@ -198,6 +199,7 @@ contract RoycoAccountantComprehensiveTest is BaseTest {
         assertEq(toUint256(state.jtEffectiveNAV), jtEffBefore - jtLoss, "JT absorbs own loss");
         assertEq(toUint256(state.stEffectiveNAV), stEffBefore, "ST unchanged");
         _assertNAVConservation(state);
+        _assertConfigFields(state);
     }
 
     /// @notice Test Case 5: deltaJT < 0, deltaST < 0 (both lose)
@@ -218,6 +220,7 @@ contract RoycoAccountantComprehensiveTest is BaseTest {
         assertEq(toUint256(state.jtEffectiveNAV), jtEffBefore - jtLoss - stLoss, "JT absorbs both");
         assertEq(toUint256(state.stEffectiveNAV), stEffBefore, "ST covered");
         _assertNAVConservation(state);
+        _assertConfigFields(state);
     }
 
     /// @notice Test Case 6: deltaJT < 0, deltaST > 0 (JT loss, ST gain)
@@ -252,6 +255,7 @@ contract RoycoAccountantComprehensiveTest is BaseTest {
         assertEq(toUint256(state.stEffectiveNAV), stEffBefore, "ST unchanged");
         assertGt(toUint256(state.jtProtocolFeeAccrued), 0, "JT protocol fee accrued");
         _assertNAVConservation(state);
+        _assertConfigFields(state);
     }
 
     /// @notice Test Case 8: deltaJT > 0, deltaST < 0 (JT gain, ST loss)
@@ -286,6 +290,7 @@ contract RoycoAccountantComprehensiveTest is BaseTest {
         uint256 totalGain = stGain + jtGain;
         assertEq(toUint256(state.stEffectiveNAV) + toUint256(state.jtEffectiveNAV), 150e18 + totalGain, "total gain captured");
         _assertNAVConservation(state);
+        _assertConfigFields(state);
     }
 
     /// @notice Fuzz test for all 9 delta combinations
@@ -307,6 +312,7 @@ contract RoycoAccountantComprehensiveTest is BaseTest {
 
         _assertNAVConservation(state);
         _assertNonNegativity(state);
+        _assertConfigFields(state);
     }
 
     // =========================================================================
@@ -479,6 +485,7 @@ contract RoycoAccountantComprehensiveTest is BaseTest {
         SyncedAccountingState memory s4 = accountant.preOpSyncTrancheAccounting(_nav(90e18), _nav(50e18));
         assertEq(uint8(s4.marketState), uint8(MarketState.PERPETUAL), "FIXED_TERM -> PERPETUAL via expiry");
         assertEq(toUint256(s4.jtCoverageImpermanentLoss), 0, "IL cleared on expiry");
+        _assertConfigFields(s4);
     }
 
     /// @notice Test LLTV breach triggers perpetual state
@@ -493,6 +500,7 @@ contract RoycoAccountantComprehensiveTest is BaseTest {
         if (toUint256(state.stImpermanentLoss) > 0) {
             assertEq(uint8(state.marketState), uint8(MarketState.PERPETUAL), "ST IL forces PERPETUAL");
         }
+        _assertConfigFields(state);
     }
 
     /// @notice Test fixedTermDuration = 0 always stays perpetual
@@ -586,6 +594,7 @@ contract RoycoAccountantComprehensiveTest is BaseTest {
         // Coverage IL should be scaled proportionally
         assertLe(toUint256(state.jtCoverageImpermanentLoss), jtCoverageILBefore, "coverage IL scaled down");
         _assertNAVConservation(state);
+        _assertConfigFields(state);
     }
 
     /// @notice Test JT_DECREASE_NAV with JT self IL scaling
@@ -1149,6 +1158,32 @@ contract RoycoAccountantComprehensiveTest is BaseTest {
         uint256 numerator = WAD - betaCov;
         uint256 denominator = WAD + coverageWAD - betaCov;
         return numerator.mulDiv(WAD, denominator, Math.Rounding.Ceil);
+    }
+
+    function _assertConfigFields(SyncedAccountingState memory state) internal view {
+        IRoycoAccountant.RoycoAccountantState memory accountantState = accountant.getState();
+
+        // Verify fixed term fields
+        assertEq(state.fixedTermDurationSeconds, accountantState.fixedTermDurationSeconds, "fixedTermDurationSeconds mismatch");
+
+        // Verify LLTV and coverage fields
+        assertEq(state.lltvWAD, accountantState.lltvWAD, "lltvWAD mismatch");
+        assertEq(state.coverageWAD, accountantState.coverageWAD, "coverageWAD mismatch");
+
+        // Verify LTV is computed correctly
+        uint256 expectedLtv = UtilsLib.computeLTV(state.stEffectiveNAV, state.stImpermanentLoss, state.jtEffectiveNAV);
+        assertEq(state.currentLtvWad, expectedLtv, "currentLtvWad mismatch");
+
+        // Verify utilization is computed correctly
+        uint256 expectedUtil = UtilsLib.computeUtilization(
+            state.stRawNAV, state.jtRawNAV, accountantState.betaWAD, accountantState.coverageWAD, state.jtEffectiveNAV
+        );
+        assertEq(state.currentUtilizationWad, expectedUtil, "currentUtilizationWad mismatch");
+
+        // Verify fixed term end timestamp based on market state
+        if (state.marketState == MarketState.PERPETUAL) {
+            assertEq(state.fixedTermEndTimestamp, 0, "fixedTermEndTimestamp should be 0 in perpetual state");
+        }
     }
 }
 
