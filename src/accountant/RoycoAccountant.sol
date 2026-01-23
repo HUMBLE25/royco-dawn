@@ -208,7 +208,8 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
                     jtCoverageImpermanentLoss = jtCoverageImpermanentLoss.mulDiv(stEffectiveNAV, preWithdrawalSTEffectiveNAV, Math.Rounding.Floor);
                 }
                 // JT raw NAV that is leaving the market realized its proportional share of past JT losses from its own depreciation, rounding in favor of senior
-                if (jtSelfImpermanentLoss != ZERO_NAV_UNITS) {
+                // If JT raw NAV is zero, none of the JT exposure is leaving the market, so it is still entitled to 100% of it's self inflicted impermanent loss.
+                if (jtSelfImpermanentLoss != ZERO_NAV_UNITS && $.lastJTRawNAV != ZERO_NAV_UNITS) {
                     jtSelfImpermanentLoss = jtSelfImpermanentLoss.mulDiv(jtRawNAV, $.lastJTRawNAV, Math.Rounding.Floor);
                 }
             } else if (_op == Operation.JT_REDEEM) {
@@ -220,7 +221,8 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
                     jtCoverageImpermanentLoss = jtCoverageImpermanentLoss.mulDiv(jtEffectiveNAV, preWithdrawalJTEffectiveNAV, Math.Rounding.Floor);
                 }
                 // JT raw NAV that is leaving the market realized its proportional share of past JT losses from its own depreciation, rounding in favor of senior
-                if (jtSelfImpermanentLoss != ZERO_NAV_UNITS) {
+                // If JT raw NAV is zero, none of the JT exposure is leaving the market, so it is still entitled to 100% of it's self inflicted impermanent loss.
+                if (jtSelfImpermanentLoss != ZERO_NAV_UNITS && $.lastJTRawNAV != ZERO_NAV_UNITS) {
                     jtSelfImpermanentLoss = jtSelfImpermanentLoss.mulDiv(jtRawNAV, $.lastJTRawNAV, Math.Rounding.Floor);
                 }
             }
