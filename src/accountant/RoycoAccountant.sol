@@ -547,11 +547,8 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         // 1. Perpetual: The minimum JT coverage IL to enter a fixed term state hasn't been incurred, LLTV has been breached, ST IL exists, or the fixed term duration is set to 0
         // 2. Fixed term: The minimum JT coverage IL to enter a fixed term state has been incurred but LLTV has not been breached, ST IL does not exist, and the fixed term duration is not set to 0
         MarketState resultingMarketState;
-        if (jtCoverageImpermanentLoss < $.minJtCoverageILToEnterFixedTermState) {
-            // JT coverage IL is either non-existant or can be attributed to dust losses (eg. rounding in the underlying ST NAV)
-            resultingMarketState = MarketState.PERPETUAL;
-        } else if (
-            UtilsLib.computeLTV(stEffectiveNAV, stImpermanentLoss, jtEffectiveNAV) >= $.lltvWAD || stImpermanentLoss != ZERO_NAV_UNITS
+        if (
+            stImpermanentLoss != ZERO_NAV_UNITS || UtilsLib.computeLTV(stEffectiveNAV, stImpermanentLoss, jtEffectiveNAV) >= $.lltvWAD
                 || $.fixedTermDurationSeconds == 0
         ) {
             resultingMarketState = MarketState.PERPETUAL;
@@ -560,6 +557,9 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
             // If ST IL exists, the market is in a distressed state: STs need to be able to book losses and any future appreciation will go to making ST whole again
             // If the fixed term duration is 0, the market is permanently in a perpetual state and never incurs any JT coverage IL
             jtCoverageImpermanentLoss = ZERO_NAV_UNITS;
+        } else if (jtCoverageImpermanentLoss < $.minJtCoverageILToEnterFixedTermState) {
+            // JT coverage IL is either non-existant or can be attributed to dust losses (eg. rounding in the underlying ST NAV)
+            resultingMarketState = MarketState.PERPETUAL;
         } else {
             resultingMarketState = MarketState.FIXED_TERM;
         }

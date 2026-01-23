@@ -175,10 +175,8 @@ contract FluidStETH_Test is ERC4626_TestBase {
         DeployScript.ERC4626STERC4626JTInKindAssetsKernelParams memory kernelParams =
             DeployScript.ERC4626STERC4626JTInKindAssetsKernelParams({ stVault: _getSTVault(), jtVault: _getJTVault() });
 
-        DeployScript.AdaptiveCurveYDMParams memory ydmParams = DeployScript.AdaptiveCurveYDMParams({
-            jtYieldShareAtTargetUtilWAD: 0.3e18,
-            jtYieldShareAtFullUtilWAD: 1e18
-        });
+        DeployScript.AdaptiveCurveYDMParams memory ydmParams =
+            DeployScript.AdaptiveCurveYDMParams({ jtYieldShareAtTargetUtilWAD: 0.3e18, jtYieldShareAtFullUtilWAD: 1e18 });
 
         DeployScript.DeploymentParams memory params = DeployScript.DeploymentParams({
             factoryAdmin: address(DEPLOY_SCRIPT),
@@ -221,22 +219,6 @@ contract FluidStETH_Test is ERC4626_TestBase {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // STETH ROUNDING OVERRIDES
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    /// @notice Override to account for stETH's inherent 1-2 wei rounding per transfer
-    function testFuzz_JT_deposit_transfersAssets(uint256 _amount) external override {
-        _amount = bound(_amount, _minDepositAmount(), config.initialFunding / 10);
-
-        uint256 balanceBefore = IERC20(config.jtAsset).balanceOf(ALICE_ADDRESS);
-        _depositJT(ALICE_ADDRESS, _amount);
-        uint256 balanceAfter = IERC20(config.jtAsset).balanceOf(ALICE_ADDRESS);
-
-        // stETH has inherent 1-2 wei rounding per operation
-        assertApproxEqAbs(balanceBefore - balanceAfter, _amount, 2, "Should transfer correct amount of assets");
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
     // FLUID-SPECIFIC TESTS: convertToAssets rounding behavior
     // ═══════════════════════════════════════════════════════════════════════════
     // These tests verify the system handles Fluid's actual rounding behavior correctly.
@@ -265,10 +247,7 @@ contract FluidStETH_Test is ERC4626_TestBase {
         // Verify JT NAV is approximately preserved (within tolerance for Fluid drift)
         NAV_UNIT jtNavAfterSTDeposit = JT.totalAssets().nav;
         assertApproxEqAbs(
-            toUint256(jtNavAfterSTDeposit),
-            toUint256(jtNavAfterDeposit),
-            toUint256(maxNAVDelta()),
-            "JT NAV should be preserved within Fluid rounding tolerance"
+            toUint256(jtNavAfterSTDeposit), toUint256(jtNavAfterDeposit), toUint256(maxNAVDelta()), "JT NAV should be preserved within Fluid rounding tolerance"
         );
     }
 
@@ -376,96 +355,6 @@ contract FluidStETH_Test is ERC4626_TestBase {
     // ═══════════════════════════════════════════════════════════════════════════
     // SHARED VAULT OVERRIDES
     // ═══════════════════════════════════════════════════════════════════════════
-    // For shared vault architecture (ST_VAULT == JT_VAULT), maxRedeem can be
-    // slightly less than shares owned due to Floor rounding in proportional
-    // claim calculations. These tests use maxRedeem instead of raw shares.
-
-    /// @notice Override to use maxRedeem for shared vault architecture
-    function testFuzz_JT_cancelRedeemRequest(uint256 _amount, uint256 _withdrawPercentage) external override {
-        _amount = bound(_amount, _minDepositAmount(), config.initialFunding / 10);
-        _withdrawPercentage = bound(_withdrawPercentage, 10, 100);
-
-        uint256 jtShares = _depositJT(ALICE_ADDRESS, _amount);
-
-        // For shared vault: use maxRedeem which accounts for proportional claim rounding
-        uint256 maxRedeemable = JT.maxRedeem(ALICE_ADDRESS);
-        uint256 sharesToWithdraw = maxRedeemable * _withdrawPercentage / 100;
-
-        if (sharesToWithdraw == 0) sharesToWithdraw = 1;
-        // Ensure we don't exceed maxRedeem after percentage calculation
-        if (sharesToWithdraw > maxRedeemable) sharesToWithdraw = maxRedeemable;
-
-        // Request redeem
-        vm.prank(ALICE_ADDRESS);
-        (uint256 requestId,) = JT.requestRedeem(sharesToWithdraw, ALICE_ADDRESS, ALICE_ADDRESS);
-
-        // Verify pending
-        assertEq(JT.pendingRedeemRequest(requestId, ALICE_ADDRESS), sharesToWithdraw, "Should be pending");
-
-        // Cancel request
-        vm.prank(ALICE_ADDRESS);
-        JT.cancelRedeemRequest(requestId, ALICE_ADDRESS);
-
-        // Should be claimable for cancel
-        assertEq(JT.claimableCancelRedeemRequest(requestId, ALICE_ADDRESS), sharesToWithdraw, "Should be claimable for cancel");
-        assertEq(JT.pendingRedeemRequest(requestId, ALICE_ADDRESS), 0, "Should no longer be pending");
-
-        // Claim cancelled shares
-        uint256 sharesBefore = JT.balanceOf(ALICE_ADDRESS);
-        vm.prank(ALICE_ADDRESS);
-        JT.claimCancelRedeemRequest(requestId, ALICE_ADDRESS, ALICE_ADDRESS);
-
-        assertEq(JT.balanceOf(ALICE_ADDRESS), sharesBefore + sharesToWithdraw, "Should get shares back");
-    }
-
-    /// @notice Override to handle shared vault coverage constraints
-    function testFuzz_coverageTightening_redeem_respectsCoverageLimits(uint256 _jtAmount, uint256 _stPercentage) external override {
-        _jtAmount = bound(_jtAmount, _minDepositAmount() * 20, config.initialFunding / 4);
-        _stPercentage = bound(_stPercentage, 50, 90);
-
-        // Deposit JT
-        uint256 jtShares = _depositJT(ALICE_ADDRESS, _jtAmount);
-
-        // For shared vault: use maxRedeem which accounts for proportional claim rounding
-        uint256 maxRedeemable = JT.maxRedeem(ALICE_ADDRESS);
-        // Set jtShares to the max redeemable amount
-        jtShares = maxRedeemable;
-
-        if (jtShares == 0) return;
-
-        // Request redeem for max redeemable shares
-        vm.prank(ALICE_ADDRESS);
-        (uint256 requestId,) = JT.requestRedeem(jtShares, ALICE_ADDRESS, ALICE_ADDRESS);
-
-        // Warp past delay
-        vm.warp(vm.getBlockTimestamp() + _getJTRedemptionDelay() + 1);
-
-        // Deposit ST to tighten coverage
-        TRANCHE_UNIT stMaxDeposit = ST.maxDeposit(BOB_ADDRESS);
-        uint256 stAmount = toUint256(stMaxDeposit) * _stPercentage / 100;
-        if (stAmount > config.initialFunding) stAmount = config.initialFunding * _stPercentage / 100;
-        if (stAmount < _minDepositAmount()) return;
-
-        _depositST(BOB_ADDRESS, stAmount);
-
-        // Get what's actually claimable vs what coverage allows
-        uint256 claimable = JT.claimableRedeemRequest(requestId, ALICE_ADDRESS);
-        uint256 maxRedeemableNow = JT.maxRedeem(ALICE_ADDRESS);
-
-        // After ST deposit, coverage may be tighter than what was originally requested
-        // Use the minimum of claimable and maxRedeem
-        uint256 actualRedeem = claimable < maxRedeemableNow ? claimable : maxRedeemableNow;
-
-        // Skip if redeem amount is too small (would round to 0 in post-op)
-        // This can happen when coverage is extremely tight
-        if (actualRedeem < _minDepositAmount()) return;
-
-        // Redeem the actual amount allowed by current coverage - should succeed
-        vm.prank(ALICE_ADDRESS);
-        (AssetClaims memory claims,) = JT.redeem(actualRedeem, ALICE_ADDRESS, ALICE_ADDRESS, requestId);
-
-        assertGt(toUint256(claims.jtAssets), 0, "Should have received assets");
-    }
 
     /// @notice POC: Demonstrates that Fluid vault's convertToAssets changes when stETH is deposited
     /// This is the root cause of NAV_CONSERVATION_VIOLATION - not stETH rebasing
