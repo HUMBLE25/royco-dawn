@@ -178,6 +178,19 @@ contract FluidStETH_Test is ERC4626_TestBase {
         DeployScript.AdaptiveCurveYDMParams memory ydmParams =
             DeployScript.AdaptiveCurveYDMParams({ jtYieldShareAtTargetUtilWAD: 0.3e18, jtYieldShareAtFullUtilWAD: 1e18 });
 
+        // Build role assignments
+        DeployScript.RoleAssignmentConfiguration[] memory roleAssignments = new DeployScript.RoleAssignmentConfiguration[](6);
+        roleAssignments[0] =
+            DeployScript.RoleAssignmentConfiguration({ role: ADMIN_PAUSER_ROLE, roleAdminRole: 0, assignee: PAUSER_ADDRESS, executionDelay: 0 });
+        roleAssignments[1] =
+            DeployScript.RoleAssignmentConfiguration({ role: ADMIN_UPGRADER_ROLE, roleAdminRole: 0, assignee: UPGRADER_ADDRESS, executionDelay: 0 });
+        roleAssignments[2] =
+            DeployScript.RoleAssignmentConfiguration({ role: LP_ROLE_ADMIN_ROLE, roleAdminRole: 0, assignee: OWNER_ADDRESS, executionDelay: 0 });
+        roleAssignments[3] = DeployScript.RoleAssignmentConfiguration({ role: SYNC_ROLE, roleAdminRole: 0, assignee: OWNER_ADDRESS, executionDelay: 0 });
+        roleAssignments[4] = DeployScript.RoleAssignmentConfiguration({ role: ADMIN_KERNEL_ROLE, roleAdminRole: 0, assignee: OWNER_ADDRESS, executionDelay: 0 });
+        roleAssignments[5] =
+            DeployScript.RoleAssignmentConfiguration({ role: ADMIN_ORACLE_QUOTER_ROLE, roleAdminRole: 0, assignee: OWNER_ADDRESS, executionDelay: 0 });
+
         DeployScript.DeploymentParams memory params = DeployScript.DeploymentParams({
             factoryAdmin: address(DEPLOY_SCRIPT),
             factoryOwnerAddress: OWNER_ADDRESS,
@@ -201,18 +214,7 @@ contract FluidStETH_Test is ERC4626_TestBase {
             fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
             ydmType: DeployScript.YDMType.AdaptiveCurve,
             ydmSpecificParams: abi.encode(ydmParams),
-            pauserAddress: PAUSER_ADDRESS,
-            pauserExecutionDelay: 0,
-            upgraderAddress: UPGRADER_ADDRESS,
-            upgraderExecutionDelay: 0,
-            lpRoleAddress: OWNER_ADDRESS,
-            lpRoleExecutionDelay: 0,
-            syncRoleAddress: OWNER_ADDRESS,
-            syncRoleExecutionDelay: 0,
-            kernelAdminRoleAddress: OWNER_ADDRESS,
-            kernelAdminRoleExecutionDelay: 0,
-            oracleQuoterAdminRoleAddress: OWNER_ADDRESS,
-            oracleQuoterAdminRoleExecutionDelay: 0
+            roleAssignments: roleAssignments
         });
 
         return DEPLOY_SCRIPT.deploy(params);

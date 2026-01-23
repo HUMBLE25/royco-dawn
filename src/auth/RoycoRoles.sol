@@ -24,4 +24,7 @@ abstract contract RoycoRoles {
 
     /// Quoter roles
     uint64 public constant ADMIN_ORACLE_QUOTER_ROLE = uint64(uint256(keccak256(abi.encode("ROYCO_ADMIN_ORACLE_QUOTER_ROLE"))));
+
+    /// Meta Roles
+    uint64 public constant LP_ROLE_ADMIN_ROLE = uint64(uint256(keccak256(abi.encode("ROYCO_LP_ROLE_ADMIN_ROLE"))));
 }

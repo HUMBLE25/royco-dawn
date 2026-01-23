@@ -194,7 +194,7 @@ struct MarketDeploymentParams {
     bytes32 kernelProxyDeploymentSalt;
     bytes32 accountantProxyDeploymentSalt;
     // Initial Roles Configuration
-    RolesConfiguration[] roles;
+    RolesTargetConfiguration[] roles;
 }
 
 /**
@@ -209,12 +209,12 @@ struct TrancheDeploymentParams {
 }
 
 /**
- * @notice The configuration for a role
+ * @notice For a given target address, the configuration for a role
  * @custom:field target - The target address of the role
  * @custom:field selectors - The selectors of the role
  * @custom:field roles - The roles of the role
  */
-struct RolesConfiguration {
+struct RolesTargetConfiguration {
     address target;
     bytes4[] selectors;
     uint64[] roles;

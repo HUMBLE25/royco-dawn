@@ -10,7 +10,7 @@ import { IRoycoAccountant } from "./interfaces/IRoycoAccountant.sol";
 import { IRoycoFactory } from "./interfaces/IRoycoFactory.sol";
 import { IRoycoKernel } from "./interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoVaultTranche } from "./interfaces/tranche/IRoycoVaultTranche.sol";
-import { MarketDeploymentParams, RolesConfiguration, RoycoMarket } from "./libraries/Types.sol";
+import { MarketDeploymentParams, RolesTargetConfiguration, RoycoMarket } from "./libraries/Types.sol";
 
 /**
  * @title RoycoFactory
@@ -140,9 +140,9 @@ contract RoycoFactory is AccessManager, RoycoRoles, IRoycoFactory {
      * @param _roycoMarket The deployed contracts to configure
      * @param _roles The roles to configure
      */
-    function _configureRoles(RoycoMarket memory _roycoMarket, RolesConfiguration[] calldata _roles) internal {
+    function _configureRoles(RoycoMarket memory _roycoMarket, RolesTargetConfiguration[] calldata _roles) internal {
         for (uint256 i = 0; i < _roles.length; ++i) {
-            RolesConfiguration calldata role = _roles[i];
+            RolesTargetConfiguration calldata role = _roles[i];
 
             // Validate that the selectors and roles length match
             require(role.selectors.length == role.roles.length, ROLES_CONFIGURATION_LENGTH_MISMATCH());

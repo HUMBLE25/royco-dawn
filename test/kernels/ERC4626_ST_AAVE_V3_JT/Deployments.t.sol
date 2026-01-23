@@ -15,7 +15,7 @@ import {
     IRoycoAccountant,
     IRoycoKernel,
     MarketDeploymentParams,
-    RolesConfiguration,
+    RolesTargetConfiguration,
     SyncedAccountingState,
     TrancheDeploymentParams
 } from "../../../src/libraries/Types.sol";
@@ -470,12 +470,12 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         FACTORY.deployMarket(params);
     }
 
-    function test_deployMarket_revertsOnRolesConfigurationLengthMismatch() public {
+    function test_deployMarket_revertsOnRolesTargetConfigurationLengthMismatch() public {
         bytes32 salt = keccak256(abi.encodePacked("SALT", "ROLES_LENGTH_MISMATCH"));
         (MarketDeploymentParams memory params,) = _buildValidMarketParamsForSalt(salt);
 
         // Create a roles configuration with mismatched lengths
-        RolesConfiguration[] memory roles = new RolesConfiguration[](1);
+        RolesTargetConfiguration[] memory roles = new RolesTargetConfiguration[](1);
         bytes4[] memory selectors = new bytes4[](2);
         uint64[] memory rolesArray = new uint64[](1); // Different length!
 
@@ -483,7 +483,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         selectors[1] = IRoycoAuth.unpause.selector;
         rolesArray[0] = RoycoRoles.ADMIN_PAUSER_ROLE;
 
-        roles[0] = RolesConfiguration({
+        roles[0] = RolesTargetConfiguration({
             target: params.roles[0].target, // Use a valid target
             selectors: selectors,
             roles: rolesArray
@@ -501,14 +501,14 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         (MarketDeploymentParams memory params,) = _buildValidMarketParamsForSalt(salt);
 
         // Create a roles configuration with an invalid target (not one of the deployed contracts)
-        RolesConfiguration[] memory roles = new RolesConfiguration[](1);
+        RolesTargetConfiguration[] memory roles = new RolesTargetConfiguration[](1);
         bytes4[] memory selectors = new bytes4[](1);
         uint64[] memory rolesArray = new uint64[](1);
 
         selectors[0] = IRoycoAuth.pause.selector;
         rolesArray[0] = RoycoRoles.ADMIN_PAUSER_ROLE;
 
-        roles[0] = RolesConfiguration({
+        roles[0] = RolesTargetConfiguration({
             target: address(0xdead), // Invalid target - not one of the deployed contracts
             selectors: selectors,
             roles: rolesArray
@@ -526,7 +526,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         (MarketDeploymentParams memory params,) = _buildValidMarketParamsForSalt(salt);
 
         // Create a roles configuration with an invalid target
-        RolesConfiguration[] memory roles = new RolesConfiguration[](1);
+        RolesTargetConfiguration[] memory roles = new RolesTargetConfiguration[](1);
         bytes4[] memory selectors = new bytes4[](1);
         uint64[] memory rolesArray = new uint64[](1);
 
@@ -534,7 +534,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         rolesArray[0] = RoycoRoles.ADMIN_PAUSER_ROLE;
 
         address invalidTarget = address(0x1234567890123456789012345678901234567890);
-        roles[0] = RolesConfiguration({
+        roles[0] = RolesTargetConfiguration({
             target: invalidTarget, // Invalid target - not one of the deployed contracts
             selectors: selectors,
             roles: rolesArray
@@ -630,7 +630,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
             juniorTrancheProxyDeploymentSalt: salt,
             kernelProxyDeploymentSalt: salt,
             accountantProxyDeploymentSalt: salt,
-            roles: DEPLOY_SCRIPT.buildRolesConfiguration(
+            roles: DEPLOY_SCRIPT.buildRolesTargetConfiguration(
                 expectedSeniorTrancheAddress, expectedJuniorTrancheAddress, expectedKernelAddress, expectedAccountantAddress
             )
         });
