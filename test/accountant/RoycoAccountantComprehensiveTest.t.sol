@@ -1175,9 +1175,8 @@ contract RoycoAccountantComprehensiveTest is BaseTest {
         assertEq(state.currentLtvWad, expectedLtv, "currentLtvWad mismatch");
 
         // Verify utilization is computed correctly
-        uint256 expectedUtil = UtilsLib.computeUtilization(
-            state.stRawNAV, state.jtRawNAV, accountantState.betaWAD, accountantState.coverageWAD, state.jtEffectiveNAV
-        );
+        uint256 expectedUtil =
+            UtilsLib.computeUtilization(state.stRawNAV, state.jtRawNAV, accountantState.betaWAD, accountantState.coverageWAD, state.jtEffectiveNAV);
         assertEq(state.currentUtilizationWad, expectedUtil, "currentUtilizationWad mismatch");
 
         // Verify fixed term end timestamp based on market state

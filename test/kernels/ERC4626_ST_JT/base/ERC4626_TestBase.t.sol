@@ -152,11 +152,7 @@ abstract contract ERC4626_TestBase is AbstractKernelTestSuite {
         uint256 newAssetsValue = stOwnedShares * _newSharePrice / 1e18;
 
         // Mock convertToAssets with the exact calldata (selector + shares amount)
-        vm.mockCall(
-            vault,
-            abi.encodeWithSelector(IERC4626.convertToAssets.selector, stOwnedShares),
-            abi.encode(newAssetsValue)
-        );
+        vm.mockCall(vault, abi.encodeWithSelector(IERC4626.convertToAssets.selector, stOwnedShares), abi.encode(newAssetsValue));
     }
 
     /// @notice Mocks the JT vault's convertToAssets to return scaled value for kernel's JT shares
@@ -176,11 +172,7 @@ abstract contract ERC4626_TestBase is AbstractKernelTestSuite {
         uint256 newAssetsValue = jtOwnedShares * _newSharePrice / 1e18;
 
         // Mock convertToAssets with the exact calldata (selector + shares amount)
-        vm.mockCall(
-            vault,
-            abi.encodeWithSelector(IERC4626.convertToAssets.selector, jtOwnedShares),
-            abi.encode(newAssetsValue)
-        );
+        vm.mockCall(vault, abi.encodeWithSelector(IERC4626.convertToAssets.selector, jtOwnedShares), abi.encode(newAssetsValue));
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
