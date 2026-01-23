@@ -323,8 +323,8 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
         roles[index++] = RolesConfiguration({ target: _kernel, selectors: kernelSelectors, roles: kernelRoleValues });
 
         // Accountant roles
-        bytes4[] memory accountantSelectors = new bytes4[](10);
-        uint64[] memory accountantRoleValues = new uint64[](10);
+        bytes4[] memory accountantSelectors = new bytes4[](11);
+        uint64[] memory accountantRoleValues = new uint64[](11);
 
         accountantSelectors[0] = IRoycoAccountant.setYDM.selector;
         accountantRoleValues[0] = ADMIN_KERNEL_ROLE;
@@ -346,6 +346,8 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
         accountantRoleValues[8] = ADMIN_PAUSER_ROLE;
         accountantSelectors[9] = UUPSUpgradeable.upgradeToAndCall.selector;
         accountantRoleValues[9] = ADMIN_UPGRADER_ROLE;
+        accountantSelectors[10] = IRoycoAccountant.setMinJtCoverageILToEnterFixedTermState.selector;
+        accountantRoleValues[10] = ADMIN_KERNEL_ROLE;
 
         roles[index++] = RolesConfiguration({ target: _accountant, selectors: accountantSelectors, roles: accountantRoleValues });
     }
