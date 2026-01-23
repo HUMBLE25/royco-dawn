@@ -720,4 +720,89 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
             "Underlying ST vault must have no USDC assets remaining"
         );
     }
+
+    function testStLoss_exceedsJTCoverage_thenJTAppreciates_shouldApplyCoverage() external {
+        // Deposit into JT
+        address jtDepositor = ALICE_ADDRESS;
+        uint256 jtDepositAmount = 1000e6;
+        vm.startPrank(jtDepositor);
+        USDC.approve(address(JT), jtDepositAmount);
+        JT.deposit(toTrancheUnits(jtDepositAmount), jtDepositor, jtDepositor);
+        vm.stopPrank();
+
+        // Deposit into ST
+        address stDepositor = BOB_ADDRESS;
+        uint256 stDepositAmount = 3000e6;
+        vm.startPrank(stDepositor);
+        USDC.approve(address(ST), stDepositAmount);
+        ST.deposit(toTrancheUnits(stDepositAmount), stDepositor, stDepositor);
+        vm.stopPrank();
+
+        skip(1 days);
+        vm.prank(OWNER_ADDRESS);
+        KERNEL.syncTrancheAccounting();
+
+        vm.prank(address(MOCK_UNDERLYING_ST_VAULT));
+        USDC.transfer(CHARLIE_ADDRESS, 999e6); // remove 99.9% of JT by ST coverage
+
+        skip(1);
+        vm.prank(OWNER_ADDRESS);
+        KERNEL.syncTrancheAccounting();
+        vm.prank(address(MOCK_UNDERLYING_ST_VAULT)); // Remove all JT by ST coverage -> leaving 0 effective JT
+        USDC.transfer(CHARLIE_ADDRESS, 5e6);
+
+        skip(100);
+        vm.prank(OWNER_ADDRESS);
+        KERNEL.syncTrancheAccounting();
+    }
+
+    function testJtRawNavGoesToZero_jtRedemptionShouldClaimStYield() external {
+        // Deposit into JT
+        address jtDepositor = ALICE_ADDRESS;
+        uint256 jtDepositAmount = 1000e6;
+        vm.startPrank(jtDepositor);
+        USDC.approve(address(JT), jtDepositAmount);
+        JT.deposit(toTrancheUnits(jtDepositAmount), jtDepositor, jtDepositor);
+        vm.stopPrank();
+
+        // Deposit into ST
+        address stDepositor = BOB_ADDRESS;
+        uint256 stDepositAmount = 1000e6;
+        vm.startPrank(stDepositor);
+        USDC.approve(address(ST), stDepositAmount);
+        ST.deposit(toTrancheUnits(stDepositAmount), stDepositor, stDepositor);
+        vm.stopPrank();
+
+        // ST Gain
+        vm.prank(DAN_ADDRESS);
+        USDC.transfer(address(MOCK_UNDERLYING_ST_VAULT), 500e6);
+
+        // Sync Accounting
+        vm.startPrank(jtDepositor);
+        USDC.approve(address(JT), jtDepositAmount);
+        JT.deposit(toTrancheUnits(1e6), jtDepositor, jtDepositor);
+        vm.stopPrank();
+        skip(1 days);
+
+        // JT loss - exhausted
+        uint256 jtLossAmount = AUSDC.balanceOf(address(KERNEL));
+        vm.prank(address(KERNEL));
+        AUSDC.transfer(CHARLIE_ADDRESS, jtLossAmount);
+
+        // Redeem from ST
+        vm.startPrank(stDepositor);
+        ST.redeem(ST.balanceOf(stDepositor), stDepositor, stDepositor);
+        vm.stopPrank();
+
+        // Redeem from JT
+        vm.startPrank(jtDepositor);
+        uint256 jtShares = JT.balanceOf(jtDepositor) / 10;
+        (uint256 requestId,) = JT.requestRedeem(jtShares, jtDepositor, jtDepositor);
+        vm.stopPrank();
+        vm.warp(block.timestamp + JT_REDEMPTION_DELAY_SECONDS);
+
+        vm.startPrank(jtDepositor);
+        JT.redeem(jtShares, jtDepositor, jtDepositor, requestId);
+        vm.stopPrank();
+    }
 }
