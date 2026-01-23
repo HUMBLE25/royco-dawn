@@ -720,4 +720,39 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
             "Underlying ST vault must have no USDC assets remaining"
         );
     }
+
+    function testStLoss_exceedsJTCoverage_thenJTAppreciates_shouldApplyCoverage() external {
+        // Deposit into JT
+        address jtDepositor = ALICE_ADDRESS;
+        uint256 jtDepositAmount = 1000e6;
+        vm.startPrank(jtDepositor);
+        USDC.approve(address(JT), jtDepositAmount);
+        JT.deposit(toTrancheUnits(jtDepositAmount), jtDepositor, jtDepositor);
+        vm.stopPrank();
+
+        // Deposit into ST
+        address stDepositor = BOB_ADDRESS;
+        uint256 stDepositAmount = 3000e6;
+        vm.startPrank(stDepositor);
+        USDC.approve(address(ST), stDepositAmount);
+        ST.deposit(toTrancheUnits(stDepositAmount), stDepositor, stDepositor);
+        vm.stopPrank();
+
+        skip(1 days);
+        vm.prank(OWNER_ADDRESS);
+        KERNEL.syncTrancheAccounting();
+
+        vm.prank(address(MOCK_UNDERLYING_ST_VAULT));
+        USDC.transfer(CHARLIE_ADDRESS, 999e6); // remove 99.9% of JT by ST coverage
+
+        skip(1);
+        vm.prank(OWNER_ADDRESS);
+        KERNEL.syncTrancheAccounting();
+        vm.prank(address(MOCK_UNDERLYING_ST_VAULT)); // Remove all JT by ST coverage -> leaving 0 effective JT
+        USDC.transfer(CHARLIE_ADDRESS, 5e6);
+
+        skip(100);
+        vm.prank(OWNER_ADDRESS);
+        KERNEL.syncTrancheAccounting();
+    }
 }

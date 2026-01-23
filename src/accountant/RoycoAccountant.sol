@@ -443,6 +443,8 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         // The deltas represent the unrealized PNL of the underlying investment since the last NAV checkpoints
         int256 deltaST = UnitsMathLib.computeNAVDelta(_stRawNAV, $.lastSTRawNAV);
         int256 deltaJT = UnitsMathLib.computeNAVDelta(_jtRawNAV, $.lastJTRawNAV);
+        // The net JT gains after ST IL recovery and JT self inflicted IL is recovered. The protocol fee accrued is calculated on this amount.
+        NAV_UNIT jtGainAfterILRecovery = ZERO_NAV_UNITS;
 
         // Mark both the tranche NAVs to market
         /// @dev STEP_APPLY_JT_LOSS: The JT assets depreciated in value
@@ -487,10 +489,11 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
             }
             /// @dev STEP_JT_ACCRUES_RESIDUAL_GAINS: JT accrues any remaining appreciation after clearing ST IL and JT self inflicted IL
             if (jtGain != ZERO_NAV_UNITS) {
+                jtGainAfterILRecovery = jtGain;
                 // Compute the protocol fee taken on this JT yield accrual - will be used to mint JT shares to the protocol fee recipient at the updated JT effective NAV
-                jtProtocolFeeAccrued = jtGain.mulDiv($.jtProtocolFeeWAD, WAD, Math.Rounding.Floor);
+                jtProtocolFeeAccrued = jtGainAfterILRecovery.mulDiv($.jtProtocolFeeWAD, WAD, Math.Rounding.Floor);
                 // Book the residual gains to the JT
-                jtEffectiveNAV = (jtEffectiveNAV + jtGain);
+                jtEffectiveNAV = (jtEffectiveNAV + jtGainAfterILRecovery);
             }
         }
 
@@ -500,6 +503,12 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
             /// @dev STEP_APPLY_JT_COVERAGE_TO_ST: Apply any possible coverage to ST provided by JT's loss-absorption buffer
             NAV_UNIT coverageApplied = UnitsMathLib.min(stLoss, jtEffectiveNAV);
             if (coverageApplied != ZERO_NAV_UNITS) {
+                // If there was a net JT gain after ST IL recovery, reduce it by the amount of coverage applied and recalculate the protocol fee accrued on the remaining amount.
+                if (jtGainAfterILRecovery != ZERO_NAV_UNITS) {
+                    jtGainAfterILRecovery = jtGainAfterILRecovery.saturatingSub(coverageApplied);
+                    jtProtocolFeeAccrued = jtGainAfterILRecovery.mulDiv($.jtProtocolFeeWAD, WAD, Math.Rounding.Floor);
+                }
+                // Apply the coverage to JT effective NAV
                 jtEffectiveNAV = (jtEffectiveNAV - coverageApplied);
                 // Any coverage provided is a ST liability to JT
                 jtCoverageImpermanentLoss = (jtCoverageImpermanentLoss + coverageApplied);
