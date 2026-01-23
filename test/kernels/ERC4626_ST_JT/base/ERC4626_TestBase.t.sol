@@ -2,6 +2,7 @@
 pragma solidity ^0.8.28;
 
 import { IERC4626 } from "../../../../lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
+import { IERC20 } from "../../../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 import { DeployScript } from "../../../../script/Deploy.s.sol";
 import { ERC4626_ST_ERC4626_JT_InKindAssets_Kernel } from "../../../../src/kernels/ERC4626_ST_ERC4626_JT_InKindAssets_Kernel.sol";
@@ -27,6 +28,9 @@ abstract contract ERC4626_TestBase is AbstractKernelTestSuite {
     /// @notice Tracks the mocked JT vault share price
     uint256 internal mockedJTSharePrice;
 
+    /// @dev ERC7201 storage slot for ERC4626KernelState (from ERC4626KernelStorageLib)
+    bytes32 private constant ERC4626_KERNEL_STORAGE_SLOT = 0x31dcae1a6c8e7be3177d6c56be6f186dd279c19bdd7d7f4820a1be934a634800;
+
     // ═══════════════════════════════════════════════════════════════════════════
     // CONFIGURATION (To be overridden by protocol-specific implementations)
     // ═══════════════════════════════════════════════════════════════════════════
@@ -46,32 +50,48 @@ abstract contract ERC4626_TestBase is AbstractKernelTestSuite {
     // NAV MANIPULATION HOOKS IMPLEMENTATION
     // ═══════════════════════════════════════════════════════════════════════════
 
-    /// @notice Simulates yield for ST by increasing the ST vault's share price
+    /// @notice Simulates yield for ST by donating assets to the vault
+    /// @dev This increases totalAssets without minting shares, which is how real yield works
     function simulateSTYield(uint256 _percentageWAD) public virtual override {
-        uint256 currentPrice = _getSTSharePrice();
-        uint256 newPrice = currentPrice * (WAD + _percentageWAD) / WAD;
-        _mockSTConvertToAssets(newPrice);
+        address vault = _getSTVault();
+        uint256 totalAssets = IERC4626(vault).totalAssets();
+        uint256 yieldAmount = totalAssets * _percentageWAD / WAD;
+        if (yieldAmount == 0) return;
+
+        // Donate assets directly to the vault (not via deposit)
+        dealSTAsset(address(this), yieldAmount);
+        IERC20(config.stAsset).transfer(vault, yieldAmount);
     }
 
-    /// @notice Simulates yield for JT by increasing the JT vault's share price
+    /// @notice Simulates yield for JT by donating assets to the vault
+    /// @dev This increases totalAssets without minting shares, which is how real yield works
     function simulateJTYield(uint256 _percentageWAD) public virtual override {
-        uint256 currentPrice = _getJTSharePrice();
-        uint256 newPrice = currentPrice * (WAD + _percentageWAD) / WAD;
-        _mockJTConvertToAssets(newPrice);
+        address vault = _getJTVault();
+        uint256 totalAssets = IERC4626(vault).totalAssets();
+        uint256 yieldAmount = totalAssets * _percentageWAD / WAD;
+        if (yieldAmount == 0) return;
+
+        // Donate assets directly to the vault (not via deposit)
+        dealJTAsset(address(this), yieldAmount);
+        IERC20(config.jtAsset).transfer(vault, yieldAmount);
     }
 
-    /// @notice Simulates loss for ST by decreasing the ST vault's share price
+    /// @notice Simulates loss for ST by mocking totalAssets to a lower value
+    /// @dev Loss simulation requires mocking since we can't remove assets from the vault
     function simulateSTLoss(uint256 _percentageWAD) public virtual override {
-        uint256 currentPrice = _getSTSharePrice();
-        uint256 newPrice = currentPrice * (WAD - _percentageWAD) / WAD;
-        _mockSTConvertToAssets(newPrice);
+        address vault = _getSTVault();
+        uint256 totalAssets = IERC4626(vault).totalAssets();
+        uint256 newTotalAssets = totalAssets * (WAD - _percentageWAD) / WAD;
+        vm.mockCall(vault, abi.encodeWithSelector(IERC4626.totalAssets.selector), abi.encode(newTotalAssets));
     }
 
-    /// @notice Simulates loss for JT by decreasing the JT vault's share price
+    /// @notice Simulates loss for JT by mocking totalAssets to a lower value
+    /// @dev Loss simulation requires mocking since we can't remove assets from the vault
     function simulateJTLoss(uint256 _percentageWAD) public virtual override {
-        uint256 currentPrice = _getJTSharePrice();
-        uint256 newPrice = currentPrice * (WAD - _percentageWAD) / WAD;
-        _mockJTConvertToAssets(newPrice);
+        address vault = _getJTVault();
+        uint256 totalAssets = IERC4626(vault).totalAssets();
+        uint256 newTotalAssets = totalAssets * (WAD - _percentageWAD) / WAD;
+        vm.mockCall(vault, abi.encodeWithSelector(IERC4626.totalAssets.selector), abi.encode(newTotalAssets));
     }
 
     /// @notice Deals ST asset to an address
@@ -116,18 +136,51 @@ abstract contract ERC4626_TestBase is AbstractKernelTestSuite {
         return IERC4626(_getJTVault()).convertToAssets(1e18);
     }
 
-    /// @notice Mocks the ST vault's convertToAssets function
+    /// @notice Mocks the ST vault's convertToAssets to return scaled value for kernel's ST shares
+    /// @dev Reads kernel's internal $.stOwnedShares via vm.load to get exact shares amount
     function _mockSTConvertToAssets(uint256 _newSharePrice) internal {
         mockedSTSharePrice = _newSharePrice;
-        // Mock convertToAssets for any input to return proportional value
-        vm.mockCall(_getSTVault(), abi.encodeWithSelector(IERC4626.convertToAssets.selector), abi.encode(_newSharePrice));
+        address vault = _getSTVault();
+
+        // Read kernel's internal stOwnedShares from storage (slot 0 of ERC4626KernelState)
+        uint256 stOwnedShares = uint256(vm.load(address(KERNEL), ERC4626_KERNEL_STORAGE_SLOT));
+
+        if (stOwnedShares == 0) return;
+
+        // Calculate what the new assets value should be at the new share price
+        // assets = shares * sharePrice / 1e18
+        uint256 newAssetsValue = stOwnedShares * _newSharePrice / 1e18;
+
+        // Mock convertToAssets with the exact calldata (selector + shares amount)
+        vm.mockCall(
+            vault,
+            abi.encodeWithSelector(IERC4626.convertToAssets.selector, stOwnedShares),
+            abi.encode(newAssetsValue)
+        );
     }
 
-    /// @notice Mocks the JT vault's convertToAssets function
+    /// @notice Mocks the JT vault's convertToAssets to return scaled value for kernel's JT shares
+    /// @dev Reads kernel's internal $.jtOwnedShares via vm.load to get exact shares amount
     function _mockJTConvertToAssets(uint256 _newSharePrice) internal {
         mockedJTSharePrice = _newSharePrice;
-        // Mock convertToAssets for any input to return proportional value
-        vm.mockCall(_getJTVault(), abi.encodeWithSelector(IERC4626.convertToAssets.selector), abi.encode(_newSharePrice));
+        address vault = _getJTVault();
+
+        // Read kernel's internal jtOwnedShares from storage (slot 1 of ERC4626KernelState)
+        bytes32 jtSharesSlot = bytes32(uint256(ERC4626_KERNEL_STORAGE_SLOT) + 1);
+        uint256 jtOwnedShares = uint256(vm.load(address(KERNEL), jtSharesSlot));
+
+        if (jtOwnedShares == 0) return;
+
+        // Calculate what the new assets value should be at the new share price
+        // assets = shares * sharePrice / 1e18
+        uint256 newAssetsValue = jtOwnedShares * _newSharePrice / 1e18;
+
+        // Mock convertToAssets with the exact calldata (selector + shares amount)
+        vm.mockCall(
+            vault,
+            abi.encodeWithSelector(IERC4626.convertToAssets.selector, jtOwnedShares),
+            abi.encode(newAssetsValue)
+        );
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -135,7 +188,7 @@ abstract contract ERC4626_TestBase is AbstractKernelTestSuite {
     // ═══════════════════════════════════════════════════════════════════════════
 
     /// @notice Tests that ST vault share price yield increases NAV
-    function testFuzz_stVaultSharePrice_yield_updatesNAV(uint256 _jtAmount, uint256 _stPercentage, uint256 _yieldPercentage) external {
+    function testFuzz_stVaultSharePrice_yield_updatesNAV(uint256 _jtAmount, uint256 _stPercentage, uint256 _yieldPercentage) external virtual {
         _jtAmount = bound(_jtAmount, _minDepositAmount(), config.initialFunding / 2);
         _stPercentage = bound(_stPercentage, 10, 50);
         _yieldPercentage = bound(_yieldPercentage, 1, 50); // 1-50% yield
@@ -162,7 +215,7 @@ abstract contract ERC4626_TestBase is AbstractKernelTestSuite {
     }
 
     /// @notice Tests that JT vault share price yield increases NAV
-    function testFuzz_jtVaultSharePrice_yield_updatesNAV(uint256 _jtAmount, uint256 _yieldPercentage) external {
+    function testFuzz_jtVaultSharePrice_yield_updatesNAV(uint256 _jtAmount, uint256 _yieldPercentage) external virtual {
         _jtAmount = bound(_jtAmount, _minDepositAmount(), config.initialFunding / 2);
         _yieldPercentage = bound(_yieldPercentage, 1, 50); // 1-50% yield
 
@@ -182,7 +235,7 @@ abstract contract ERC4626_TestBase is AbstractKernelTestSuite {
     }
 
     /// @notice Tests that vault share price loss decreases NAV
-    function testFuzz_vaultSharePrice_loss_updatesNAV(uint256 _jtAmount, uint256 _lossPercentage) external {
+    function testFuzz_vaultSharePrice_loss_updatesNAV(uint256 _jtAmount, uint256 _lossPercentage) external virtual {
         _jtAmount = bound(_jtAmount, _minDepositAmount(), config.initialFunding / 2);
         _lossPercentage = bound(_lossPercentage, 1, 30); // 1-30% loss
 
@@ -202,7 +255,7 @@ abstract contract ERC4626_TestBase is AbstractKernelTestSuite {
     }
 
     /// @notice Tests NAV conservation after vault share price changes
-    function testFuzz_vaultSharePrice_NAVConservation(uint256 _jtAmount, uint256 _yieldPercentage) external {
+    function testFuzz_vaultSharePrice_NAVConservation(uint256 _jtAmount, uint256 _yieldPercentage) external virtual {
         _jtAmount = bound(_jtAmount, _minDepositAmount(), config.initialFunding / 2);
         _yieldPercentage = bound(_yieldPercentage, 1, 30);
 

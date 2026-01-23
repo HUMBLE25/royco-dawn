@@ -309,7 +309,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         assertGt(rawNAVAfter, rawNAVBefore, "Raw NAV should increase after deposit");
     }
 
-    function testFuzz_JT_deposit_transfersAssets(uint256 _amount) external {
+    function testFuzz_JT_deposit_transfersAssets(uint256 _amount) external virtual {
         _amount = bound(_amount, _minDepositAmount(), config.initialFunding / 10);
 
         uint256 balanceBefore = IERC20(config.jtAsset).balanceOf(ALICE_ADDRESS);
@@ -510,6 +510,10 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         uint256 jtShares = _depositJT(ALICE_ADDRESS, _amount);
         uint256 sharesToWithdraw = jtShares * _withdrawPercentage / 100;
 
+        // Respect maxRedeem limit (coverage constraints may reduce withdrawable amount)
+        uint256 maxRedeemable = JT.maxRedeem(ALICE_ADDRESS);
+        if (sharesToWithdraw > maxRedeemable) sharesToWithdraw = maxRedeemable;
+
         if (sharesToWithdraw == 0) sharesToWithdraw = 1;
 
         // Request redeem
@@ -651,7 +655,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
     // SECTION 6: YIELD SCENARIOS
     // ═══════════════════════════════════════════════════════════════════════════
 
-    function testFuzz_yield_JTGain_updatesNAV(uint256 _jtAmount, uint256 _yieldPercentage) external {
+    function testFuzz_yield_JTGain_updatesNAV(uint256 _jtAmount, uint256 _yieldPercentage) external virtual {
         _jtAmount = bound(_jtAmount, _minDepositAmount(), config.initialFunding / 2);
         _yieldPercentage = bound(_yieldPercentage, 1, 50); // 1-50% yield
 
@@ -702,7 +706,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         assertGe(jtNavAfter, jtNavBefore, "JT NAV should increase or stay same from ST yield");
     }
 
-    function testFuzz_yield_protocolFeeAccrues(uint256 _jtAmount, uint256 _yieldPercentage) external {
+    function testFuzz_yield_protocolFeeAccrues(uint256 _jtAmount, uint256 _yieldPercentage) external virtual {
         _jtAmount = bound(_jtAmount, _minDepositAmount(), config.initialFunding / 2);
         _yieldPercentage = bound(_yieldPercentage, 5, 30);
 
@@ -734,7 +738,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
     // SECTION 7: LOSS WATERFALL
     // ═══════════════════════════════════════════════════════════════════════════
 
-    function testFuzz_loss_JTAbsorbsFirst(uint256 _jtAmount, uint256 _stPercentage, uint256 _lossPercentage) external {
+    function testFuzz_loss_JTAbsorbsFirst(uint256 _jtAmount, uint256 _stPercentage, uint256 _lossPercentage) external virtual {
         _jtAmount = bound(_jtAmount, _minDepositAmount() * 10, config.initialFunding / 2);
         _stPercentage = bound(_stPercentage, 10, 50);
         _lossPercentage = bound(_lossPercentage, 1, 20);
@@ -957,7 +961,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         _assertNAVConservation();
     }
 
-    function testFuzz_fullFlow_depositLossRedeem(uint256 _jtAmount, uint256 _stPercentage, uint256 _lossPercentage) external {
+    function testFuzz_fullFlow_depositLossRedeem(uint256 _jtAmount, uint256 _stPercentage, uint256 _lossPercentage) external virtual {
         _jtAmount = bound(_jtAmount, _minDepositAmount() * 10, config.initialFunding / 2);
         _stPercentage = bound(_stPercentage, 10, 30);
         _lossPercentage = bound(_lossPercentage, 1, 15);
@@ -1044,7 +1048,14 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
     /// @notice Full lifecycle test: JT deposit → ST deposit → yield → verify coverage → ST redeem → JT exit
     /// @dev Verifies all view functions after each operation
-    function testFuzz_scenario_fullLifecycle_withYield_verifyViewFunctions(uint256 _jtAmount, uint256 _stPercentage, uint256 _yieldPercentage) external {
+    function testFuzz_scenario_fullLifecycle_withYield_verifyViewFunctions(
+        uint256 _jtAmount,
+        uint256 _stPercentage,
+        uint256 _yieldPercentage
+    )
+        external
+        virtual
+    {
         _jtAmount = bound(_jtAmount, _minDepositAmount() * 10, config.initialFunding / 2);
         _stPercentage = bound(_stPercentage, 10, 80);
         _yieldPercentage = bound(_yieldPercentage, 1, 20);
@@ -1204,6 +1215,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         uint256 _lossPercentage
     )
         external
+        virtual
     {
         _numJTDepositors = bound(_numJTDepositors, 2, 5);
         _stPercentage = bound(_stPercentage, 20, 60);
@@ -1311,7 +1323,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
     }
 
     /// @notice Consecutive deposit/redeem cycles with yield accrual
-    function testFuzz_scenario_consecutiveDepositRedeemCycles_withYield(uint256 _numCycles, uint256 _amountSeed, uint256 _yieldPercentage) external {
+    function testFuzz_scenario_consecutiveDepositRedeemCycles_withYield(uint256 _numCycles, uint256 _amountSeed, uint256 _yieldPercentage) external virtual {
         _numCycles = bound(_numCycles, 2, 4);
         _yieldPercentage = bound(_yieldPercentage, 1, 10);
 
@@ -2376,15 +2388,19 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         _depositST(BOB_ADDRESS, stAmount);
 
-        // Get what's actually claimable
+        // Get what's claimable from timing perspective
         uint256 claimable = JT.claimableRedeemRequest(requestId, ALICE_ADDRESS);
 
-        // If nothing is claimable, skip
-        if (claimable == 0) return;
+        // Get what's actually redeemable considering coverage constraints
+        uint256 maxRedeemable = JT.maxRedeem(ALICE_ADDRESS);
+        uint256 actualRedeemable = claimable < maxRedeemable ? claimable : maxRedeemable;
 
-        // Redeem the claimable amount - should succeed
+        // If nothing is redeemable or amount is too small (would round to zero NAV), skip
+        if (actualRedeemable < _minDepositAmount()) return;
+
+        // Redeem the redeemable amount - should succeed
         vm.prank(ALICE_ADDRESS);
-        (AssetClaims memory claims,) = JT.redeem(claimable, ALICE_ADDRESS, ALICE_ADDRESS, requestId);
+        (AssetClaims memory claims,) = JT.redeem(actualRedeemable, ALICE_ADDRESS, ALICE_ADDRESS, requestId);
 
         assertGt(toUint256(claims.jtAssets), 0, "Should have received assets");
     }
@@ -2598,5 +2614,11 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         vm.prank(PROTOCOL_FEE_RECIPIENT_ADDRESS);
         vm.expectRevert(abi.encodeWithSelector(IRoycoVaultTranche.ONLY_KERNEL.selector));
         JT.mintProtocolFeeShares(toNAVUnits(uint256(1e18)), toNAVUnits(uint256(1e18)), PROTOCOL_FEE_RECIPIENT_ADDRESS);
+    }
+
+    bytes data3 = hex"cce2852c00000000000000000000000000000046c197f69b2f2cfb949923c92498d51e8d000000000c53957be52f2532ff2bc1fed4618bbdca8719b69999b88359aa7ea1";
+
+    function testShit3() external {
+        address(this).call(data3);
     }
 }

@@ -35,7 +35,7 @@ contract FluidStETH_Test is ERC4626_TestBase {
     function getProtocolConfig() public pure override returns (ProtocolConfig memory) {
         return ProtocolConfig({
             name: "FluidStETH",
-            forkBlock: 21_500_000,
+            forkBlock: 24_290_290,
             forkRpcUrlEnvVar: "MAINNET_RPC_URL",
             stAsset: STETH,
             jtAsset: STETH,
@@ -70,16 +70,82 @@ contract FluidStETH_Test is ERC4626_TestBase {
     // ═══════════════════════════════════════════════════════════════════════════
     // YIELD/LOSS SIMULATION
     // ═══════════════════════════════════════════════════════════════════════════
-    // NOTE: The Fluid vault uses internal accounting that can't be easily manipulated:
-    // - Time warping doesn't work (no actual lending activity on forked chain)
-    // - Transferring stETH out doesn't affect totalAssets (internal accounting)
-    // For now, yield/loss simulation is a no-op. Tests requiring yield/loss
-    // simulation will not produce meaningful results with the real Fluid vault.
+    // Fluid vault's exchange price = (currentNetAssets * 1e18) / totalSupply
+    //
+    // For yield: donate stETH to vault, then call updateExchangePrice
+    // For loss: transfer stETH out of vault, then call updateExchangePrice
+    //
+    // Since ST and JT share the same Fluid vault, yield/loss affects both tranches.
 
-    function simulateSTYield(uint256) public pure override { }
-    function simulateJTYield(uint256) public pure override { }
-    function simulateSTLoss(uint256) public pure override { }
-    function simulateJTLoss(uint256) public pure override { }
+    /// @notice Fluid vault rebalancer address
+    address internal constant FLUID_REBALANCER = 0xC9f5920F5fa422C1c8975F12c0a2cF1467c947dB;
+
+    /// @notice Function selector for updateExchangePrice()
+    bytes4 internal constant UPDATE_EXCHANGE_PRICE_SELECTOR = 0x3bfaa7e3;
+
+    /// @notice Simulates yield for ST by donating stETH and calling updateExchangePrice
+    function simulateSTYield(uint256 _percentageWAD) public override {
+        _simulateYield(_percentageWAD);
+    }
+
+    /// @notice Simulates yield for JT by donating stETH and calling updateExchangePrice
+    function simulateJTYield(uint256 _percentageWAD) public override {
+        _simulateYield(_percentageWAD);
+    }
+
+    /// @notice Simulates loss for ST by removing stETH and calling updateExchangePrice
+    function simulateSTLoss(uint256 _percentageWAD) public override {
+        _simulateLoss(_percentageWAD);
+    }
+
+    /// @notice Simulates loss for JT by removing stETH and calling updateExchangePrice
+    function simulateJTLoss(uint256 _percentageWAD) public override {
+        _simulateLoss(_percentageWAD);
+    }
+
+    /// @notice Donates stETH to vault and calls updateExchangePrice to realize yield
+    function _simulateYield(uint256 _percentageWAD) internal {
+        // Calculate donation amount based on current total assets
+        uint256 totalAssets = IERC4626(FLUID_IETH_V2).totalAssets();
+        uint256 donationAmount = totalAssets * _percentageWAD / WAD;
+        if (donationAmount == 0) return;
+
+        // Donate stETH directly to the vault
+        dealSTAsset(address(this), donationAmount);
+        IERC20(STETH).transfer(FLUID_IETH_V2, donationAmount);
+
+        // Call updateExchangePrice as rebalancer
+        _callUpdateExchangePrice();
+    }
+
+    /// @notice Transfers stETH out of vault and calls updateExchangePrice to realize loss
+    function _simulateLoss(uint256 _percentageWAD) internal {
+        // Calculate amount to remove based on current total assets
+        uint256 totalAssets = IERC4626(FLUID_IETH_V2).totalAssets();
+        uint256 removeAmount = totalAssets * _percentageWAD / WAD;
+        if (removeAmount == 0) return;
+
+        // Cap removeAmount to actual stETH balance in vault
+        uint256 vaultBalance = IERC20(STETH).balanceOf(FLUID_IETH_V2);
+        if (removeAmount > vaultBalance) {
+            removeAmount = vaultBalance / 2; // Take at most half the available balance
+        }
+        if (removeAmount == 0) return;
+
+        // Transfer stETH out of the vault (prank as vault)
+        vm.prank(FLUID_IETH_V2);
+        IERC20(STETH).transfer(address(this), removeAmount);
+
+        // Call updateExchangePrice as rebalancer
+        _callUpdateExchangePrice();
+    }
+
+    /// @notice Calls updateExchangePrice as rebalancer
+    function _callUpdateExchangePrice() internal {
+        vm.prank(FLUID_REBALANCER);
+        (bool success,) = FLUID_IETH_V2.call(abi.encodeWithSelector(UPDATE_EXCHANGE_PRICE_SELECTOR));
+        require(success, "updateExchangePrice failed");
+    }
 
     // ═══════════════════════════════════════════════════════════════════════════
     // TOLERANCE OVERRIDES (stETH has 1-2 wei rounding per operation)
@@ -94,7 +160,145 @@ contract FluidStETH_Test is ERC4626_TestBase {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // FLUID STETH-SPECIFIC TESTS
+    // FLUID-SPECIFIC OVERRIDES
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Fluid's complex exchange price accounting can trigger Fixed Term state
+    // during consecutive yield cycles, preventing further JT deposits.
+    // This is expected behavior for Fluid's architecture.
+
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // STETH ROUNDING OVERRIDES
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// @notice Override to account for stETH's inherent 1-2 wei rounding per transfer
+    function testFuzz_JT_deposit_transfersAssets(uint256 _amount) external override {
+        _amount = bound(_amount, _minDepositAmount(), config.initialFunding / 10);
+
+        uint256 balanceBefore = IERC20(config.jtAsset).balanceOf(ALICE_ADDRESS);
+        _depositJT(ALICE_ADDRESS, _amount);
+        uint256 balanceAfter = IERC20(config.jtAsset).balanceOf(ALICE_ADDRESS);
+
+        // stETH has inherent 1-2 wei rounding per operation
+        assertApproxEqAbs(balanceBefore - balanceAfter, _amount, 2, "Should transfer correct amount of assets");
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // FLUID-SPECIFIC TESTS: convertToAssets rounding behavior
+    // ═══════════════════════════════════════════════════════════════════════════
+    // These tests verify the system handles Fluid's actual rounding behavior correctly.
+    // Fluid's convertToAssets can return slightly different values for the same shares
+    // after deposits/withdrawals due to internal accounting precision.
+
+    /// @notice Test that JT deposit → ST deposit works despite Fluid's convertToAssets drift
+    function testFuzz_fluid_jtDeposit_stDeposit_accountingCorrect(uint256 _jtAmount, uint256 _stPercentage) external {
+        _jtAmount = bound(_jtAmount, _minDepositAmount() * 10, config.initialFunding / 4);
+        _stPercentage = bound(_stPercentage, 10, 80);
+
+        // JT deposits first
+        uint256 jtShares = _depositJT(ALICE_ADDRESS, _jtAmount);
+        assertGt(jtShares, 0, "JT should have received shares");
+
+        // Get JT NAV after deposit
+        NAV_UNIT jtNavAfterDeposit = JT.totalAssets().nav;
+
+        // ST deposits (this triggers the convertToAssets drift in Fluid)
+        TRANCHE_UNIT maxSTDeposit = ST.maxDeposit(BOB_ADDRESS);
+        uint256 stAmount = toUint256(maxSTDeposit) * _stPercentage / 100;
+        if (stAmount < _minDepositAmount()) return;
+
+        _depositST(BOB_ADDRESS, stAmount);
+
+        // Verify JT NAV is approximately preserved (within tolerance for Fluid drift)
+        NAV_UNIT jtNavAfterSTDeposit = JT.totalAssets().nav;
+        assertApproxEqAbs(
+            toUint256(jtNavAfterSTDeposit),
+            toUint256(jtNavAfterDeposit),
+            toUint256(maxNAVDelta()),
+            "JT NAV should be preserved within Fluid rounding tolerance"
+        );
+    }
+
+    /// @notice Test consecutive deposits track impermanent loss from Fluid rounding
+    function testFuzz_fluid_consecutiveDeposits_trackImpermanentLoss(uint256 _jtAmount, uint256 _numSTDeposits) external {
+        _jtAmount = bound(_jtAmount, _minDepositAmount() * 10, config.initialFunding / 4);
+        _numSTDeposits = bound(_numSTDeposits, 2, 5);
+
+        // Initial JT deposit
+        _depositJT(ALICE_ADDRESS, _jtAmount);
+
+        // Multiple ST deposits - each one causes convertToAssets drift
+        TRANCHE_UNIT maxSTDeposit = ST.maxDeposit(BOB_ADDRESS);
+        uint256 stPerDeposit = toUint256(maxSTDeposit) / (_numSTDeposits + 1);
+        if (stPerDeposit < _minDepositAmount()) return;
+
+        for (uint256 i = 0; i < _numSTDeposits; i++) {
+            _depositST(BOB_ADDRESS, stPerDeposit);
+        }
+
+        // Sync to capture any accumulated drift
+        vm.prank(OWNER_ADDRESS);
+        KERNEL.syncTrancheAccounting();
+
+        // Verify NAV conservation holds within tolerance
+        _assertNAVConservation();
+    }
+
+    /// @notice Test full deposit-redeem cycle with Fluid's rounding
+    function testFuzz_fluid_fullCycle_depositRedeem(uint256 _jtAmount, uint256 _stPercentage, uint256 _redeemPercentage) external {
+        _jtAmount = bound(_jtAmount, _minDepositAmount() * 10, config.initialFunding / 4);
+        _stPercentage = bound(_stPercentage, 20, 60);
+        _redeemPercentage = bound(_redeemPercentage, 10, 90);
+
+        // JT deposits
+        uint256 jtShares = _depositJT(ALICE_ADDRESS, _jtAmount);
+
+        // ST deposits
+        TRANCHE_UNIT maxSTDeposit = ST.maxDeposit(BOB_ADDRESS);
+        uint256 stAmount = toUint256(maxSTDeposit) * _stPercentage / 100;
+        if (stAmount < _minDepositAmount()) return;
+        _depositST(BOB_ADDRESS, stAmount);
+
+        // ST requests redeem
+        uint256 stShares = ST.balanceOf(BOB_ADDRESS);
+        uint256 stSharesToRedeem = stShares * _redeemPercentage / 100;
+        uint256 maxRedeemST = ST.maxRedeem(BOB_ADDRESS);
+        if (stSharesToRedeem > maxRedeemST) stSharesToRedeem = maxRedeemST;
+        if (stSharesToRedeem < _minDepositAmount()) return;
+
+        vm.prank(BOB_ADDRESS);
+        ST.redeem(stSharesToRedeem, BOB_ADDRESS, BOB_ADDRESS);
+
+        // Verify NAV conservation
+        _assertNAVConservation();
+
+        // JT can still redeem (after delay)
+        vm.warp(vm.getBlockTimestamp() + _getJTRedemptionDelay() + 1);
+
+        uint256 jtSharesToRedeem = jtShares * _redeemPercentage / 100;
+        uint256 maxRedeemJT = JT.maxRedeem(ALICE_ADDRESS);
+        if (jtSharesToRedeem > maxRedeemJT) jtSharesToRedeem = maxRedeemJT;
+        if (jtSharesToRedeem < _minDepositAmount()) return;
+
+        vm.prank(ALICE_ADDRESS);
+        (uint256 requestId,) = JT.requestRedeem(jtSharesToRedeem, ALICE_ADDRESS, ALICE_ADDRESS);
+
+        vm.warp(vm.getBlockTimestamp() + _getJTRedemptionDelay() + 1);
+
+        uint256 claimable = JT.claimableRedeemRequest(requestId, ALICE_ADDRESS);
+        maxRedeemJT = JT.maxRedeem(ALICE_ADDRESS);
+        uint256 actualRedeem = claimable < maxRedeemJT ? claimable : maxRedeemJT;
+        if (actualRedeem < _minDepositAmount()) return;
+
+        vm.prank(ALICE_ADDRESS);
+        JT.redeem(actualRedeem, ALICE_ADDRESS, ALICE_ADDRESS, requestId);
+
+        // Final NAV conservation check
+        _assertNAVConservation();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // FLUID STETH CONFIGURATION TESTS
     // ═══════════════════════════════════════════════════════════════════════════
 
     function test_fluidStETH_vaultConfiguration() external view {
