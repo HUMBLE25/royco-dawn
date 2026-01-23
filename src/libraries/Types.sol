@@ -58,6 +58,12 @@ struct AssetClaims {
  *                                       This represents the first claim on capital that the junior tranche has on future JT recoveries
  * @custom:field stProtocolFeeAccrued - Protocol fee taken on ST yield on this sync
  * @custom:field jtProtocolFeeAccrued - Protocol fee taken on JT yield on this sync
+ * @custom:field fixedTermDurationSeconds - The duration of the fixed term in seconds
+ * @custom:field fixedTermEndTimestamp - The timestamp at which the fixed term ends. Set to 0 if the market is not in a fixed term state
+ * @custom:field currentLtvWad - The current loan to value of the market, scaled to WAD precision
+ * @custom:field lltvWAD - The liquidation loan to value of the market, scaled to WAD precision
+ * @custom:field currentUtilizationWad - The current utilization of the market, scaled to WAD precision
+ * @custom:field coverageWAD - The coverage percentage that the senior tranche is expected to be protected by, scaled to WAD precision
  */
 struct SyncedAccountingState {
     MarketState marketState;
@@ -70,6 +76,14 @@ struct SyncedAccountingState {
     NAV_UNIT jtSelfImpermanentLoss;
     NAV_UNIT stProtocolFeeAccrued;
     NAV_UNIT jtProtocolFeeAccrued;
+    // Fixed term state variables
+    uint256 fixedTermDurationSeconds;
+    uint256 fixedTermEndTimestamp;
+    // LLTV and utilization state variables
+    uint256 currentLtvWad;
+    uint256 lltvWAD;
+    uint256 currentUtilizationWad;
+    uint256 coverageWAD;
 }
 
 /**
