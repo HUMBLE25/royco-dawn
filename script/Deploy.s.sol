@@ -5,7 +5,6 @@ import { IAccessManager } from "../lib/openzeppelin-contracts/contracts/access/m
 import { UUPSUpgradeable } from "../lib/openzeppelin-contracts/contracts/proxy/utils/UUPSUpgradeable.sol";
 import { RoycoFactory } from "../src/RoycoFactory.sol";
 import { RoycoAccountant } from "../src/accountant/RoycoAccountant.sol";
-import { RoycoRoles } from "../src/auth/RoycoRoles.sol";
 import { IRoycoAccountant } from "../src/interfaces/IRoycoAccountant.sol";
 import { IRoycoAuth } from "../src/interfaces/IRoycoAuth.sol";
 import { IYDM } from "../src/interfaces/IYDM.sol";
@@ -33,6 +32,7 @@ import { RoycoSeniorTranche } from "../src/tranches/RoycoSeniorTranche.sol";
 import { AdaptiveCurveYDM } from "../src/ydm/AdaptiveCurveYDM.sol";
 import { StaticCurveYDM } from "../src/ydm/StaticCurveYDM.sol";
 import { Create2DeployUtils } from "./Create2DeployUtils.sol";
+import { RolesConfiguration } from "./RolesConfiguration.sol";
 import { Script } from "lib/forge-std/src/Script.sol";
 import { console2 } from "lib/forge-std/src/console2.sol";
 
@@ -42,7 +42,7 @@ interface IKernelOracleQuoterAdmin {
     function setTrancheAssetToReferenceAssetOracle(address _trancheAssetToReferenceAssetOracle, uint48 _stalenessThresholdSeconds) external;
 }
 
-contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
+contract DeployScript is Script, Create2DeployUtils, RolesConfiguration {
     // Custom errors
     error UnsupportedKernelType(KernelType kernelType);
     error UnsupportedYDMType(YDMType ydmType);
@@ -58,9 +58,6 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
     bytes32 constant YDM_SALT = keccak256("ROYCO_YDM_IMPLEMENTATION_V1");
     bytes32 constant FACTORY_SALT_BASE = keccak256("ROYCO_FACTORY_IMPLEMENTATION_V1");
     bytes32 constant MARKET_DEPLOYMENT_SALT = keccak256("ROYCO_MARKET_DEPLOYMENT_V2");
-
-    // Constants
-    uint64 constant ADMIN_ROLE = 0;
 
     /// @notice Enum for kernel types
     enum KernelType {
@@ -356,6 +353,105 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
         roles[index++] = RolesTargetConfiguration({ target: _accountant, selectors: accountantSelectors, roles: accountantRoleValues });
     }
 
+    /// @notice Generates role assignments from addresses
+    /// @dev LP_ROLE is included with assignee=address(0) so its admin role gets configured
+    /// @param _pauserAddress Address for ADMIN_PAUSER_ROLE
+    /// @param _upgraderAddress Address for ADMIN_UPGRADER_ROLE
+    /// @param _syncRoleAddress Address for SYNC_ROLE
+    /// @param _adminKernelAddress Address for ADMIN_KERNEL_ROLE
+    /// @param _adminAccountantAddress Address for ADMIN_ACCOUNTANT_ROLE
+    /// @param _adminProtocolFeeSetterAddress Address for ADMIN_PROTOCOL_FEE_SETTER_ROLE
+    /// @param _adminOracleQuoterAddress Address for ADMIN_ORACLE_QUOTER_ROLE
+    /// @param _lpRoleAdminAddress Address for LP_ROLE_ADMIN_ROLE
+    /// @param _roleGuardianAddress Address for ROLE_GUARDIAN_ROLE
+    /// @return roleAssignments Array of role assignment configurations
+    function generateRolesAssignments(
+        address _pauserAddress,
+        address _upgraderAddress,
+        address _syncRoleAddress,
+        address _adminKernelAddress,
+        address _adminAccountantAddress,
+        address _adminProtocolFeeSetterAddress,
+        address _adminOracleQuoterAddress,
+        address _lpRoleAdminAddress,
+        address _roleGuardianAddress
+    )
+        public
+        pure
+        returns (RoleAssignmentConfiguration[] memory roleAssignments)
+    {
+        roleAssignments = new RoleAssignmentConfiguration[](10);
+
+        // Get role configs from RolesConfiguration
+        RoleConfig memory pauserConfig = getRoleConfig(ADMIN_PAUSER_ROLE);
+        RoleConfig memory upgraderConfig = getRoleConfig(ADMIN_UPGRADER_ROLE);
+        RoleConfig memory syncConfig = getRoleConfig(SYNC_ROLE);
+        RoleConfig memory kernelConfig = getRoleConfig(ADMIN_KERNEL_ROLE);
+        RoleConfig memory accountantConfig = getRoleConfig(ADMIN_ACCOUNTANT_ROLE);
+        RoleConfig memory feeSetterConfig = getRoleConfig(ADMIN_PROTOCOL_FEE_SETTER_ROLE);
+        RoleConfig memory oracleQuoterConfig = getRoleConfig(ADMIN_ORACLE_QUOTER_ROLE);
+        RoleConfig memory lpRoleAdminConfig = getRoleConfig(LP_ROLE_ADMIN_ROLE);
+        RoleConfig memory lpRoleConfig = getRoleConfig(LP_ROLE);
+        RoleConfig memory roleGuardianConfig = getRoleConfig(ROLE_GUARDIAN_ROLE);
+
+        roleAssignments[0] = RoleAssignmentConfiguration({
+            role: ADMIN_PAUSER_ROLE, roleAdminRole: pauserConfig.adminRole, assignee: _pauserAddress, executionDelay: pauserConfig.executionDelay
+        });
+
+        roleAssignments[1] = RoleAssignmentConfiguration({
+            role: ADMIN_UPGRADER_ROLE, roleAdminRole: upgraderConfig.adminRole, assignee: _upgraderAddress, executionDelay: upgraderConfig.executionDelay
+        });
+
+        roleAssignments[2] = RoleAssignmentConfiguration({
+            role: SYNC_ROLE, roleAdminRole: syncConfig.adminRole, assignee: _syncRoleAddress, executionDelay: syncConfig.executionDelay
+        });
+
+        roleAssignments[3] = RoleAssignmentConfiguration({
+            role: ADMIN_KERNEL_ROLE, roleAdminRole: kernelConfig.adminRole, assignee: _adminKernelAddress, executionDelay: kernelConfig.executionDelay
+        });
+
+        roleAssignments[4] = RoleAssignmentConfiguration({
+            role: ADMIN_ACCOUNTANT_ROLE,
+            roleAdminRole: accountantConfig.adminRole,
+            assignee: _adminAccountantAddress,
+            executionDelay: accountantConfig.executionDelay
+        });
+
+        roleAssignments[5] = RoleAssignmentConfiguration({
+            role: ADMIN_PROTOCOL_FEE_SETTER_ROLE,
+            roleAdminRole: feeSetterConfig.adminRole,
+            assignee: _adminProtocolFeeSetterAddress,
+            executionDelay: feeSetterConfig.executionDelay
+        });
+
+        roleAssignments[6] = RoleAssignmentConfiguration({
+            role: ADMIN_ORACLE_QUOTER_ROLE,
+            roleAdminRole: oracleQuoterConfig.adminRole,
+            assignee: _adminOracleQuoterAddress,
+            executionDelay: oracleQuoterConfig.executionDelay
+        });
+
+        roleAssignments[7] = RoleAssignmentConfiguration({
+            role: LP_ROLE_ADMIN_ROLE,
+            roleAdminRole: lpRoleAdminConfig.adminRole,
+            assignee: _lpRoleAdminAddress,
+            executionDelay: lpRoleAdminConfig.executionDelay
+        });
+
+        // LP_ROLE with address(0) assignee - role admin will be set but no direct assignment
+        // LP roles are granted separately via GrantLPRolesScript
+        roleAssignments[8] = RoleAssignmentConfiguration({
+            role: LP_ROLE, roleAdminRole: lpRoleConfig.adminRole, assignee: address(0), executionDelay: lpRoleConfig.executionDelay
+        });
+
+        roleAssignments[9] = RoleAssignmentConfiguration({
+            role: ROLE_GUARDIAN_ROLE,
+            roleAdminRole: roleGuardianConfig.adminRole,
+            assignee: _roleGuardianAddress,
+            executionDelay: roleGuardianConfig.executionDelay
+        });
+    }
+
     /// @notice Grants all relevant roles to the addresses specified in the deployment parameters
     /// @param _factory The factory contract (which acts as the AccessManager)
     /// @param _params The deployment parameters containing role addresses
@@ -372,25 +468,32 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
 
         for (uint256 i = 0; i < _params.roleAssignments.length; i++) {
             RoleAssignmentConfiguration memory roleAssignment = _params.roleAssignments[i];
-            require(roleAssignment.roleAdminRole == 0, RoleAssignmentAdminRoleNotFound(roleAssignment.roleAdminRole));
-            require(roleAssignment.assignee != address(0), RoleAssignmentAssigneeAddressIsZero(roleAssignment.assignee));
 
-            // Grant the role to the assignee
-            (hasRole,) = accessManager.hasRole(roleAssignment.role, roleAssignment.assignee);
-            if (!hasRole) {
-                console2.log("  - Granting role: %s to: %s with delay: %s", roleAssignment.role, roleAssignment.assignee, roleAssignment.executionDelay);
-                accessManager.grantRole(roleAssignment.role, roleAssignment.assignee, roleAssignment.executionDelay);
-                console2.log("  - %s granted to: %s with delay: %s", roleAssignment.role, roleAssignment.assignee, roleAssignment.executionDelay);
+            // Get role config to set up admin and guardian
+            RoleConfig memory roleConfig = getRoleConfig(roleAssignment.role);
+
+            // Grant the role to the assignee (skip if assignee is zero, e.g., LP_ROLE which is handled separately)
+            if (roleAssignment.assignee != address(0)) {
+                (hasRole,) = accessManager.hasRole(roleAssignment.role, roleAssignment.assignee);
+                if (!hasRole) {
+                    console2.log("  - Granting role: %s to: %s with delay: %s", roleAssignment.role, roleAssignment.assignee, roleAssignment.executionDelay);
+                    accessManager.grantRole(roleAssignment.role, roleAssignment.assignee, roleAssignment.executionDelay);
+                } else {
+                    console2.log("  - %s already granted to: %s skipping role grant", roleAssignment.role, roleAssignment.assignee);
+                }
             } else {
-                console2.log("  - %s already granted to: %s skipping role grant", roleAssignment.role, roleAssignment.assignee);
+                console2.log("  - Skipping role grant for %s: assignee is zero address", roleAssignment.role);
             }
 
-            // Set the role admin if specified
-            if (roleAssignment.roleAdminRole != 0) {
-                console2.log("  - Setting role admin for:", roleAssignment.role, "to:", roleAssignment.roleAdminRole);
-                accessManager.setRoleAdmin(roleAssignment.roleAdminRole, roleAssignment.role);
-                console2.log("  - Set role admin for:", roleAssignment.role, "to:", roleAssignment.roleAdminRole);
+            // Set the role admin if different from default (0)
+            if (roleConfig.adminRole != ADMIN_ROLE) {
+                console2.log("  - Setting role admin for: %s to: %s", roleAssignment.role, roleConfig.adminRole);
+                accessManager.setRoleAdmin(roleAssignment.role, roleConfig.adminRole);
             }
+
+            // Set the role guardian
+            console2.log("  - Setting role guardian for: %s to: %s", roleAssignment.role, roleConfig.guardianRole);
+            accessManager.setRoleGuardian(roleAssignment.role, roleConfig.guardianRole);
         }
 
         console2.log("All roles granted successfully!");

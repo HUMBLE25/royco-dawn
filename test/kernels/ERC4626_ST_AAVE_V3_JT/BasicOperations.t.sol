@@ -739,20 +739,20 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         vm.stopPrank();
 
         skip(1 days);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         vm.prank(address(MOCK_UNDERLYING_ST_VAULT));
         USDC.transfer(CHARLIE_ADDRESS, 999e6); // remove 99.9% of JT by ST coverage
 
         skip(1);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
         vm.prank(address(MOCK_UNDERLYING_ST_VAULT)); // Remove all JT by ST coverage -> leaving 0 effective JT
         USDC.transfer(CHARLIE_ADDRESS, 5e6);
 
         skip(100);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
     }
 

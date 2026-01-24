@@ -199,7 +199,7 @@ abstract contract ERC4626_TestBase is AbstractKernelTestSuite {
         simulateSTYield(_yieldPercentage * 1e16); // Convert to WAD
 
         // Trigger sync
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         NAV_UNIT navAfter = ST.totalAssets().nav;
@@ -219,7 +219,7 @@ abstract contract ERC4626_TestBase is AbstractKernelTestSuite {
         simulateJTYield(_yieldPercentage * 1e16); // Convert to WAD
 
         // Trigger sync
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         NAV_UNIT navAfter = JT.totalAssets().nav;
@@ -239,7 +239,7 @@ abstract contract ERC4626_TestBase is AbstractKernelTestSuite {
         simulateJTLoss(_lossPercentage * 1e16); // Convert to WAD
 
         // Trigger sync
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         NAV_UNIT navAfter = JT.totalAssets().nav;
@@ -256,7 +256,7 @@ abstract contract ERC4626_TestBase is AbstractKernelTestSuite {
         // Simulate vault share price yield
         simulateJTYield(_yieldPercentage * 1e16);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         _assertNAVConservation();
@@ -280,18 +280,8 @@ abstract contract ERC4626_TestBase is AbstractKernelTestSuite {
             jtYieldShareAtFullUtilWAD: 1e18 // 100% at 100% utilization
         });
 
-        // Build role assignments
-        DeployScript.RoleAssignmentConfiguration[] memory roleAssignments = new DeployScript.RoleAssignmentConfiguration[](6);
-        roleAssignments[0] =
-            DeployScript.RoleAssignmentConfiguration({ role: ADMIN_PAUSER_ROLE, roleAdminRole: 0, assignee: PAUSER_ADDRESS, executionDelay: 0 });
-        roleAssignments[1] =
-            DeployScript.RoleAssignmentConfiguration({ role: ADMIN_UPGRADER_ROLE, roleAdminRole: 0, assignee: UPGRADER_ADDRESS, executionDelay: 0 });
-        roleAssignments[2] =
-            DeployScript.RoleAssignmentConfiguration({ role: LP_ROLE_ADMIN_ROLE, roleAdminRole: 0, assignee: OWNER_ADDRESS, executionDelay: 0 });
-        roleAssignments[3] = DeployScript.RoleAssignmentConfiguration({ role: SYNC_ROLE, roleAdminRole: 0, assignee: OWNER_ADDRESS, executionDelay: 0 });
-        roleAssignments[4] = DeployScript.RoleAssignmentConfiguration({ role: ADMIN_KERNEL_ROLE, roleAdminRole: 0, assignee: OWNER_ADDRESS, executionDelay: 0 });
-        roleAssignments[5] =
-            DeployScript.RoleAssignmentConfiguration({ role: ADMIN_ORACLE_QUOTER_ROLE, roleAdminRole: 0, assignee: OWNER_ADDRESS, executionDelay: 0 });
+        // Build role assignments using the centralized function
+        DeployScript.RoleAssignmentConfiguration[] memory roleAssignments = _generateRoleAssignments();
 
         DeployScript.DeploymentParams memory params = DeployScript.DeploymentParams({
             factoryAdmin: address(DEPLOY_SCRIPT),

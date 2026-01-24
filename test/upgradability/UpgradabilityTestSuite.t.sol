@@ -85,18 +85,8 @@ contract UpgradabilityTestSuite is BaseTest {
         DeployScript.AdaptiveCurveYDMParams memory ydmParams =
             DeployScript.AdaptiveCurveYDMParams({ jtYieldShareAtTargetUtilWAD: 0.3e18, jtYieldShareAtFullUtilWAD: 1e18 });
 
-        // Build role assignments
-        DeployScript.RoleAssignmentConfiguration[] memory roleAssignments = new DeployScript.RoleAssignmentConfiguration[](6);
-        roleAssignments[0] =
-            DeployScript.RoleAssignmentConfiguration({ role: ADMIN_PAUSER_ROLE, roleAdminRole: 0, assignee: PAUSER_ADDRESS, executionDelay: 0 });
-        roleAssignments[1] =
-            DeployScript.RoleAssignmentConfiguration({ role: ADMIN_UPGRADER_ROLE, roleAdminRole: 0, assignee: UPGRADER_ADDRESS, executionDelay: 0 });
-        roleAssignments[2] =
-            DeployScript.RoleAssignmentConfiguration({ role: LP_ROLE_ADMIN_ROLE, roleAdminRole: 0, assignee: OWNER_ADDRESS, executionDelay: 0 });
-        roleAssignments[3] = DeployScript.RoleAssignmentConfiguration({ role: SYNC_ROLE, roleAdminRole: 0, assignee: OWNER_ADDRESS, executionDelay: 0 });
-        roleAssignments[4] = DeployScript.RoleAssignmentConfiguration({ role: ADMIN_KERNEL_ROLE, roleAdminRole: 0, assignee: OWNER_ADDRESS, executionDelay: 0 });
-        roleAssignments[5] =
-            DeployScript.RoleAssignmentConfiguration({ role: ADMIN_ORACLE_QUOTER_ROLE, roleAdminRole: 0, assignee: OWNER_ADDRESS, executionDelay: 0 });
+        // Build role assignments using the centralized function
+        DeployScript.RoleAssignmentConfiguration[] memory roleAssignments = _generateRoleAssignments();
 
         DeployScript.DeploymentParams memory params = DeployScript.DeploymentParams({
             factoryAdmin: address(DEPLOY_SCRIPT),
@@ -150,6 +140,22 @@ contract UpgradabilityTestSuite is BaseTest {
 
         newKernelImpl = address(new YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter_Kernel(constructionParams));
         vm.label(newKernelImpl, "NewKernelImpl");
+    }
+
+    /// @notice Helper to schedule and execute an upgrade operation (requires 1 day delay for ADMIN_UPGRADER_ROLE)
+    function _executeUpgrade(address _proxy, address _newImpl) internal {
+        bytes memory upgradeData = abi.encodeCall(UUPSUpgradeable.upgradeToAndCall, (_newImpl, ""));
+
+        // Schedule the upgrade
+        vm.prank(UPGRADER_ADDRESS);
+        FACTORY.schedule(_proxy, upgradeData, 0);
+
+        // Wait for the delay to pass
+        vm.warp(block.timestamp + 1 days + 1);
+
+        // Execute the upgrade
+        vm.prank(UPGRADER_ADDRESS);
+        FACTORY.execute(_proxy, upgradeData);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -261,8 +267,7 @@ contract UpgradabilityTestSuite is BaseTest {
         uint256 totalSupplyBefore = ST.totalSupply();
         string memory nameBefore = IERC4626(address(ST)).name();
 
-        vm.prank(UPGRADER_ADDRESS);
-        UUPSUpgradeable(address(ST)).upgradeToAndCall(address(newSTImpl), "");
+        _executeUpgrade(address(ST), address(newSTImpl));
 
         assertEq(ST.totalSupply(), totalSupplyBefore, "Total supply should be preserved after upgrade");
         assertEq(IERC4626(address(ST)).name(), nameBefore, "Name should be preserved after upgrade");
@@ -273,8 +278,7 @@ contract UpgradabilityTestSuite is BaseTest {
         uint256 totalSupplyBefore = JT.totalSupply();
         string memory nameBefore = IERC4626(address(JT)).name();
 
-        vm.prank(UPGRADER_ADDRESS);
-        UUPSUpgradeable(address(JT)).upgradeToAndCall(address(newJTImpl), "");
+        _executeUpgrade(address(JT), address(newJTImpl));
 
         assertEq(JT.totalSupply(), totalSupplyBefore, "Total supply should be preserved after upgrade");
         assertEq(IERC4626(address(JT)).name(), nameBefore, "Name should be preserved after upgrade");
@@ -285,8 +289,7 @@ contract UpgradabilityTestSuite is BaseTest {
         uint64 coverageBefore = ACCOUNTANT.getState().coverageWAD;
         address kernelBefore = ACCOUNTANT.getState().kernel;
 
-        vm.prank(UPGRADER_ADDRESS);
-        UUPSUpgradeable(address(ACCOUNTANT)).upgradeToAndCall(address(newAccountantImpl), "");
+        _executeUpgrade(address(ACCOUNTANT), address(newAccountantImpl));
 
         assertEq(ACCOUNTANT.getState().coverageWAD, coverageBefore, "Coverage should be preserved after upgrade");
         assertEq(ACCOUNTANT.getState().kernel, kernelBefore, "Kernel should be preserved after upgrade");
@@ -296,8 +299,7 @@ contract UpgradabilityTestSuite is BaseTest {
     function test_kernelProxy_canBeUpgradedByUpgrader() external {
         (address stBefore,, address jtBefore,,, address accountantBefore,) = KERNEL.getState();
 
-        vm.prank(UPGRADER_ADDRESS);
-        UUPSUpgradeable(address(KERNEL)).upgradeToAndCall(newKernelImpl, "");
+        _executeUpgrade(address(KERNEL), newKernelImpl);
 
         (address stAfter,, address jtAfter,,, address accountantAfter,) = KERNEL.getState();
         assertEq(stAfter, stBefore, "ST address should be preserved after upgrade");
@@ -370,8 +372,7 @@ contract UpgradabilityTestSuite is BaseTest {
         uint256 aliceBalanceBefore = JT.balanceOf(ALICE_ADDRESS);
 
         // Upgrade JT
-        vm.prank(UPGRADER_ADDRESS);
-        UUPSUpgradeable(address(JT)).upgradeToAndCall(address(newJTImpl), "");
+        _executeUpgrade(address(JT), address(newJTImpl));
 
         // Verify state is preserved
         assertEq(JT.totalSupply(), totalSupplyBefore, "Total supply should be preserved");
@@ -401,8 +402,7 @@ contract UpgradabilityTestSuite is BaseTest {
         uint256 aliceBalanceBefore = ST.balanceOf(ALICE_ADDRESS);
 
         // Upgrade ST
-        vm.prank(UPGRADER_ADDRESS);
-        UUPSUpgradeable(address(ST)).upgradeToAndCall(address(newSTImpl), "");
+        _executeUpgrade(address(ST), address(newSTImpl));
 
         // Verify state is preserved
         assertEq(ST.totalSupply(), totalSupplyBefore, "Total supply should be preserved");
@@ -421,8 +421,7 @@ contract UpgradabilityTestSuite is BaseTest {
         vm.stopPrank();
 
         // Upgrade JT
-        vm.prank(UPGRADER_ADDRESS);
-        UUPSUpgradeable(address(JT)).upgradeToAndCall(address(newJTImpl), "");
+        _executeUpgrade(address(JT), address(newJTImpl));
 
         // Deposit after upgrade should still work
         vm.startPrank(BOB_ADDRESS);
@@ -449,11 +448,10 @@ contract UpgradabilityTestSuite is BaseTest {
         vm.stopPrank();
 
         // Upgrade kernel
-        vm.prank(UPGRADER_ADDRESS);
-        UUPSUpgradeable(address(KERNEL)).upgradeToAndCall(newKernelImpl, "");
+        _executeUpgrade(address(KERNEL), newKernelImpl);
 
         // Sync should still work after upgrade
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         // Should not revert - sync completed successfully

@@ -174,9 +174,9 @@ abstract contract YieldBearingERC4626_TestBase is AbstractKernelTestSuite {
     }
 
     /// @notice Sets the conversion rate using the kernel's setter (in RAY precision)
-    /// @dev Requires ORACLE_QUOTER_ADMIN_ROLE, which is granted to OWNER_ADDRESS
+    /// @dev Requires ADMIN_ORACLE_QUOTER_ROLE, which is granted to ORACLE_QUOTER_ADMIN_ADDRESS
     function _setConversionRate(uint256 _newRateRAY) internal {
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(ORACLE_QUOTER_ADMIN_ADDRESS);
         YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter_Kernel(address(KERNEL)).setConversionRate(_newRateRAY);
     }
 
@@ -198,7 +198,7 @@ abstract contract YieldBearingERC4626_TestBase is AbstractKernelTestSuite {
         simulateVaultSharePriceYield(_yieldPercentage * 1e16); // Convert to WAD
 
         // Trigger sync
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         NAV_UNIT navAfter = JT.totalAssets().nav;
@@ -219,7 +219,7 @@ abstract contract YieldBearingERC4626_TestBase is AbstractKernelTestSuite {
         simulateVaultSharePriceLoss(_lossPercentage * 1e16); // Convert to WAD
 
         // Trigger sync
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         NAV_UNIT navAfter = JT.totalAssets().nav;
@@ -250,7 +250,7 @@ abstract contract YieldBearingERC4626_TestBase is AbstractKernelTestSuite {
         vm.warp(vm.getBlockTimestamp() + 1 days);
 
         // Trigger sync
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         NAV_UNIT jtNavAfter = JT.totalAssets().nav;
@@ -269,7 +269,7 @@ abstract contract YieldBearingERC4626_TestBase is AbstractKernelTestSuite {
         // Simulate vault share price yield
         simulateVaultSharePriceYield(_yieldPercentage * 1e16);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         _assertNAVConservation();
@@ -298,18 +298,8 @@ abstract contract YieldBearingERC4626_TestBase is AbstractKernelTestSuite {
             jtYieldShareAtFullUtilWAD: 1e18 // 100% at 100% utilization
         });
 
-        // Build role assignments
-        DeployScript.RoleAssignmentConfiguration[] memory roleAssignments = new DeployScript.RoleAssignmentConfiguration[](6);
-        roleAssignments[0] =
-            DeployScript.RoleAssignmentConfiguration({ role: ADMIN_PAUSER_ROLE, roleAdminRole: 0, assignee: PAUSER_ADDRESS, executionDelay: 0 });
-        roleAssignments[1] =
-            DeployScript.RoleAssignmentConfiguration({ role: ADMIN_UPGRADER_ROLE, roleAdminRole: 0, assignee: UPGRADER_ADDRESS, executionDelay: 0 });
-        roleAssignments[2] =
-            DeployScript.RoleAssignmentConfiguration({ role: LP_ROLE_ADMIN_ROLE, roleAdminRole: 0, assignee: OWNER_ADDRESS, executionDelay: 0 });
-        roleAssignments[3] = DeployScript.RoleAssignmentConfiguration({ role: SYNC_ROLE, roleAdminRole: 0, assignee: OWNER_ADDRESS, executionDelay: 0 });
-        roleAssignments[4] = DeployScript.RoleAssignmentConfiguration({ role: ADMIN_KERNEL_ROLE, roleAdminRole: 0, assignee: OWNER_ADDRESS, executionDelay: 0 });
-        roleAssignments[5] =
-            DeployScript.RoleAssignmentConfiguration({ role: ADMIN_ORACLE_QUOTER_ROLE, roleAdminRole: 0, assignee: OWNER_ADDRESS, executionDelay: 0 });
+        // Build role assignments using the centralized function
+        DeployScript.RoleAssignmentConfiguration[] memory roleAssignments = _generateRoleAssignments();
 
         DeployScript.DeploymentParams memory params = DeployScript.DeploymentParams({
             factoryAdmin: address(DEPLOY_SCRIPT),

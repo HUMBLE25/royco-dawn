@@ -27,4 +27,7 @@ abstract contract RoycoRoles {
 
     /// Meta Roles
     uint64 public constant LP_ROLE_ADMIN_ROLE = uint64(uint256(keccak256(abi.encode("ROYCO_LP_ROLE_ADMIN_ROLE"))));
+
+    /// Guardian role - can cancel delayed operations for all roles
+    uint64 public constant ROLE_GUARDIAN_ROLE = uint64(uint256(keccak256(abi.encode("ROYCO_ROLE_GUARDIAN_ROLE"))));
 }

@@ -178,18 +178,8 @@ contract FluidStETH_Test is ERC4626_TestBase {
         DeployScript.AdaptiveCurveYDMParams memory ydmParams =
             DeployScript.AdaptiveCurveYDMParams({ jtYieldShareAtTargetUtilWAD: 0.3e18, jtYieldShareAtFullUtilWAD: 1e18 });
 
-        // Build role assignments
-        DeployScript.RoleAssignmentConfiguration[] memory roleAssignments = new DeployScript.RoleAssignmentConfiguration[](6);
-        roleAssignments[0] =
-            DeployScript.RoleAssignmentConfiguration({ role: ADMIN_PAUSER_ROLE, roleAdminRole: 0, assignee: PAUSER_ADDRESS, executionDelay: 0 });
-        roleAssignments[1] =
-            DeployScript.RoleAssignmentConfiguration({ role: ADMIN_UPGRADER_ROLE, roleAdminRole: 0, assignee: UPGRADER_ADDRESS, executionDelay: 0 });
-        roleAssignments[2] =
-            DeployScript.RoleAssignmentConfiguration({ role: LP_ROLE_ADMIN_ROLE, roleAdminRole: 0, assignee: OWNER_ADDRESS, executionDelay: 0 });
-        roleAssignments[3] = DeployScript.RoleAssignmentConfiguration({ role: SYNC_ROLE, roleAdminRole: 0, assignee: OWNER_ADDRESS, executionDelay: 0 });
-        roleAssignments[4] = DeployScript.RoleAssignmentConfiguration({ role: ADMIN_KERNEL_ROLE, roleAdminRole: 0, assignee: OWNER_ADDRESS, executionDelay: 0 });
-        roleAssignments[5] =
-            DeployScript.RoleAssignmentConfiguration({ role: ADMIN_ORACLE_QUOTER_ROLE, roleAdminRole: 0, assignee: OWNER_ADDRESS, executionDelay: 0 });
+        // Build role assignments using the centralized function
+        DeployScript.RoleAssignmentConfiguration[] memory roleAssignments = _generateRoleAssignments();
 
         DeployScript.DeploymentParams memory params = DeployScript.DeploymentParams({
             factoryAdmin: address(DEPLOY_SCRIPT),
@@ -271,7 +261,7 @@ contract FluidStETH_Test is ERC4626_TestBase {
         }
 
         // Sync to capture any accumulated drift
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         // Verify NAV conservation holds within tolerance

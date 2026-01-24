@@ -187,7 +187,7 @@ contract reUSD_Test is AbstractKernelTestSuite {
         uint256 rateAfter = _getCurrentICLConversionRate();
         assertGt(rateAfter, rateBefore, "Rate should increase after yield");
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         NAV_UNIT navAfter = JT.totalAssets().nav;
@@ -210,7 +210,7 @@ contract reUSD_Test is AbstractKernelTestSuite {
         uint256 rateAfter = _getCurrentICLConversionRate();
         assertLt(rateAfter, rateBefore, "Rate should decrease after loss");
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         NAV_UNIT navAfter = JT.totalAssets().nav;
@@ -221,7 +221,7 @@ contract reUSD_Test is AbstractKernelTestSuite {
     function test_setConversionRate_success() external {
         uint256 newRate = 1.05e27;
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(ORACLE_QUOTER_ADMIN_ADDRESS);
         ReUSD_ST_ReUSD_JT_Kernel(address(KERNEL)).setConversionRate(newRate);
 
         uint256 storedRate = ReUSD_ST_ReUSD_JT_Kernel(address(KERNEL)).getStoredConversionRateRAY();
@@ -251,18 +251,8 @@ contract reUSD_Test is AbstractKernelTestSuite {
         DeployScript.AdaptiveCurveYDMParams memory ydmParams =
             DeployScript.AdaptiveCurveYDMParams({ jtYieldShareAtTargetUtilWAD: 0.3e18, jtYieldShareAtFullUtilWAD: 1e18 });
 
-        // Build role assignments
-        DeployScript.RoleAssignmentConfiguration[] memory roleAssignments = new DeployScript.RoleAssignmentConfiguration[](6);
-        roleAssignments[0] =
-            DeployScript.RoleAssignmentConfiguration({ role: ADMIN_PAUSER_ROLE, roleAdminRole: 0, assignee: PAUSER_ADDRESS, executionDelay: 0 });
-        roleAssignments[1] =
-            DeployScript.RoleAssignmentConfiguration({ role: ADMIN_UPGRADER_ROLE, roleAdminRole: 0, assignee: UPGRADER_ADDRESS, executionDelay: 0 });
-        roleAssignments[2] =
-            DeployScript.RoleAssignmentConfiguration({ role: LP_ROLE_ADMIN_ROLE, roleAdminRole: 0, assignee: OWNER_ADDRESS, executionDelay: 0 });
-        roleAssignments[3] = DeployScript.RoleAssignmentConfiguration({ role: SYNC_ROLE, roleAdminRole: 0, assignee: OWNER_ADDRESS, executionDelay: 0 });
-        roleAssignments[4] = DeployScript.RoleAssignmentConfiguration({ role: ADMIN_KERNEL_ROLE, roleAdminRole: 0, assignee: OWNER_ADDRESS, executionDelay: 0 });
-        roleAssignments[5] =
-            DeployScript.RoleAssignmentConfiguration({ role: ADMIN_ORACLE_QUOTER_ROLE, roleAdminRole: 0, assignee: OWNER_ADDRESS, executionDelay: 0 });
+        // Build role assignments using the centralized function
+        DeployScript.RoleAssignmentConfiguration[] memory roleAssignments = _generateRoleAssignments();
 
         DeployScript.DeploymentParams memory params = DeployScript.DeploymentParams({
             factoryAdmin: address(DEPLOY_SCRIPT),

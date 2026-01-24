@@ -105,7 +105,7 @@ contract sNUSD_sNUSD_Test is YieldBearingERC4626_TestBase {
         assertGt(rateAfter, rateBefore, "Rate should increase after yield");
 
         // Sync accounting
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         NAV_UNIT navAfter = JT.totalAssets().nav;
@@ -130,7 +130,7 @@ contract sNUSD_sNUSD_Test is YieldBearingERC4626_TestBase {
         assertLt(rateAfter, rateBefore, "Rate should decrease after loss");
 
         // Sync accounting
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         NAV_UNIT navAfter = JT.totalAssets().nav;

@@ -671,7 +671,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         simulateJTYield(_yieldPercentage * 1e16); // Convert to WAD
 
         // Trigger sync
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         NAV_UNIT navAfter = JT.totalAssets().nav;
@@ -701,7 +701,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         vm.warp(vm.getBlockTimestamp() + 1 days);
 
         // Trigger sync
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         NAV_UNIT jtNavAfter = JT.totalAssets().nav;
@@ -725,7 +725,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         vm.warp(vm.getBlockTimestamp() + 1 days);
 
         // Trigger sync
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         // Do another deposit to trigger fee share minting
@@ -763,7 +763,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         simulateJTLoss(_lossPercentage * 1e16);
 
         // Trigger sync
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         NAV_UNIT stNavAfter = ST.totalAssets().nav;
@@ -796,7 +796,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         simulateSTLoss(_lossPercentage * 1e16);
 
         // Trigger sync
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         NAV_UNIT jtNavAfter = JT.totalAssets().nav;
@@ -831,7 +831,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         simulateSTLoss(5e16); // 5% loss
 
         // Trigger sync
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         // Check state - may transition to FIXED_TERM depending on configuration
@@ -873,7 +873,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         // Simulate yield
         simulateJTYield(_yieldPercentage * 1e16);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         _assertNAVConservation();
@@ -888,7 +888,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         // Simulate loss
         simulateJTLoss(_lossPercentage * 1e16);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         _assertNAVConservation();
@@ -931,7 +931,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         // Step 3: Simulate yield
         simulateJTYield(_yieldPercentage * 1e16);
         vm.warp(vm.getBlockTimestamp() + 1 days);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         // Step 4: ST redeems
@@ -985,7 +985,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         // Step 3: Simulate JT loss
         simulateJTLoss(_lossPercentage * 1e16);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         NAV_UNIT stNavAfterLoss = ST.totalAssets().nav;
@@ -1126,7 +1126,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         simulateJTYield(_yieldPercentage * 1e16);
         vm.warp(vm.getBlockTimestamp() + 1 days);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         NAV_UNIT jtNavAfterYield = JT.totalAssets().nav;
@@ -1271,7 +1271,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         simulateJTLoss(_lossPercentage * 1e16);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         NAV_UNIT stNavAfterLoss = ST.totalAssets().nav;
@@ -1362,7 +1362,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
             simulateJTYield(_yieldPercentage * 1e16);
             vm.warp(vm.getBlockTimestamp() + 1 days);
 
-            vm.prank(OWNER_ADDRESS);
+            vm.prank(SYNC_ROLE_ADDRESS);
             KERNEL.syncTrancheAccounting();
 
             NAV_UNIT jtNavAfterYield = JT.totalAssets().nav;
@@ -1963,7 +1963,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         // Simulate loss
         simulateJTLoss(_lossPercentage * 1e16);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         // maxRedeem should decrease after loss
@@ -2293,7 +2293,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         // Simulate loss to tighten coverage
         simulateJTLoss(_lossPercentage * 1e16);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         // Check claimable after loss - should be reduced or zero
@@ -2522,7 +2522,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         // Simulate yield
         simulateJTYield(_yieldPercentage * 1e16);
         vm.warp(vm.getBlockTimestamp() + 1 days);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         // maxRedeem after yield
@@ -2554,7 +2554,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         // Simulate loss
         simulateJTLoss(_lossPercentage * 1e16);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         // maxRedeem after loss - coverage might have tightened

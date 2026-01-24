@@ -578,9 +578,8 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         (,,,, address currentRecipient,,) = KERNEL.getState();
         assertTrue(currentRecipient != newRecipient, "New recipient must be different");
 
-        // Update recipient (requires admin role)
-        vm.prank(OWNER_ADDRESS);
-        KERNEL.setProtocolFeeRecipient(newRecipient);
+        // Update recipient (requires admin role with scheduling)
+        _setProtocolFeeRecipient(newRecipient);
 
         // Verify update
         (,,,, address updatedRecipient,,) = KERNEL.getState();
@@ -589,17 +588,26 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
 
     /// @notice Test setProtocolFeeRecipient reverts on zero address
     function test_setProtocolFeeRecipient_revertsOnZeroAddress() public {
-        vm.prank(OWNER_ADDRESS);
+        // Schedule the operation (it will fail on execute due to zero address)
+        bytes memory data = abi.encodeCall(KERNEL.setProtocolFeeRecipient, (address(0)));
+        vm.prank(KERNEL_ADMIN_ADDRESS);
+        FACTORY.schedule(address(KERNEL), data, 0);
+
+        // Warp past the delay
+        vm.warp(block.timestamp + 1 days + 1);
+
+        // Execute should revert
+        vm.prank(KERNEL_ADMIN_ADDRESS);
         vm.expectRevert(); // Should revert with NULL_ADDRESS or similar
-        KERNEL.setProtocolFeeRecipient(address(0));
+        FACTORY.execute(address(KERNEL), data);
     }
 
     /// @notice Test setJuniorTrancheRedemptionDelay updates delay
     function test_setJuniorTrancheRedemptionDelay_updatesDelay() public {
         uint24 newDelay = 500_000; // Different from initial
 
-        vm.prank(OWNER_ADDRESS);
-        KERNEL.setJuniorTrancheRedemptionDelay(newDelay);
+        // Update delay (requires admin role with scheduling)
+        _setJuniorTrancheRedemptionDelay(newDelay);
 
         // Verify update
         (,,,,,, uint24 updatedDelay) = KERNEL.getState();
@@ -634,7 +642,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         USDC.transfer(CHARLIE_ADDRESS, catastrophicLoss);
 
         // Sync to update market state (requires SYNC_ROLE)
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         // Check market state
@@ -680,7 +688,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         USDC.transfer(CHARLIE_ADDRESS, stLoss);
 
         // Sync to update market state
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         // Check market state
@@ -770,7 +778,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         vm.prank(address(MOCK_UNDERLYING_ST_VAULT));
         USDC.transfer(CHARLIE_ADDRESS, stLoss);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         IRoycoAccountant.RoycoAccountantState memory state2 = ACCOUNTANT.getState();
@@ -785,7 +793,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
             // Step 4: Wait for fixed term to expire
             vm.warp(vm.getBlockTimestamp() + FIXED_TERM_DURATION_SECONDS + 1);
 
-            vm.prank(OWNER_ADDRESS);
+            vm.prank(SYNC_ROLE_ADDRESS);
             KERNEL.syncTrancheAccounting();
 
             // Step 5: Verify transition back to PERPETUAL
@@ -864,7 +872,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         (SyncedAccountingState memory previewState,,) = KERNEL.previewSyncTrancheAccounting(TrancheType.SENIOR);
 
         // Actual sync (requires SYNC_ROLE)
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         // Get actual state
@@ -897,7 +905,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         skip(365 days);
 
         // Sync to accrue fees (requires SYNC_ROLE)
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         // Check fees accrued
@@ -1415,7 +1423,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         vm.stopPrank();
 
         // Authorized sync
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
         // Should not revert
     }
@@ -1520,7 +1528,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         USDC.transfer(CHARLIE_ADDRESS, moderateLoss);
 
         // Sync to trigger state transition
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory syncedState = KERNEL.syncTrancheAccounting();
 
         // If JT coverage IL exists and no ST IL, should be FIXED_TERM
@@ -1550,7 +1558,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         vm.prank(address(MOCK_UNDERLYING_ST_VAULT));
         USDC.transfer(CHARLIE_ADDRESS, catastrophicLoss);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         // Verify FIXED_TERM state
@@ -1898,7 +1906,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         skip(30 days);
 
         // Sync
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         // Fees should not have accrued (still below high-water mark)
@@ -2047,7 +2055,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         vm.prank(CHARLIE_ADDRESS);
         USDC.transfer(address(MOCK_UNDERLYING_ST_VAULT), 5000e6);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory state1 = KERNEL.syncTrancheAccounting();
         _verifyNAVConservation(state1, "after ST gain");
 
@@ -2057,7 +2065,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         vm.prank(address(MOCK_UNDERLYING_ST_VAULT));
         USDC.transfer(CHARLIE_ADDRESS, lossAmount);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory state2 = KERNEL.syncTrancheAccounting();
         _verifyNAVConservation(state2, "after ST loss");
 
@@ -2134,7 +2142,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         vm.prank(address(MOCK_UNDERLYING_ST_VAULT));
         USDC.transfer(CHARLIE_ADDRESS, 20_000e6); // ST loss
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory state = KERNEL.syncTrancheAccounting();
 
         // All impermanent losses must be non-negative
@@ -2150,14 +2158,14 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         _depositST(50_000e6, BOB_ADDRESS);
 
         // Sync to establish baseline
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         // Apply loss (no fees should accrue)
         vm.prank(address(MOCK_UNDERLYING_ST_VAULT));
         USDC.transfer(CHARLIE_ADDRESS, 10_000e6);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory lossState = KERNEL.syncTrancheAccounting();
         assertEq(toUint256(lossState.stProtocolFeeAccrued), 0, "No ST protocol fees on loss");
 
@@ -2165,7 +2173,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         vm.prank(CHARLIE_ADDRESS);
         USDC.transfer(address(MOCK_UNDERLYING_ST_VAULT), 15_000e6);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory gainState = KERNEL.syncTrancheAccounting();
         // Protocol fees may accrue on the gain portion
         assertTrue(toUint256(gainState.stProtocolFeeAccrued) >= 0, "Protocol fees are valid");
@@ -2185,7 +2193,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         vm.prank(address(MOCK_UNDERLYING_ST_VAULT));
         USDC.transfer(CHARLIE_ADDRESS, 30_000e6); // Large ST loss
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory afterLossState = KERNEL.syncTrancheAccounting();
 
         // If JT coverage impermanent loss > 0, market should be in FIXED_TERM
@@ -2206,7 +2214,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         vm.prank(address(MOCK_UNDERLYING_ST_VAULT));
         USDC.transfer(CHARLIE_ADDRESS, lossAmount);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         // Get claims from both tranches
@@ -2260,7 +2268,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         vm.prank(address(MOCK_UNDERLYING_ST_VAULT));
         USDC.transfer(CHARLIE_ADDRESS, lossAmount);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory state1 = KERNEL.syncTrancheAccounting();
 
         // If it entered FIXED_TERM, verify it returns to PERPETUAL after duration elapses
@@ -2268,7 +2276,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
             // Warp past the fixed term duration
             vm.warp(vm.getBlockTimestamp() + FIXED_TERM_DURATION_SECONDS + 1);
 
-            vm.prank(OWNER_ADDRESS);
+            vm.prank(SYNC_ROLE_ADDRESS);
             SyncedAccountingState memory state2 = KERNEL.syncTrancheAccounting();
 
             // Should return to PERPETUAL after term elapses
@@ -2620,7 +2628,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         }
 
         // Verify NAV conservation
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory state = KERNEL.syncTrancheAccounting();
         _verifyNAVConservation(state, "fuzz NAV conservation");
     }
@@ -2658,7 +2666,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         vm.prank(CHARLIE_ADDRESS);
         USDC.transfer(address(MOCK_UNDERLYING_ST_VAULT), stGain);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory state = KERNEL.syncTrancheAccounting();
 
         // Verify: ST effective NAV increased, JT effective NAV may increase (yield share)
@@ -2680,7 +2688,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         (SyncedAccountingState memory initialState,,) = KERNEL.previewSyncTrancheAccounting(TrancheType.JUNIOR);
 
         // Sync and verify state consistency
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory state = KERNEL.syncTrancheAccounting();
 
         // Verify: State remains consistent
@@ -2700,7 +2708,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         vm.prank(address(MOCK_UNDERLYING_ST_VAULT));
         USDC.transfer(CHARLIE_ADDRESS, stLoss);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory state = KERNEL.syncTrancheAccounting();
 
         // Verify: JT provided coverage, ST effective NAV unchanged
@@ -2726,7 +2734,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
             vm.prank(address(MOCK_UNDERLYING_ST_VAULT));
             USDC.transfer(CHARLIE_ADDRESS, stLoss);
 
-            vm.prank(OWNER_ADDRESS);
+            vm.prank(SYNC_ROLE_ADDRESS);
             SyncedAccountingState memory state = KERNEL.syncTrancheAccounting();
 
             // Verify state consistency
@@ -2745,7 +2753,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         vm.prank(address(MOCK_UNDERLYING_ST_VAULT));
         USDC.transfer(CHARLIE_ADDRESS, 20_000e6);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory state = KERNEL.syncTrancheAccounting();
 
         // Verify: JT effective NAV decreased from providing coverage
@@ -2767,7 +2775,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
             vm.prank(address(MOCK_UNDERLYING_ST_VAULT));
             USDC.transfer(CHARLIE_ADDRESS, stLoss);
 
-            vm.prank(OWNER_ADDRESS);
+            vm.prank(SYNC_ROLE_ADDRESS);
             SyncedAccountingState memory state = KERNEL.syncTrancheAccounting();
 
             // Verify: JT effective NAV decreased significantly
@@ -2786,7 +2794,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         vm.prank(CHARLIE_ADDRESS);
         USDC.transfer(address(MOCK_UNDERLYING_ST_VAULT), 5000e6);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory state = KERNEL.syncTrancheAccounting();
 
         // ST should have increased NAV
@@ -2809,7 +2817,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         vm.prank(CHARLIE_ADDRESS);
         USDC.transfer(address(MOCK_UNDERLYING_ST_VAULT), 15_000e6);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory state = KERNEL.syncTrancheAccounting();
 
         // Net result should be ST gain
@@ -2827,7 +2835,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         vm.prank(address(MOCK_UNDERLYING_ST_VAULT));
         USDC.transfer(CHARLIE_ADDRESS, 10_000e6);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory state = KERNEL.syncTrancheAccounting();
 
         // ST loss covered by JT
@@ -2845,7 +2853,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         vm.prank(address(MOCK_UNDERLYING_ST_VAULT));
         USDC.transfer(CHARLIE_ADDRESS, 15_000e6);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory state = KERNEL.syncTrancheAccounting();
 
         // JT provides coverage for ST loss
@@ -2865,7 +2873,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         _depositST(50_000e6, BOB_ADDRESS);
 
         // First sync to establish baseline
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         // Get vault balance and transfer a portion to create loss (within vault balance)
@@ -2875,7 +2883,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         vm.prank(address(MOCK_UNDERLYING_ST_VAULT));
         USDC.transfer(CHARLIE_ADDRESS, lossAmount);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory lossState = KERNEL.syncTrancheAccounting();
 
         // Check if ST IL was created (loss may be absorbed by JT coverage depending on amounts)
@@ -2887,7 +2895,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
             vm.prank(CHARLIE_ADDRESS);
             USDC.transfer(address(MOCK_UNDERLYING_ST_VAULT), recoveryAmount);
 
-            vm.prank(OWNER_ADDRESS);
+            vm.prank(SYNC_ROLE_ADDRESS);
             SyncedAccountingState memory recoveryState = KERNEL.syncTrancheAccounting();
 
             // ST IL should decrease (recovery)
@@ -2904,7 +2912,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         _depositST(50_000e6, BOB_ADDRESS);
 
         // First sync to establish baseline
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         // Get vault balance and transfer a moderate amount (should create JT coverage IL but not ST IL)
@@ -2914,7 +2922,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         vm.prank(address(MOCK_UNDERLYING_ST_VAULT));
         USDC.transfer(CHARLIE_ADDRESS, lossAmount);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory lossState = KERNEL.syncTrancheAccounting();
         uint256 jtCoverageILBefore = toUint256(lossState.jtCoverageImpermanentLoss);
 
@@ -2925,7 +2933,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
             vm.prank(CHARLIE_ADDRESS);
             USDC.transfer(address(MOCK_UNDERLYING_ST_VAULT), recoveryAmount);
 
-            vm.prank(OWNER_ADDRESS);
+            vm.prank(SYNC_ROLE_ADDRESS);
             SyncedAccountingState memory recoveryState = KERNEL.syncTrancheAccounting();
 
             // JT coverage IL should decrease or be eliminated
@@ -2940,7 +2948,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         _depositJT(100_000e6, ALICE_ADDRESS);
         _depositST(50_000e6, BOB_ADDRESS);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory initialState = KERNEL.syncTrancheAccounting();
         _verifyNAVConservation(initialState, "initial state");
 
@@ -2951,7 +2959,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         vm.prank(address(MOCK_UNDERLYING_ST_VAULT));
         USDC.transfer(CHARLIE_ADDRESS, lossAmount);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory lossState = KERNEL.syncTrancheAccounting();
         _verifyNAVConservation(lossState, "after loss");
 
@@ -2959,7 +2967,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         vm.prank(CHARLIE_ADDRESS);
         USDC.transfer(address(MOCK_UNDERLYING_ST_VAULT), lossAmount / 2);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory recoveryState = KERNEL.syncTrancheAccounting();
         _verifyNAVConservation(recoveryState, "after partial recovery");
     }
@@ -2977,14 +2985,14 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         vm.prank(address(MOCK_UNDERLYING_ST_VAULT));
         USDC.transfer(CHARLIE_ADDRESS, smallLoss);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory state1 = KERNEL.syncTrancheAccounting();
         _verifyNAVConservation(state1, "cycle 1 loss");
 
         vm.prank(CHARLIE_ADDRESS);
         USDC.transfer(address(MOCK_UNDERLYING_ST_VAULT), smallLoss);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory state2 = KERNEL.syncTrancheAccounting();
         _verifyNAVConservation(state2, "cycle 1 recovery");
 
@@ -2995,14 +3003,14 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         vm.prank(address(MOCK_UNDERLYING_ST_VAULT));
         USDC.transfer(CHARLIE_ADDRESS, mediumLoss);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory state3 = KERNEL.syncTrancheAccounting();
         _verifyNAVConservation(state3, "cycle 2 loss");
 
         vm.prank(CHARLIE_ADDRESS);
         USDC.transfer(address(MOCK_UNDERLYING_ST_VAULT), mediumLoss);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory state4 = KERNEL.syncTrancheAccounting();
         _verifyNAVConservation(state4, "cycle 2 recovery");
     }
@@ -3020,7 +3028,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         vm.prank(CHARLIE_ADDRESS);
         USDC.transfer(address(MOCK_UNDERLYING_ST_VAULT), 5000e6); // ST gain
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory state = KERNEL.syncTrancheAccounting();
 
         assertEq(uint256(state.marketState), uint256(MarketState.PERPETUAL), "Must stay PERPETUAL without coverage IL");
@@ -3036,7 +3044,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         vm.prank(address(MOCK_UNDERLYING_ST_VAULT));
         USDC.transfer(CHARLIE_ADDRESS, 15_000e6);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory state = KERNEL.syncTrancheAccounting();
 
         // If JT coverage IL exists and LLTV not breached, should be FIXED_TERM
@@ -3054,13 +3062,13 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         vm.prank(address(MOCK_UNDERLYING_ST_VAULT));
         USDC.transfer(CHARLIE_ADDRESS, 15_000e6);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory fixedTermState = KERNEL.syncTrancheAccounting();
 
         // Wait for fixed term to elapse
         vm.warp(vm.getBlockTimestamp() + FIXED_TERM_DURATION_SECONDS);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory afterTermState = KERNEL.syncTrancheAccounting();
 
         assertEq(uint256(afterTermState.marketState), uint256(MarketState.PERPETUAL), "Should return to PERPETUAL after term");
@@ -3086,7 +3094,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         vm.prank(address(MOCK_UNDERLYING_ST_VAULT));
         USDC.transfer(CHARLIE_ADDRESS, lossAmount);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory state = KERNEL.syncTrancheAccounting();
 
         // With such severe loss, check if ST IL exists
@@ -3114,7 +3122,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         vm.prank(address(MOCK_UNDERLYING_ST_VAULT));
         USDC.transfer(CHARLIE_ADDRESS, lossAmount);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory state = KERNEL.syncTrancheAccounting();
 
         // With severe loss, ST IL may exist or LLTV may be breached - either way stays PERPETUAL
@@ -3133,7 +3141,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         _depositST(50_000e6, BOB_ADDRESS);
 
         // Get JT NAV before gain
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory beforeState = KERNEL.syncTrancheAccounting();
         uint256 jtEffNAVBefore = toUint256(beforeState.jtEffectiveNAV);
 
@@ -3145,7 +3153,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         vm.prank(CHARLIE_ADDRESS);
         USDC.transfer(address(MOCK_UNDERLYING_ST_VAULT), stGain);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory state = KERNEL.syncTrancheAccounting();
 
         // JT should receive a share of ST yield (based on YDM) - compare with synced state
@@ -3165,7 +3173,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         vm.prank(CHARLIE_ADDRESS);
         USDC.transfer(address(MOCK_UNDERLYING_ST_VAULT), 10_000e6);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory state = KERNEL.syncTrancheAccounting();
 
         // Protocol fees should be valid (can be 0 if no gain yet)
@@ -3183,7 +3191,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         // Wait for Aave yield to accrue (rebasing)
         vm.warp(vm.getBlockTimestamp() + 30 days);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory state = KERNEL.syncTrancheAccounting();
 
         // Protocol fees should be valid values
@@ -3276,21 +3284,21 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         // Step 1: ST loss
         vm.prank(address(MOCK_UNDERLYING_ST_VAULT));
         USDC.transfer(CHARLIE_ADDRESS, 10_000e6);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory state1 = KERNEL.syncTrancheAccounting();
         _verifyNAVConservation(state1, "sequence: loss");
 
         // Step 2: ST gain
         vm.prank(CHARLIE_ADDRESS);
         USDC.transfer(address(MOCK_UNDERLYING_ST_VAULT), 15_000e6);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory state2 = KERNEL.syncTrancheAccounting();
         _verifyNAVConservation(state2, "sequence: loss -> gain");
 
         // Step 3: ST loss again
         vm.prank(address(MOCK_UNDERLYING_ST_VAULT));
         USDC.transfer(CHARLIE_ADDRESS, 8000e6);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory state3 = KERNEL.syncTrancheAccounting();
         _verifyNAVConservation(state3, "sequence: loss -> gain -> loss");
     }
@@ -3303,21 +3311,21 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         // Step 1: ST gain
         vm.prank(CHARLIE_ADDRESS);
         USDC.transfer(address(MOCK_UNDERLYING_ST_VAULT), 10_000e6);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory state1 = KERNEL.syncTrancheAccounting();
         _verifyNAVConservation(state1, "sequence: gain");
 
         // Step 2: ST loss
         vm.prank(address(MOCK_UNDERLYING_ST_VAULT));
         USDC.transfer(CHARLIE_ADDRESS, 15_000e6);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory state2 = KERNEL.syncTrancheAccounting();
         _verifyNAVConservation(state2, "sequence: gain -> loss");
 
         // Step 3: ST gain again
         vm.prank(CHARLIE_ADDRESS);
         USDC.transfer(address(MOCK_UNDERLYING_ST_VAULT), 8000e6);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory state3 = KERNEL.syncTrancheAccounting();
         _verifyNAVConservation(state3, "sequence: gain -> loss -> gain");
     }
@@ -3332,13 +3340,13 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         // Step 1: ST gain
         vm.prank(CHARLIE_ADDRESS);
         USDC.transfer(address(MOCK_UNDERLYING_ST_VAULT), 5000e6);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory s1 = KERNEL.syncTrancheAccounting();
         _verifyNAVConservation(s1, "interleaved: ST gain");
 
         // Step 2: Wait for Aave yield accrual (simulates JT change from rebasing)
         vm.warp(vm.getBlockTimestamp() + 30 days);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory s2 = KERNEL.syncTrancheAccounting();
         _verifyNAVConservation(s2, "interleaved: ST gain -> time passes");
 
@@ -3347,14 +3355,14 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         uint256 lossAmount = vaultBalance * 15 / 100;
         vm.prank(address(MOCK_UNDERLYING_ST_VAULT));
         USDC.transfer(CHARLIE_ADDRESS, lossAmount);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory s3 = KERNEL.syncTrancheAccounting();
         _verifyNAVConservation(s3, "interleaved: ST gain -> time -> ST loss");
 
         // Step 4: ST gain again
         vm.prank(CHARLIE_ADDRESS);
         USDC.transfer(address(MOCK_UNDERLYING_ST_VAULT), lossAmount / 2);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory s4 = KERNEL.syncTrancheAccounting();
         _verifyNAVConservation(s4, "interleaved: all 4 operations");
     }
