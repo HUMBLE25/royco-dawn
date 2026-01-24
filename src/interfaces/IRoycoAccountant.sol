@@ -161,9 +161,9 @@ interface IRoycoAccountant {
 
     /**
      * @notice Emitted when JT's coverage loss is realized when transitioning from a fixed term state to a perpetual state
-     * @param jtCoverageILErased The amount of JT coverage loss erased when transitioning from a fixed term state to a perpetual state
+     * @param jtCoverageImpermanentLossErased The amount of JT coverage loss erased when transitioning from a fixed term state to a perpetual state
      */
-    event JTCoverageImpermanentLossErased(NAV_UNIT jtCoverageILErased);
+    event JTCoverageImpermanentLossErased(NAV_UNIT jtCoverageImpermanentLossErased);
 
     /// @notice Thrown when the accountant's coverage config is invalid
     error INVALID_COVERAGE_CONFIG();

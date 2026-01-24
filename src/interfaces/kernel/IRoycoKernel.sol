@@ -66,8 +66,11 @@ interface IRoycoKernel {
     /// @notice Thrown when trying to cancel a redemption request that has already been canceled
     error REDEMPTION_REQUEST_CANCELED();
 
-    /// @notice Thrown when the market is in a state where the operation is not allowed
-    error INVALID_MARKET_STATE();
+    /// @notice Thrown when a ST LP is attempting to redeem in a fixed term market state
+    error ST_REDEEM_DISABLED_IN_FIXED_TERM_STATE();
+
+    /// @notice Thrown when a JT LP is attempting to deposit in a fixed term market state
+    error JT_DEPOSIT_DISABLED_IN_FIXED_TERM_STATE();
 
     /**
      * @notice Returns the execution model for the senior tranche's increase NAV operation

@@ -543,7 +543,7 @@ abstract contract YieldBearingERC20Chainlink_TestBase is AbstractKernelTestSuite
             juniorTrancheSymbol: string(abi.encodePacked("RJ-", cfg.name)),
             seniorAsset: cfg.stAsset,
             juniorAsset: cfg.jtAsset,
-            dustTolerance: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE,
+            dustTolerance: DUST_TOLERANCE,
             kernelType: DeployScript.KernelType.YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkOracleQuoter,
             kernelSpecificParams: abi.encode(kernelParams),
             protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS,
