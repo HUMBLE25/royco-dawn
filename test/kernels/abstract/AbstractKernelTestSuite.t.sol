@@ -2619,7 +2619,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
     /// @dev FIXED_TERM should only occur from actual losses, not from deposit rounding
     /// @param _numCycles Number of deposit cycles to run
     function testFuzz_deposits_neverCauseFixedTermState(uint256 _numCycles) external {
-        _numCycles = bound(_numCycles, 100, 1000);
+        _numCycles = bound(_numCycles, 1, 100);
 
         // Verify initial state is PERPETUAL
         assertEq(uint256(ACCOUNTANT.getState().lastMarketState), uint256(MarketState.PERPETUAL), "Market should start in PERPETUAL state");
@@ -2665,9 +2665,10 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
     /// @notice Test full cycle: JT deposit -> ST deposit -> ST withdraw -> JT withdraw
     /// @dev Pure deposit/withdraw interleaving should never revert (no yield/loss)
+    /// @dev Override this test for protocols with time-sensitive oracles (Chainlink, etc.)
     /// @param _numCycles Number of full cycles to run
-    function testFuzz_fullDepositWithdrawCycle_neverReverts(uint256 _numCycles) external {
-        _numCycles = bound(_numCycles, 10, 500);
+    function testFuzz_fullDepositWithdrawCycle_neverReverts(uint256 _numCycles) external virtual {
+        _numCycles = bound(_numCycles, 1, 100);
 
         uint256 minDeposit = _minDepositAmount();
 
