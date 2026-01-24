@@ -133,7 +133,7 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
     /// @return forkBlock The fork block
     /// @return forkRpcUrl The fork RPC URL
     function _forkConfiguration() internal override returns (uint256 forkBlock, string memory forkRpcUrl) {
-        forkBlock = 23_997_023;
+        forkBlock = 24_290_290;
         forkRpcUrl = vm.envString("MAINNET_RPC_URL");
         if (bytes(forkRpcUrl).length == 0) {
             fail("MAINNET_RPC_URL environment variable is not set");
