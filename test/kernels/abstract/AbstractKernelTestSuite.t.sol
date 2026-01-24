@@ -2652,7 +2652,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         }
 
         // Final sync and verification
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         assertEq(uint256(ACCOUNTANT.getState().lastMarketState), uint256(MarketState.PERPETUAL), "Market should still be PERPETUAL after all deposit cycles");
@@ -2751,7 +2751,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         }
 
         // Final sync
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         // Final state verification

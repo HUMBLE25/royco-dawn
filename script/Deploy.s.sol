@@ -530,8 +530,9 @@ contract DeployScript is Script, Create2DeployUtils, RolesConfiguration {
         internal
         returns (RoycoMarket memory, address)
     {
-        // Precompute expected proxy addresses using inline salt
-        bytes32 salt = MARKET_DEPLOYMENT_SALT;
+        // Precompute expected proxy addresses using salt derived from market ID
+        // This ensures each market deployment has a unique salt to avoid Create2 collisions
+        bytes32 salt = keccak256(abi.encodePacked(MARKET_DEPLOYMENT_SALT, _params.marketId));
         address expectedSeniorTrancheAddress = factory.predictERC1967ProxyAddress(address(stTrancheImpl), salt);
         address expectedJuniorTrancheAddress = factory.predictERC1967ProxyAddress(address(jtTrancheImpl), salt);
         address expectedAccountantAddress = factory.predictERC1967ProxyAddress(address(accountantImpl), salt);
