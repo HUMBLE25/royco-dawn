@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
+import { Vm } from "../../lib/forge-std/src/Vm.sol";
 import { IAccessManager } from "../../lib/openzeppelin-contracts/contracts/access/manager/IAccessManager.sol";
 import { IERC20 } from "../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { DeployScript } from "../../script/Deploy.s.sol";
@@ -9,7 +10,6 @@ import { IRoycoKernel } from "../../src/interfaces/kernel/IRoycoKernel.sol";
 import { NAV_UNIT, toNAVUnits } from "../../src/libraries/Units.sol";
 import { BaseTest } from "../base/BaseTest.t.sol";
 import { ERC4626Mock } from "../mock/ERC4626Mock.sol";
-import { Vm } from "../../lib/forge-std/src/Vm.sol";
 
 /// @title GuardianCancellationTest
 /// @notice Tests that the ROLE_GUARDIAN_ROLE can cancel any and all delayed operations
@@ -60,8 +60,7 @@ contract GuardianCancellationTest is BaseTest {
 
         // Build kernel-specific params
         DeployScript.ERC4626STAaveV3JTInKindAssetsKernelParams memory kernelParams = DeployScript.ERC4626STAaveV3JTInKindAssetsKernelParams({
-            stVault: address(MOCK_UNDERLYING_ST_VAULT),
-            aaveV3Pool: ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS
+            stVault: address(MOCK_UNDERLYING_ST_VAULT), aaveV3Pool: ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS
         });
 
         // Build YDM params (AdaptiveCurve)
