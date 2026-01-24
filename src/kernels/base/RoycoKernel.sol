@@ -351,7 +351,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
             MarketState marketState = state.marketState;
 
             // Ensure that the market is in a state where ST redemptions are allowed: PERPETUAL
-            require(marketState == MarketState.PERPETUAL, INVALID_MARKET_STATE());
+            require(marketState == MarketState.PERPETUAL, ST_REDEEM_DISABLED_IN_FIXED_TERM_STATE());
         }
 
         // Scale total tranche asset claims by the ratio of shares this user owns of the tranche vault
@@ -390,7 +390,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         navToMintAt = state.jtEffectiveNAV;
 
         // Ensure that the market is in a state where JT deposits are allowed: PERPETUAL
-        require(state.marketState == MarketState.PERPETUAL, INVALID_MARKET_STATE());
+        require(state.marketState == MarketState.PERPETUAL, JT_DEPOSIT_DISABLED_IN_FIXED_TERM_STATE());
 
         // Deposit the assets into the underlying JT investment
         NAV_UNIT jtDepositPreOpNAV = _jtDepositAssets(_assets);

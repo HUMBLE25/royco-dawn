@@ -96,7 +96,7 @@ contract UpgradabilityTestSuite is BaseTest {
             juniorTrancheSymbol: "RJ-sNUSD",
             seniorAsset: SNUSD,
             juniorAsset: SNUSD,
-            dustTolerance: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE,
+            dustTolerance: DUST_TOLERANCE,
             kernelType: DeployScript.KernelType.YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter,
             kernelSpecificParams: abi.encode(kernelParams),
             protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS,
@@ -183,7 +183,7 @@ contract UpgradabilityTestSuite is BaseTest {
             ydm: address(YDM),
             ydmInitializationData: "",
             fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
-            dustTolerance: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
+            dustTolerance: DUST_TOLERANCE
         });
 
         vm.expectRevert(Initializable.InvalidInitialization.selector);
@@ -231,7 +231,7 @@ contract UpgradabilityTestSuite is BaseTest {
             ydm: address(YDM),
             ydmInitializationData: "",
             fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
-            dustTolerance: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
+            dustTolerance: DUST_TOLERANCE
         });
 
         vm.expectRevert(Initializable.InvalidInitialization.selector);

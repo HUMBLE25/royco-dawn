@@ -318,7 +318,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
                     ydmInitializationData: abi.encodeCall(AdaptiveCurveYDM.initializeYDMForMarket, (0.225e18, 1e18)),
                     fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
                     lltvWAD: LLTV,
-                    dustTolerance: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
+                    dustTolerance: DUST_TOLERANCE
                 }),
                 OWNER_ADDRESS // invalid authority: must be FACTORY
             )
@@ -459,7 +459,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
                     ydmInitializationData: abi.encodeCall(AdaptiveCurveYDM.initializeYDMForMarket, (0.225e18, 1e18)),
                     fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
                     lltvWAD: LLTV,
-                    dustTolerance: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
+                    dustTolerance: DUST_TOLERANCE
                 }),
                 address(FACTORY)
             )
@@ -588,7 +588,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
                     ydmInitializationData: abi.encodeCall(AdaptiveCurveYDM.initializeYDMForMarket, (0.225e18, 1e18)),
                     fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
                     lltvWAD: LLTV,
-                    dustTolerance: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
+                    dustTolerance: DUST_TOLERANCE
                 }),
                 address(FACTORY)
             )

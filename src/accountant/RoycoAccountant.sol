@@ -361,6 +361,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         RoycoAccountantState storage $ = _getRoycoAccountantStorage();
         // Get the surplus JT assets in NAV units
         NAV_UNIT surplusJTAssets = _calculateSurplusJtAssetsInNav(_stRawNAV, _jtRawNAV);
+
         // Compute the total JT claim on NAV and preemptively return if zero
         NAV_UNIT totalJTClaims = _jtClaimOnStUnits + _jtClaimOnJtUnits;
         if (totalJTClaims == ZERO_NAV_UNITS) return (ZERO_NAV_UNITS, ZERO_NAV_UNITS, ZERO_NAV_UNITS);
@@ -377,8 +378,11 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         // Split it into individual tranche's claims
         stClaimable = totalNAVClaimable.mulDiv(kS_WAD, WAD, Math.Rounding.Floor);
         jtClaimable = totalNAVClaimable.mulDiv(kJ_WAD, WAD, Math.Rounding.Floor);
-        // Compute the prorata dust tolerance for each tranche, being conservative with rounding
+
+        // Check for any dust tolerance in this market
         NAV_UNIT dustTolerance = $.dustTolerance;
+        if (dustTolerance == ZERO_NAV_UNITS) return (totalNAVClaimable, stClaimable, jtClaimable);
+        // Compute the prorata dust tolerance for each tranche, being conservative with rounding
         NAV_UNIT stClaimableDustTolerance = dustTolerance.mulDiv(stClaimable, totalNAVClaimable, Math.Rounding.Ceil);
         NAV_UNIT jtClaimableDustTolerance = dustTolerance.mulDiv(jtClaimable, totalNAVClaimable, Math.Rounding.Ceil);
         // Account for the market's dust tolerance to preclude reverts due to rounding after JT withdrawal

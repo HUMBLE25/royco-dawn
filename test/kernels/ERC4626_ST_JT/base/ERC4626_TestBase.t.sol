@@ -290,7 +290,7 @@ abstract contract ERC4626_TestBase is AbstractKernelTestSuite {
             juniorTrancheSymbol: string(abi.encodePacked("RJ-", cfg.name)),
             seniorAsset: cfg.stAsset,
             juniorAsset: cfg.jtAsset,
-            dustTolerance: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE,
+            dustTolerance: DUST_TOLERANCE,
             kernelType: DeployScript.KernelType.ERC4626_ST_ERC4626_JT_InKindAssets,
             kernelSpecificParams: abi.encode(kernelParams),
             protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS,

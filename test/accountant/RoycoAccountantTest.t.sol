@@ -46,7 +46,7 @@ contract RoycoAccountantTest is BaseTest {
             BETA_WAD,
             address(adaptiveYDM),
             FIXED_TERM_DURATION_SECONDS,
-            MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE,
+            DUST_TOLERANCE,
             LLTV_WAD,
             YDM_JT_YIELD_AT_TARGET,
             YDM_JT_YIELD_AT_FULL
@@ -127,7 +127,7 @@ contract RoycoAccountantTest is BaseTest {
             0,
             address(adaptiveYDM),
             FIXED_TERM_DURATION_SECONDS,
-            MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE,
+            DUST_TOLERANCE,
             lltvWAD,
             YDM_JT_YIELD_AT_TARGET,
             YDM_JT_YIELD_AT_FULL
@@ -146,7 +146,7 @@ contract RoycoAccountantTest is BaseTest {
             BETA_WAD,
             address(adaptiveYDM),
             FIXED_TERM_DURATION_SECONDS,
-            MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE,
+            DUST_TOLERANCE,
             LLTV_WAD,
             YDM_JT_YIELD_AT_TARGET,
             YDM_JT_YIELD_AT_FULL
@@ -161,7 +161,7 @@ contract RoycoAccountantTest is BaseTest {
             BETA_WAD,
             address(adaptiveYDM),
             FIXED_TERM_DURATION_SECONDS,
-            MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE,
+            DUST_TOLERANCE,
             LLTV_WAD,
             YDM_JT_YIELD_AT_TARGET,
             YDM_JT_YIELD_AT_FULL
@@ -180,7 +180,7 @@ contract RoycoAccountantTest is BaseTest {
             BETA_WAD,
             address(adaptiveYDM),
             FIXED_TERM_DURATION_SECONDS,
-            MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE,
+            DUST_TOLERANCE,
             uint64(maxLTV),
             YDM_JT_YIELD_AT_TARGET,
             YDM_JT_YIELD_AT_FULL
@@ -195,7 +195,7 @@ contract RoycoAccountantTest is BaseTest {
             BETA_WAD,
             address(adaptiveYDM),
             FIXED_TERM_DURATION_SECONDS,
-            MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE,
+            DUST_TOLERANCE,
             uint64(WAD),
             YDM_JT_YIELD_AT_TARGET,
             YDM_JT_YIELD_AT_FULL
@@ -213,7 +213,7 @@ contract RoycoAccountantTest is BaseTest {
             ydmInitializationData: "",
             fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
             lltvWAD: LLTV_WAD,
-            dustTolerance: MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE
+            dustTolerance: DUST_TOLERANCE
         });
 
         bytes memory initData = abi.encodeCall(RoycoAccountant.initialize, (params, address(accessManager)));
@@ -231,7 +231,7 @@ contract RoycoAccountantTest is BaseTest {
             BETA_WAD,
             address(adaptiveYDM),
             FIXED_TERM_DURATION_SECONDS,
-            MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE,
+            DUST_TOLERANCE,
             LLTV_WAD,
             YDM_JT_YIELD_AT_TARGET,
             YDM_JT_YIELD_AT_FULL
@@ -246,7 +246,7 @@ contract RoycoAccountantTest is BaseTest {
             BETA_WAD,
             address(adaptiveYDM),
             FIXED_TERM_DURATION_SECONDS,
-            MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE,
+            DUST_TOLERANCE,
             LLTV_WAD,
             YDM_JT_YIELD_AT_TARGET,
             YDM_JT_YIELD_AT_FULL
@@ -570,7 +570,7 @@ contract RoycoAccountantTest is BaseTest {
             BETA_WAD,
             address(adaptiveYDM),
             0,
-            MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE,
+            DUST_TOLERANCE,
             LLTV_WAD,
             YDM_JT_YIELD_AT_TARGET,
             YDM_JT_YIELD_AT_FULL
@@ -1321,7 +1321,7 @@ contract RoycoAccountantTest is BaseTest {
             BETA_WAD,
             address(adaptiveYDM),
             FIXED_TERM_DURATION_SECONDS,
-            MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE,
+            DUST_TOLERANCE,
             LLTV_WAD,
             YDM_JT_YIELD_AT_TARGET,
             YDM_JT_YIELD_AT_FULL

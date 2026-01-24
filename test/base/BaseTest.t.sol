@@ -102,7 +102,7 @@ abstract contract BaseTest is Test, RoycoRoles, Assertions {
     uint64 internal JT_PROTOCOL_FEE_WAD = 0.1e18; // 10% protocol fee
     uint64 internal LLTV = 0.97e18; // 95% LLTV
     uint24 internal FIXED_TERM_DURATION_SECONDS = 2 weeks; // 2 weeks in seconds
-    NAV_UNIT internal MIN_JT_COVERAGE_IL_TO_ENTER_FIXED_TERM_STATE = toNAVUnits(uint256(2)); // 2 Wei
+    NAV_UNIT internal DUST_TOLERANCE = toNAVUnits(uint256(1));
 
     /// -----------------------------------------
     /// Mainnet Fork Addresses
