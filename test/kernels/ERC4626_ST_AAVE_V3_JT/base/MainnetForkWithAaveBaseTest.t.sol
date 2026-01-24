@@ -96,10 +96,12 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
         DeployScript.AdaptiveCurveYDMParams memory ydmParams =
             DeployScript.AdaptiveCurveYDMParams({ jtYieldShareAtTargetUtilWAD: 0.225e18, jtYieldShareAtFullUtilWAD: 1e18 });
 
+        // Build role assignments using the centralized function
+        DeployScript.RoleAssignmentConfiguration[] memory roleAssignments = _generateRoleAssignments();
+
         // Build deployment params
         DeployScript.DeploymentParams memory params = DeployScript.DeploymentParams({
-            factoryAdmin: address(DEPLOY_SCRIPT),
-            factoryOwnerAddress: OWNER_ADDRESS,
+            factoryAdmin: OWNER_ADDRESS,
             marketId: marketID,
             seniorTrancheName: SENIOR_TRANCHE_NAME,
             seniorTrancheSymbol: SENIOR_TRANCHE_SYMBOL,
@@ -120,29 +122,18 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
             fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
             ydmType: DeployScript.YDMType.AdaptiveCurve,
             ydmSpecificParams: abi.encode(ydmParams),
-            pauserAddress: PAUSER_ADDRESS,
-            pauserExecutionDelay: 0,
-            upgraderAddress: UPGRADER_ADDRESS,
-            upgraderExecutionDelay: 0,
-            lpRoleAddress: OWNER_ADDRESS,
-            lpRoleExecutionDelay: 0,
-            syncRoleAddress: OWNER_ADDRESS,
-            syncRoleExecutionDelay: 0,
-            kernelAdminRoleAddress: OWNER_ADDRESS,
-            kernelAdminRoleExecutionDelay: 0,
-            oracleQuoterAdminRoleAddress: OWNER_ADDRESS,
-            oracleQuoterAdminRoleExecutionDelay: 0
+            roleAssignments: roleAssignments
         });
 
         // Deploy using the deployment script
-        return DEPLOY_SCRIPT.deploy(params);
+        return DEPLOY_SCRIPT.deploy(params, DEPLOYER.privateKey);
     }
 
     /// @notice Returns the fork configuration
     /// @return forkBlock The fork block
     /// @return forkRpcUrl The fork RPC URL
     function _forkConfiguration() internal override returns (uint256 forkBlock, string memory forkRpcUrl) {
-        forkBlock = 23_997_023;
+        forkBlock = 24_290_290;
         forkRpcUrl = vm.envString("MAINNET_RPC_URL");
         if (bytes(forkRpcUrl).length == 0) {
             fail("MAINNET_RPC_URL environment variable is not set");

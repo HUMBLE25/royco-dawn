@@ -6,9 +6,10 @@ import { Vm } from "../../lib/forge-std/src/Vm.sol";
 import { ERC20Mock } from "../../lib/openzeppelin-contracts/contracts/mocks/token/ERC20Mock.sol";
 import { ERC1967Proxy } from "../../lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import { DeployScript } from "../../script/Deploy.s.sol";
-import { RoycoFactory } from "../../src/RoycoFactory.sol";
+import { GrantLPRolesScript } from "../../script/GrantLPRoles.s.sol";
+import { RolesConfiguration } from "../../script/config/RolesConfiguration.sol";
 import { RoycoAccountant } from "../../src/accountant/RoycoAccountant.sol";
-import { RoycoRoles } from "../../src/auth/RoycoRoles.sol";
+import { RoycoFactory } from "../../src/factory/RoycoFactory.sol";
 import { IRoycoAccountant } from "../../src/interfaces/IRoycoAccountant.sol";
 import { IYDM } from "../../src/interfaces/IYDM.sol";
 import { IRoycoKernel } from "../../src/interfaces/kernel/IRoycoKernel.sol";
@@ -19,7 +20,7 @@ import { RoycoJuniorTranche } from "../../src/tranches/RoycoJuniorTranche.sol";
 import { RoycoSeniorTranche } from "../../src/tranches/RoycoSeniorTranche.sol";
 import { Assertions } from "./Assertions.t.sol";
 
-abstract contract BaseTest is Test, RoycoRoles, Assertions {
+abstract contract BaseTest is Test, RolesConfiguration, Assertions {
     uint256 internal constant BPS = 0.0001e18;
 
     struct TrancheState {
@@ -37,15 +38,44 @@ abstract contract BaseTest is Test, RoycoRoles, Assertions {
     Vm.Wallet internal OWNER;
     address internal OWNER_ADDRESS;
 
+    // Role-specific wallets
     Vm.Wallet internal PAUSER;
     address internal PAUSER_ADDRESS;
 
     Vm.Wallet internal UPGRADER;
     address internal UPGRADER_ADDRESS;
 
+    Vm.Wallet internal SYNC_ROLE_HOLDER;
+    address internal SYNC_ROLE_ADDRESS;
+
+    Vm.Wallet internal KERNEL_ADMIN;
+    address internal KERNEL_ADMIN_ADDRESS;
+
+    Vm.Wallet internal ACCOUNTANT_ADMIN;
+    address internal ACCOUNTANT_ADMIN_ADDRESS;
+
+    Vm.Wallet internal PROTOCOL_FEE_SETTER;
+    address internal PROTOCOL_FEE_SETTER_ADDRESS;
+
+    Vm.Wallet internal ORACLE_QUOTER_ADMIN;
+    address internal ORACLE_QUOTER_ADMIN_ADDRESS;
+
+    Vm.Wallet internal LP_ROLE_ADMIN;
+    address internal LP_ROLE_ADMIN_ADDRESS;
+
+    Vm.Wallet internal ROLE_GUARDIAN;
+    address internal ROLE_GUARDIAN_ADDRESS;
+
     Vm.Wallet internal PROTOCOL_FEE_RECIPIENT;
     address internal PROTOCOL_FEE_RECIPIENT_ADDRESS;
 
+    Vm.Wallet internal DEPLOYER;
+    address internal DEPLOYER_ADDRESS;
+
+    Vm.Wallet internal DEPLOYER_ADMIN;
+    address internal DEPLOYER_ADMIN_ADDRESS;
+
+    // Provider wallets (LPs)
     Vm.Wallet internal ALICE;
     Vm.Wallet internal BOB;
     Vm.Wallet internal CHARLIE;
@@ -73,6 +103,9 @@ abstract contract BaseTest is Test, RoycoRoles, Assertions {
 
     // Deploy Script
     DeployScript internal DEPLOY_SCRIPT;
+
+    // LP Roles Script
+    GrantLPRolesScript internal LP_ROLES_SCRIPT;
 
     // Deployments
     RoycoFactory internal FACTORY;
@@ -159,15 +192,50 @@ abstract contract BaseTest is Test, RoycoRoles, Assertions {
     }
 
     function _setupWallets() internal {
+        // Admin wallet
         OWNER = _initWallet("OWNER", 1000 ether);
-        PAUSER = _initWallet("PAUSER", 1000 ether);
-        UPGRADER = _initWallet("UPGRADER", 1000 ether);
-        PROTOCOL_FEE_RECIPIENT = _initWallet("PROTOCOL_FEE_RECIPIENT", 1000 ether);
-
         OWNER_ADDRESS = OWNER.addr;
+
+        // Role-specific wallets
+        PAUSER = _initWallet("PAUSER", 1000 ether);
         PAUSER_ADDRESS = PAUSER.addr;
-        PROTOCOL_FEE_RECIPIENT_ADDRESS = PROTOCOL_FEE_RECIPIENT.addr;
+
+        UPGRADER = _initWallet("UPGRADER", 1000 ether);
         UPGRADER_ADDRESS = UPGRADER.addr;
+
+        SYNC_ROLE_HOLDER = _initWallet("SYNC_ROLE_HOLDER", 1000 ether);
+        SYNC_ROLE_ADDRESS = SYNC_ROLE_HOLDER.addr;
+
+        KERNEL_ADMIN = _initWallet("KERNEL_ADMIN", 1000 ether);
+        KERNEL_ADMIN_ADDRESS = KERNEL_ADMIN.addr;
+
+        ACCOUNTANT_ADMIN = _initWallet("ACCOUNTANT_ADMIN", 1000 ether);
+        ACCOUNTANT_ADMIN_ADDRESS = ACCOUNTANT_ADMIN.addr;
+
+        PROTOCOL_FEE_SETTER = _initWallet("PROTOCOL_FEE_SETTER", 1000 ether);
+        PROTOCOL_FEE_SETTER_ADDRESS = PROTOCOL_FEE_SETTER.addr;
+
+        ORACLE_QUOTER_ADMIN = _initWallet("ORACLE_QUOTER_ADMIN", 1000 ether);
+        ORACLE_QUOTER_ADMIN_ADDRESS = ORACLE_QUOTER_ADMIN.addr;
+
+        LP_ROLE_ADMIN = _initWallet("LP_ROLE_ADMIN", 1000 ether);
+        LP_ROLE_ADMIN_ADDRESS = LP_ROLE_ADMIN.addr;
+
+        ROLE_GUARDIAN = _initWallet("ROLE_GUARDIAN", 1000 ether);
+        ROLE_GUARDIAN_ADDRESS = ROLE_GUARDIAN.addr;
+
+        PROTOCOL_FEE_RECIPIENT = _initWallet("PROTOCOL_FEE_RECIPIENT", 1000 ether);
+        PROTOCOL_FEE_RECIPIENT_ADDRESS = PROTOCOL_FEE_RECIPIENT.addr;
+
+        // Deployer wallets (for factory deployment)
+        DEPLOYER = _initWallet("DEPLOYER", 1000 ether);
+        DEPLOYER_ADDRESS = DEPLOYER.addr;
+
+        DEPLOYER_ADMIN = _initWallet("DEPLOYER_ADMIN", 1000 ether);
+        DEPLOYER_ADMIN_ADDRESS = DEPLOYER_ADMIN.addr;
+
+        // Deploy LP roles script
+        LP_ROLES_SCRIPT = new GrantLPRolesScript();
     }
 
     function _setupProviders() internal {
@@ -233,15 +301,14 @@ abstract contract BaseTest is Test, RoycoRoles, Assertions {
     /// @notice Generates a provider address
     /// @param _name The name of the provider
     /// @return provider The provider address
-    function _generateProvider(string memory _name) internal virtual prankModifier(OWNER_ADDRESS) returns (Vm.Wallet memory provider) {
+    function _generateProvider(string memory _name) internal virtual returns (Vm.Wallet memory provider) {
         // Generate a unique wallet
         provider = _initWallet(_name, 10_000_000e6);
+        address[] memory addresses = new address[](1);
+        addresses[0] = provider.addr;
 
-        // Grant Permissions
-        FACTORY.grantRole(RoycoRoles.LP_ROLE, provider.addr, 0);
-        FACTORY.grantRole(RoycoRoles.LP_ROLE, provider.addr, 0);
-        FACTORY.grantRole(RoycoRoles.LP_ROLE, provider.addr, 0);
-        FACTORY.grantRole(RoycoRoles.LP_ROLE, provider.addr, 0);
+        // Grant LP role using the LP roles script (uses broadcast with private key)
+        LP_ROLES_SCRIPT.grantLPRoles(address(FACTORY), addresses, LP_ROLE_ADMIN.privateKey);
 
         return provider;
     }
@@ -249,14 +316,15 @@ abstract contract BaseTest is Test, RoycoRoles, Assertions {
     /// @notice Generates a provider address
     /// @param index The index of the provider
     /// @return provider The provider address
-    function _generateProvider(uint256 index) internal virtual prankModifier(OWNER_ADDRESS) returns (Vm.Wallet memory provider) {
+    function _generateProvider(uint256 index) internal virtual returns (Vm.Wallet memory provider) {
         // Generate a unique wallet
         string memory providerName = string(abi.encodePacked("PROVIDER", vm.toString(index)));
         provider = _initWallet(providerName, 10_000_000e6);
+        address[] memory addresses = new address[](1);
+        addresses[0] = provider.addr;
 
-        // Grant Permissions
-        FACTORY.grantRole(RoycoRoles.LP_ROLE, provider.addr, 0);
-        FACTORY.grantRole(RoycoRoles.LP_ROLE, provider.addr, 0);
+        // Grant LP role using the LP roles script (uses broadcast with private key)
+        LP_ROLES_SCRIPT.grantLPRoles(address(FACTORY), addresses, LP_ROLE_ADMIN.privateKey);
 
         return provider;
     }
@@ -377,5 +445,155 @@ abstract contract BaseTest is Test, RoycoRoles, Assertions {
     /// @return forkRpcUrl The fork RPC URL
     function _forkConfiguration() internal virtual returns (uint256 forkBlock, string memory forkRpcUrl) {
         return (0, "");
+    }
+
+    /// @notice Generates role assignments using the role-specific addresses
+    /// @return roleAssignments Array of role assignment configurations
+    function _generateRoleAssignments() internal view returns (DeployScript.RoleAssignmentConfiguration[] memory roleAssignments) {
+        return DEPLOY_SCRIPT.generateRolesAssignments(
+            DeployScript.RoleAssignmentAddresses({
+                pauserAddress: PAUSER_ADDRESS,
+                upgraderAddress: UPGRADER_ADDRESS,
+                syncRoleAddress: SYNC_ROLE_ADDRESS,
+                adminKernelAddress: KERNEL_ADMIN_ADDRESS,
+                adminAccountantAddress: ACCOUNTANT_ADMIN_ADDRESS,
+                adminProtocolFeeSetterAddress: PROTOCOL_FEE_SETTER_ADDRESS,
+                adminOracleQuoterAddress: ORACLE_QUOTER_ADMIN_ADDRESS,
+                lpRoleAdminAddress: LP_ROLE_ADMIN_ADDRESS,
+                roleGuardianAddress: ROLE_GUARDIAN_ADDRESS,
+                deployerAddress: DEPLOYER_ADDRESS,
+                deployerAdminAddress: DEPLOYER_ADMIN_ADDRESS
+            })
+        );
+    }
+
+    /// @notice Grants all roles to their respective addresses
+    /// @dev This should be called after the factory is deployed
+    function _grantAllRoles() internal prankModifier(OWNER_ADDRESS) {
+        // Grant ADMIN_PAUSER_ROLE
+        FACTORY.grantRole(ADMIN_PAUSER_ROLE, PAUSER_ADDRESS, 0);
+
+        // Grant ADMIN_UPGRADER_ROLE
+        FACTORY.grantRole(ADMIN_UPGRADER_ROLE, UPGRADER_ADDRESS, 0);
+
+        // Grant SYNC_ROLE
+        FACTORY.grantRole(SYNC_ROLE, SYNC_ROLE_ADDRESS, 0);
+
+        // Grant ADMIN_KERNEL_ROLE
+        FACTORY.grantRole(ADMIN_KERNEL_ROLE, KERNEL_ADMIN_ADDRESS, 0);
+
+        // Grant ADMIN_ACCOUNTANT_ROLE
+        FACTORY.grantRole(ADMIN_ACCOUNTANT_ROLE, ACCOUNTANT_ADMIN_ADDRESS, 0);
+
+        // Grant ADMIN_PROTOCOL_FEE_SETTER_ROLE
+        FACTORY.grantRole(ADMIN_PROTOCOL_FEE_SETTER_ROLE, PROTOCOL_FEE_SETTER_ADDRESS, 0);
+
+        // Grant ADMIN_ORACLE_QUOTER_ROLE
+        FACTORY.grantRole(ADMIN_ORACLE_QUOTER_ROLE, ORACLE_QUOTER_ADMIN_ADDRESS, 0);
+
+        // Grant LP_ROLE_ADMIN_ROLE
+        FACTORY.grantRole(LP_ROLE_ADMIN_ROLE, LP_ROLE_ADMIN_ADDRESS, 0);
+
+        // Set LP_ROLE admin to LP_ROLE_ADMIN_ROLE
+        FACTORY.setRoleAdmin(LP_ROLE, LP_ROLE_ADMIN_ROLE);
+    }
+
+    // -----------------------------------------
+    // Role-Specific Helper Functions
+    // -----------------------------------------
+
+    /// @notice Calls sync on the kernel with SYNC_ROLE
+    function _sync() internal prankModifier(SYNC_ROLE_ADDRESS) {
+        KERNEL.syncTrancheAccounting();
+    }
+
+    /// @notice Schedules and executes a kernel admin operation (handles delay)
+    /// @param _target The target contract address
+    /// @param _data The calldata for the operation
+    function _executeKernelAdminOperation(address _target, bytes memory _data) internal {
+        // Schedule the operation
+        vm.prank(KERNEL_ADMIN_ADDRESS);
+        FACTORY.schedule(_target, _data, 0);
+
+        // Warp past the delay (1 day for ADMIN_KERNEL_ROLE)
+        vm.warp(block.timestamp + 1 days + 1);
+
+        // Execute the operation
+        vm.prank(KERNEL_ADMIN_ADDRESS);
+        FACTORY.execute(_target, _data);
+    }
+
+    /// @notice Schedules and executes an accountant admin operation (handles delay)
+    /// @param _target The target contract address
+    /// @param _data The calldata for the operation
+    function _executeAccountantAdminOperation(address _target, bytes memory _data) internal {
+        // Schedule the operation
+        vm.prank(ACCOUNTANT_ADMIN_ADDRESS);
+        FACTORY.schedule(_target, _data, 0);
+
+        // Warp past the delay (1 day for ADMIN_ACCOUNTANT_ROLE)
+        vm.warp(block.timestamp + 1 days + 1);
+
+        // Execute the operation
+        vm.prank(ACCOUNTANT_ADMIN_ADDRESS);
+        FACTORY.execute(_target, _data);
+    }
+
+    /// @notice Schedules and executes a protocol fee setter operation (handles delay)
+    /// @param _target The target contract address
+    /// @param _data The calldata for the operation
+    function _executeProtocolFeeSetterOperation(address _target, bytes memory _data) internal {
+        // Schedule the operation
+        vm.prank(PROTOCOL_FEE_SETTER_ADDRESS);
+        FACTORY.schedule(_target, _data, 0);
+
+        // Warp past the delay (1 day for ADMIN_PROTOCOL_FEE_SETTER_ROLE)
+        vm.warp(block.timestamp + 1 days + 1);
+
+        // Execute the operation
+        vm.prank(PROTOCOL_FEE_SETTER_ADDRESS);
+        FACTORY.execute(_target, _data);
+    }
+
+    /// @notice Sets the protocol fee recipient via kernel admin (with scheduling)
+    /// @param _newRecipient The new protocol fee recipient address
+    function _setProtocolFeeRecipient(address _newRecipient) internal {
+        bytes memory data = abi.encodeCall(KERNEL.setProtocolFeeRecipient, (_newRecipient));
+        _executeKernelAdminOperation(address(KERNEL), data);
+    }
+
+    /// @notice Sets the junior tranche redemption delay via kernel admin (with scheduling)
+    /// @param _newDelay The new redemption delay in seconds
+    function _setJuniorTrancheRedemptionDelay(uint24 _newDelay) internal {
+        bytes memory data = abi.encodeCall(KERNEL.setJuniorTrancheRedemptionDelay, (_newDelay));
+        _executeKernelAdminOperation(address(KERNEL), data);
+    }
+
+    /// @notice Sets the coverage via accountant admin (with scheduling)
+    /// @param _newCoverageWAD The new coverage in WAD
+    function _setCoverage(uint64 _newCoverageWAD) internal {
+        bytes memory data = abi.encodeCall(ACCOUNTANT.setCoverage, (_newCoverageWAD));
+        _executeAccountantAdminOperation(address(ACCOUNTANT), data);
+    }
+
+    /// @notice Sets the beta via accountant admin (with scheduling)
+    /// @param _newBetaWAD The new beta in WAD
+    function _setBeta(uint96 _newBetaWAD) internal {
+        bytes memory data = abi.encodeCall(ACCOUNTANT.setBeta, (_newBetaWAD));
+        _executeAccountantAdminOperation(address(ACCOUNTANT), data);
+    }
+
+    /// @notice Sets the ST protocol fee via protocol fee setter (with scheduling)
+    /// @param _newFeeWAD The new fee in WAD
+    function _setSeniorTrancheProtocolFee(uint64 _newFeeWAD) internal {
+        bytes memory data = abi.encodeCall(ACCOUNTANT.setSeniorTrancheProtocolFee, (_newFeeWAD));
+        _executeProtocolFeeSetterOperation(address(ACCOUNTANT), data);
+    }
+
+    /// @notice Sets the JT protocol fee via protocol fee setter (with scheduling)
+    /// @param _newFeeWAD The new fee in WAD
+    function _setJuniorTrancheProtocolFee(uint64 _newFeeWAD) internal {
+        bytes memory data = abi.encodeCall(ACCOUNTANT.setJuniorTrancheProtocolFee, (_newFeeWAD));
+        _executeProtocolFeeSetterOperation(address(ACCOUNTANT), data);
     }
 }

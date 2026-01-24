@@ -179,9 +179,11 @@ contract FluidStETH_Test is ERC4626_TestBase {
         DeployScript.AdaptiveCurveYDMParams memory ydmParams =
             DeployScript.AdaptiveCurveYDMParams({ jtYieldShareAtTargetUtilWAD: 0.3e18, jtYieldShareAtFullUtilWAD: 1e18 });
 
+        // Build role assignments using the centralized function
+        DeployScript.RoleAssignmentConfiguration[] memory roleAssignments = _generateRoleAssignments();
+
         DeployScript.DeploymentParams memory params = DeployScript.DeploymentParams({
-            factoryAdmin: address(DEPLOY_SCRIPT),
-            factoryOwnerAddress: OWNER_ADDRESS,
+            factoryAdmin: OWNER_ADDRESS,
             marketId: marketId,
             seniorTrancheName: string(abi.encodePacked("Royco Senior ", cfg.name)),
             seniorTrancheSymbol: string(abi.encodePacked("RS-", cfg.name)),
@@ -202,21 +204,10 @@ contract FluidStETH_Test is ERC4626_TestBase {
             fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
             ydmType: DeployScript.YDMType.AdaptiveCurve,
             ydmSpecificParams: abi.encode(ydmParams),
-            pauserAddress: PAUSER_ADDRESS,
-            pauserExecutionDelay: 0,
-            upgraderAddress: UPGRADER_ADDRESS,
-            upgraderExecutionDelay: 0,
-            lpRoleAddress: OWNER_ADDRESS,
-            lpRoleExecutionDelay: 0,
-            syncRoleAddress: OWNER_ADDRESS,
-            syncRoleExecutionDelay: 0,
-            kernelAdminRoleAddress: OWNER_ADDRESS,
-            kernelAdminRoleExecutionDelay: 0,
-            oracleQuoterAdminRoleAddress: OWNER_ADDRESS,
-            oracleQuoterAdminRoleExecutionDelay: 0
+            roleAssignments: roleAssignments
         });
 
-        return DEPLOY_SCRIPT.deploy(params);
+        return DEPLOY_SCRIPT.deploy(params, DEPLOYER.privateKey);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -270,7 +261,7 @@ contract FluidStETH_Test is ERC4626_TestBase {
         }
 
         // Sync to capture any accumulated drift
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         // Verify NAV conservation holds within tolerance
@@ -492,7 +483,7 @@ contract FluidStETH_Test is ERC4626_TestBase {
         }
 
         // Sync and verify NAV conservation still holds
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         _assertNAVConservation();
@@ -588,7 +579,7 @@ contract FluidStETH_Test is ERC4626_TestBase {
         simulateSTLoss(0.05e18); // 5% loss
 
         // Sync to apply the loss
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         // Check state after loss
@@ -615,7 +606,7 @@ contract FluidStETH_Test is ERC4626_TestBase {
         // Simulate loss to potentially enter FIXED_TERM
         simulateSTLoss(0.05e18);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         IRoycoAccountant.RoycoAccountantState memory stateAfterLoss = ACCOUNTANT.getState();
@@ -630,7 +621,7 @@ contract FluidStETH_Test is ERC4626_TestBase {
         vm.warp(block.timestamp + FIXED_TERM_DURATION_SECONDS + 1);
 
         // Sync to trigger state transition check
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         IRoycoAccountant.RoycoAccountantState memory stateAfterExpiry = ACCOUNTANT.getState();
@@ -653,7 +644,7 @@ contract FluidStETH_Test is ERC4626_TestBase {
         // Simulate loss to enter FIXED_TERM
         simulateSTLoss(0.03e18); // 3% loss
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         IRoycoAccountant.RoycoAccountantState memory stateAfterLoss = ACCOUNTANT.getState();
@@ -666,7 +657,7 @@ contract FluidStETH_Test is ERC4626_TestBase {
         // Simulate yield to restore coverage (yield > loss)
         simulateJTYield(0.1e18); // 10% yield
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         IRoycoAccountant.RoycoAccountantState memory stateAfterYield = ACCOUNTANT.getState();
@@ -696,12 +687,12 @@ contract FluidStETH_Test is ERC4626_TestBase {
         for (uint256 i = 0; i < _numCycles; i++) {
             // Loss cycle
             simulateSTLoss(0.02e18); // 2% loss
-            vm.prank(OWNER_ADDRESS);
+            vm.prank(SYNC_ROLE_ADDRESS);
             KERNEL.syncTrancheAccounting();
 
             // Yield cycle
             simulateJTYield(0.03e18); // 3% yield
-            vm.prank(OWNER_ADDRESS);
+            vm.prank(SYNC_ROLE_ADDRESS);
             KERNEL.syncTrancheAccounting();
 
             // Advance time
@@ -727,7 +718,7 @@ contract FluidStETH_Test is ERC4626_TestBase {
         _depositST(BOB_ADDRESS, stAmount);
 
         // Get initial LTV via sync
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory syncedState = KERNEL.syncTrancheAccounting();
         emit log_named_uint("Initial LTV (WAD)", syncedState.ltvWAD);
 
@@ -735,7 +726,7 @@ contract FluidStETH_Test is ERC4626_TestBase {
         for (uint256 i = 0; i < 5; i++) {
             simulateJTLoss(0.05e18); // 5% loss each
 
-            vm.prank(OWNER_ADDRESS);
+            vm.prank(SYNC_ROLE_ADDRESS);
             syncedState = KERNEL.syncTrancheAccounting();
             emit log_named_uint("LTV after loss", syncedState.ltvWAD);
 
@@ -756,7 +747,7 @@ contract FluidStETH_Test is ERC4626_TestBase {
         // Only JT deposits - no ST
         _depositJT(ALICE_ADDRESS, config.initialFunding / 4);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory syncedState = KERNEL.syncTrancheAccounting();
         assertEq(syncedState.utilizationWAD, 0, "Utilization should be 0 with no ST");
 
@@ -784,7 +775,7 @@ contract FluidStETH_Test is ERC4626_TestBase {
 
         _depositST(BOB_ADDRESS, stAmount);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         SyncedAccountingState memory syncedState = KERNEL.syncTrancheAccounting();
         emit log_named_uint("Utilization at max ST", syncedState.utilizationWAD);
 
@@ -840,7 +831,7 @@ contract FluidStETH_Test is ERC4626_TestBase {
                 }
             } else {
                 // Sync
-                vm.prank(OWNER_ADDRESS);
+                vm.prank(SYNC_ROLE_ADDRESS);
                 KERNEL.syncTrancheAccounting();
             }
 
@@ -877,7 +868,7 @@ contract FluidStETH_Test is ERC4626_TestBase {
         // Simulate loss to trigger state transition
         simulateSTLoss(0.05e18);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         // Wait for claim delay
@@ -924,7 +915,7 @@ contract FluidStETH_Test is ERC4626_TestBase {
             vm.warp(block.timestamp + 1 days);
 
             // Sync
-            vm.prank(OWNER_ADDRESS);
+            vm.prank(SYNC_ROLE_ADDRESS);
             KERNEL.syncTrancheAccounting();
         }
 

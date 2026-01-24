@@ -199,7 +199,7 @@ abstract contract ERC4626_TestBase is AbstractKernelTestSuite {
         simulateSTYield(_yieldPercentage * 1e16); // Convert to WAD
 
         // Trigger sync
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         NAV_UNIT navAfter = ST.totalAssets().nav;
@@ -219,7 +219,7 @@ abstract contract ERC4626_TestBase is AbstractKernelTestSuite {
         simulateJTYield(_yieldPercentage * 1e16); // Convert to WAD
 
         // Trigger sync
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         NAV_UNIT navAfter = JT.totalAssets().nav;
@@ -239,7 +239,7 @@ abstract contract ERC4626_TestBase is AbstractKernelTestSuite {
         simulateJTLoss(_lossPercentage * 1e16); // Convert to WAD
 
         // Trigger sync
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         NAV_UNIT navAfter = JT.totalAssets().nav;
@@ -256,7 +256,7 @@ abstract contract ERC4626_TestBase is AbstractKernelTestSuite {
         // Simulate vault share price yield
         simulateJTYield(_yieldPercentage * 1e16);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         _assertNAVConservation();
@@ -280,9 +280,11 @@ abstract contract ERC4626_TestBase is AbstractKernelTestSuite {
             jtYieldShareAtFullUtilWAD: 1e18 // 100% at 100% utilization
         });
 
+        // Build role assignments using the centralized function
+        DeployScript.RoleAssignmentConfiguration[] memory roleAssignments = _generateRoleAssignments();
+
         DeployScript.DeploymentParams memory params = DeployScript.DeploymentParams({
-            factoryAdmin: address(DEPLOY_SCRIPT),
-            factoryOwnerAddress: OWNER_ADDRESS,
+            factoryAdmin: OWNER_ADDRESS,
             marketId: marketId,
             seniorTrancheName: string(abi.encodePacked("Royco Senior ", cfg.name)),
             seniorTrancheSymbol: string(abi.encodePacked("RS-", cfg.name)),
@@ -303,20 +305,9 @@ abstract contract ERC4626_TestBase is AbstractKernelTestSuite {
             fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
             ydmType: DeployScript.YDMType.AdaptiveCurve,
             ydmSpecificParams: abi.encode(ydmParams),
-            pauserAddress: PAUSER_ADDRESS,
-            pauserExecutionDelay: 0,
-            upgraderAddress: UPGRADER_ADDRESS,
-            upgraderExecutionDelay: 0,
-            lpRoleAddress: OWNER_ADDRESS,
-            lpRoleExecutionDelay: 0,
-            syncRoleAddress: OWNER_ADDRESS,
-            syncRoleExecutionDelay: 0,
-            kernelAdminRoleAddress: OWNER_ADDRESS,
-            kernelAdminRoleExecutionDelay: 0,
-            oracleQuoterAdminRoleAddress: OWNER_ADDRESS,
-            oracleQuoterAdminRoleExecutionDelay: 0
+            roleAssignments: roleAssignments
         });
 
-        return DEPLOY_SCRIPT.deploy(params);
+        return DEPLOY_SCRIPT.deploy(params, DEPLOYER.privateKey);
     }
 }

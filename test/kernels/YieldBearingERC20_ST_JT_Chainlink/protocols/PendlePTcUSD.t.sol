@@ -130,7 +130,7 @@ contract PendlePTcUSD_Test is YieldBearingERC20Chainlink_TestBase {
         simulateChainlinkPriceYield(yieldWAD);
 
         // Sync accounting
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         NAV_UNIT navAfter = JT.totalAssets().nav;
@@ -151,7 +151,7 @@ contract PendlePTcUSD_Test is YieldBearingERC20Chainlink_TestBase {
         simulateChainlinkPriceLoss(lossWAD);
 
         // Sync accounting
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         NAV_UNIT navAfter = JT.totalAssets().nav;
@@ -176,7 +176,7 @@ contract PendlePTcUSD_Test is YieldBearingERC20Chainlink_TestBase {
         assertGt(rateAfter, rateBefore, "Stored rate should increase after yield");
 
         // Sync accounting
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         NAV_UNIT navAfter = JT.totalAssets().nav;
@@ -198,7 +198,7 @@ contract PendlePTcUSD_Test is YieldBearingERC20Chainlink_TestBase {
         simulateStoredRateYield(_storedRateYieldBps * 1e14);
 
         // Sync accounting
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         NAV_UNIT navAfter = JT.totalAssets().nav;
