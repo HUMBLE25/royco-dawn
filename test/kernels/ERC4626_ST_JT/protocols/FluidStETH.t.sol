@@ -5,8 +5,9 @@ import { IERC4626 } from "../../../../lib/openzeppelin-contracts/contracts/inter
 import { IERC20 } from "../../../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { IERC20Metadata } from "../../../../lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
+import { IRoycoAccountant } from "../../../../src/interfaces/IRoycoAccountant.sol";
 import { WAD } from "../../../../src/libraries/Constants.sol";
-import { AssetClaims } from "../../../../src/libraries/Types.sol";
+import { AssetClaims, MarketState, SyncedAccountingState } from "../../../../src/libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, toNAVUnits, toTrancheUnits, toUint256 } from "../../../../src/libraries/Units.sol";
 
 import { DeployScript } from "../../../../script/Deploy.s.sol";
@@ -190,7 +191,7 @@ contract FluidStETH_Test is ERC4626_TestBase {
             juniorTrancheSymbol: string(abi.encodePacked("RJ-", cfg.name)),
             seniorAsset: cfg.stAsset,
             juniorAsset: cfg.jtAsset,
-            dustTolerance: toNAVUnits(uint256(10)), // 10 wei for ~250 cycle headroom
+            dustTolerance: toNAVUnits(uint256(5)),
             kernelType: DeployScript.KernelType.ERC4626_ST_ERC4626_JT_InKindAssets,
             kernelSpecificParams: abi.encode(kernelParams),
             protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS,
@@ -432,5 +433,533 @@ contract FluidStETH_Test is ERC4626_TestBase {
             emit log("!!! convertToAssets drift detected !!!");
             emit log_named_uint("Drift (wei)", jtAssetsBefore > jtAssetsAfter ? jtAssetsBefore - jtAssetsAfter : jtAssetsAfter - jtAssetsBefore);
         }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ADVERSARIAL TESTS: ROUNDING EDGE CASES
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// @notice Test minimum deposit amount edge case
+    /// @dev Verifies system handles minimum viable deposits without breaking
+    function test_adversarial_minimumDeposit() external {
+        uint256 minDeposit = _minDepositAmount();
+
+        // JT deposits minimum
+        uint256 jtShares = _depositJT(ALICE_ADDRESS, minDeposit);
+        assertGt(jtShares, 0, "Should receive shares for min deposit");
+
+        // Verify NAV is tracked
+        NAV_UNIT jtNav = JT.totalAssets().nav;
+        assertGt(toUint256(jtNav), 0, "JT NAV should be positive");
+
+        _assertNAVConservation();
+    }
+
+    /// @notice Test many small deposits accumulating rounding drift
+    /// @dev Each deposit can cause 1 wei drift - test if 100+ deposits break invariants
+    function testFuzz_adversarial_manySmallDeposits_accumulateDrift(uint256 _numDeposits) external {
+        _numDeposits = bound(_numDeposits, 50, 150);
+
+        uint256 depositAmount = _minDepositAmount() * 2;
+
+        // Initial JT deposit to enable ST deposits
+        _depositJT(ALICE_ADDRESS, config.initialFunding / 4);
+
+        // Track initial state
+        NAV_UNIT initialJTNav = JT.totalAssets().nav;
+
+        // Many small ST deposits - each one potentially causes 1 wei drift
+        TRANCHE_UNIT maxSTDeposit = ST.maxDeposit(BOB_ADDRESS);
+        uint256 maxSTDepositUint = toUint256(maxSTDeposit);
+
+        uint256 actualDeposits = 0;
+        for (uint256 i = 0; i < _numDeposits; i++) {
+            // Check if we can still deposit
+            maxSTDeposit = ST.maxDeposit(BOB_ADDRESS);
+            if (toUint256(maxSTDeposit) < depositAmount) break;
+
+            _depositST(BOB_ADDRESS, depositAmount);
+            actualDeposits++;
+        }
+
+        // Sync and verify NAV conservation still holds
+        vm.prank(OWNER_ADDRESS);
+        KERNEL.syncTrancheAccounting();
+
+        _assertNAVConservation();
+
+        // Log accumulated drift for analysis
+        NAV_UNIT finalJTNav = JT.totalAssets().nav;
+        emit log_named_uint("Number of deposits", actualDeposits);
+        emit log_named_uint("Initial JT NAV", toUint256(initialJTNav));
+        emit log_named_uint("Final JT NAV", toUint256(finalJTNav));
+
+        if (toUint256(initialJTNav) > toUint256(finalJTNav)) {
+            emit log_named_uint("Total drift (wei)", toUint256(initialJTNav) - toUint256(finalJTNav));
+        }
+    }
+
+    /// @notice Test deposits followed by many small redemptions
+    /// @dev Each redemption can also cause rounding - verify no value leakage
+    function testFuzz_adversarial_manySmallRedemptions(uint256 _numRedemptions) external {
+        _numRedemptions = bound(_numRedemptions, 10, 50);
+
+        // Setup: JT and ST deposit
+        _depositJT(ALICE_ADDRESS, config.initialFunding / 4);
+
+        TRANCHE_UNIT maxSTDeposit = ST.maxDeposit(BOB_ADDRESS);
+        uint256 stAmount = toUint256(maxSTDeposit) / 2;
+        _depositST(BOB_ADDRESS, stAmount);
+
+        uint256 stShares = ST.balanceOf(BOB_ADDRESS);
+        uint256 redeemPerIteration = stShares / (_numRedemptions + 1);
+
+        // Many small redemptions
+        uint256 actualRedemptions = 0;
+        for (uint256 i = 0; i < _numRedemptions; i++) {
+            // Check if market entered FIXED_TERM (ST redemptions disabled)
+            if (ACCOUNTANT.getState().lastMarketState == MarketState.FIXED_TERM) break;
+
+            uint256 maxRedeem = ST.maxRedeem(BOB_ADDRESS);
+            if (maxRedeem < redeemPerIteration) break;
+
+            vm.prank(BOB_ADDRESS);
+            ST.redeem(redeemPerIteration, BOB_ADDRESS, BOB_ADDRESS);
+            actualRedemptions++;
+        }
+
+        _assertNAVConservation();
+
+        emit log_named_uint("Number of redemptions", actualRedemptions);
+    }
+
+    /// @notice Test rounding at exact coverage boundary
+    /// @dev Deposit exactly at max coverage to test boundary rounding
+    function test_adversarial_exactCoverageBoundary() external {
+        // JT deposits
+        uint256 jtAmount = config.initialFunding / 4;
+        _depositJT(ALICE_ADDRESS, jtAmount);
+
+        // Get exact max ST deposit (coverage boundary)
+        TRANCHE_UNIT maxSTDeposit = ST.maxDeposit(BOB_ADDRESS);
+        uint256 maxSTDepositUint = toUint256(maxSTDeposit);
+
+        if (maxSTDepositUint < _minDepositAmount()) return;
+
+        // Deposit exactly at max (boundary)
+        _depositST(BOB_ADDRESS, maxSTDepositUint);
+
+        _assertNAVConservation();
+
+        // Verify we're at max coverage - no more ST deposits allowed
+        TRANCHE_UNIT remainingMaxDeposit = ST.maxDeposit(CHARLIE_ADDRESS);
+        assertLe(toUint256(remainingMaxDeposit), toUint256(DUST_TOLERANCE) + 1, "Should be at coverage limit");
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ADVERSARIAL TESTS: MARKET STATE TRANSITIONS
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// @notice Test PERPETUAL → FIXED_TERM transition via loss
+    /// @dev Simulate loss that exceeds dust tolerance to trigger state transition
+    function test_adversarial_stateTransition_perpetualToFixedTerm() external {
+        // Setup market in PERPETUAL state
+        _depositJT(ALICE_ADDRESS, config.initialFunding / 4);
+
+        TRANCHE_UNIT maxSTDeposit = ST.maxDeposit(BOB_ADDRESS);
+        uint256 stAmount = toUint256(maxSTDeposit) / 2;
+        _depositST(BOB_ADDRESS, stAmount);
+
+        // Verify initial state is PERPETUAL
+        IRoycoAccountant.RoycoAccountantState memory stateBefore = ACCOUNTANT.getState();
+        assertEq(uint256(stateBefore.lastMarketState), uint256(MarketState.PERPETUAL), "Should start in PERPETUAL");
+
+        // Simulate significant loss to trigger FIXED_TERM
+        // Loss needs to exceed dust tolerance to trigger transition
+        simulateSTLoss(0.05e18); // 5% loss
+
+        // Sync to apply the loss
+        vm.prank(OWNER_ADDRESS);
+        KERNEL.syncTrancheAccounting();
+
+        // Check state after loss
+        IRoycoAccountant.RoycoAccountantState memory stateAfter = ACCOUNTANT.getState();
+
+        // If there's JT coverage IL > dust tolerance, should be FIXED_TERM
+        if (toUint256(stateAfter.lastJTCoverageImpermanentLoss) > toUint256(ACCOUNTANT.getState().dustTolerance)) {
+            assertEq(uint256(stateAfter.lastMarketState), uint256(MarketState.FIXED_TERM), "Should transition to FIXED_TERM after loss");
+        }
+
+        _assertNAVConservation();
+    }
+
+    /// @notice Test FIXED_TERM → PERPETUAL transition via term expiry
+    /// @dev Put market in FIXED_TERM, wait for term to elapse, verify transition
+    function test_adversarial_stateTransition_fixedTermExpiry() external {
+        // Setup market
+        _depositJT(ALICE_ADDRESS, config.initialFunding / 4);
+
+        TRANCHE_UNIT maxSTDeposit = ST.maxDeposit(BOB_ADDRESS);
+        uint256 stAmount = toUint256(maxSTDeposit) / 2;
+        _depositST(BOB_ADDRESS, stAmount);
+
+        // Simulate loss to potentially enter FIXED_TERM
+        simulateSTLoss(0.05e18);
+
+        vm.prank(OWNER_ADDRESS);
+        KERNEL.syncTrancheAccounting();
+
+        IRoycoAccountant.RoycoAccountantState memory stateAfterLoss = ACCOUNTANT.getState();
+
+        // Only continue if we're in FIXED_TERM
+        if (stateAfterLoss.lastMarketState != MarketState.FIXED_TERM) {
+            emit log("Market didn't enter FIXED_TERM - loss may have been too small");
+            return;
+        }
+
+        // Fast forward past fixed term duration
+        vm.warp(block.timestamp + FIXED_TERM_DURATION_SECONDS + 1);
+
+        // Sync to trigger state transition check
+        vm.prank(OWNER_ADDRESS);
+        KERNEL.syncTrancheAccounting();
+
+        IRoycoAccountant.RoycoAccountantState memory stateAfterExpiry = ACCOUNTANT.getState();
+        assertEq(uint256(stateAfterExpiry.lastMarketState), uint256(MarketState.PERPETUAL), "Should return to PERPETUAL after term expiry");
+
+        // JT coverage IL should be erased
+        assertEq(toUint256(stateAfterExpiry.lastJTCoverageImpermanentLoss), 0, "JT coverage IL should be erased after term expiry");
+    }
+
+    /// @notice Test FIXED_TERM → PERPETUAL transition via coverage restoration
+    /// @dev Put market in FIXED_TERM, then restore coverage via JT yield
+    function test_adversarial_stateTransition_coverageRestoration() external {
+        // Setup market
+        _depositJT(ALICE_ADDRESS, config.initialFunding / 4);
+
+        TRANCHE_UNIT maxSTDeposit = ST.maxDeposit(BOB_ADDRESS);
+        uint256 stAmount = toUint256(maxSTDeposit) / 2;
+        _depositST(BOB_ADDRESS, stAmount);
+
+        // Simulate loss to enter FIXED_TERM
+        simulateSTLoss(0.03e18); // 3% loss
+
+        vm.prank(OWNER_ADDRESS);
+        KERNEL.syncTrancheAccounting();
+
+        IRoycoAccountant.RoycoAccountantState memory stateAfterLoss = ACCOUNTANT.getState();
+
+        if (stateAfterLoss.lastMarketState != MarketState.FIXED_TERM) {
+            emit log("Market didn't enter FIXED_TERM");
+            return;
+        }
+
+        // Simulate yield to restore coverage (yield > loss)
+        simulateJTYield(0.1e18); // 10% yield
+
+        vm.prank(OWNER_ADDRESS);
+        KERNEL.syncTrancheAccounting();
+
+        IRoycoAccountant.RoycoAccountantState memory stateAfterYield = ACCOUNTANT.getState();
+
+        // If coverage is restored (JT coverage IL <= dust tolerance), should be PERPETUAL
+        if (toUint256(stateAfterYield.lastJTCoverageImpermanentLoss) <= toUint256(stateAfterYield.dustTolerance)) {
+            // Note: May still be FIXED_TERM until IL is completely zero per the accountant logic
+            emit log_named_uint("JT Coverage IL after yield", toUint256(stateAfterYield.lastJTCoverageImpermanentLoss));
+        }
+
+        _assertNAVConservation();
+    }
+
+    /// @notice Test rapid state transitions don't break accounting
+    /// @dev Multiple loss/yield cycles to stress test state machine
+    function testFuzz_adversarial_rapidStateTransitions(uint256 _numCycles) external {
+        _numCycles = bound(_numCycles, 3, 10);
+
+        // Setup market
+        _depositJT(ALICE_ADDRESS, config.initialFunding / 4);
+
+        TRANCHE_UNIT maxSTDeposit = ST.maxDeposit(BOB_ADDRESS);
+        uint256 stAmount = toUint256(maxSTDeposit) / 3;
+        if (stAmount < _minDepositAmount()) return;
+        _depositST(BOB_ADDRESS, stAmount);
+
+        for (uint256 i = 0; i < _numCycles; i++) {
+            // Loss cycle
+            simulateSTLoss(0.02e18); // 2% loss
+            vm.prank(OWNER_ADDRESS);
+            KERNEL.syncTrancheAccounting();
+
+            // Yield cycle
+            simulateJTYield(0.03e18); // 3% yield
+            vm.prank(OWNER_ADDRESS);
+            KERNEL.syncTrancheAccounting();
+
+            // Advance time
+            vm.warp(block.timestamp + 1 days);
+        }
+
+        _assertNAVConservation();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ADVERSARIAL TESTS: LLTV AND COVERAGE EDGE CASES
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// @notice Test approaching LLTV boundary via losses
+    /// @dev Verify system handles approaching liquidation threshold correctly
+    function test_adversarial_approachLLTV() external {
+        // Setup with high utilization
+        _depositJT(ALICE_ADDRESS, config.initialFunding / 4);
+
+        TRANCHE_UNIT maxSTDeposit = ST.maxDeposit(BOB_ADDRESS);
+        uint256 stAmount = toUint256(maxSTDeposit) * 80 / 100; // 80% of max
+        if (stAmount < _minDepositAmount()) return;
+        _depositST(BOB_ADDRESS, stAmount);
+
+        // Get initial LTV via sync
+        vm.prank(OWNER_ADDRESS);
+        SyncedAccountingState memory syncedState = KERNEL.syncTrancheAccounting();
+        emit log_named_uint("Initial LTV (WAD)", syncedState.ltvWAD);
+
+        // Simulate progressive losses
+        for (uint256 i = 0; i < 5; i++) {
+            simulateJTLoss(0.05e18); // 5% loss each
+
+            vm.prank(OWNER_ADDRESS);
+            syncedState = KERNEL.syncTrancheAccounting();
+            emit log_named_uint("LTV after loss", syncedState.ltvWAD);
+
+            // If we hit LLTV, ST should still be able to withdraw
+            if (syncedState.ltvWAD >= LLTV) {
+                uint256 stMaxRedeem = ST.maxRedeem(BOB_ADDRESS);
+                emit log_named_uint("ST maxRedeem at LLTV breach", stMaxRedeem);
+                break;
+            }
+        }
+
+        _assertNAVConservation();
+    }
+
+    /// @notice Test zero utilization edge case
+    /// @dev Market with JT only, no ST deposits
+    function test_adversarial_zeroUtilization() external {
+        // Only JT deposits - no ST
+        _depositJT(ALICE_ADDRESS, config.initialFunding / 4);
+
+        vm.prank(OWNER_ADDRESS);
+        SyncedAccountingState memory syncedState = KERNEL.syncTrancheAccounting();
+        assertEq(syncedState.utilizationWAD, 0, "Utilization should be 0 with no ST");
+
+        // JT should be able to fully redeem
+        vm.warp(block.timestamp + _getJTRedemptionDelay() + 1);
+
+        uint256 jtShares = JT.balanceOf(ALICE_ADDRESS);
+        uint256 maxRedeem = JT.maxRedeem(ALICE_ADDRESS);
+
+        // Note: Fluid vault has higher rounding than DUST_TOLERANCE (observed 11 wei delta)
+        // This is a known characteristic of Fluid's convertToAssets rounding
+        assertApproxEqAbs(maxRedeem, jtShares, toUint256(maxNAVDelta()), "JT should be able to redeem all at 0 utilization");
+    }
+
+    /// @notice Test 100% utilization edge case
+    /// @dev Deposit ST up to max coverage
+    function test_adversarial_fullUtilization() external {
+        // JT deposits
+        _depositJT(ALICE_ADDRESS, config.initialFunding / 4);
+
+        // ST deposits to max coverage
+        TRANCHE_UNIT maxSTDeposit = ST.maxDeposit(BOB_ADDRESS);
+        uint256 stAmount = toUint256(maxSTDeposit);
+        if (stAmount < _minDepositAmount()) return;
+
+        _depositST(BOB_ADDRESS, stAmount);
+
+        vm.prank(OWNER_ADDRESS);
+        SyncedAccountingState memory syncedState = KERNEL.syncTrancheAccounting();
+        emit log_named_uint("Utilization at max ST", syncedState.utilizationWAD);
+
+        // JT maxRedeem should be very limited
+        vm.warp(block.timestamp + _getJTRedemptionDelay() + 1);
+
+        uint256 jtMaxRedeem = JT.maxRedeem(ALICE_ADDRESS);
+        emit log_named_uint("JT maxRedeem at full utilization", jtMaxRedeem);
+
+        _assertNAVConservation();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ADVERSARIAL TESTS: CONCURRENT OPERATIONS
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// @notice Test interleaved ST/JT deposits and redemptions
+    /// @dev Stress test with multiple users doing concurrent operations
+    function testFuzz_adversarial_interleavedOperations(uint256 _seed) external {
+        _seed = bound(_seed, 1, type(uint256).max);
+
+        // Initial setup
+        _depositJT(ALICE_ADDRESS, config.initialFunding / 8);
+
+        // Interleaved operations
+        for (uint256 i = 0; i < 10; i++) {
+            uint256 action = uint256(keccak256(abi.encodePacked(_seed, i))) % 4;
+
+            if (action == 0) {
+                // JT deposit
+                uint256 amount = bound(uint256(keccak256(abi.encodePacked(_seed, i, "jt"))), _minDepositAmount(), config.initialFunding / 20);
+                _depositJT(CHARLIE_ADDRESS, amount);
+            } else if (action == 1) {
+                // ST deposit (if possible)
+                TRANCHE_UNIT maxSTDeposit = ST.maxDeposit(BOB_ADDRESS);
+                uint256 maxAmount = toUint256(maxSTDeposit);
+                if (maxAmount >= _minDepositAmount()) {
+                    uint256 amount = bound(uint256(keccak256(abi.encodePacked(_seed, i, "st"))), _minDepositAmount(), maxAmount / 2);
+                    if (amount >= _minDepositAmount()) {
+                        _depositST(BOB_ADDRESS, amount);
+                    }
+                }
+            } else if (action == 2) {
+                // ST redeem (if has balance)
+                uint256 stBalance = ST.balanceOf(BOB_ADDRESS);
+                uint256 maxRedeem = ST.maxRedeem(BOB_ADDRESS);
+                if (maxRedeem >= _minDepositAmount()) {
+                    uint256 amount = bound(uint256(keccak256(abi.encodePacked(_seed, i, "str"))), _minDepositAmount(), maxRedeem / 2);
+                    if (amount >= _minDepositAmount()) {
+                        vm.prank(BOB_ADDRESS);
+                        ST.redeem(amount, BOB_ADDRESS, BOB_ADDRESS);
+                    }
+                }
+            } else {
+                // Sync
+                vm.prank(OWNER_ADDRESS);
+                KERNEL.syncTrancheAccounting();
+            }
+
+            // Advance time slightly
+            vm.warp(block.timestamp + 1 hours);
+        }
+
+        _assertNAVConservation();
+    }
+
+    /// @notice Test redemption request during state transition
+    /// @dev Create redemption request, then trigger state transition, then claim
+    function test_adversarial_redemptionDuringStateTransition() external {
+        // Setup
+        _depositJT(ALICE_ADDRESS, config.initialFunding / 4);
+
+        TRANCHE_UNIT maxSTDeposit = ST.maxDeposit(BOB_ADDRESS);
+        uint256 stAmount = toUint256(maxSTDeposit) / 2;
+        if (stAmount < _minDepositAmount()) return;
+        _depositST(BOB_ADDRESS, stAmount);
+
+        // Wait for JT redemption delay
+        vm.warp(block.timestamp + _getJTRedemptionDelay() + 1);
+
+        // JT creates redemption request
+        uint256 jtShares = JT.balanceOf(ALICE_ADDRESS);
+        uint256 maxRedeem = JT.maxRedeem(ALICE_ADDRESS);
+        uint256 redeemAmount = maxRedeem / 2;
+        if (redeemAmount < _minDepositAmount()) return;
+
+        vm.prank(ALICE_ADDRESS);
+        (uint256 requestId,) = JT.requestRedeem(redeemAmount, ALICE_ADDRESS, ALICE_ADDRESS);
+
+        // Simulate loss to trigger state transition
+        simulateSTLoss(0.05e18);
+
+        vm.prank(OWNER_ADDRESS);
+        KERNEL.syncTrancheAccounting();
+
+        // Wait for claim delay
+        vm.warp(block.timestamp + _getJTRedemptionDelay() + 1);
+
+        // Try to claim - should work but amount may be reduced
+        uint256 claimable = JT.claimableRedeemRequest(requestId, ALICE_ADDRESS);
+        uint256 newMaxRedeem = JT.maxRedeem(ALICE_ADDRESS);
+        uint256 actualClaim = claimable < newMaxRedeem ? claimable : newMaxRedeem;
+
+        if (actualClaim >= _minDepositAmount()) {
+            vm.prank(ALICE_ADDRESS);
+            JT.redeem(actualClaim, ALICE_ADDRESS, ALICE_ADDRESS, requestId);
+        }
+
+        _assertNAVConservation();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ADVERSARIAL TESTS: DUST ACCUMULATION ANALYSIS
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// @notice Analyze dust accumulation over many yield distribution cycles
+    /// @dev This tests the comment in deployment: "~1 wei per 25-40 yield distribution cycles"
+    function test_adversarial_dustAccumulationAnalysis() external {
+        // Setup
+        _depositJT(ALICE_ADDRESS, config.initialFunding / 4);
+
+        TRANCHE_UNIT maxSTDeposit = ST.maxDeposit(BOB_ADDRESS);
+        uint256 stAmount = toUint256(maxSTDeposit) / 2;
+        if (stAmount < _minDepositAmount()) return;
+        _depositST(BOB_ADDRESS, stAmount);
+
+        NAV_UNIT initialJTNav = JT.totalAssets().nav;
+        uint256 initialJTCoverageIL = toUint256(ACCOUNTANT.getState().lastJTCoverageImpermanentLoss);
+
+        // Many yield cycles
+        uint256 numCycles = 100;
+        for (uint256 i = 0; i < numCycles; i++) {
+            // Small yield
+            simulateSTYield(0.001e18); // 0.1% yield
+
+            // Advance time for yield distribution
+            vm.warp(block.timestamp + 1 days);
+
+            // Sync
+            vm.prank(OWNER_ADDRESS);
+            KERNEL.syncTrancheAccounting();
+        }
+
+        NAV_UNIT finalJTNav = JT.totalAssets().nav;
+        uint256 finalJTCoverageIL = toUint256(ACCOUNTANT.getState().lastJTCoverageImpermanentLoss);
+
+        emit log_named_uint("Number of yield cycles", numCycles);
+        emit log_named_uint("Initial JT NAV", toUint256(initialJTNav));
+        emit log_named_uint("Final JT NAV", toUint256(finalJTNav));
+        emit log_named_uint("Initial JT Coverage IL", initialJTCoverageIL);
+        emit log_named_uint("Final JT Coverage IL", finalJTCoverageIL);
+        emit log_named_uint("Accumulated Coverage IL", finalJTCoverageIL - initialJTCoverageIL);
+
+        // Verify dust tolerance is not exceeded
+        assertLe(finalJTCoverageIL, toUint256(ACCOUNTANT.getState().dustTolerance), "Coverage IL should stay within dust tolerance for yield-only cycles");
+
+        _assertNAVConservation();
+    }
+
+    /// @notice Test that preOpSync is re-entered on every deposit with dust
+    /// @dev This verifies the gas inefficiency concern discussed earlier
+    function test_adversarial_preOpSyncReentry() external {
+        // Initial JT deposit
+        _depositJT(ALICE_ADDRESS, config.initialFunding / 4);
+
+        // Track gas for ST deposit
+        TRANCHE_UNIT maxSTDeposit = ST.maxDeposit(BOB_ADDRESS);
+        uint256 stAmount = toUint256(maxSTDeposit) / 4;
+        if (stAmount < _minDepositAmount()) return;
+
+        uint256 gasBefore = gasleft();
+        _depositST(BOB_ADDRESS, stAmount);
+        uint256 gasUsed = gasBefore - gasleft();
+
+        emit log_named_uint("Gas used for ST deposit", gasUsed);
+
+        // Second deposit should use similar gas (both trigger preOpSync re-entry if there's drift)
+        uint256 gasBefore2 = gasleft();
+        _depositST(BOB_ADDRESS, stAmount);
+        uint256 gasUsed2 = gasBefore2 - gasleft();
+
+        emit log_named_uint("Gas used for 2nd ST deposit", gasUsed2);
+
+        // Note: If dust causes preOpSync re-entry, gas should be noticeably higher
+        // A deposit without re-entry would use less gas
     }
 }

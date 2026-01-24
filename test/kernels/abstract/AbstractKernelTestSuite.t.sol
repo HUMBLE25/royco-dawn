@@ -2609,4 +2609,163 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         vm.expectRevert(abi.encodeWithSelector(IRoycoVaultTranche.ONLY_KERNEL.selector));
         JT.mintProtocolFeeShares(toNAVUnits(uint256(1e18)), toNAVUnits(uint256(1e18)), PROTOCOL_FEE_RECIPIENT_ADDRESS);
     }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // SECTION: ROUNDING INVARIANT TESTS
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// @notice Test that pure deposits (no yield/loss) never cause FIXED_TERM state transition
+    /// @dev FIXED_TERM should only occur from actual losses, not from deposit rounding
+    /// @param _numCycles Number of deposit cycles to run
+    function testFuzz_deposits_neverCauseFixedTermState(uint256 _numCycles) external {
+        _numCycles = bound(_numCycles, 100, 1000);
+
+        // Verify initial state is PERPETUAL
+        assertEq(uint256(ACCOUNTANT.getState().lastMarketState), uint256(MarketState.PERPETUAL), "Market should start in PERPETUAL state");
+
+        uint256 minDeposit = _minDepositAmount();
+
+        for (uint256 i = 0; i < _numCycles; i++) {
+            // Generate unique depositors for each cycle
+            Vm.Wallet memory jtDepositor = _generateProvider(i * 2);
+            Vm.Wallet memory stDepositor = _generateProvider(i * 2 + 1);
+
+            // JT deposit - fund just-in-time with exact amount needed
+            uint256 jtAmount = minDeposit * 10;
+            dealJTAsset(jtDepositor.addr, jtAmount);
+            _depositJT(jtDepositor.addr, jtAmount);
+
+            // ST deposit - use 50% of max to guarantee coverage compliance
+            TRANCHE_UNIT maxSTDeposit = ST.maxDeposit(stDepositor.addr);
+            uint256 stAmount = toUint256(maxSTDeposit) / 2;
+
+            if (stAmount >= minDeposit) {
+                // Fund just-in-time with exact amount needed
+                dealSTAsset(stDepositor.addr, stAmount);
+                _depositST(stDepositor.addr, stAmount);
+            }
+
+            // CRITICAL ASSERTION: Market must remain in PERPETUAL state
+            // Pure deposits should NEVER cause transition to FIXED_TERM
+            MarketState currentState = ACCOUNTANT.getState().lastMarketState;
+            assertEq(uint256(currentState), uint256(MarketState.PERPETUAL), "Market entered FIXED_TERM on deposit");
+        }
+
+        // Final sync and verification
+        vm.prank(OWNER_ADDRESS);
+        KERNEL.syncTrancheAccounting();
+
+        assertEq(uint256(ACCOUNTANT.getState().lastMarketState), uint256(MarketState.PERPETUAL), "Market should still be PERPETUAL after all deposit cycles");
+
+        // Verify no JT coverage impermanent loss accumulated
+        NAV_UNIT jtCoverageIL = ACCOUNTANT.getState().lastJTCoverageImpermanentLoss;
+        assertEq(toUint256(jtCoverageIL), 0, "JT coverage IL should be 0 with no yield/loss - only deposits");
+    }
+
+    /// @notice Test full cycle: JT deposit -> ST deposit -> ST withdraw -> JT withdraw
+    /// @dev Pure deposit/withdraw interleaving should never revert (no yield/loss)
+    /// @param _numCycles Number of full cycles to run
+    function testFuzz_fullDepositWithdrawCycle_neverReverts(uint256 _numCycles) external {
+        _numCycles = bound(_numCycles, 10, 500);
+
+        uint256 minDeposit = _minDepositAmount();
+
+        for (uint256 i = 0; i < _numCycles; i++) {
+            // Generate unique depositors for this cycle
+            Vm.Wallet memory jtDepositor = _generateProvider(i * 2);
+            Vm.Wallet memory stDepositor = _generateProvider(i * 2 + 1);
+
+            // ══════════════════════════════════════════════════════════════
+            // STEP 1: JT Deposit
+            // ══════════════════════════════════════════════════════════════
+            uint256 jtDepositAmount = minDeposit * 10;
+            dealJTAsset(jtDepositor.addr, jtDepositAmount);
+            uint256 jtShares = _depositJT(jtDepositor.addr, jtDepositAmount);
+            assertGt(jtShares, 0, "JT deposit should mint shares");
+
+            // ══════════════════════════════════════════════════════════════
+            // STEP 2: ST Deposit (50% of max to ensure coverage)
+            // ══════════════════════════════════════════════════════════════
+            TRANCHE_UNIT maxSTDeposit = ST.maxDeposit(stDepositor.addr);
+            uint256 stDepositAmount = toUint256(maxSTDeposit) / 2;
+            uint256 stShares = 0;
+
+            if (stDepositAmount >= minDeposit) {
+                dealSTAsset(stDepositor.addr, stDepositAmount);
+                stShares = _depositST(stDepositor.addr, stDepositAmount);
+                assertGt(stShares, 0, "ST deposit should mint shares");
+            }
+
+            // Verify market is still PERPETUAL after deposits
+            assertEq(
+                uint256(ACCOUNTANT.getState().lastMarketState),
+                uint256(MarketState.PERPETUAL),
+                string.concat("Market should be PERPETUAL after deposits on cycle ", vm.toString(i))
+            );
+
+            // ══════════════════════════════════════════════════════════════
+            // STEP 3: ST Withdraw (if ST deposited)
+            // ══════════════════════════════════════════════════════════════
+            if (stShares > 0) {
+                uint256 stMaxRedeem = ST.maxRedeem(stDepositor.addr);
+                uint256 stSharesToRedeem = stShares < stMaxRedeem ? stShares : stMaxRedeem;
+
+                if (stSharesToRedeem > 0) {
+                    vm.startPrank(stDepositor.addr);
+                    ST.redeem(stSharesToRedeem, stDepositor.addr, stDepositor.addr);
+                    vm.stopPrank();
+                }
+            }
+
+            // ══════════════════════════════════════════════════════════════
+            // STEP 4: JT Withdraw (request + wait + claim)
+            // ══════════════════════════════════════════════════════════════
+            uint256 jtMaxRedeem = JT.maxRedeem(jtDepositor.addr);
+            uint256 jtSharesToRedeem = jtShares < jtMaxRedeem ? jtShares : jtMaxRedeem;
+
+            if (jtSharesToRedeem > 0) {
+                // Request redeem
+                vm.startPrank(jtDepositor.addr);
+                (uint256 requestId,) = JT.requestRedeem(jtSharesToRedeem, jtDepositor.addr, jtDepositor.addr);
+                vm.stopPrank();
+
+                // Wait for redemption delay
+                (,,,,,, uint24 jtRedemptionDelay) = KERNEL.getState();
+                vm.warp(block.timestamp + jtRedemptionDelay + 1);
+
+                // Claim redeem
+                uint256 claimableShares = JT.claimableRedeemRequest(requestId, jtDepositor.addr);
+                if (claimableShares > 0) {
+                    vm.startPrank(jtDepositor.addr);
+                    JT.redeem(claimableShares, jtDepositor.addr, jtDepositor.addr, requestId);
+                    vm.stopPrank();
+                }
+            }
+
+            // Verify market is still PERPETUAL after full cycle
+            assertEq(
+                uint256(ACCOUNTANT.getState().lastMarketState),
+                uint256(MarketState.PERPETUAL),
+                string.concat("Market should be PERPETUAL after full cycle ", vm.toString(i))
+            );
+        }
+
+        // Final sync
+        vm.prank(OWNER_ADDRESS);
+        KERNEL.syncTrancheAccounting();
+
+        // Final state verification
+        assertEq(uint256(ACCOUNTANT.getState().lastMarketState), uint256(MarketState.PERPETUAL), "Market should be PERPETUAL after all cycles");
+
+        // Verify no significant impermanent losses accumulated from pure deposit/withdraw
+        // (allow for dust tolerance from underlying protocol rounding)
+        NAV_UNIT stIL = ACCOUNTANT.getState().lastSTImpermanentLoss;
+        NAV_UNIT jtCoverageIL = ACCOUNTANT.getState().lastJTCoverageImpermanentLoss;
+        NAV_UNIT jtSelfIL = ACCOUNTANT.getState().lastJTSelfImpermanentLoss;
+        NAV_UNIT dustTolerance = ACCOUNTANT.getState().dustTolerance;
+
+        assertEq(toUint256(stIL), 0, "ST IL should be 0 with no yield/loss");
+        assertLe(toUint256(jtCoverageIL), toUint256(dustTolerance), "JT coverage IL should be within dust tolerance");
+        assertLe(toUint256(jtSelfIL), toUint256(dustTolerance), "JT self IL should be within dust tolerance");
+    }
 }
