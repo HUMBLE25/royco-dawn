@@ -515,7 +515,10 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         uint256 maxRedeem = JT.maxRedeem(ALICE_ADDRESS);
         if (maxRedeem < sharesToWithdraw) {
             assertApproxEqAbs(
-                maxRedeem, sharesToWithdraw, toUint256(ACCOUNTANT.getState().dustTolerance) + 1, "Shares to withdraw should be approximately equal to max redeem if max redeem is less than shares to withdraw"
+                maxRedeem,
+                sharesToWithdraw,
+                toUint256(ACCOUNTANT.getState().dustTolerance) + 1,
+                "Shares to withdraw should be approximately equal to max redeem if max redeem is less than shares to withdraw"
             );
             sharesToWithdraw = maxRedeem;
         }

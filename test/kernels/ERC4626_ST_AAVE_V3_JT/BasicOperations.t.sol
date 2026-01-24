@@ -376,7 +376,9 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
             }
 
             // Verify that the pending redeem request is equal to the shares to withdraw
-            assertEq(JT.pendingRedeemRequest(requestId, jtDepositor), actualSharesToWithdraw, "Pending redeem request must equal the shares to withdraw initially");
+            assertEq(
+                JT.pendingRedeemRequest(requestId, jtDepositor), actualSharesToWithdraw, "Pending redeem request must equal the shares to withdraw initially"
+            );
 
             // Verify that the claimable redeem request is 0
             assertEq(JT.claimableRedeemRequest(requestId, jtDepositor), 0, "Claimable redeem request must be zero initially");
@@ -458,9 +460,8 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
             uint256 maxRedeemable = JT.maxRedeem(jtDepositor);
             if (maxRedeemable == 0) break; // No more shares to withdraw
 
-            sharesToWithdrawForEachRequest[i] = i == _totalWithdrawalRequests - 1
-                ? Math.min(shares - totalSharesWithdrawn, maxRedeemable)
-                : Math.min(sharesToWithdraw, maxRedeemable);
+            sharesToWithdrawForEachRequest[i] =
+                i == _totalWithdrawalRequests - 1 ? Math.min(shares - totalSharesWithdrawn, maxRedeemable) : Math.min(sharesToWithdraw, maxRedeemable);
             if (sharesToWithdrawForEachRequest[i] == 0) break;
 
             expectedAssetsToWithdrawForEachRequest[i] = JT.convertToAssets(sharesToWithdrawForEachRequest[i]).jtAssets;
