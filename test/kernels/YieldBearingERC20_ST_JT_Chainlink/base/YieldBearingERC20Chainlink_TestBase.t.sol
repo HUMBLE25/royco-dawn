@@ -560,4 +560,16 @@ abstract contract YieldBearingERC20Chainlink_TestBase is AbstractKernelTestSuite
 
         return DEPLOY_SCRIPT.deploy(params, DEPLOYER.privateKey);
     }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ORACLE REFRESH HOOK
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// @notice Refresh chainlink oracle after vm.warp to avoid PRICE_STALE errors
+    /// @dev Re-mocks the chainlink price with current timestamp
+    function _refreshOraclesAfterWarp() internal virtual override {
+        // Re-mock with the same price but updated timestamp
+        int256 currentPrice = _getCurrentChainlinkPrice();
+        _mockChainlinkPrice(currentPrice);
+    }
 }

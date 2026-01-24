@@ -66,6 +66,11 @@ contract PendlePTcUSD_Test is YieldBearingERC20Chainlink_TestBase {
         return RAY;
     }
 
+    /// @notice Returns the JT redemption delay
+    function _getJTRedemptionDelay() internal pure virtual override returns (uint24) {
+        return 60;
+    }
+
     // ═══════════════════════════════════════════════════════════════════════════
     // TOLERANCE OVERRIDES
     // ═══════════════════════════════════════════════════════════════════════════
@@ -203,15 +208,5 @@ contract PendlePTcUSD_Test is YieldBearingERC20Chainlink_TestBase {
 
         NAV_UNIT navAfter = JT.totalAssets().nav;
         assertGt(navAfter, navBefore, "NAV should increase after combined yield");
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // TEST OVERRIDES - Time-sensitive oracle constraints
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    /// @notice Skip full deposit/withdraw cycle test due to time-sensitive Chainlink oracle
-    /// @dev The vm.warp for JT redemption delay causes PRICE_STALE() errors
-    function testFuzz_fullDepositWithdrawCycle_neverReverts(uint256) external override {
-        vm.skip(true);
     }
 }

@@ -87,6 +87,12 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
     /// @notice Returns the maximum delta tolerance for NAV comparisons
     function maxNAVDelta() public view virtual returns (NAV_UNIT);
 
+    /// @notice Called after vm.warp to refresh time-sensitive oracles
+    /// @dev Override in protocol tests that use Chainlink or other time-sensitive oracles
+    function _refreshOraclesAfterWarp() internal virtual {
+        // Default: no-op. Override for protocols with stale price checks.
+    }
+
     // ═══════════════════════════════════════════════════════════════════════════
     // SETUP
     // ═══════════════════════════════════════════════════════════════════════════
@@ -2733,6 +2739,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
                 // Wait for redemption delay
                 (,,,,,, uint24 jtRedemptionDelay) = KERNEL.getState();
                 vm.warp(block.timestamp + jtRedemptionDelay + 1);
+                _refreshOraclesAfterWarp();
 
                 // Claim redeem
                 uint256 claimableShares = JT.claimableRedeemRequest(requestId, jtDepositor.addr);
