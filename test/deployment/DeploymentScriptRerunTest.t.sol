@@ -3,11 +3,11 @@ pragma solidity ^0.8.28;
 
 import { Test } from "../../lib/forge-std/src/Test.sol";
 import { Vm } from "../../lib/forge-std/src/Vm.sol";
-import { IERC20 } from "../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { IAccessManager } from "../../lib/openzeppelin-contracts/contracts/access/manager/IAccessManager.sol";
+import { IERC20 } from "../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { DeployScript } from "../../script/Deploy.s.sol";
 import { RolesConfiguration } from "../../script/config/RolesConfiguration.sol";
-import { RoycoFactory } from "../../script/factory/RoycoFactory.sol";
+import { RoycoFactory } from "../../src/factory/RoycoFactory.sol";
 import { IRoycoAccountant } from "../../src/interfaces/IRoycoAccountant.sol";
 import { IRoycoKernel } from "../../src/interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoVaultTranche } from "../../src/interfaces/tranche/IRoycoVaultTranche.sol";
@@ -196,10 +196,8 @@ contract DeploymentScriptRerunTest is Test, RolesConfiguration {
         bytes32 marketID = keccak256(abi.encodePacked(_seniorTrancheName, _juniorTrancheName, vm.getBlockTimestamp()));
 
         // Build kernel-specific params
-        DeployScript.ERC4626STAaveV3JTInKindAssetsKernelParams memory kernelParams = DeployScript.ERC4626STAaveV3JTInKindAssetsKernelParams({
-            stVault: _stVault,
-            aaveV3Pool: ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS
-        });
+        DeployScript.ERC4626STAaveV3JTInKindAssetsKernelParams memory kernelParams =
+            DeployScript.ERC4626STAaveV3JTInKindAssetsKernelParams({ stVault: _stVault, aaveV3Pool: ETHEREUM_MAINNET_AAVE_V3_POOL_ADDRESS });
 
         // Build YDM params (AdaptiveCurve)
         DeployScript.AdaptiveCurveYDMParams memory ydmParams =
@@ -243,13 +241,8 @@ contract DeploymentScriptRerunTest is Test, RolesConfiguration {
         // ============================================
         // FIRST DEPLOYMENT
         // ============================================
-        DeployScript.DeploymentParams memory params1 = _buildDeploymentParams(
-            "Royco Senior Tranche Alpha",
-            "RST-A",
-            "Royco Junior Tranche Alpha",
-            "RJT-A",
-            address(MOCK_UNDERLYING_ST_VAULT_1)
-        );
+        DeployScript.DeploymentParams memory params1 =
+            _buildDeploymentParams("Royco Senior Tranche Alpha", "RST-A", "Royco Junior Tranche Alpha", "RJT-A", address(MOCK_UNDERLYING_ST_VAULT_1));
 
         DeployScript.DeploymentResult memory result1 = DEPLOY_SCRIPT.deploy(params1, DEPLOYER.privateKey);
 
@@ -272,13 +265,8 @@ contract DeploymentScriptRerunTest is Test, RolesConfiguration {
         // Warp time to get different market ID
         vm.warp(block.timestamp + 1);
 
-        DeployScript.DeploymentParams memory params2 = _buildDeploymentParams(
-            "Royco Senior Tranche Beta",
-            "RST-B",
-            "Royco Junior Tranche Beta",
-            "RJT-B",
-            address(MOCK_UNDERLYING_ST_VAULT_2)
-        );
+        DeployScript.DeploymentParams memory params2 =
+            _buildDeploymentParams("Royco Senior Tranche Beta", "RST-B", "Royco Junior Tranche Beta", "RJT-B", address(MOCK_UNDERLYING_ST_VAULT_2));
 
         // Second deployment should succeed
         DeployScript.DeploymentResult memory result2 = DEPLOY_SCRIPT.deploy(params2, DEPLOYER.privateKey);
@@ -314,13 +302,8 @@ contract DeploymentScriptRerunTest is Test, RolesConfiguration {
     /// @notice Test that the deployment script properly configures roles on both runs
     function test_deploymentScript_rolesConfiguredOnBothRuns() public {
         // First deployment
-        DeployScript.DeploymentParams memory params1 = _buildDeploymentParams(
-            "Royco Senior Tranche Alpha",
-            "RST-A",
-            "Royco Junior Tranche Alpha",
-            "RJT-A",
-            address(MOCK_UNDERLYING_ST_VAULT_1)
-        );
+        DeployScript.DeploymentParams memory params1 =
+            _buildDeploymentParams("Royco Senior Tranche Alpha", "RST-A", "Royco Junior Tranche Alpha", "RJT-A", address(MOCK_UNDERLYING_ST_VAULT_1));
 
         DeployScript.DeploymentResult memory result1 = DEPLOY_SCRIPT.deploy(params1, DEPLOYER.privateKey);
 
@@ -338,13 +321,8 @@ contract DeploymentScriptRerunTest is Test, RolesConfiguration {
         // Second deployment
         vm.warp(block.timestamp + 1);
 
-        DeployScript.DeploymentParams memory params2 = _buildDeploymentParams(
-            "Royco Senior Tranche Beta",
-            "RST-B",
-            "Royco Junior Tranche Beta",
-            "RJT-B",
-            address(MOCK_UNDERLYING_ST_VAULT_2)
-        );
+        DeployScript.DeploymentParams memory params2 =
+            _buildDeploymentParams("Royco Senior Tranche Beta", "RST-B", "Royco Junior Tranche Beta", "RJT-B", address(MOCK_UNDERLYING_ST_VAULT_2));
 
         DeployScript.DeploymentResult memory result2 = DEPLOY_SCRIPT.deploy(params2, DEPLOYER.privateKey);
 
@@ -363,13 +341,8 @@ contract DeploymentScriptRerunTest is Test, RolesConfiguration {
     /// @notice Test that deployer can deploy multiple markets using the factory's deployMarket function
     function test_deployerCanDeployMultipleMarketsViaFactory() public {
         // First deployment creates the factory
-        DeployScript.DeploymentParams memory params1 = _buildDeploymentParams(
-            "Royco Senior Tranche Alpha",
-            "RST-A",
-            "Royco Junior Tranche Alpha",
-            "RJT-A",
-            address(MOCK_UNDERLYING_ST_VAULT_1)
-        );
+        DeployScript.DeploymentParams memory params1 =
+            _buildDeploymentParams("Royco Senior Tranche Alpha", "RST-A", "Royco Junior Tranche Alpha", "RJT-A", address(MOCK_UNDERLYING_ST_VAULT_1));
 
         DeployScript.DeploymentResult memory result1 = DEPLOY_SCRIPT.deploy(params1, DEPLOYER.privateKey);
         RoycoFactory factory = result1.factory;
@@ -407,13 +380,8 @@ contract DeploymentScriptRerunTest is Test, RolesConfiguration {
     /// @notice Test that the same deployer can use the factory after ownership transfer
     function test_deployerRetainsRoleAfterOwnershipTransfer() public {
         // Deploy first market
-        DeployScript.DeploymentParams memory params1 = _buildDeploymentParams(
-            "Royco Senior Tranche Alpha",
-            "RST-A",
-            "Royco Junior Tranche Alpha",
-            "RJT-A",
-            address(MOCK_UNDERLYING_ST_VAULT_1)
-        );
+        DeployScript.DeploymentParams memory params1 =
+            _buildDeploymentParams("Royco Senior Tranche Alpha", "RST-A", "Royco Junior Tranche Alpha", "RJT-A", address(MOCK_UNDERLYING_ST_VAULT_1));
 
         DeployScript.DeploymentResult memory result1 = DEPLOY_SCRIPT.deploy(params1, DEPLOYER.privateKey);
         RoycoFactory factory = result1.factory;
