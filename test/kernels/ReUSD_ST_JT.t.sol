@@ -104,7 +104,7 @@ contract reUSD_Test is AbstractKernelTestSuite {
 
     /// @notice Returns the JT redemption delay
     function _getJTRedemptionDelay() internal pure virtual override returns (uint24) {
-        return 3600;
+        return 60;
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -187,7 +187,7 @@ contract reUSD_Test is AbstractKernelTestSuite {
         uint256 rateAfter = _getCurrentICLConversionRate();
         assertGt(rateAfter, rateBefore, "Rate should increase after yield");
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         NAV_UNIT navAfter = JT.totalAssets().nav;
@@ -210,7 +210,7 @@ contract reUSD_Test is AbstractKernelTestSuite {
         uint256 rateAfter = _getCurrentICLConversionRate();
         assertLt(rateAfter, rateBefore, "Rate should decrease after loss");
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         NAV_UNIT navAfter = JT.totalAssets().nav;
@@ -221,7 +221,7 @@ contract reUSD_Test is AbstractKernelTestSuite {
     function test_setConversionRate_success() external {
         uint256 newRate = 1.05e27;
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(ORACLE_QUOTER_ADMIN_ADDRESS);
         ReUSD_ST_ReUSD_JT_Kernel(address(KERNEL)).setConversionRate(newRate);
 
         uint256 storedRate = ReUSD_ST_ReUSD_JT_Kernel(address(KERNEL)).getStoredConversionRateRAY();
@@ -251,9 +251,11 @@ contract reUSD_Test is AbstractKernelTestSuite {
         DeployScript.AdaptiveCurveYDMParams memory ydmParams =
             DeployScript.AdaptiveCurveYDMParams({ jtYieldShareAtTargetUtilWAD: 0.3e18, jtYieldShareAtFullUtilWAD: 1e18 });
 
+        // Build role assignments using the centralized function
+        DeployScript.RoleAssignmentConfiguration[] memory roleAssignments = _generateRoleAssignments();
+
         DeployScript.DeploymentParams memory params = DeployScript.DeploymentParams({
-            factoryAdmin: address(DEPLOY_SCRIPT),
-            factoryOwnerAddress: OWNER_ADDRESS,
+            factoryAdmin: OWNER_ADDRESS,
             marketId: marketId,
             seniorTrancheName: string(abi.encodePacked("Royco Senior ", cfg.name)),
             seniorTrancheSymbol: string(abi.encodePacked("RS-", cfg.name)),
@@ -261,6 +263,7 @@ contract reUSD_Test is AbstractKernelTestSuite {
             juniorTrancheSymbol: string(abi.encodePacked("RJ-", cfg.name)),
             seniorAsset: cfg.stAsset,
             juniorAsset: cfg.jtAsset,
+            dustTolerance: DUST_TOLERANCE,
             kernelType: DeployScript.KernelType.ReUSD_ST_ReUSD_JT,
             kernelSpecificParams: abi.encode(kernelParams),
             protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS,
@@ -273,29 +276,9 @@ contract reUSD_Test is AbstractKernelTestSuite {
             fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
             ydmType: DeployScript.YDMType.AdaptiveCurve,
             ydmSpecificParams: abi.encode(ydmParams),
-            pauserAddress: PAUSER_ADDRESS,
-            pauserExecutionDelay: 0,
-            upgraderAddress: UPGRADER_ADDRESS,
-            upgraderExecutionDelay: 0,
-            lpRoleAddress: OWNER_ADDRESS,
-            lpRoleExecutionDelay: 0,
-            syncRoleAddress: OWNER_ADDRESS,
-            syncRoleExecutionDelay: 0,
-            kernelAdminRoleAddress: OWNER_ADDRESS,
-            kernelAdminRoleExecutionDelay: 0,
-            oracleQuoterAdminRoleAddress: OWNER_ADDRESS,
-            oracleQuoterAdminRoleExecutionDelay: 0
+            roleAssignments: roleAssignments
         });
 
-        return DEPLOY_SCRIPT.deploy(params);
-    }
-
-    bytes data =
-        hex"00a78f740000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000160ab64ec587acacde1c427aa5";
-    bytes data2 =
-        hex"00a78f74000000000000000000000000000000000000000000000000000000000000000200000000000220099f84552298f08da5b37fba96f228cd9de9c8c4135d67b6d30000000000000000000000000000000000000000000000000000000000000001";
-
-    function testShit() external {
-        address(this).call(data2);
+        return DEPLOY_SCRIPT.deploy(params, DEPLOYER.privateKey);
     }
 }

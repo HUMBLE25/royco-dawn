@@ -47,16 +47,14 @@ abstract contract ERC4626_JT_Kernel is RoycoKernel {
     }
 
     /// @inheritdoc IRoycoKernel
-    function jtPreviewDeposit(TRANCHE_UNIT _assets) external view override returns (SyncedAccountingState memory stateBeforeDeposit, NAV_UNIT valueAllocated) {
-        // Simulate the deposit of the assets into the underlying investment vault
-        uint256 jtVaultSharesMinted = IERC4626(JT_VAULT).previewDeposit(toUint256(_assets));
-
-        // Convert the underlying vault shares to tranche units. This value may differ from _assets if a fee or slippage is incurred to the deposit.
-        TRANCHE_UNIT jtAssetsAllocated = toTrancheUnits(IERC4626(JT_VAULT).convertToAssets(jtVaultSharesMinted));
-
-        // Convert the assets allocated to NAV units and preview a sync to get the current NAV to mint shares at for the junior tranche
-        valueAllocated = jtConvertTrancheUnitsToNAVUnits(jtAssetsAllocated);
+    function jtPreviewDeposit(TRANCHE_UNIT _jtAssets)
+        external
+        view
+        override
+        returns (SyncedAccountingState memory stateBeforeDeposit, NAV_UNIT valueAllocated)
+    {
         stateBeforeDeposit = _previewSyncTrancheAccounting();
+        valueAllocated = _jtPreviewDepositAllocatedNAV(_jtAssets);
     }
 
     /// @inheritdoc RoycoKernel
@@ -89,7 +87,10 @@ abstract contract ERC4626_JT_Kernel is RoycoKernel {
     }
 
     /// @inheritdoc RoycoKernel
-    function _jtDepositAssets(TRANCHE_UNIT _jtAssets) internal override(RoycoKernel) {
+    function _jtDepositAssets(TRANCHE_UNIT _jtAssets) internal override(RoycoKernel) returns (NAV_UNIT jtDepositPreOpNAV) {
+        // Account for any fees or slippage involved in depositing
+        jtDepositPreOpNAV = _jtPreviewDepositAllocatedNAV(_jtAssets);
+
         // Deposit the assets into the underlying investment vault and add to the number of ST controlled shares for this vault
         ERC4626KernelState storage $ = ERC4626KernelStorageLib._getERC4626KernelStorage();
         $.jtOwnedShares += IERC4626(JT_VAULT).deposit(toUint256(_jtAssets), address(this));
@@ -110,5 +111,21 @@ abstract contract ERC4626_JT_Kernel is RoycoKernel {
             $.jtOwnedShares -= sharesEquivalentToWithdraw;
             IERC20(address(JT_VAULT)).safeTransfer(_receiver, sharesEquivalentToWithdraw);
         }
+    }
+
+    /**
+     * @notice Helper function to preview the deposit of assets into the underlying investment vault and convert the allocated assets to NAV units
+     * @param _jtAssets The amount of assets to deposit, denominated in the junior tranche's tranche units
+     * @return jtDepositPreOpNAV The value of the assets deposited, denominated in the kernel's NAV units before the deposit is made
+     */
+    function _jtPreviewDepositAllocatedNAV(TRANCHE_UNIT _jtAssets) internal view returns (NAV_UNIT) {
+        // Simulate the deposit of the assets into the underlying investment vault
+        uint256 jtVaultSharesMinted = IERC4626(JT_VAULT).previewDeposit(toUint256(_jtAssets));
+
+        // Convert the underlying vault shares to tranche units. This value may differ from _jtAssets if a fee or slippage is incurred to the deposit.
+        TRANCHE_UNIT jtAssetsAllocated = toTrancheUnits(IERC4626(JT_VAULT).convertToAssets(jtVaultSharesMinted));
+
+        // Convert the assets allocated to NAV units and preview a sync to get the current NAV to mint shares at for the junior tranche
+        return jtConvertTrancheUnitsToNAVUnits(jtAssetsAllocated);
     }
 }

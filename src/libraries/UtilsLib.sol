@@ -44,7 +44,7 @@ library UtilsLib {
 
     /**
      * @notice Computes the loan to value (LTV) of the Royco market given the market's state
-     * @dev Informally: total covered capital / (remaining covered capital + remaining loss capital)
+     * @dev Informally: expected covered capital / (remaining covered capital + remaining loss capital)
      * @dev Formally: LTV = (ST_EFFECTIVE_NAV + ST_IL) / (ST_EFFECTIVE_NAV + JT_EFFECTIVE_NAV)
      * @param _stEffectiveNAV The senior tranche net asset value after receiving coverage, ST yield distribution, and ST losses
      * @param _stImpermanentLoss The impermanent loss that the senior tranche has suffered after exhausting JT's loss-absorption buffer

@@ -58,6 +58,10 @@ struct AssetClaims {
  *                                       This represents the first claim on capital that the junior tranche has on future JT recoveries
  * @custom:field stProtocolFeeAccrued - Protocol fee taken on ST yield on this sync
  * @custom:field jtProtocolFeeAccrued - Protocol fee taken on JT yield on this sync
+ * @custom:field fixedTermDurationSeconds - The duration of the fixed term in seconds
+ * @custom:field utilizationWAD - The current utilization of the market, scaled to WAD precision
+ * @custom:field ltvWAD - The current loan to value of the market, scaled to WAD precision
+ * @custom:field fixedTermEndTimestamp - The timestamp at which the fixed term ends. Set to 0 if the market is not in a fixed term state
  */
 struct SyncedAccountingState {
     MarketState marketState;
@@ -70,21 +74,25 @@ struct SyncedAccountingState {
     NAV_UNIT jtSelfImpermanentLoss;
     NAV_UNIT stProtocolFeeAccrued;
     NAV_UNIT jtProtocolFeeAccrued;
+    // Additional data about the market's post-sync state
+    uint256 utilizationWAD;
+    uint256 ltvWAD;
+    uint32 fixedTermEndTimestamp;
 }
 
 /**
  * @title Operation
  * @dev Defines the type of operation being executed by the user
- * @custom:type ST_INCREASE_NAV - An operation that will potentially increase the NAV of ST
- * @custom:type ST_DECREASE_NAV - An operation that will potentially decrease the NAV of ST
- * @custom:type JT_INCREASE_NAV - An operation that will potentially increase the NAV of JT
- * @custom:type JT_DECREASE_NAV - An operation that will potentially decrease the NAV of JT
+ * @custom:type ST_DEPOSIT - A senior tranche deposit that increases ST's effective NAV
+ * @custom:type ST_REDEEM - A senior tranche redemption that decreases ST's effective NAV
+ * @custom:type JT_DEPOSIT - A junior tranche deposit that increases JT's effective NAV
+ * @custom:type JT_REDEEM - A junior tranche redemption that decreases JT's effective NAV
  */
 enum Operation {
-    ST_INCREASE_NAV,
-    ST_DECREASE_NAV,
-    JT_INCREASE_NAV,
-    JT_DECREASE_NAV
+    ST_DEPOSIT,
+    ST_REDEEM,
+    JT_DEPOSIT,
+    JT_REDEEM
 }
 
 /**
@@ -186,7 +194,7 @@ struct MarketDeploymentParams {
     bytes32 kernelProxyDeploymentSalt;
     bytes32 accountantProxyDeploymentSalt;
     // Initial Roles Configuration
-    RolesConfiguration[] roles;
+    RolesTargetConfiguration[] roles;
 }
 
 /**
@@ -201,12 +209,12 @@ struct TrancheDeploymentParams {
 }
 
 /**
- * @notice The configuration for a role
+ * @notice For a given target address, the configuration for a role
  * @custom:field target - The target address of the role
  * @custom:field selectors - The selectors of the role
  * @custom:field roles - The roles of the role
  */
-struct RolesConfiguration {
+struct RolesTargetConfiguration {
     address target;
     bytes4[] selectors;
     uint64[] roles;

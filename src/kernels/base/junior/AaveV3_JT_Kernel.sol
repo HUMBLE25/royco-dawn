@@ -63,7 +63,7 @@ abstract contract AaveV3_JT_Kernel is RoycoKernel {
     }
 
     /// @inheritdoc IRoycoKernel
-    function jtPreviewDeposit(TRANCHE_UNIT _assets)
+    function jtPreviewDeposit(TRANCHE_UNIT _jtAssets)
         external
         view
         override
@@ -71,7 +71,7 @@ abstract contract AaveV3_JT_Kernel is RoycoKernel {
         returns (SyncedAccountingState memory stateBeforeDeposit, NAV_UNIT valueAllocated)
     {
         // Preview the deposit by converting the assets to NAV units and returning the NAV at which the shares will be minted
-        valueAllocated = jtConvertTrancheUnitsToNAVUnits(_assets);
+        valueAllocated = jtConvertTrancheUnitsToNAVUnits(_jtAssets);
         stateBeforeDeposit = _previewSyncTrancheAccounting();
     }
 
@@ -159,7 +159,10 @@ abstract contract AaveV3_JT_Kernel is RoycoKernel {
     }
 
     /// @inheritdoc RoycoKernel
-    function _jtDepositAssets(TRANCHE_UNIT _jtAssets) internal override(RoycoKernel) {
+    function _jtDepositAssets(TRANCHE_UNIT _jtAssets) internal override(RoycoKernel) returns (NAV_UNIT jtDepositPreOpNAV) {
+        // No fees or slippage on supplying to Aave V3
+        jtDepositPreOpNAV = jtConvertTrancheUnitsToNAVUnits(_jtAssets);
+
         // Supply the specified assets to the pool
         // Max approval already given to the pool on initialization
         IPool(AAVE_V3_POOL).supply(JT_ASSET, toUint256(_jtAssets), address(this), 0);

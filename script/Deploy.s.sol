@@ -3,9 +3,8 @@ pragma solidity ^0.8.28;
 
 import { IAccessManager } from "../lib/openzeppelin-contracts/contracts/access/manager/IAccessManager.sol";
 import { UUPSUpgradeable } from "../lib/openzeppelin-contracts/contracts/proxy/utils/UUPSUpgradeable.sol";
-import { RoycoFactory } from "../src/RoycoFactory.sol";
 import { RoycoAccountant } from "../src/accountant/RoycoAccountant.sol";
-import { RoycoRoles } from "../src/auth/RoycoRoles.sol";
+import { RoycoFactory } from "../src/factory/RoycoFactory.sol";
 import { IRoycoAccountant } from "../src/interfaces/IRoycoAccountant.sol";
 import { IRoycoAuth } from "../src/interfaces/IRoycoAuth.sol";
 import { IYDM } from "../src/interfaces/IYDM.sol";
@@ -22,14 +21,18 @@ import {
 import {
     YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter_Kernel
 } from "../src/kernels/YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter_Kernel.sol";
+import { IdenticalERC4626SharesAdminOracleQuoter } from "../src/kernels/base/quoter/IdenticalERC4626SharesAdminOracleQuoter.sol";
+import { IdenticalAssetsChainlinkOracleQuoter } from "../src/kernels/base/quoter/base/IdenticalAssetsChainlinkOracleQuoter.sol";
+import { IdenticalAssetsOracleQuoter } from "../src/kernels/base/quoter/base/IdenticalAssetsOracleQuoter.sol";
 import { RoycoKernelInitParams } from "../src/libraries/RoycoKernelStorageLib.sol";
-import { AssetClaims, MarketDeploymentParams, RolesConfiguration, RoycoMarket, TrancheDeploymentParams } from "../src/libraries/Types.sol";
-import { TRANCHE_UNIT } from "../src/libraries/Units.sol";
+import { AssetClaims, MarketDeploymentParams, RolesTargetConfiguration, RoycoMarket, TrancheDeploymentParams } from "../src/libraries/Types.sol";
+import { NAV_UNIT, TRANCHE_UNIT, toNAVUnits } from "../src/libraries/Units.sol";
 import { RoycoJuniorTranche } from "../src/tranches/RoycoJuniorTranche.sol";
 import { RoycoSeniorTranche } from "../src/tranches/RoycoSeniorTranche.sol";
 import { AdaptiveCurveYDM } from "../src/ydm/AdaptiveCurveYDM.sol";
 import { StaticCurveYDM } from "../src/ydm/StaticCurveYDM.sol";
-import { Create2DeployUtils } from "./Create2DeployUtils.sol";
+import { RolesConfiguration } from "./config/RolesConfiguration.sol";
+import { Create2DeployUtils } from "./utils/Create2DeployUtils.sol";
 import { Script } from "lib/forge-std/src/Script.sol";
 import { console2 } from "lib/forge-std/src/console2.sol";
 
@@ -39,11 +42,13 @@ interface IKernelOracleQuoterAdmin {
     function setTrancheAssetToReferenceAssetOracle(address _trancheAssetToReferenceAssetOracle, uint48 _stalenessThresholdSeconds) external;
 }
 
-contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
+contract DeployScript is Script, Create2DeployUtils, RolesConfiguration {
     // Custom errors
     error UnsupportedKernelType(KernelType kernelType);
     error UnsupportedYDMType(YDMType ydmType);
     error DeployerNotFactoryAdmin(address deployer);
+    error RoleAssignmentAdminRoleNotFound(uint64 role);
+    error RoleAssignmentAssigneeAddressIsZero(address assignee);
 
     // Deployment salts for CREATE2
     bytes32 constant ACCOUNTANT_IMPL_SALT = keccak256("ROYCO_ACCOUNTANT_IMPLEMENTATION_V1");
@@ -128,11 +133,33 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
         bytes32 marketId;
     }
 
+    /// @notice Addresses for role assignments
+    struct RoleAssignmentAddresses {
+        address pauserAddress;
+        address upgraderAddress;
+        address syncRoleAddress;
+        address adminKernelAddress;
+        address adminAccountantAddress;
+        address adminProtocolFeeSetterAddress;
+        address adminOracleQuoterAddress;
+        address lpRoleAdminAddress;
+        address roleGuardianAddress;
+        address deployerAddress;
+        address deployerAdminAddress;
+    }
+
+    /// @notice Configuration for assigning a role to an address
+    struct RoleAssignmentConfiguration {
+        uint64 role; // The role to assign
+        uint64 roleAdminRole; // The admin role that can assign the role, 0 if none
+        address assignee; // The address to assign the role to
+        uint32 executionDelay; // The delay after which the role can be assigned
+    }
+
     /// @notice Main deployment parameters struct
     struct DeploymentParams {
         // Factory params
         address factoryAdmin;
-        address factoryOwnerAddress;
         // Market params
         bytes32 marketId;
         string seniorTrancheName;
@@ -141,6 +168,7 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
         string juniorTrancheSymbol;
         address seniorAsset;
         address juniorAsset;
+        NAV_UNIT dustTolerance;
         // Kernel params
         KernelType kernelType;
         bytes kernelSpecificParams; // Encoded kernel-specific params
@@ -158,48 +186,39 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
         YDMType ydmType;
         bytes ydmSpecificParams; // Encoded YDM-specific params
         // Roles
-        address pauserAddress;
-        uint32 pauserExecutionDelay;
-        address upgraderAddress;
-        uint32 upgraderExecutionDelay;
-        address lpRoleAddress;
-        uint32 lpRoleExecutionDelay;
-        address syncRoleAddress;
-        uint32 syncRoleExecutionDelay;
-        address kernelAdminRoleAddress;
-        uint32 kernelAdminRoleExecutionDelay;
-        address oracleQuoterAdminRoleAddress;
-        uint32 oracleQuoterAdminRoleExecutionDelay;
+        RoleAssignmentConfiguration[] roleAssignments;
     }
 
     function run() external {
         // Read deployer private key
         uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
-        vm.startBroadcast(deployerPrivateKey);
 
         // Read all deployment parameters from environment variables
         DeploymentParams memory params = _readDeploymentParamsFromEnv();
 
         // Deploy using the main deploy function
-        deploy(params);
-
-        vm.stopBroadcast();
+        deploy(params, deployerPrivateKey);
     }
 
     /// @notice Main deployment function that accepts all parameters
-    function deploy(DeploymentParams memory _params) public returns (DeploymentResult memory) {
+    function deploy(DeploymentParams memory _params, uint256 _deployerPrivateKey) public returns (DeploymentResult memory) {
+        vm.startBroadcast(_deployerPrivateKey);
+        address deployer = vm.addr(_deployerPrivateKey);
+
         // Deploy implementations using CREATE2
         RoycoAccountant accountantImpl = _deployAccountantImpl();
         RoycoSeniorTranche stTrancheImpl = _deploySTTrancheImpl();
         RoycoJuniorTranche jtTrancheImpl = _deployJTTrancheImpl();
         IYDM ydm = _deployYDM(_params.ydmType);
-        RoycoFactory factory = _deployFactory(_params.factoryAdmin);
+
+        // Deploy factory with deployer as admin and deployer as deployer
+        RoycoFactory factory = _deployFactory(deployer, deployer);
 
         // Deploy market using factory (kernel implementation is deployed inside _deployMarket)
-        (RoycoMarket memory market, address kernelImpl) = _deployMarket(factory, accountantImpl, stTrancheImpl, jtTrancheImpl, address(ydm), _params);
+        (RoycoMarket memory market, address kernelImpl) = _deployMarket(factory, accountantImpl, stTrancheImpl, jtTrancheImpl, address(ydm), _params, deployer);
 
-        // Transfer factory ownership to new admin if provided
-        _transferFactoryOwnership(factory, _params.factoryOwnerAddress);
+        // Transfer factory ownership to factory admin
+        _transferFactoryOwnership(factory, _params.factoryAdmin);
 
         // Build deployment result
         DeploymentResult memory result = DeploymentResult({
@@ -220,7 +239,6 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
         console2.log("=== Deployment Summary ===");
         console2.log("Factory:", address(result.factory));
         console2.log("Factory Admin:", _params.factoryAdmin);
-        console2.log("Factory Owner:", _params.factoryOwnerAddress);
         console2.log("YDM:", address(result.ydm));
         console2.log("Accountant Implementation:", address(result.accountantImplementation));
         console2.log("ST Tranche Implementation:", address(result.stTrancheImplementation));
@@ -233,6 +251,8 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
         console2.log("Market ID:", uint256(_params.marketId));
         console2.log("========================");
 
+        vm.stopBroadcast();
+
         return result;
     }
 
@@ -242,7 +262,7 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
     /// @param _kernel The kernel address
     /// @param _accountant The accountant address
     /// @return roles The roles configuration array
-    function buildRolesConfiguration(
+    function buildRolesTargetConfiguration(
         address _seniorTranche,
         address _juniorTranche,
         address _kernel,
@@ -250,12 +270,12 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
     )
         public
         pure
-        returns (RolesConfiguration[] memory roles)
+        returns (RolesTargetConfiguration[] memory roles)
     {
         // Count how many role configurations we need
         uint256 roleCount = 4; // ST, JT, Kernel, Accountant
 
-        roles = new RolesConfiguration[](roleCount);
+        roles = new RolesTargetConfiguration[](roleCount);
         uint256 index = 0;
 
         // Senior Tranche roles
@@ -282,20 +302,20 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
         stRoles[8] = ADMIN_PAUSER_ROLE;
         stSelectors[9] = IRoycoAuth.unpause.selector;
         stRoles[9] = ADMIN_PAUSER_ROLE;
-        stSelectors[10] = bytes4(0xe4cca4b0);
+        stSelectors[10] = bytes4(0xe4cca4b0); // deposit(uint256,address,address,uint256)
         stRoles[10] = LP_ROLE;
-        stSelectors[11] = bytes4(0x9f40a7b3);
+        stSelectors[11] = bytes4(0x9f40a7b3); // redeem(uint256,address,address,uint256)
         stRoles[11] = LP_ROLE;
         stSelectors[12] = UUPSUpgradeable.upgradeToAndCall.selector;
         stRoles[12] = ADMIN_UPGRADER_ROLE;
 
-        roles[index++] = RolesConfiguration({ target: _seniorTranche, selectors: stSelectors, roles: stRoles });
+        roles[index++] = RolesTargetConfiguration({ target: _seniorTranche, selectors: stSelectors, roles: stRoles });
 
         // Junior Tranche roles (same as senior)
         bytes4[] memory jtSelectors = stSelectors;
         uint64[] memory jtRoles = stRoles;
 
-        roles[index++] = RolesConfiguration({ target: _juniorTranche, selectors: jtSelectors, roles: jtRoles });
+        roles[index++] = RolesTargetConfiguration({ target: _juniorTranche, selectors: jtSelectors, roles: jtRoles });
 
         // Kernel roles
         bytes4[] memory kernelSelectors = new bytes4[](8);
@@ -311,77 +331,180 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
         kernelRoleValues[3] = ADMIN_PAUSER_ROLE;
         kernelSelectors[4] = IRoycoKernel.setJuniorTrancheRedemptionDelay.selector;
         kernelRoleValues[4] = ADMIN_KERNEL_ROLE;
-        // Quoter admin functions (only present in kernels with oracle quoters)
-        kernelSelectors[5] = bytes4(0xd2e80494); // setConversionRate(uint256)
+        kernelSelectors[5] = IdenticalAssetsOracleQuoter.setConversionRate.selector;
         kernelRoleValues[5] = ADMIN_ORACLE_QUOTER_ROLE;
-        kernelSelectors[6] = bytes4(0x8138d87d); // setTrancheAssetToReferenceAssetOracle(address,uint48)
+        kernelSelectors[6] = IdenticalAssetsChainlinkOracleQuoter.setTrancheAssetToReferenceAssetOracle.selector;
         kernelRoleValues[6] = ADMIN_ORACLE_QUOTER_ROLE;
         kernelSelectors[7] = UUPSUpgradeable.upgradeToAndCall.selector;
         kernelRoleValues[7] = ADMIN_UPGRADER_ROLE;
 
-        roles[index++] = RolesConfiguration({ target: _kernel, selectors: kernelSelectors, roles: kernelRoleValues });
+        roles[index++] = RolesTargetConfiguration({ target: _kernel, selectors: kernelSelectors, roles: kernelRoleValues });
 
         // Accountant roles
-        bytes4[] memory accountantSelectors = new bytes4[](10);
-        uint64[] memory accountantRoleValues = new uint64[](10);
+        bytes4[] memory accountantSelectors = new bytes4[](11);
+        uint64[] memory accountantRoleValues = new uint64[](11);
 
         accountantSelectors[0] = IRoycoAccountant.setYDM.selector;
-        accountantRoleValues[0] = ADMIN_KERNEL_ROLE;
+        accountantRoleValues[0] = ADMIN_ACCOUNTANT_ROLE;
         accountantSelectors[1] = IRoycoAccountant.setSeniorTrancheProtocolFee.selector;
-        accountantRoleValues[1] = ADMIN_KERNEL_ROLE;
+        accountantRoleValues[1] = ADMIN_PROTOCOL_FEE_SETTER_ROLE;
         accountantSelectors[2] = IRoycoAccountant.setJuniorTrancheProtocolFee.selector;
-        accountantRoleValues[2] = ADMIN_KERNEL_ROLE;
+        accountantRoleValues[2] = ADMIN_PROTOCOL_FEE_SETTER_ROLE;
         accountantSelectors[3] = IRoycoAccountant.setCoverage.selector;
-        accountantRoleValues[3] = ADMIN_KERNEL_ROLE;
+        accountantRoleValues[3] = ADMIN_ACCOUNTANT_ROLE;
         accountantSelectors[4] = IRoycoAccountant.setBeta.selector;
-        accountantRoleValues[4] = ADMIN_KERNEL_ROLE;
+        accountantRoleValues[4] = ADMIN_ACCOUNTANT_ROLE;
         accountantSelectors[5] = IRoycoAccountant.setLLTV.selector;
-        accountantRoleValues[5] = ADMIN_KERNEL_ROLE;
+        accountantRoleValues[5] = ADMIN_ACCOUNTANT_ROLE;
         accountantSelectors[6] = IRoycoAccountant.setFixedTermDuration.selector;
-        accountantRoleValues[6] = ADMIN_KERNEL_ROLE;
+        accountantRoleValues[6] = ADMIN_ACCOUNTANT_ROLE;
         accountantSelectors[7] = IRoycoAuth.pause.selector;
         accountantRoleValues[7] = ADMIN_PAUSER_ROLE;
         accountantSelectors[8] = IRoycoAuth.unpause.selector;
         accountantRoleValues[8] = ADMIN_PAUSER_ROLE;
         accountantSelectors[9] = UUPSUpgradeable.upgradeToAndCall.selector;
         accountantRoleValues[9] = ADMIN_UPGRADER_ROLE;
+        accountantSelectors[10] = IRoycoAccountant.setDustTolerance.selector;
+        accountantRoleValues[10] = ADMIN_ACCOUNTANT_ROLE;
 
-        roles[index++] = RolesConfiguration({ target: _accountant, selectors: accountantSelectors, roles: accountantRoleValues });
+        roles[index++] = RolesTargetConfiguration({ target: _accountant, selectors: accountantSelectors, roles: accountantRoleValues });
+    }
+
+    /// @notice Generates role assignments from addresses
+    /// @dev LP_ROLE is included with assignee=address(0) so its admin role gets configured
+    /// @param _addresses The addresses for role assignments
+    function generateRolesAssignments(RoleAssignmentAddresses memory _addresses) public pure returns (RoleAssignmentConfiguration[] memory roleAssignments) {
+        roleAssignments = new RoleAssignmentConfiguration[](12);
+
+        // Get role configs from RolesConfiguration
+        RoleConfig memory pauserConfig = getRoleConfig(ADMIN_PAUSER_ROLE);
+        RoleConfig memory upgraderConfig = getRoleConfig(ADMIN_UPGRADER_ROLE);
+        RoleConfig memory syncConfig = getRoleConfig(SYNC_ROLE);
+        RoleConfig memory kernelConfig = getRoleConfig(ADMIN_KERNEL_ROLE);
+        RoleConfig memory accountantConfig = getRoleConfig(ADMIN_ACCOUNTANT_ROLE);
+        RoleConfig memory feeSetterConfig = getRoleConfig(ADMIN_PROTOCOL_FEE_SETTER_ROLE);
+        RoleConfig memory oracleQuoterConfig = getRoleConfig(ADMIN_ORACLE_QUOTER_ROLE);
+        RoleConfig memory lpRoleAdminConfig = getRoleConfig(LP_ROLE_ADMIN_ROLE);
+        RoleConfig memory lpRoleConfig = getRoleConfig(LP_ROLE);
+        RoleConfig memory roleGuardianConfig = getRoleConfig(ROLE_GUARDIAN_ROLE);
+        RoleConfig memory deployerConfig = getRoleConfig(DEPLOYER_ROLE);
+        RoleConfig memory deployerAdminConfig = getRoleConfig(DEPLOYER_ROLE_ADMIN_ROLE);
+
+        roleAssignments[0] = RoleAssignmentConfiguration({
+            role: ADMIN_PAUSER_ROLE, roleAdminRole: pauserConfig.adminRole, assignee: _addresses.pauserAddress, executionDelay: pauserConfig.executionDelay
+        });
+
+        roleAssignments[1] = RoleAssignmentConfiguration({
+            role: ADMIN_UPGRADER_ROLE,
+            roleAdminRole: upgraderConfig.adminRole,
+            assignee: _addresses.upgraderAddress,
+            executionDelay: upgraderConfig.executionDelay
+        });
+
+        roleAssignments[2] = RoleAssignmentConfiguration({
+            role: SYNC_ROLE, roleAdminRole: syncConfig.adminRole, assignee: _addresses.syncRoleAddress, executionDelay: syncConfig.executionDelay
+        });
+
+        roleAssignments[3] = RoleAssignmentConfiguration({
+            role: ADMIN_KERNEL_ROLE, roleAdminRole: kernelConfig.adminRole, assignee: _addresses.adminKernelAddress, executionDelay: kernelConfig.executionDelay
+        });
+
+        roleAssignments[4] = RoleAssignmentConfiguration({
+            role: ADMIN_ACCOUNTANT_ROLE,
+            roleAdminRole: accountantConfig.adminRole,
+            assignee: _addresses.adminAccountantAddress,
+            executionDelay: accountantConfig.executionDelay
+        });
+
+        roleAssignments[5] = RoleAssignmentConfiguration({
+            role: ADMIN_PROTOCOL_FEE_SETTER_ROLE,
+            roleAdminRole: feeSetterConfig.adminRole,
+            assignee: _addresses.adminProtocolFeeSetterAddress,
+            executionDelay: feeSetterConfig.executionDelay
+        });
+
+        roleAssignments[6] = RoleAssignmentConfiguration({
+            role: ADMIN_ORACLE_QUOTER_ROLE,
+            roleAdminRole: oracleQuoterConfig.adminRole,
+            assignee: _addresses.adminOracleQuoterAddress,
+            executionDelay: oracleQuoterConfig.executionDelay
+        });
+
+        roleAssignments[7] = RoleAssignmentConfiguration({
+            role: LP_ROLE_ADMIN_ROLE,
+            roleAdminRole: lpRoleAdminConfig.adminRole,
+            assignee: _addresses.lpRoleAdminAddress,
+            executionDelay: lpRoleAdminConfig.executionDelay
+        });
+
+        // LP_ROLE with address(0) assignee - role admin will be set but no direct assignment
+        // LP roles are granted separately via GrantLPRolesScript
+        roleAssignments[8] = RoleAssignmentConfiguration({
+            role: LP_ROLE, roleAdminRole: lpRoleConfig.adminRole, assignee: address(0), executionDelay: lpRoleConfig.executionDelay
+        });
+
+        roleAssignments[9] = RoleAssignmentConfiguration({
+            role: ROLE_GUARDIAN_ROLE,
+            roleAdminRole: roleGuardianConfig.adminRole,
+            assignee: _addresses.roleGuardianAddress,
+            executionDelay: roleGuardianConfig.executionDelay
+        });
+
+        roleAssignments[10] = RoleAssignmentConfiguration({
+            role: DEPLOYER_ROLE, roleAdminRole: deployerConfig.adminRole, assignee: _addresses.deployerAddress, executionDelay: deployerConfig.executionDelay
+        });
+
+        roleAssignments[11] = RoleAssignmentConfiguration({
+            role: DEPLOYER_ROLE_ADMIN_ROLE,
+            roleAdminRole: deployerAdminConfig.adminRole,
+            assignee: _addresses.deployerAdminAddress,
+            executionDelay: deployerAdminConfig.executionDelay
+        });
     }
 
     /// @notice Grants all relevant roles to the addresses specified in the deployment parameters
     /// @param _factory The factory contract (which acts as the AccessManager)
     /// @param _params The deployment parameters containing role addresses
-    function grantAllRoles(RoycoFactory _factory, DeploymentParams memory _params) public {
+    function grantAllRoles(RoycoFactory _factory, DeploymentParams memory _params, address _deployer) public {
         IAccessManager accessManager = IAccessManager(address(_factory));
+
+        (bool hasRole,) = accessManager.hasRole(_ADMIN_ROLE, _deployer);
+        if (!hasRole) {
+            console2.log("This script invoker does not have ADMIN_ROLE, skipping the role assignments step");
+            return;
+        }
 
         console2.log("Granting roles on AccessManager:", address(_factory));
 
-        // Grant ADMIN_PAUSER_ROLE (used by ST, JT, Kernel, Accountant)
-        accessManager.grantRole(ADMIN_PAUSER_ROLE, _params.pauserAddress, _params.pauserExecutionDelay);
-        console2.log("  - ADMIN_PAUSER_ROLE granted to:", _params.pauserAddress, "with delay:", _params.pauserExecutionDelay);
+        for (uint256 i = 0; i < _params.roleAssignments.length; i++) {
+            RoleAssignmentConfiguration memory roleAssignment = _params.roleAssignments[i];
 
-        // Grant ADMIN_UPGRADER_ROLE (used by ST, JT, Kernel, Accountant for UUPS upgrades)
-        accessManager.grantRole(ADMIN_UPGRADER_ROLE, _params.upgraderAddress, _params.upgraderExecutionDelay);
-        console2.log("  - ADMIN_UPGRADER_ROLE granted to:", _params.upgraderAddress, "with delay:", _params.upgraderExecutionDelay);
+            // Get role config to set up admin and guardian
+            RoleConfig memory roleConfig = getRoleConfig(roleAssignment.role);
 
-        // Grant LP_ROLE (used by ST, JT)
-        accessManager.grantRole(LP_ROLE, _params.lpRoleAddress, _params.lpRoleExecutionDelay);
-        console2.log("  - LP_ROLE granted to:", _params.lpRoleAddress, "with delay:", _params.lpRoleExecutionDelay);
+            // Grant the role to the assignee (skip if assignee is zero, e.g., LP_ROLE which is handled separately)
+            if (roleAssignment.assignee != address(0)) {
+                (hasRole,) = accessManager.hasRole(roleAssignment.role, roleAssignment.assignee);
+                if (!hasRole) {
+                    console2.log("  - Granting role: %s to: %s with delay: %s", roleAssignment.role, roleAssignment.assignee, roleAssignment.executionDelay);
+                    accessManager.grantRole(roleAssignment.role, roleAssignment.assignee, roleAssignment.executionDelay);
+                } else {
+                    console2.log("  - %s already granted to: %s skipping role grant", roleAssignment.role, roleAssignment.assignee);
+                }
+            } else {
+                console2.log("  - Skipping role grant for %s: assignee is zero address", roleAssignment.role);
+            }
 
-        // Grant SYNC_ROLE (used by Kernel)
-        accessManager.grantRole(SYNC_ROLE, _params.syncRoleAddress, _params.syncRoleExecutionDelay);
-        console2.log("  - SYNC_ROLE granted to:", _params.syncRoleAddress, "with delay:", _params.syncRoleExecutionDelay);
+            // Set the role admin if different from default (0)
+            if (roleConfig.adminRole != _ADMIN_ROLE) {
+                console2.log("  - Setting role admin for: %s to: %s", roleAssignment.role, roleConfig.adminRole);
+                accessManager.setRoleAdmin(roleAssignment.role, roleConfig.adminRole);
+            }
 
-        // Grant ADMIN_KERNEL_ROLE (used by Kernel, Accountant)
-        accessManager.grantRole(ADMIN_KERNEL_ROLE, _params.kernelAdminRoleAddress, _params.kernelAdminRoleExecutionDelay);
-        console2.log("  - ADMIN_KERNEL_ROLE granted to:", _params.kernelAdminRoleAddress, "with delay:", _params.kernelAdminRoleExecutionDelay);
-
-        // Grant ADMIN_ORACLE_QUOTER_ROLE (used by Kernel quoters)
-        accessManager.grantRole(ADMIN_ORACLE_QUOTER_ROLE, _params.oracleQuoterAdminRoleAddress, _params.oracleQuoterAdminRoleExecutionDelay);
-        console2.log(
-            "  - ADMIN_ORACLE_QUOTER_ROLE granted to:", _params.oracleQuoterAdminRoleAddress, "with delay:", _params.oracleQuoterAdminRoleExecutionDelay
-        );
+            // Set the role guardian
+            console2.log("  - Setting role guardian for: %s to: %s", roleAssignment.role, roleConfig.guardianRole);
+            accessManager.setRoleGuardian(roleAssignment.role, roleConfig.guardianRole);
+        }
 
         console2.log("All roles granted successfully!");
     }
@@ -401,13 +524,15 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
         RoycoSeniorTranche stTrancheImpl,
         RoycoJuniorTranche jtTrancheImpl,
         address ydmAddress,
-        DeploymentParams memory _params
+        DeploymentParams memory _params,
+        address _deployer
     )
         internal
         returns (RoycoMarket memory, address)
     {
-        // Precompute expected proxy addresses using inline salt
-        bytes32 salt = MARKET_DEPLOYMENT_SALT;
+        // Precompute expected proxy addresses using salt derived from market ID
+        // This ensures each market deployment has a unique salt to avoid Create2 collisions
+        bytes32 salt = keccak256(abi.encodePacked(MARKET_DEPLOYMENT_SALT, _params.marketId));
         address expectedSeniorTrancheAddress = factory.predictERC1967ProxyAddress(address(stTrancheImpl), salt);
         address expectedJuniorTrancheAddress = factory.predictERC1967ProxyAddress(address(jtTrancheImpl), salt);
         address expectedAccountantAddress = factory.predictERC1967ProxyAddress(address(accountantImpl), salt);
@@ -437,8 +562,8 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
         bytes memory juniorTrancheInitializationData = _buildJuniorTrancheInitializationData(expectedKernelAddress, _params.marketId, factoryAddress, _params);
 
         // Build roles configuration
-        RolesConfiguration[] memory roles =
-            buildRolesConfiguration(expectedSeniorTrancheAddress, expectedJuniorTrancheAddress, expectedKernelAddress, expectedAccountantAddress);
+        RolesTargetConfiguration[] memory roles =
+            buildRolesTargetConfiguration(expectedSeniorTrancheAddress, expectedJuniorTrancheAddress, expectedKernelAddress, expectedAccountantAddress);
 
         // Build market deployment params
         MarketDeploymentParams memory marketParams = MarketDeploymentParams({
@@ -473,7 +598,7 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
         console2.log("Accountant:", address(deployedContracts.accountant));
 
         // Grant all roles to the specified addresses
-        grantAllRoles(factory, _params);
+        grantAllRoles(factory, _params, _deployer);
 
         return (deployedContracts, kernelImpl);
     }
@@ -516,7 +641,6 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
 
         return DeploymentParams({
             factoryAdmin: vm.envAddress("FACTORY_ADMIN"),
-            factoryOwnerAddress: vm.envAddress("FACTORY_OWNER_ADDRESS"),
             marketId: vm.envBytes32("MARKET_ID"),
             seniorTrancheName: vm.envString("SENIOR_TRANCHE_NAME"),
             seniorTrancheSymbol: vm.envString("SENIOR_TRANCHE_SYMBOL"),
@@ -534,21 +658,66 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
             betaWAD: uint96(vm.envUint("BETA_WAD")),
             lltvWAD: uint64(vm.envUint("LLTV_WAD")),
             fixedTermDurationSeconds: uint24(vm.envUint("FIXED_TERM_DURATION_SECONDS")),
+            dustTolerance: toNAVUnits(vm.envUint("DUST_TOLERANCE")),
             ydmType: YDMType(vm.envUint("YDM_TYPE")),
             ydmSpecificParams: _readYDMParamsFromEnv(YDMType(vm.envUint("YDM_TYPE"))),
-            pauserAddress: vm.envAddress("PAUSER_ADDRESS"),
-            pauserExecutionDelay: uint32(vm.envUint("PAUSER_EXECUTION_DELAY")),
-            upgraderAddress: vm.envAddress("UPGRADER_ADDRESS"),
-            upgraderExecutionDelay: uint32(vm.envUint("UPGRADER_EXECUTION_DELAY")),
-            lpRoleAddress: vm.envAddress("LP_ROLE_ADDRESS"),
-            lpRoleExecutionDelay: uint32(vm.envUint("LP_ROLE_EXECUTION_DELAY")),
-            syncRoleAddress: vm.envAddress("SYNC_ROLE_ADDRESS"),
-            syncRoleExecutionDelay: uint32(vm.envUint("SYNC_ROLE_EXECUTION_DELAY")),
-            kernelAdminRoleAddress: vm.envAddress("ADMIN_KERNEL_ROLE_ADDRESS"),
-            kernelAdminRoleExecutionDelay: uint32(vm.envUint("ADMIN_KERNEL_ROLE_EXECUTION_DELAY")),
-            oracleQuoterAdminRoleAddress: vm.envAddress("ADMIN_ORACLE_QUOTER_ROLE_ADDRESS"),
-            oracleQuoterAdminRoleExecutionDelay: uint32(vm.envUint("ADMIN_ORACLE_QUOTER_ROLE_EXECUTION_DELAY"))
+            roleAssignments: _readRoleAssignmentsFromEnv()
         });
+    }
+
+    /// @notice Reads role assignments from environment variables
+    function _readRoleAssignmentsFromEnv() internal view returns (RoleAssignmentConfiguration[] memory) {
+        RoleAssignmentConfiguration[] memory roleAssignments = new RoleAssignmentConfiguration[](9);
+        roleAssignments[0] = RoleAssignmentConfiguration({
+            role: ADMIN_PAUSER_ROLE, roleAdminRole: 0, assignee: vm.envAddress("PAUSER_ADDRESS"), executionDelay: uint32(vm.envUint("PAUSER_EXECUTION_DELAY"))
+        });
+        roleAssignments[1] = RoleAssignmentConfiguration({
+            role: ADMIN_UPGRADER_ROLE,
+            roleAdminRole: 0,
+            assignee: vm.envAddress("UPGRADER_ADDRESS"),
+            executionDelay: uint32(vm.envUint("UPGRADER_EXECUTION_DELAY"))
+        });
+        roleAssignments[2] = RoleAssignmentConfiguration({
+            role: SYNC_ROLE, roleAdminRole: 0, assignee: vm.envAddress("SYNC_ROLE_ADDRESS"), executionDelay: uint32(vm.envUint("SYNC_ROLE_EXECUTION_DELAY"))
+        });
+        roleAssignments[3] = RoleAssignmentConfiguration({
+            role: ADMIN_KERNEL_ROLE,
+            roleAdminRole: 0,
+            assignee: vm.envAddress("ADMIN_KERNEL_ROLE_ADDRESS"),
+            executionDelay: uint32(vm.envUint("ADMIN_KERNEL_ROLE_EXECUTION_DELAY"))
+        });
+        roleAssignments[4] = RoleAssignmentConfiguration({
+            role: ADMIN_ORACLE_QUOTER_ROLE,
+            roleAdminRole: 0,
+            assignee: vm.envAddress("ADMIN_ORACLE_QUOTER_ROLE_ADDRESS"),
+            executionDelay: uint32(vm.envUint("ADMIN_ORACLE_QUOTER_ROLE_EXECUTION_DELAY"))
+        });
+        roleAssignments[5] = RoleAssignmentConfiguration({
+            role: ADMIN_ACCOUNTANT_ROLE,
+            roleAdminRole: 0,
+            assignee: vm.envAddress("ADMIN_ACCOUNTANT_ROLE_ADDRESS"),
+            executionDelay: uint32(vm.envUint("ADMIN_ACCOUNTANT_ROLE_EXECUTION_DELAY"))
+        });
+        roleAssignments[6] = RoleAssignmentConfiguration({
+            role: ADMIN_PROTOCOL_FEE_SETTER_ROLE,
+            roleAdminRole: 0,
+            assignee: vm.envAddress("ADMIN_PROTOCOL_FEE_SETTER_ROLE_ADDRESS"),
+            executionDelay: uint32(vm.envUint("ADMIN_PROTOCOL_FEE_SETTER_ROLE_EXECUTION_DELAY"))
+        });
+        roleAssignments[7] = RoleAssignmentConfiguration({
+            role: LP_ROLE_ADMIN_ROLE,
+            roleAdminRole: 0,
+            assignee: vm.envAddress("LP_ROLE_ADMIN_ROLE_ADDRESS"),
+            executionDelay: uint32(vm.envUint("LP_ROLE_ADMIN_ROLE_EXECUTION_DELAY"))
+        });
+        roleAssignments[8] = RoleAssignmentConfiguration({
+            role: LP_ROLE,
+            roleAdminRole: LP_ROLE_ADMIN_ROLE,
+            // LP roles are assigned later
+            assignee: address(0),
+            executionDelay: uint32(vm.envUint("LP_ROLE_EXECUTION_DELAY"))
+        });
+        return roleAssignments;
     }
 
     /// @notice Reads YDM-specific parameters from environment variables
@@ -644,8 +813,8 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
     /// @notice Deploys factory implementation
     /// @param _factoryAdmin The address of the factory admin
     /// @return The deployed factory implementation
-    function _deployFactory(address _factoryAdmin) internal returns (RoycoFactory) {
-        bytes memory creationCode = abi.encodePacked(type(RoycoFactory).creationCode, abi.encode(_factoryAdmin));
+    function _deployFactory(address _factoryAdmin, address _deployer) internal returns (RoycoFactory) {
+        bytes memory creationCode = abi.encodePacked(type(RoycoFactory).creationCode, abi.encode(_factoryAdmin, _deployer));
 
         (address addr, bool alreadyDeployed) = deployWithSanityChecks(FACTORY_SALT_BASE, creationCode, false);
         if (alreadyDeployed) {
@@ -879,7 +1048,8 @@ contract DeployScript is Script, Create2DeployUtils, RoycoRoles {
             lltvWAD: _params.lltvWAD,
             ydm: _ydmAddress,
             ydmInitializationData: _buildYDMInitializationData(_params.ydmType, _params.ydmSpecificParams),
-            fixedTermDurationSeconds: _params.fixedTermDurationSeconds
+            fixedTermDurationSeconds: _params.fixedTermDurationSeconds,
+            dustTolerance: _params.dustTolerance
         });
 
         return abi.encodeCall(RoycoAccountant.initialize, (accountantParams, _factoryAddress));

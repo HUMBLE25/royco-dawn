@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import { AccessManagedUpgradeable } from "../lib/openzeppelin-contracts-upgradeable/contracts/access/manager/AccessManagedUpgradeable.sol";
-import { AccessManager } from "../lib/openzeppelin-contracts/contracts/access/manager/AccessManager.sol";
-import { ERC1967Proxy } from "../lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import { Create2 } from "../lib/openzeppelin-contracts/contracts/utils/Create2.sol";
-import { RoycoRoles } from "./auth/RoycoRoles.sol";
-import { IRoycoAccountant } from "./interfaces/IRoycoAccountant.sol";
-import { IRoycoFactory } from "./interfaces/IRoycoFactory.sol";
-import { IRoycoKernel } from "./interfaces/kernel/IRoycoKernel.sol";
-import { IRoycoVaultTranche } from "./interfaces/tranche/IRoycoVaultTranche.sol";
-import { MarketDeploymentParams, RolesConfiguration, RoycoMarket } from "./libraries/Types.sol";
+import { AccessManagedUpgradeable } from "../../lib/openzeppelin-contracts-upgradeable/contracts/access/manager/AccessManagedUpgradeable.sol";
+import { AccessManager } from "../../lib/openzeppelin-contracts/contracts/access/manager/AccessManager.sol";
+import { ERC1967Proxy } from "../../lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import { Create2 } from "../../lib/openzeppelin-contracts/contracts/utils/Create2.sol";
+import { RolesConfiguration } from "../../script/config/RolesConfiguration.sol";
+import { IRoycoAccountant } from "../../src/interfaces/IRoycoAccountant.sol";
+import { IRoycoFactory } from "../../src/interfaces/IRoycoFactory.sol";
+import { IRoycoKernel } from "../../src/interfaces/kernel/IRoycoKernel.sol";
+import { IRoycoVaultTranche } from "../../src/interfaces/tranche/IRoycoVaultTranche.sol";
+import { MarketDeploymentParams, RolesTargetConfiguration, RoycoMarket } from "../../src/libraries/Types.sol";
 
 /**
  * @title RoycoFactory
@@ -19,12 +19,18 @@ import { MarketDeploymentParams, RolesConfiguration, RoycoMarket } from "./libra
  * @notice The factory also acts as a singleton access manager for all the Royco markets and their constituent contracts
  * @dev The factory deploys each market's constituent contracts using the UUPS proxy pattern
  */
-contract RoycoFactory is AccessManager, RoycoRoles, IRoycoFactory {
+contract RoycoFactory is AccessManager, RolesConfiguration, IRoycoFactory {
     /**
      * @notice Initializes the Royco Factory
-     * @param _initialAdmin The initial admin of the access manager
+     * @param _admin The admin of the factory
+     * @param _deployer The deployer address that can deploy new markets
      */
-    constructor(address _initialAdmin) AccessManager(_initialAdmin) { }
+    constructor(address _admin, address _deployer) AccessManager(_admin) {
+        // Grant the deployer the deployer role
+        _grantRole(DEPLOYER_ROLE, _deployer, 0, 0);
+        // Set the deployer role on the deployMarket function
+        _setTargetFunctionRole(address(this), RoycoFactory.deployMarket.selector, DEPLOYER_ROLE);
+    }
 
     /// @inheritdoc IRoycoFactory
     function deployMarket(MarketDeploymentParams calldata _params) external override(IRoycoFactory) onlyAuthorized returns (RoycoMarket memory roycoMarket) {
@@ -140,9 +146,9 @@ contract RoycoFactory is AccessManager, RoycoRoles, IRoycoFactory {
      * @param _roycoMarket The deployed contracts to configure
      * @param _roles The roles to configure
      */
-    function _configureRoles(RoycoMarket memory _roycoMarket, RolesConfiguration[] calldata _roles) internal {
+    function _configureRoles(RoycoMarket memory _roycoMarket, RolesTargetConfiguration[] calldata _roles) internal {
         for (uint256 i = 0; i < _roles.length; ++i) {
-            RolesConfiguration calldata role = _roles[i];
+            RolesTargetConfiguration calldata role = _roles[i];
 
             // Validate that the selectors and roles length match
             require(role.selectors.length == role.roles.length, ROLES_CONFIGURATION_LENGTH_MISMATCH());

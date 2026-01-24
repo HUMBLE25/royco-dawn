@@ -38,6 +38,9 @@ interface IRoycoVaultTranche is IERC20Metadata, IRoycoAsyncVault, IRoycoAsyncCan
      */
     event ProtocolFeeSharesMinted(address indexed protocolFeeRecipient, uint256 mintedProtocolFeeShares, uint256 totalTrancheShares);
 
+    /// @notice Thrown when the address being checked is the null address
+    error NULL_ADDRESS();
+
     /// @notice Thrown when the requested redeem amount is greater than the maximum amount of shares that can be redeemed
     error MUST_REQUEST_WITHIN_MAX_REDEEM_AMOUNT();
 

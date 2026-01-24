@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
+import { console2 } from "../../../lib/forge-std/src/console2.sol";
 import { ERC20Upgradeable, IERC20, IERC20Metadata } from "../../../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/ERC20Upgradeable.sol";
 import { ERC20PausableUpgradeable } from "../../../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/ERC20PausableUpgradeable.sol";
 import { ERC20PermitUpgradeable } from "../../../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
@@ -52,9 +53,9 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
     }
 
     /**
-     * @notice Modifier to ensure caller is either the specified address or an approved operator
+     * @notice Modifier to ensure caller is either the specified account or an approved operator
+     * @dev Reverts if caller is neither the specified account nor an approved operator
      * @param _account The address that the caller should match or have operator approval for
-     * @dev Reverts if caller is neither the address nor an approved operator
      */
     /// forge-lint: disable-next-item(unwrapped-modifier-logic)
     modifier onlyCallerOrOperator(address _account) {
@@ -134,6 +135,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
     /// @inheritdoc IRoycoVaultTranche
     function maxRedeem(address _owner) public view virtual override(IRoycoVaultTranche) returns (uint256 shares) {
         shares = _maxRedeem(_owner, balanceOf(_owner));
+        console2.log("maxRedeem", shares);
     }
 
     /// @inheritdoc IRoycoVaultTranche
@@ -288,6 +290,9 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
 
     /// @inheritdoc IRoycoAsyncVault
     function setOperator(address _operator, bool _approved) external virtual override(IRoycoAsyncVault) whenNotPaused returns (bool) {
+        // Cannot set the null address as an operator
+        require(_operator != address(0), NULL_ADDRESS());
+
         // Set the operator's approval status for the caller
         RoycoTrancheStorageLib._getRoycoTrancheStorage().isOperator[msg.sender][_operator] = _approved;
         emit OperatorSet(msg.sender, _operator, _approved);
@@ -710,16 +715,15 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
      */
     function _maxRedeem(address _owner, uint256 _sharesOwned) internal view returns (uint256 shares) {
         // Get the notional claims and the max withdrawable assets for the tranche
-        (NAV_UNIT claimOnStNAV, NAV_UNIT claimOnJtNAV, NAV_UNIT stMaxWithdrawableNAV, NAV_UNIT jtMaxWithdrawableNAV) =
+        (NAV_UNIT claimOnStNAV, NAV_UNIT claimOnJtNAV, NAV_UNIT stMaxWithdrawableNAV, NAV_UNIT jtMaxWithdrawableNAV, uint256 totalSharesAfterMintingFees) =
             (TRANCHE_TYPE() == TrancheType.SENIOR ? IRoycoKernel(kernel()).stMaxWithdrawable(_owner) : IRoycoKernel(kernel()).jtMaxWithdrawable(_owner));
-        uint256 totalShares = _withVirtualShares(totalSupply());
 
         // Calculate the maximum amount of shares that can be redeemed based on the senior and junior constraints
         // If the notional claim of the tranche on the ST or JT assets is zero, ignore the constraints since the tranche has no claims on the assets
         uint256 sharesWithdrawableBasedOnSeniorConstraints =
-            claimOnStNAV == ZERO_NAV_UNITS ? _sharesOwned : totalShares.mulDiv(stMaxWithdrawableNAV, claimOnStNAV, Math.Rounding.Floor);
+            claimOnStNAV == ZERO_NAV_UNITS ? _sharesOwned : totalSharesAfterMintingFees.mulDiv(stMaxWithdrawableNAV, claimOnStNAV, Math.Rounding.Floor);
         uint256 sharesWithdrawableBasedOnJuniorConstraints =
-            claimOnJtNAV == ZERO_NAV_UNITS ? _sharesOwned : totalShares.mulDiv(jtMaxWithdrawableNAV, claimOnJtNAV, Math.Rounding.Floor);
+            claimOnJtNAV == ZERO_NAV_UNITS ? _sharesOwned : totalSharesAfterMintingFees.mulDiv(jtMaxWithdrawableNAV, claimOnJtNAV, Math.Rounding.Floor);
         shares = Math.min(_sharesOwned, Math.min(sharesWithdrawableBasedOnSeniorConstraints, sharesWithdrawableBasedOnJuniorConstraints));
     }
 

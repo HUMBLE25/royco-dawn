@@ -39,7 +39,13 @@ contract ERC4626_ST_ERC4626_JT_InKindAssets_Kernel is ERC4626_ST_ERC4626_JT_Kern
         view
         virtual
         override(RoycoKernel, ERC4626_ST_ERC4626_JT_Kernel)
-        returns (NAV_UNIT claimOnStNAV, NAV_UNIT claimOnJtNAV, NAV_UNIT stMaxWithdrawableNAV, NAV_UNIT jtMaxWithdrawableNAV)
+        returns (
+            NAV_UNIT claimOnStNAV,
+            NAV_UNIT claimOnJtNAV,
+            NAV_UNIT stMaxWithdrawableNAV,
+            NAV_UNIT jtMaxWithdrawableNAV,
+            uint256 totalTrancheSharesAfterMintingFees
+        )
     {
         return ERC4626_ST_ERC4626_JT_Kernel.stMaxWithdrawable(_owner);
     }
@@ -50,7 +56,13 @@ contract ERC4626_ST_ERC4626_JT_InKindAssets_Kernel is ERC4626_ST_ERC4626_JT_Kern
         view
         virtual
         override(RoycoKernel, ERC4626_ST_ERC4626_JT_Kernel)
-        returns (NAV_UNIT claimOnStNAV, NAV_UNIT claimOnJtNAV, NAV_UNIT stMaxWithdrawableNAV, NAV_UNIT jtMaxWithdrawableNAV)
+        returns (
+            NAV_UNIT claimOnStNAV,
+            NAV_UNIT claimOnJtNAV,
+            NAV_UNIT stMaxWithdrawableNAV,
+            NAV_UNIT jtMaxWithdrawableNAV,
+            uint256 totalTrancheSharesAfterMintingFees
+        )
     {
         return ERC4626_ST_ERC4626_JT_Kernel.jtMaxWithdrawable(_owner);
     }

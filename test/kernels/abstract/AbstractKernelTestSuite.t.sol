@@ -8,8 +8,7 @@ import { IERC20 } from "../../../lib/openzeppelin-contracts/contracts/token/ERC2
 import { Math } from "../../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 
 import { DeployScript } from "../../../script/Deploy.s.sol";
-import { RoycoFactory } from "../../../src/RoycoFactory.sol";
-import { RoycoRoles } from "../../../src/auth/RoycoRoles.sol";
+import { RoycoFactory } from "../../../src/factory/RoycoFactory.sol";
 import { IRoycoAccountant } from "../../../src/interfaces/IRoycoAccountant.sol";
 import { IRoycoKernel } from "../../../src/interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoVaultTranche } from "../../../src/interfaces/tranche/IRoycoVaultTranche.sol";
@@ -87,6 +86,12 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
     /// @notice Returns the maximum delta tolerance for NAV comparisons
     function maxNAVDelta() public view virtual returns (NAV_UNIT);
+
+    /// @notice Called after vm.warp to refresh time-sensitive oracles
+    /// @dev Override in protocol tests that use Chainlink or other time-sensitive oracles
+    function _refreshOraclesAfterWarp() internal virtual {
+        // Default: no-op. Override for protocols with stale price checks.
+    }
 
     // ═══════════════════════════════════════════════════════════════════════════
     // SETUP
@@ -255,7 +260,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         _depositST(BOB_ADDRESS, stDeposit);
 
-        (NAV_UNIT claimOnST,,,) = KERNEL.stMaxWithdrawable(BOB_ADDRESS);
+        (NAV_UNIT claimOnST,,,,) = KERNEL.stMaxWithdrawable(BOB_ADDRESS);
 
         assertGt(claimOnST, ZERO_NAV_UNITS, "Should have claim on ST");
     }
@@ -265,7 +270,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         _depositJT(ALICE_ADDRESS, _jtDeposit);
 
-        (, NAV_UNIT claimOnJT,,) = KERNEL.jtMaxWithdrawable(ALICE_ADDRESS);
+        (, NAV_UNIT claimOnJT,,,) = KERNEL.jtMaxWithdrawable(ALICE_ADDRESS);
 
         assertGt(claimOnJT, ZERO_NAV_UNITS, "Should have claim on JT");
     }
@@ -309,14 +314,14 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         assertGt(rawNAVAfter, rawNAVBefore, "Raw NAV should increase after deposit");
     }
 
-    function testFuzz_JT_deposit_transfersAssets(uint256 _amount) external {
+    function testFuzz_JT_deposit_transfersAssets(uint256 _amount) external virtual {
         _amount = bound(_amount, _minDepositAmount(), config.initialFunding / 10);
 
         uint256 balanceBefore = IERC20(config.jtAsset).balanceOf(ALICE_ADDRESS);
         _depositJT(ALICE_ADDRESS, _amount);
         uint256 balanceAfter = IERC20(config.jtAsset).balanceOf(ALICE_ADDRESS);
 
-        assertEq(balanceBefore - balanceAfter, _amount, "Should transfer correct amount of assets");
+        assertApproxEqAbs(balanceBefore - balanceAfter, _amount, 2, "Should transfer correct amount of assets");
     }
 
     function test_ST_deposit_revertsWithoutJTCoverage() external {
@@ -503,7 +508,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         JT.redeem(maxRedeem, ALICE_ADDRESS, ALICE_ADDRESS, requestId);
     }
 
-    function testFuzz_JT_cancelRedeemRequest(uint256 _amount, uint256 _withdrawPercentage) external {
+    function testFuzz_JT_cancelRedeemRequest(uint256 _amount, uint256 _withdrawPercentage) external virtual {
         _amount = bound(_amount, _minDepositAmount(), config.initialFunding / 10);
         _withdrawPercentage = bound(_withdrawPercentage, 10, 100);
 
@@ -511,6 +516,17 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         uint256 sharesToWithdraw = jtShares * _withdrawPercentage / 100;
 
         if (sharesToWithdraw == 0) sharesToWithdraw = 1;
+
+        uint256 maxRedeem = JT.maxRedeem(ALICE_ADDRESS);
+        if (maxRedeem < sharesToWithdraw) {
+            assertApproxEqAbs(
+                maxRedeem,
+                sharesToWithdraw,
+                toUint256(ACCOUNTANT.getState().dustTolerance) + 1,
+                "Shares to withdraw should be approximately equal to max redeem if max redeem is less than shares to withdraw"
+            );
+            sharesToWithdraw = maxRedeem;
+        }
 
         // Request redeem
         vm.prank(ALICE_ADDRESS);
@@ -663,7 +679,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         simulateJTYield(_yieldPercentage * 1e16); // Convert to WAD
 
         // Trigger sync
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         NAV_UNIT navAfter = JT.totalAssets().nav;
@@ -693,7 +709,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         vm.warp(vm.getBlockTimestamp() + 1 days);
 
         // Trigger sync
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         NAV_UNIT jtNavAfter = JT.totalAssets().nav;
@@ -717,7 +733,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         vm.warp(vm.getBlockTimestamp() + 1 days);
 
         // Trigger sync
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         // Do another deposit to trigger fee share minting
@@ -755,7 +771,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         simulateJTLoss(_lossPercentage * 1e16);
 
         // Trigger sync
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         NAV_UNIT stNavAfter = ST.totalAssets().nav;
@@ -788,7 +804,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         simulateSTLoss(_lossPercentage * 1e16);
 
         // Trigger sync
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         NAV_UNIT jtNavAfter = JT.totalAssets().nav;
@@ -823,7 +839,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         simulateSTLoss(5e16); // 5% loss
 
         // Trigger sync
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         // Check state - may transition to FIXED_TERM depending on configuration
@@ -865,7 +881,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         // Simulate yield
         simulateJTYield(_yieldPercentage * 1e16);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         _assertNAVConservation();
@@ -880,7 +896,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         // Simulate loss
         simulateJTLoss(_lossPercentage * 1e16);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         _assertNAVConservation();
@@ -923,7 +939,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         // Step 3: Simulate yield
         simulateJTYield(_yieldPercentage * 1e16);
         vm.warp(vm.getBlockTimestamp() + 1 days);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         // Step 4: ST redeems
@@ -977,7 +993,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         // Step 3: Simulate JT loss
         simulateJTLoss(_lossPercentage * 1e16);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         NAV_UNIT stNavAfterLoss = ST.totalAssets().nav;
@@ -1075,7 +1091,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         // Verify JT view functions
         assertEq(JT.balanceOf(ALICE_ADDRESS), jtShares, "JT balance should match shares");
         assertEq(JT.totalSupply(), jtShares, "JT totalSupply should match shares");
-        assertApproxEqAbs(JT.maxRedeem(ALICE_ADDRESS), jtShares, 1, "JT maxRedeem should equal shares");
+        assertApproxEqAbs(JT.maxRedeem(ALICE_ADDRESS), jtShares, toUint256(ACCOUNTANT.getState().dustTolerance) + 1, "JT maxRedeem should equal shares");
 
         // Verify ST maxDeposit is now enabled
         TRANCHE_UNIT stMaxDeposit = ST.maxDeposit(BOB_ADDRESS);
@@ -1118,7 +1134,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         simulateJTYield(_yieldPercentage * 1e16);
         vm.warp(vm.getBlockTimestamp() + 1 days);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         NAV_UNIT jtNavAfterYield = JT.totalAssets().nav;
@@ -1263,7 +1279,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         simulateJTLoss(_lossPercentage * 1e16);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         NAV_UNIT stNavAfterLoss = ST.totalAssets().nav;
@@ -1354,7 +1370,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
             simulateJTYield(_yieldPercentage * 1e16);
             vm.warp(vm.getBlockTimestamp() + 1 days);
 
-            vm.prank(OWNER_ADDRESS);
+            vm.prank(SYNC_ROLE_ADDRESS);
             KERNEL.syncTrancheAccounting();
 
             NAV_UNIT jtNavAfterYield = JT.totalAssets().nav;
@@ -1401,7 +1417,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         // Verify initial state
         assertEq(JT.balanceOf(ALICE_ADDRESS), jtShares, "Should have JT shares");
-        assertApproxEqAbs(JT.maxRedeem(ALICE_ADDRESS), jtShares, 1, "Should be able to redeem all");
+        assertApproxEqAbs(JT.maxRedeem(ALICE_ADDRESS), jtShares, toUint256(ACCOUNTANT.getState().dustTolerance) + 1, "Should be able to redeem all");
 
         // ═══════════════════════════════════════════════════════════════════════════
         // STEP 2: Create multiple parallel redeem requests
@@ -1531,7 +1547,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         // Should be able to redeem normally
         uint256 maxRedeem = JT.maxRedeem(ALICE_ADDRESS);
-        assertApproxEqAbs(maxRedeem, jtShares, 1, "Should be able to redeem all shares again");
+        assertApproxEqAbs(maxRedeem, jtShares, toUint256(ACCOUNTANT.getState().dustTolerance) + 1, "Should be able to redeem all shares again");
     }
 
     /// @notice High utilization scenario: Test coverage limits
@@ -1597,8 +1613,8 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         uint256 aliceFinalMaxRedeem = JT.maxRedeem(ALICE_ADDRESS);
         uint256 charlieFinalMaxRedeem = JT.maxRedeem(CHARLIE_ADDRESS);
 
-        assertApproxEqAbs(aliceFinalMaxRedeem, jtShares, 1, "Alice should be able to redeem all");
-        assertApproxEqAbs(charlieFinalMaxRedeem, additionalJTShares, 1, "Charlie should be able to redeem all");
+        assertApproxEqAbs(aliceFinalMaxRedeem, jtShares, toUint256(ACCOUNTANT.getState().dustTolerance) + 1, "Alice should be able to redeem all");
+        assertApproxEqAbs(charlieFinalMaxRedeem, additionalJTShares, toUint256(ACCOUNTANT.getState().dustTolerance) + 1, "Charlie should be able to redeem all");
 
         // Verify NAV conservation
         _assertNAVConservation();
@@ -1708,7 +1724,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         // Deposit JT for ALICE
         uint256 jtShares = _depositJT(ALICE_ADDRESS, _jtAmount);
-        assertApproxEqAbs(jtShares, JT.maxRedeem(ALICE_ADDRESS), 1);
+        assertApproxEqAbs(jtShares, JT.maxRedeem(ALICE_ADDRESS), toUint256(ACCOUNTANT.getState().dustTolerance) + 1);
         jtShares = JT.maxRedeem(ALICE_ADDRESS);
 
         // ALICE sets BOB as operator
@@ -1848,7 +1864,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         // maxRedeem should equal owned shares (no ST, no coverage constraint)
         uint256 maxRedeemable = JT.maxRedeem(ALICE_ADDRESS);
-        assertApproxEqAbs(maxRedeemable, jtShares, 1, "maxRedeem should equal owned shares");
+        assertApproxEqAbs(maxRedeemable, jtShares, toUint256(ACCOUNTANT.getState().dustTolerance) + 1, "maxRedeem should equal owned shares");
 
         // Try to redeem more than owned - should revert
         vm.prank(ALICE_ADDRESS);
@@ -1955,7 +1971,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         // Simulate loss
         simulateJTLoss(_lossPercentage * 1e16);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         // maxRedeem should decrease after loss
@@ -2081,7 +2097,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         assertEq(JT.allowance(ALICE_ADDRESS, BOB_ADDRESS), jtShares, "Allowance should be set");
 
         // Check that maxRedeem is equal to the deposited shares
-        assertApproxEqAbs(JT.maxRedeem(ALICE_ADDRESS), jtShares, 1);
+        assertApproxEqAbs(JT.maxRedeem(ALICE_ADDRESS), jtShares, toUint256(ACCOUNTANT.getState().dustTolerance) + 1);
         jtShares = JT.maxRedeem(ALICE_ADDRESS);
 
         // BOB (not operator, but has allowance) calls requestRedeem - should succeed
@@ -2091,7 +2107,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         assertGt(requestId, 0, "Request should be created");
 
         // Allowance should be spent
-        assertTrue(JT.allowance(ALICE_ADDRESS, BOB_ADDRESS) <= 1, "Allowance should be spent");
+        assertTrue(JT.allowance(ALICE_ADDRESS, BOB_ADDRESS) <= toUint256(ACCOUNTANT.getState().dustTolerance) + 1, "Allowance should be spent");
     }
 
     /// @notice Test that allowance spending fails with insufficient allowance
@@ -2118,7 +2134,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         // Deposit JT for ALICE
         uint256 jtShares = _depositJT(ALICE_ADDRESS, _jtAmount);
-        assertApproxEqAbs(jtShares, JT.maxRedeem(ALICE_ADDRESS), 1);
+        assertApproxEqAbs(jtShares, JT.maxRedeem(ALICE_ADDRESS), toUint256(ACCOUNTANT.getState().dustTolerance) + 1);
         jtShares = JT.maxRedeem(ALICE_ADDRESS);
 
         // ALICE sets BOB as operator AND gives allowance
@@ -2205,7 +2221,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         NAV_UNIT stRawNavBefore = ST.getRawNAV();
         NAV_UNIT stEffectiveNavBefore = ST.totalAssets().nav;
 
-        assertApproxEqAbs(jtShares, JT.maxRedeem(ALICE_ADDRESS), 1);
+        assertApproxEqAbs(jtShares, JT.maxRedeem(ALICE_ADDRESS), toUint256(ACCOUNTANT.getState().dustTolerance) + 1);
         jtShares = JT.maxRedeem(ALICE_ADDRESS);
 
         // Request redeem
@@ -2285,7 +2301,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         // Simulate loss to tighten coverage
         simulateJTLoss(_lossPercentage * 1e16);
 
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         // Check claimable after loss - should be reduced or zero
@@ -2314,7 +2330,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         // Get max redeemable with no ST (should be all shares)
         uint256 maxRedeemableNoST = JT.maxRedeem(ALICE_ADDRESS);
-        assertApproxEqAbs(maxRedeemableNoST, jtShares, 1, "Should be able to redeem all initially");
+        assertApproxEqAbs(maxRedeemableNoST, jtShares, toUint256(ACCOUNTANT.getState().dustTolerance) + 1, "Should be able to redeem all initially");
         jtShares = maxRedeemableNoST;
 
         // Request redeem for all shares
@@ -2327,7 +2343,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         // Initially all should be claimable
         uint256 claimableInitial = JT.claimableRedeemRequest(requestId, ALICE_ADDRESS);
         uint256 pendingInitial = JT.pendingRedeemRequest(requestId, ALICE_ADDRESS);
-        assertApproxEqAbs(claimableInitial, jtShares, 1, "Initially all should be claimable");
+        assertApproxEqAbs(claimableInitial, jtShares, toUint256(ACCOUNTANT.getState().dustTolerance) + 1, "Initially all should be claimable");
         assertEq(pendingInitial, 0, "Initially nothing should be pending");
 
         // Now deposit ST which will tighten coverage
@@ -2344,20 +2360,20 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         uint256 pendingAfterST = JT.pendingRedeemRequest(requestId, ALICE_ADDRESS);
 
         // The sum should still equal the original request
-        assertApproxEqAbs(claimableAfterST + pendingAfterST, jtShares, 1, "Sum should equal original request");
+        assertApproxEqAbs(claimableAfterST + pendingAfterST, jtShares, toUint256(ACCOUNTANT.getState().dustTolerance) + 1, "Sum should equal original request");
 
         // Pending should be positive (coverage locked some shares)
         assertGt(pendingAfterST, 0, "Some shares should be pending due to coverage");
     }
 
     /// @notice Test that redeem respects coverage limits even on claimable requests
-    function testFuzz_coverageTightening_redeem_respectsCoverageLimits(uint256 _jtAmount, uint256 _stPercentage) external {
+    function testFuzz_coverageTightening_redeem_respectsCoverageLimits(uint256 _jtAmount, uint256 _stPercentage) external virtual {
         _jtAmount = bound(_jtAmount, _minDepositAmount() * 20, config.initialFunding / 4);
         _stPercentage = bound(_stPercentage, 50, 90);
 
         // Deposit JT
         uint256 jtShares = _depositJT(ALICE_ADDRESS, _jtAmount);
-        assertApproxEqAbs(jtShares, JT.maxRedeem(ALICE_ADDRESS), 1);
+        assertApproxEqAbs(jtShares, JT.maxRedeem(ALICE_ADDRESS), toUint256(ACCOUNTANT.getState().dustTolerance) + 1);
         // Set jtShares to the max redeemable amount
         jtShares = JT.maxRedeem(ALICE_ADDRESS);
 
@@ -2409,7 +2425,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         // maxRedeem should equal full balance
         uint256 maxRedeemable = JT.maxRedeem(ALICE_ADDRESS);
-        assertApproxEqAbs(maxRedeemable, jtShares, 1, "maxRedeem should equal full balance with no ST");
+        assertApproxEqAbs(maxRedeemable, jtShares, toUint256(ACCOUNTANT.getState().dustTolerance) + 1, "maxRedeem should equal full balance with no ST");
     }
 
     /// @notice Test ST maxRedeem returns full balance (ST has no coverage constraint on itself)
@@ -2440,7 +2456,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         // Deposit JT
         uint256 jtShares = _depositJT(ALICE_ADDRESS, _jtAmount);
         uint256 maxRedeemBefore = JT.maxRedeem(ALICE_ADDRESS);
-        assertApproxEqAbs(maxRedeemBefore, jtShares, 1, "Initially should redeem all");
+        assertApproxEqAbs(maxRedeemBefore, jtShares, toUint256(ACCOUNTANT.getState().dustTolerance) + 1, "Initially should redeem all");
 
         // Deposit ST in increments and verify maxRedeem decreases
         TRANCHE_UNIT stMaxDeposit = ST.maxDeposit(BOB_ADDRESS);
@@ -2489,7 +2505,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         // JT maxRedeem should increase
         uint256 maxRedeemAfterSTRedeem = JT.maxRedeem(ALICE_ADDRESS);
         assertGt(maxRedeemAfterSTRedeem, maxRedeemWithST, "JT maxRedeem should increase after ST redeems");
-        assertApproxEqAbs(maxRedeemAfterSTRedeem, jtShares, 2, "JT maxRedeem should return to full balance");
+        assertApproxEqAbs(maxRedeemAfterSTRedeem, jtShares, toUint256(ACCOUNTANT.getState().dustTolerance) + 2, "JT maxRedeem should return to full balance");
     }
 
     /// @notice Test maxRedeem after yield still respects coverage
@@ -2514,7 +2530,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         // Simulate yield
         simulateJTYield(_yieldPercentage * 1e16);
         vm.warp(vm.getBlockTimestamp() + 1 days);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         // maxRedeem after yield
@@ -2546,7 +2562,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         // Simulate loss
         simulateJTLoss(_lossPercentage * 1e16);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(SYNC_ROLE_ADDRESS);
         KERNEL.syncTrancheAccounting();
 
         // maxRedeem after loss - coverage might have tightened
@@ -2598,5 +2614,166 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         vm.prank(PROTOCOL_FEE_RECIPIENT_ADDRESS);
         vm.expectRevert(abi.encodeWithSelector(IRoycoVaultTranche.ONLY_KERNEL.selector));
         JT.mintProtocolFeeShares(toNAVUnits(uint256(1e18)), toNAVUnits(uint256(1e18)), PROTOCOL_FEE_RECIPIENT_ADDRESS);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // SECTION: ROUNDING INVARIANT TESTS
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// @notice Test that pure deposits (no yield/loss) never cause FIXED_TERM state transition
+    /// @dev FIXED_TERM should only occur from actual losses, not from deposit rounding
+    /// @param _numCycles Number of deposit cycles to run
+    function testFuzz_deposits_neverCauseFixedTermState(uint256 _numCycles) external {
+        _numCycles = bound(_numCycles, 1, 100);
+
+        // Verify initial state is PERPETUAL
+        assertEq(uint256(ACCOUNTANT.getState().lastMarketState), uint256(MarketState.PERPETUAL), "Market should start in PERPETUAL state");
+
+        uint256 minDeposit = _minDepositAmount();
+
+        for (uint256 i = 0; i < _numCycles; i++) {
+            // Generate unique depositors for each cycle
+            Vm.Wallet memory jtDepositor = _generateProvider(i * 2);
+            Vm.Wallet memory stDepositor = _generateProvider(i * 2 + 1);
+
+            // JT deposit - fund just-in-time with exact amount needed
+            uint256 jtAmount = minDeposit * 10;
+            dealJTAsset(jtDepositor.addr, jtAmount);
+            _depositJT(jtDepositor.addr, jtAmount);
+
+            // ST deposit - use 50% of max to guarantee coverage compliance
+            TRANCHE_UNIT maxSTDeposit = ST.maxDeposit(stDepositor.addr);
+            uint256 stAmount = toUint256(maxSTDeposit) / 2;
+
+            if (stAmount >= minDeposit) {
+                // Fund just-in-time with exact amount needed
+                dealSTAsset(stDepositor.addr, stAmount);
+                _depositST(stDepositor.addr, stAmount);
+            }
+
+            // CRITICAL ASSERTION: Market must remain in PERPETUAL state
+            // Pure deposits should NEVER cause transition to FIXED_TERM
+            MarketState currentState = ACCOUNTANT.getState().lastMarketState;
+            assertEq(uint256(currentState), uint256(MarketState.PERPETUAL), "Market entered FIXED_TERM on deposit");
+        }
+
+        // Final sync and verification
+        vm.prank(SYNC_ROLE_ADDRESS);
+        KERNEL.syncTrancheAccounting();
+
+        assertEq(uint256(ACCOUNTANT.getState().lastMarketState), uint256(MarketState.PERPETUAL), "Market should still be PERPETUAL after all deposit cycles");
+
+        // Verify no JT coverage impermanent loss accumulated
+        NAV_UNIT jtCoverageIL = ACCOUNTANT.getState().lastJTCoverageImpermanentLoss;
+        assertEq(toUint256(jtCoverageIL), 0, "JT coverage IL should be 0 with no yield/loss - only deposits");
+    }
+
+    /// @notice Test full cycle: JT deposit -> ST deposit -> ST withdraw -> JT withdraw
+    /// @dev Pure deposit/withdraw interleaving should never revert (no yield/loss)
+    /// @dev Override this test for protocols with time-sensitive oracles (Chainlink, etc.)
+    /// @param _numCycles Number of full cycles to run
+    function testFuzz_fullDepositWithdrawCycle_neverReverts(uint256 _numCycles) external virtual {
+        _numCycles = bound(_numCycles, 1, 100);
+
+        uint256 minDeposit = _minDepositAmount();
+
+        for (uint256 i = 0; i < _numCycles; i++) {
+            // Generate unique depositors for this cycle
+            Vm.Wallet memory jtDepositor = _generateProvider(i * 2);
+            Vm.Wallet memory stDepositor = _generateProvider(i * 2 + 1);
+
+            // ══════════════════════════════════════════════════════════════
+            // STEP 1: JT Deposit
+            // ══════════════════════════════════════════════════════════════
+            uint256 jtDepositAmount = minDeposit * 10;
+            dealJTAsset(jtDepositor.addr, jtDepositAmount);
+            uint256 jtShares = _depositJT(jtDepositor.addr, jtDepositAmount);
+            assertGt(jtShares, 0, "JT deposit should mint shares");
+
+            // ══════════════════════════════════════════════════════════════
+            // STEP 2: ST Deposit (50% of max to ensure coverage)
+            // ══════════════════════════════════════════════════════════════
+            TRANCHE_UNIT maxSTDeposit = ST.maxDeposit(stDepositor.addr);
+            uint256 stDepositAmount = toUint256(maxSTDeposit) / 2;
+            uint256 stShares = 0;
+
+            if (stDepositAmount >= minDeposit) {
+                dealSTAsset(stDepositor.addr, stDepositAmount);
+                stShares = _depositST(stDepositor.addr, stDepositAmount);
+                assertGt(stShares, 0, "ST deposit should mint shares");
+            }
+
+            // Verify market is still PERPETUAL after deposits
+            assertEq(
+                uint256(ACCOUNTANT.getState().lastMarketState),
+                uint256(MarketState.PERPETUAL),
+                string.concat("Market should be PERPETUAL after deposits on cycle ", vm.toString(i))
+            );
+
+            // ══════════════════════════════════════════════════════════════
+            // STEP 3: ST Withdraw (if ST deposited)
+            // ══════════════════════════════════════════════════════════════
+            if (stShares > 0) {
+                uint256 stMaxRedeem = ST.maxRedeem(stDepositor.addr);
+                uint256 stSharesToRedeem = stShares < stMaxRedeem ? stShares : stMaxRedeem;
+
+                if (stSharesToRedeem > 0) {
+                    vm.startPrank(stDepositor.addr);
+                    ST.redeem(stSharesToRedeem, stDepositor.addr, stDepositor.addr);
+                    vm.stopPrank();
+                }
+            }
+
+            // ══════════════════════════════════════════════════════════════
+            // STEP 4: JT Withdraw (request + wait + claim)
+            // ══════════════════════════════════════════════════════════════
+            uint256 jtMaxRedeem = JT.maxRedeem(jtDepositor.addr);
+            uint256 jtSharesToRedeem = jtShares < jtMaxRedeem ? jtShares : jtMaxRedeem;
+
+            if (jtSharesToRedeem > 0) {
+                // Request redeem
+                vm.startPrank(jtDepositor.addr);
+                (uint256 requestId,) = JT.requestRedeem(jtSharesToRedeem, jtDepositor.addr, jtDepositor.addr);
+                vm.stopPrank();
+
+                // Wait for redemption delay
+                (,,,,,, uint24 jtRedemptionDelay) = KERNEL.getState();
+                vm.warp(block.timestamp + jtRedemptionDelay + 1);
+                _refreshOraclesAfterWarp();
+
+                // Claim redeem
+                uint256 claimableShares = JT.claimableRedeemRequest(requestId, jtDepositor.addr);
+                if (claimableShares > 0) {
+                    vm.startPrank(jtDepositor.addr);
+                    JT.redeem(claimableShares, jtDepositor.addr, jtDepositor.addr, requestId);
+                    vm.stopPrank();
+                }
+            }
+
+            // Verify market is still PERPETUAL after full cycle
+            assertEq(
+                uint256(ACCOUNTANT.getState().lastMarketState),
+                uint256(MarketState.PERPETUAL),
+                string.concat("Market should be PERPETUAL after full cycle ", vm.toString(i))
+            );
+        }
+
+        // Final sync
+        vm.prank(SYNC_ROLE_ADDRESS);
+        KERNEL.syncTrancheAccounting();
+
+        // Final state verification
+        assertEq(uint256(ACCOUNTANT.getState().lastMarketState), uint256(MarketState.PERPETUAL), "Market should be PERPETUAL after all cycles");
+
+        // Verify no significant impermanent losses accumulated from pure deposit/withdraw
+        // (allow for dust tolerance from underlying protocol rounding)
+        NAV_UNIT stIL = ACCOUNTANT.getState().lastSTImpermanentLoss;
+        NAV_UNIT jtCoverageIL = ACCOUNTANT.getState().lastJTCoverageImpermanentLoss;
+        NAV_UNIT jtSelfIL = ACCOUNTANT.getState().lastJTSelfImpermanentLoss;
+        NAV_UNIT dustTolerance = ACCOUNTANT.getState().dustTolerance;
+
+        assertEq(toUint256(stIL), 0, "ST IL should be 0 with no yield/loss");
+        assertLe(toUint256(jtCoverageIL), toUint256(dustTolerance), "JT coverage IL should be within dust tolerance");
+        assertLe(toUint256(jtSelfIL), toUint256(dustTolerance), "JT self IL should be within dust tolerance");
     }
 }

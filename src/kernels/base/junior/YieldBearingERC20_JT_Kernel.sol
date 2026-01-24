@@ -23,10 +23,16 @@ abstract contract YieldBearingERC20_JT_Kernel is RoycoKernel {
     ExecutionModel public constant JT_DEPOSIT_EXECUTION_MODEL = ExecutionModel.SYNC;
 
     /// @inheritdoc IRoycoKernel
-    function jtPreviewDeposit(TRANCHE_UNIT _assets) external view override returns (SyncedAccountingState memory stateBeforeDeposit, NAV_UNIT valueAllocated) {
-        // Convert the yield bearing assets deposited to NAV units and preview a sync to get the current NAV to mint shares at for the junior tranche
-        valueAllocated = jtConvertTrancheUnitsToNAVUnits(_assets);
+    function jtPreviewDeposit(TRANCHE_UNIT _jtAssets)
+        external
+        view
+        override
+        returns (SyncedAccountingState memory stateBeforeDeposit, NAV_UNIT valueAllocated)
+    {
+        // Preview a sync to get the current NAV to mint shares at for the junior tranche
         stateBeforeDeposit = _previewSyncTrancheAccounting();
+        // Convert the yield bearing assets deposited to NAV units
+        valueAllocated = jtConvertTrancheUnitsToNAVUnits(_jtAssets);
     }
 
     /// @inheritdoc RoycoKernel
@@ -54,7 +60,9 @@ abstract contract YieldBearingERC20_JT_Kernel is RoycoKernel {
     }
 
     /// @inheritdoc RoycoKernel
-    function _jtDepositAssets(TRANCHE_UNIT _jtAssets) internal override(RoycoKernel) {
+    function _jtDepositAssets(TRANCHE_UNIT _jtAssets) internal override(RoycoKernel) returns (NAV_UNIT jtDepositPreOpNAV) {
+        // No fees or slippage involved in depositing
+        jtDepositPreOpNAV = jtConvertTrancheUnitsToNAVUnits(_jtAssets);
         // The tranche vault has already transfered the assets to the kernel, so simply credit those assets to the junior tranche
         YieldBearingERC20KernelState storage $ = YieldBearingERC20KernelStorageLib._getYieldBearingERC20KernelStorage();
         $.jtOwnedYieldBearingAssets = $.jtOwnedYieldBearingAssets + _jtAssets;

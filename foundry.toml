@@ -3,7 +3,7 @@ src = "src"
 out = "out"
 libs = ["lib"]
 optimizer = true
-optimizer_runs = 3500
+optimizer_runs = 3000
 bytecode_hash = "none"
 cbor_metadata = false
 sparse_mode = false
@@ -12,6 +12,12 @@ evm_version = "prague"
 via_ir = true
 deny = "never"
 fs_permissions = [{ access = "read", path = "./out" }]
+solc_version = "0.8.33"
+
+
+[profile.development]
+optimizer = false
+optimizer_runs = 0
 
 [profile.default.optimizer_details]
 constantOptimizer = true

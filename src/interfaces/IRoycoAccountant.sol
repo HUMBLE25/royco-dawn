@@ -21,6 +21,8 @@ interface IRoycoAccountant {
      * @custom:field ydmInitializationData - The data used to initialize the YDM for this market
      * @custom:field fixedTermDurationSeconds - The duration of a fixed term for this market in seconds
      * @custom:field lltvWAD - The liquidation loan to value (LLTV) for this market, scaled to WAD precision
+     * @custom:field dustTolerance - The dust tolerance in NAV units to account for miniscule deltas in the underlying protocol's NAV calculations
+     *               Primarily used for rounding in NAV calculations, and can be safely set to 0 if the underlying investments don't exhibit this behavior
      */
     struct RoycoAccountantInitParams {
         address kernel;
@@ -32,6 +34,7 @@ interface IRoycoAccountant {
         bytes ydmInitializationData;
         uint24 fixedTermDurationSeconds;
         uint64 lltvWAD;
+        NAV_UNIT dustTolerance;
     }
 
     /**
@@ -61,6 +64,8 @@ interface IRoycoAccountant {
      * @custom:field twJTYieldShareAccruedWAD - The time-weighted junior tranche yield share (YDM output) since the last yield distribution, scaled to WAD precision
      * @custom:field lastAccrualTimestamp - The timestamp at which the time-weighted JT yield share accumulator was last updated
      * @custom:field lastDistributionTimestamp - The timestamp at which the last ST yield distribution occurred
+     * @custom:field dustTolerance - The minimum amount of ST loss that must be covered by JT before transitioning to a fixed term state
+     *               Primarily used for rounding discrepancies in NAVs, and can be safely set to 0 if ST's underlying investment doesn't exhibit this behavior
      */
     struct RoycoAccountantState {
         address kernel;
@@ -83,6 +88,7 @@ interface IRoycoAccountant {
         uint192 twJTYieldShareAccruedWAD;
         uint32 lastAccrualTimestamp;
         uint32 lastDistributionTimestamp;
+        NAV_UNIT dustTolerance;
     }
 
     /**
@@ -100,17 +106,10 @@ interface IRoycoAccountant {
     event FixedTermCommenced(uint32 fixedTermEndTimestamp);
 
     /**
-     * @notice Emitted when a pre-operation tranche accounting synchronization is executed
+     * @notice Emitted when a pre or post operation tranche accounting synchronization is executed
      * @param resultingState The resulting market state after synchronizing the tranche accounting
      */
-    event PreOpTrancheAccountingSynced(SyncedAccountingState resultingState);
-
-    /**
-     * @notice Emitted when a post-operation tranche accounting synchronization is executed
-     * @param op The operation executed right before this accounting synchronization
-     * @param resultingState The resulting market state after synchronizing the tranche accounting
-     */
-    event PostOpTrancheAccountingSynced(Operation op, SyncedAccountingState resultingState);
+    event TrancheAccountingSynced(SyncedAccountingState resultingState);
 
     /**
      * @notice Emitted when the YDM (Yield Distribution Model) address is updated
@@ -154,6 +153,18 @@ interface IRoycoAccountant {
      */
     event FixedTermDurationUpdated(uint24 fixedTermDurationSeconds);
 
+    /**
+     * @notice Emitted when the minimum amount of ST loss that must be covered by JT before transitioning to a fixed term state is updated
+     * @param dustTolerance The new minimum JT coverage IL required before transitioning to a fixed term state
+     */
+    event DustToleranceUpdated(NAV_UNIT dustTolerance);
+
+    /**
+     * @notice Emitted when JT's coverage loss is realized when transitioning from a fixed term state to a perpetual state
+     * @param jtCoverageImpermanentLossErased The amount of JT coverage loss erased when transitioning from a fixed term state to a perpetual state
+     */
+    event JTCoverageImpermanentLossErased(NAV_UNIT jtCoverageImpermanentLossErased);
+
     /// @notice Thrown when the accountant's coverage config is invalid
     error INVALID_COVERAGE_CONFIG();
 
@@ -175,7 +186,7 @@ interface IRoycoAccountant {
     /// @notice Thrown when the sum of the raw NAVs don't equal the sum of the effective NAVs of both tranches
     error NAV_CONSERVATION_VIOLATION();
 
-    /// @notice Thrown when an operation results in an invalid NAV state in the post-operation synchronization
+    /// @notice Thrown when the operation and NAVs passed to post-op lead to an invalid state
     error INVALID_POST_OP_STATE(Operation _op);
 
     /// @notice Thrown when the market's coverage requirement is unsatisfied
@@ -203,26 +214,50 @@ interface IRoycoAccountant {
     /**
      * @notice Applies post-operation (deposit and withdrawal) raw NAV deltas to effective NAV checkpoints
      * @dev Interprets deltas strictly as deposits/withdrawals with no yield or coverage logic
-     * @param _stRawNAV The senior tranche's current raw NAV: the pure value of its invested assets
-     * @param _jtRawNAV The junior tranche's current raw NAV: the pure value of its invested assets
+     * @dev Exactly one of the following must be true: ST deposited, JT deposited, or withdrawal occurred
      * @param _op The operation being executed in between the pre and post synchronizations
+     * @param _stPostOpRawNAV The post-op senior tranche's raw NAV
+     * @param _jtPostOpRawNAV The post-op junior tranche's raw NAV
+     * @param _stDepositPreOpNAV The pre-op NAV deposited into the senior tranche (0 if not a ST deposit)
+     * @param _jtDepositPreOpNAV The pre-op NAV deposited into the junior tranche (0 if not a JT deposit)
+     * @param _stRedeemPreOpNAV The pre-op NAV withdrawn from the senior tranche's raw NAV (0 if not a redeem)
+     * @param _jtRedeemPreOpNAV The pre-op NAV withdrawn from the junior tranche's raw NAV (0 if not a redeem)
      * @return state The synced NAV, impermanent loss, and fee accounting containing all mark to market accounting data
      */
-    function postOpSyncTrancheAccounting(NAV_UNIT _stRawNAV, NAV_UNIT _jtRawNAV, Operation _op) external returns (SyncedAccountingState memory state);
+    function postOpSyncTrancheAccounting(
+        Operation _op,
+        NAV_UNIT _stPostOpRawNAV,
+        NAV_UNIT _jtPostOpRawNAV,
+        NAV_UNIT _stDepositPreOpNAV,
+        NAV_UNIT _jtDepositPreOpNAV,
+        NAV_UNIT _stRedeemPreOpNAV,
+        NAV_UNIT _jtRedeemPreOpNAV
+    )
+        external
+        returns (SyncedAccountingState memory state);
 
     /**
      * @notice Applies post-operation (deposit and withdrawal) raw NAV deltas to effective NAV checkpoints and enforces the coverage condition of the market
      * @dev Interprets deltas strictly as deposits/withdrawals with no yield or coverage logic
      * @dev Reverts if the coverage requirement is unsatisfied
-     * @param _stRawNAV The senior tranche's current raw NAV: the pure value of its invested assets
-     * @param _jtRawNAV The junior tranche's current raw NAV: the pure value of its invested assets
+     * @dev Exactly one of the following must be true: ST deposited, JT deposited, or withdrawal occurred
      * @param _op The operation being executed in between the pre and post synchronizations
+     * @param _stPostOpRawNAV The post-op senior tranche's raw NAV
+     * @param _jtPostOpRawNAV The post-op junior tranche's raw NAV
+     * @param _stDepositPreOpNAV The pre-op NAV deposited into the senior tranche (0 if not a ST deposit)
+     * @param _jtDepositPreOpNAV The pre-op NAV deposited into the junior tranche (0 if not a JT deposit)
+     * @param _stRedeemPreOpNAV The pre-op NAV withdrawn from the senior tranche's raw NAV
+     * @param _jtRedeemPreOpNAV The pre-op NAV withdrawn from the junior tranche's raw NAV
      * @return state The synced NAV, impermanent loss, and fee accounting containing all mark to market accounting data
      */
     function postOpSyncTrancheAccountingAndEnforceCoverage(
-        NAV_UNIT _stRawNAV,
-        NAV_UNIT _jtRawNAV,
-        Operation _op
+        Operation _op,
+        NAV_UNIT _stPostOpRawNAV,
+        NAV_UNIT _jtPostOpRawNAV,
+        NAV_UNIT _stDepositPreOpNAV,
+        NAV_UNIT _jtDepositPreOpNAV,
+        NAV_UNIT _stRedeemPreOpNAV,
+        NAV_UNIT _jtRedeemPreOpNAV
     )
         external
         returns (SyncedAccountingState memory state);
@@ -314,6 +349,14 @@ interface IRoycoAccountant {
      * @param _fixedTermDurationSeconds The new fixed term duration for this market in seconds
      */
     function setFixedTermDuration(uint24 _fixedTermDurationSeconds) external;
+
+    /**
+     * @notice Updates the dust tolerance in NAV units to account for miniscule deltas in the underlying protocol's NAV calculations, due to rounding
+     * @dev Can be safely set to 0 if the underlying investments do not exhibit rounding behavior
+     * @dev Only callable by a designated admin
+     * @param _dustTolerance The NAV tolerance for rounding discrepancies
+     */
+    function setDustTolerance(NAV_UNIT _dustTolerance) external;
 
     /**
      * @notice Returns the state of the accountant

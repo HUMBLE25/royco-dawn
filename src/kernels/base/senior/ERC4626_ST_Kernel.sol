@@ -51,16 +51,14 @@ abstract contract ERC4626_ST_Kernel is RoycoKernel {
     }
 
     /// @inheritdoc IRoycoKernel
-    function stPreviewDeposit(TRANCHE_UNIT _assets) external view override returns (SyncedAccountingState memory stateBeforeDeposit, NAV_UNIT valueAllocated) {
-        // Simulate the deposit of the assets into the underlying investment vault
-        uint256 stVaultSharesMinted = IERC4626(ST_VAULT).previewDeposit(toUint256(_assets));
-
-        // Convert the underlying vault shares to tranche units. This value may differ from _assets if a fee or slippage is incurred to the deposit.
-        TRANCHE_UNIT stAssetsAllocated = toTrancheUnits(IERC4626(ST_VAULT).convertToAssets(stVaultSharesMinted));
-
-        // Convert the assets allocated to NAV units and preview a sync to get the current NAV to mint shares at for the senior tranche
-        valueAllocated = stConvertTrancheUnitsToNAVUnits(stAssetsAllocated);
+    function stPreviewDeposit(TRANCHE_UNIT _stAssets)
+        external
+        view
+        override
+        returns (SyncedAccountingState memory stateBeforeDeposit, NAV_UNIT valueAllocated)
+    {
         stateBeforeDeposit = _previewSyncTrancheAccounting();
+        valueAllocated = _stPreviewDepositAllocatedNAV(_stAssets);
     }
 
     /// @inheritdoc IRoycoKernel
@@ -98,7 +96,10 @@ abstract contract ERC4626_ST_Kernel is RoycoKernel {
     }
 
     /// @inheritdoc RoycoKernel
-    function _stDepositAssets(TRANCHE_UNIT _stAssets) internal override(RoycoKernel) {
+    function _stDepositAssets(TRANCHE_UNIT _stAssets) internal override(RoycoKernel) returns (NAV_UNIT stDepositPreOpNAV) {
+        // Account for any fees or slippage involved in depositing
+        stDepositPreOpNAV = _stPreviewDepositAllocatedNAV(_stAssets);
+
         // Deposit the assets into the underlying investment vault and add to the number of ST controlled shares for this vault
         ERC4626KernelState storage $ = ERC4626KernelStorageLib._getERC4626KernelStorage();
         $.stOwnedShares += IERC4626(ST_VAULT).deposit(toUint256(_stAssets), address(this));
@@ -119,5 +120,21 @@ abstract contract ERC4626_ST_Kernel is RoycoKernel {
             $.stOwnedShares -= sharesEquivalentToWithdraw;
             IERC20(address(ST_VAULT)).safeTransfer(_receiver, sharesEquivalentToWithdraw);
         }
+    }
+
+    /**
+     * @notice Helper function to preview the deposit of assets into the underlying investment vault and convert the allocated assets to NAV units
+     * @param _stAssets The amount of assets to deposit, denominated in the senior tranche's tranche units
+     * @return stDepositPreOpNAV The value of the assets deposited, denominated in the kernel's NAV units before the deposit is made
+     */
+    function _stPreviewDepositAllocatedNAV(TRANCHE_UNIT _stAssets) internal view returns (NAV_UNIT) {
+        // Simulate the deposit of the assets into the underlying investment vault
+        uint256 stVaultSharesMinted = IERC4626(ST_VAULT).previewDeposit(toUint256(_stAssets));
+
+        // Convert the underlying vault shares to tranche units. This value may differ from _stAssets if a fee or slippage is incurred to the deposit.
+        TRANCHE_UNIT stAssetsAllocated = toTrancheUnits(IERC4626(ST_VAULT).convertToAssets(stVaultSharesMinted));
+
+        // Convert the assets allocated to NAV units and preview a sync to get the current NAV to mint shares at for the senior tranche
+        return stConvertTrancheUnitsToNAVUnits(stAssetsAllocated);
     }
 }
