@@ -8,8 +8,7 @@ import { IERC20 } from "../../../lib/openzeppelin-contracts/contracts/token/ERC2
 import { Math } from "../../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 
 import { DeployScript } from "../../../script/Deploy.s.sol";
-import { RoycoFactory } from "../../../src/RoycoFactory.sol";
-import { RoycoRoles } from "../../../src/auth/RoycoRoles.sol";
+import { RoycoFactory } from "../../../script/factory/RoycoFactory.sol";
 import { IRoycoAccountant } from "../../../src/interfaces/IRoycoAccountant.sol";
 import { IRoycoKernel } from "../../../src/interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoVaultTranche } from "../../../src/interfaces/tranche/IRoycoVaultTranche.sol";
@@ -515,7 +514,10 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         uint256 maxRedeem = JT.maxRedeem(ALICE_ADDRESS);
         if (maxRedeem < sharesToWithdraw) {
             assertApproxEqAbs(
-                maxRedeem, sharesToWithdraw, toUint256(ACCOUNTANT.getState().dustTolerance) + 1, "Shares to withdraw should be approximately equal to max redeem if max redeem is less than shares to withdraw"
+                maxRedeem,
+                sharesToWithdraw,
+                toUint256(ACCOUNTANT.getState().dustTolerance) + 1,
+                "Shares to withdraw should be approximately equal to max redeem if max redeem is less than shares to withdraw"
             );
             sharesToWithdraw = maxRedeem;
         }

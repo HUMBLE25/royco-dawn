@@ -1143,12 +1143,12 @@ contract RoycoAccountantComprehensiveTest is BaseTest {
         if (jtNav > 0) {
             accountant.postOpSyncTrancheAccounting(
                 Operation.JT_DEPOSIT,
-                _nav(0),      // stPostOpRawNAV
-                _nav(jtNav),  // jtPostOpRawNAV
-                _nav(0),      // stDepositPreOpNAV
-                _nav(jtNav),  // jtDepositPreOpNAV
-                _nav(0),      // stRedeemPreOpNAV
-                _nav(0)       // jtRedeemPreOpNAV
+                _nav(0), // stPostOpRawNAV
+                _nav(jtNav), // jtPostOpRawNAV
+                _nav(0), // stDepositPreOpNAV
+                _nav(jtNav), // jtDepositPreOpNAV
+                _nav(0), // stRedeemPreOpNAV
+                _nav(0) // jtRedeemPreOpNAV
             );
         }
 
@@ -1157,12 +1157,12 @@ contract RoycoAccountantComprehensiveTest is BaseTest {
             accountant.preOpSyncTrancheAccounting(_nav(0), _nav(jtNav));
             accountant.postOpSyncTrancheAccounting(
                 Operation.ST_DEPOSIT,
-                _nav(stNav),  // stPostOpRawNAV
-                _nav(jtNav),  // jtPostOpRawNAV
-                _nav(stNav),  // stDepositPreOpNAV
-                _nav(0),      // jtDepositPreOpNAV
-                _nav(0),      // stRedeemPreOpNAV
-                _nav(0)       // jtRedeemPreOpNAV
+                _nav(stNav), // stPostOpRawNAV
+                _nav(jtNav), // jtPostOpRawNAV
+                _nav(stNav), // stDepositPreOpNAV
+                _nav(0), // jtDepositPreOpNAV
+                _nav(0), // stRedeemPreOpNAV
+                _nav(0) // jtRedeemPreOpNAV
             );
         }
 
@@ -2815,9 +2815,7 @@ contract RoycoAccountantEdgeCaseTest is BaseTest {
         // Should return some positive value
         assertGt(toUint256(totalNAVClaimable), 0, "Max JT withdrawal should be positive");
         // Components should sum correctly (allow 1 wei rounding tolerance due to mulDiv operations)
-        assertApproxEqAbs(
-            toUint256(stClaimable) + toUint256(jtClaimable), toUint256(totalNAVClaimable), 1, "Components should sum to total"
-        );
+        assertApproxEqAbs(toUint256(stClaimable) + toUint256(jtClaimable), toUint256(totalNAVClaimable), 1, "Components should sum to total");
     }
 
     // =========================================================================

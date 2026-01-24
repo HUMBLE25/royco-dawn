@@ -67,8 +67,7 @@ contract PausabilityTestSuite is BaseTest {
         DeployScript.RoleAssignmentConfiguration[] memory roleAssignments = _generateRoleAssignments();
 
         DeployScript.DeploymentParams memory params = DeployScript.DeploymentParams({
-            factoryAdmin: address(DEPLOY_SCRIPT),
-            factoryOwnerAddress: OWNER_ADDRESS,
+            factoryAdmin: OWNER_ADDRESS,
             marketId: marketId,
             seniorTrancheName: "Royco Senior sNUSD",
             seniorTrancheSymbol: "RS-sNUSD",
@@ -92,7 +91,7 @@ contract PausabilityTestSuite is BaseTest {
             roleAssignments: roleAssignments
         });
 
-        return DEPLOY_SCRIPT.deploy(params);
+        return DEPLOY_SCRIPT.deploy(params, DEPLOYER.privateKey);
     }
 
     function _fundProviders() internal {

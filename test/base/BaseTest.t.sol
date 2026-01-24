@@ -7,9 +7,9 @@ import { ERC20Mock } from "../../lib/openzeppelin-contracts/contracts/mocks/toke
 import { ERC1967Proxy } from "../../lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import { DeployScript } from "../../script/Deploy.s.sol";
 import { GrantLPRolesScript } from "../../script/GrantLPRoles.s.sol";
-import { RoycoFactory } from "../../src/RoycoFactory.sol";
+import { RolesConfiguration } from "../../script/config/RolesConfiguration.sol";
+import { RoycoFactory } from "../../script/factory/RoycoFactory.sol";
 import { RoycoAccountant } from "../../src/accountant/RoycoAccountant.sol";
-import { RoycoRoles } from "../../src/auth/RoycoRoles.sol";
 import { IRoycoAccountant } from "../../src/interfaces/IRoycoAccountant.sol";
 import { IYDM } from "../../src/interfaces/IYDM.sol";
 import { IRoycoKernel } from "../../src/interfaces/kernel/IRoycoKernel.sol";
@@ -20,7 +20,7 @@ import { RoycoJuniorTranche } from "../../src/tranches/RoycoJuniorTranche.sol";
 import { RoycoSeniorTranche } from "../../src/tranches/RoycoSeniorTranche.sol";
 import { Assertions } from "./Assertions.t.sol";
 
-abstract contract BaseTest is Test, RoycoRoles, Assertions {
+abstract contract BaseTest is Test, RolesConfiguration, Assertions {
     uint256 internal constant BPS = 0.0001e18;
 
     struct TrancheState {
@@ -68,6 +68,12 @@ abstract contract BaseTest is Test, RoycoRoles, Assertions {
 
     Vm.Wallet internal PROTOCOL_FEE_RECIPIENT;
     address internal PROTOCOL_FEE_RECIPIENT_ADDRESS;
+
+    Vm.Wallet internal DEPLOYER;
+    address internal DEPLOYER_ADDRESS;
+
+    Vm.Wallet internal DEPLOYER_ADMIN;
+    address internal DEPLOYER_ADMIN_ADDRESS;
 
     // Provider wallets (LPs)
     Vm.Wallet internal ALICE;
@@ -220,6 +226,13 @@ abstract contract BaseTest is Test, RoycoRoles, Assertions {
 
         PROTOCOL_FEE_RECIPIENT = _initWallet("PROTOCOL_FEE_RECIPIENT", 1000 ether);
         PROTOCOL_FEE_RECIPIENT_ADDRESS = PROTOCOL_FEE_RECIPIENT.addr;
+
+        // Deployer wallets (for factory deployment)
+        DEPLOYER = _initWallet("DEPLOYER", 1000 ether);
+        DEPLOYER_ADDRESS = DEPLOYER.addr;
+
+        DEPLOYER_ADMIN = _initWallet("DEPLOYER_ADMIN", 1000 ether);
+        DEPLOYER_ADMIN_ADDRESS = DEPLOYER_ADMIN.addr;
 
         // Deploy LP roles script
         LP_ROLES_SCRIPT = new GrantLPRolesScript();
@@ -438,15 +451,19 @@ abstract contract BaseTest is Test, RoycoRoles, Assertions {
     /// @return roleAssignments Array of role assignment configurations
     function _generateRoleAssignments() internal view returns (DeployScript.RoleAssignmentConfiguration[] memory roleAssignments) {
         return DEPLOY_SCRIPT.generateRolesAssignments(
-            PAUSER_ADDRESS,
-            UPGRADER_ADDRESS,
-            SYNC_ROLE_ADDRESS,
-            KERNEL_ADMIN_ADDRESS,
-            ACCOUNTANT_ADMIN_ADDRESS,
-            PROTOCOL_FEE_SETTER_ADDRESS,
-            ORACLE_QUOTER_ADMIN_ADDRESS,
-            LP_ROLE_ADMIN_ADDRESS,
-            ROLE_GUARDIAN_ADDRESS
+            DeployScript.RoleAssignmentAddresses({
+                pauserAddress: PAUSER_ADDRESS,
+                upgraderAddress: UPGRADER_ADDRESS,
+                syncRoleAddress: SYNC_ROLE_ADDRESS,
+                adminKernelAddress: KERNEL_ADMIN_ADDRESS,
+                adminAccountantAddress: ACCOUNTANT_ADMIN_ADDRESS,
+                adminProtocolFeeSetterAddress: PROTOCOL_FEE_SETTER_ADDRESS,
+                adminOracleQuoterAddress: ORACLE_QUOTER_ADMIN_ADDRESS,
+                lpRoleAdminAddress: LP_ROLE_ADMIN_ADDRESS,
+                roleGuardianAddress: ROLE_GUARDIAN_ADDRESS,
+                deployerAddress: DEPLOYER_ADDRESS,
+                deployerAdminAddress: DEPLOYER_ADMIN_ADDRESS
+            })
         );
     }
 

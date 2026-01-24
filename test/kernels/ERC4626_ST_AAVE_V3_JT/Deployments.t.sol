@@ -2,10 +2,9 @@
 pragma solidity ^0.8.28;
 
 import { DeployScript } from "../../../script/Deploy.s.sol";
-import { IRoycoFactory } from "../../../src/RoycoFactory.sol";
 import { RoycoAccountant } from "../../../src/accountant/RoycoAccountant.sol";
-import { RoycoRoles } from "../../../src/auth/RoycoRoles.sol";
 import { IRoycoAuth } from "../../../src/interfaces/IRoycoAuth.sol";
+import { IRoycoFactory } from "../../../src/interfaces/IRoycoFactory.sol";
 import { IPool } from "../../../src/interfaces/external/aave/IPool.sol";
 import { TrancheType } from "../../../src/interfaces/kernel/IRoycoKernel.sol";
 import { ERC4626_ST_AaveV3_JT_InKindAssets_Kernel } from "../../../src/kernels/ERC4626_ST_AaveV3_JT_InKindAssets_Kernel.sol";
@@ -116,7 +115,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.seniorTrancheName = "";
 
         vm.expectRevert(IRoycoFactory.INVALID_NAME.selector);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(DEPLOYER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -125,7 +124,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.seniorTrancheSymbol = "";
 
         vm.expectRevert(IRoycoFactory.INVALID_SYMBOL.selector);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(DEPLOYER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -134,7 +133,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.juniorTrancheName = "";
 
         vm.expectRevert(IRoycoFactory.INVALID_NAME.selector);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(DEPLOYER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -143,7 +142,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.juniorTrancheSymbol = "";
 
         vm.expectRevert(IRoycoFactory.INVALID_SYMBOL.selector);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(DEPLOYER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -152,7 +151,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.marketId = bytes32(0);
 
         vm.expectRevert(IRoycoFactory.INVALID_MARKET_ID.selector);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(DEPLOYER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -161,7 +160,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.kernelImplementation = IRoycoKernel(address(0));
 
         vm.expectRevert(IRoycoFactory.INVALID_KERNEL_IMPLEMENTATION.selector);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(DEPLOYER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -170,7 +169,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.accountantImplementation = IRoycoAccountant(address(0));
 
         vm.expectRevert(IRoycoFactory.INVALID_ACCOUNTANT_IMPLEMENTATION.selector);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(DEPLOYER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -179,7 +178,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.kernelInitializationData = "";
 
         vm.expectRevert(IRoycoFactory.INVALID_KERNEL_INITIALIZATION_DATA.selector);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(DEPLOYER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -188,7 +187,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.accountantInitializationData = "";
 
         vm.expectRevert(IRoycoFactory.INVALID_ACCOUNTANT_INITIALIZATION_DATA.selector);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(DEPLOYER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -197,7 +196,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.seniorTrancheProxyDeploymentSalt = bytes32(0);
 
         vm.expectRevert(IRoycoFactory.INVALID_SENIOR_TRANCHE_PROXY_DEPLOYMENT_SALT.selector);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(DEPLOYER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -206,7 +205,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.juniorTrancheProxyDeploymentSalt = bytes32(0);
 
         vm.expectRevert(IRoycoFactory.INVALID_JUNIOR_TRANCHE_PROXY_DEPLOYMENT_SALT.selector);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(DEPLOYER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -215,7 +214,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.kernelProxyDeploymentSalt = bytes32(0);
 
         vm.expectRevert(IRoycoFactory.INVALID_KERNEL_PROXY_DEPLOYMENT_SALT.selector);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(DEPLOYER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -224,7 +223,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.accountantProxyDeploymentSalt = bytes32(0);
 
         vm.expectRevert(IRoycoFactory.INVALID_ACCOUNTANT_PROXY_DEPLOYMENT_SALT.selector);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(DEPLOYER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -236,7 +235,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.seniorTrancheInitializationData = abi.encodeWithSignature("nonExistentFunction(address)", address(this));
 
         vm.expectRevert(abi.encodeWithSelector(IRoycoFactory.FAILED_TO_INITIALIZE_SENIOR_TRANCHE.selector, ""));
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(DEPLOYER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -248,7 +247,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.juniorTrancheInitializationData = abi.encodeWithSignature("nonExistentFunction(address)", address(this));
 
         vm.expectRevert(abi.encodeWithSelector(IRoycoFactory.FAILED_TO_INITIALIZE_JUNIOR_TRANCHE.selector, ""));
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(DEPLOYER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -260,7 +259,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.accountantInitializationData = abi.encodeWithSignature("nonExistentFunction(address)", address(this));
 
         vm.expectRevert(abi.encodeWithSelector(IRoycoFactory.FAILED_TO_INITIALIZE_ACCOUNTANT.selector, ""));
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(DEPLOYER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -272,7 +271,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.kernelInitializationData = abi.encodeWithSignature("nonExistentFunction(address)", address(this));
 
         vm.expectRevert(abi.encodeWithSelector(IRoycoFactory.FAILED_TO_INITIALIZE_KERNEL.selector, ""));
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(DEPLOYER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -294,7 +293,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         );
 
         vm.expectRevert(IRoycoFactory.INVALID_ACCESS_MANAGER.selector);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(DEPLOYER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -325,7 +324,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         );
 
         vm.expectRevert(IRoycoFactory.INVALID_ACCESS_MANAGER.selector);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(DEPLOYER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -347,7 +346,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         );
 
         vm.expectRevert(IRoycoFactory.INVALID_ACCESS_MANAGER.selector);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(DEPLOYER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -369,7 +368,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         );
 
         vm.expectRevert(IRoycoFactory.INVALID_ACCESS_MANAGER.selector);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(DEPLOYER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -393,7 +392,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
 
         // The deployment should revert due to inconsistent senior tranche kernel wiring
         vm.expectRevert(IRoycoFactory.INVALID_KERNEL_ON_SENIOR_TRANCHE.selector);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(DEPLOYER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -417,7 +416,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
 
         // The deployment should revert due to inconsistent junior tranche kernel wiring
         vm.expectRevert(IRoycoFactory.INVALID_KERNEL_ON_JUNIOR_TRANCHE.selector);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(DEPLOYER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -437,7 +436,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         );
 
         vm.expectRevert(IRoycoFactory.INVALID_ACCOUNTANT_ON_KERNEL.selector);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(DEPLOYER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -466,7 +465,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         );
 
         vm.expectRevert(IRoycoFactory.INVALID_KERNEL_ON_ACCOUNTANT.selector);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(DEPLOYER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -481,7 +480,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
 
         selectors[0] = IRoycoAuth.pause.selector;
         selectors[1] = IRoycoAuth.unpause.selector;
-        rolesArray[0] = RoycoRoles.ADMIN_PAUSER_ROLE;
+        rolesArray[0] = ADMIN_PAUSER_ROLE;
 
         roles[0] = RolesTargetConfiguration({
             target: params.roles[0].target, // Use a valid target
@@ -492,7 +491,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.roles = roles;
 
         vm.expectRevert(IRoycoFactory.ROLES_CONFIGURATION_LENGTH_MISMATCH.selector);
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(DEPLOYER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -506,7 +505,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         uint64[] memory rolesArray = new uint64[](1);
 
         selectors[0] = IRoycoAuth.pause.selector;
-        rolesArray[0] = RoycoRoles.ADMIN_PAUSER_ROLE;
+        rolesArray[0] = ADMIN_PAUSER_ROLE;
 
         roles[0] = RolesTargetConfiguration({
             target: address(0xdead), // Invalid target - not one of the deployed contracts
@@ -517,7 +516,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.roles = roles;
 
         vm.expectRevert(abi.encodeWithSelector(IRoycoFactory.INVALID_TARGET.selector, address(0xdead)));
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(DEPLOYER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 
@@ -531,7 +530,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         uint64[] memory rolesArray = new uint64[](1);
 
         selectors[0] = IRoycoAuth.pause.selector;
-        rolesArray[0] = RoycoRoles.ADMIN_PAUSER_ROLE;
+        rolesArray[0] = ADMIN_PAUSER_ROLE;
 
         address invalidTarget = address(0x1234567890123456789012345678901234567890);
         roles[0] = RolesTargetConfiguration({
@@ -543,7 +542,7 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
         params.roles = roles;
 
         vm.expectRevert(abi.encodeWithSelector(IRoycoFactory.INVALID_TARGET.selector, invalidTarget));
-        vm.prank(OWNER_ADDRESS);
+        vm.prank(DEPLOYER_ADDRESS);
         FACTORY.deployMarket(params);
     }
 

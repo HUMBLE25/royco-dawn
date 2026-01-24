@@ -101,8 +101,7 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
 
         // Build deployment params
         DeployScript.DeploymentParams memory params = DeployScript.DeploymentParams({
-            factoryAdmin: address(DEPLOY_SCRIPT),
-            factoryOwnerAddress: OWNER_ADDRESS,
+            factoryAdmin: OWNER_ADDRESS,
             marketId: marketID,
             seniorTrancheName: SENIOR_TRANCHE_NAME,
             seniorTrancheSymbol: SENIOR_TRANCHE_SYMBOL,
@@ -127,7 +126,7 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
         });
 
         // Deploy using the deployment script
-        return DEPLOY_SCRIPT.deploy(params);
+        return DEPLOY_SCRIPT.deploy(params, DEPLOYER.privateKey);
     }
 
     /// @notice Returns the fork configuration

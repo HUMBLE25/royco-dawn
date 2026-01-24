@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import { IAccessManager } from "../lib/openzeppelin-contracts/contracts/access/manager/IAccessManager.sol";
-import { RoycoRoles } from "../src/auth/RoycoRoles.sol";
+import { RolesConfiguration } from "./config/RolesConfiguration.sol";
 import { Script } from "lib/forge-std/src/Script.sol";
 import { console2 } from "lib/forge-std/src/console2.sol";
 
@@ -12,7 +12,7 @@ import { console2 } from "lib/forge-std/src/console2.sol";
  * @notice Script for granting LP roles to addresses
  * @dev This script reads from environment variables to grant LP roles to a list of addresses
  */
-contract GrantLPRolesScript is Script, RoycoRoles {
+contract GrantLPRolesScript is Script, RolesConfiguration {
     /// @notice Error when no addresses are provided
     error NoAddressesProvided();
 

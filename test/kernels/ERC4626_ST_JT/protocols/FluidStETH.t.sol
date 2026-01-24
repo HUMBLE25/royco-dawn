@@ -182,8 +182,7 @@ contract FluidStETH_Test is ERC4626_TestBase {
         DeployScript.RoleAssignmentConfiguration[] memory roleAssignments = _generateRoleAssignments();
 
         DeployScript.DeploymentParams memory params = DeployScript.DeploymentParams({
-            factoryAdmin: address(DEPLOY_SCRIPT),
-            factoryOwnerAddress: OWNER_ADDRESS,
+            factoryAdmin: OWNER_ADDRESS,
             marketId: marketId,
             seniorTrancheName: string(abi.encodePacked("Royco Senior ", cfg.name)),
             seniorTrancheSymbol: string(abi.encodePacked("RS-", cfg.name)),
@@ -207,7 +206,7 @@ contract FluidStETH_Test is ERC4626_TestBase {
             roleAssignments: roleAssignments
         });
 
-        return DEPLOY_SCRIPT.deploy(params);
+        return DEPLOY_SCRIPT.deploy(params, DEPLOYER.privateKey);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
