@@ -38,7 +38,7 @@ abstract contract RolesConfiguration {
     uint64 public constant DEPLOYER_ROLE_ADMIN_ROLE = uint64(uint256(keccak256(abi.encode("ROYCO_DEPLOYER_ROLE_ADMIN_ROLE"))));
 
     /// Guardian role - can cancel delayed operations for all roles
-    uint64 public constant ROLE_GUARDIAN_ROLE = uint64(uint256(keccak256(abi.encode("ROYCO_ROLE_GUARDIAN_ROLE"))));
+    uint64 public constant GUARDIAN_ROLE = uint64(uint256(keccak256(abi.encode("ROYCO_GUARDIAN_ROLE"))));
 
     /// ================================
     /// ROLE CONSTANTS END
@@ -67,55 +67,54 @@ abstract contract RolesConfiguration {
         if (role == ADMIN_PAUSER_ROLE) {
             return RoleConfig({
                 adminRole: _ADMIN_ROLE,
-                guardianRole: ROLE_GUARDIAN_ROLE,
+                guardianRole: GUARDIAN_ROLE,
                 executionDelay: 0 // Pausing should be immediate
             });
         } else if (role == ADMIN_UPGRADER_ROLE) {
-            return RoleConfig({ adminRole: _ADMIN_ROLE, guardianRole: ROLE_GUARDIAN_ROLE, executionDelay: 1 days });
+            return RoleConfig({ adminRole: _ADMIN_ROLE, guardianRole: GUARDIAN_ROLE, executionDelay: 1 days });
         } else if (role == LP_ROLE) {
             return RoleConfig({
                 adminRole: LP_ROLE_ADMIN_ROLE, // LP admin can manage LP roles
-                guardianRole: ROLE_GUARDIAN_ROLE,
+                guardianRole: GUARDIAN_ROLE,
                 executionDelay: 0 // LP operations should be immediate
             });
         } else if (role == LP_ROLE_ADMIN_ROLE) {
             return RoleConfig({
                 adminRole: _ADMIN_ROLE,
-                guardianRole: ROLE_GUARDIAN_ROLE,
+                guardianRole: GUARDIAN_ROLE,
                 executionDelay: 0 // LP admin operations should be immediate
             });
         } else if (role == SYNC_ROLE) {
             return RoleConfig({
                 adminRole: _ADMIN_ROLE,
-                guardianRole: ROLE_GUARDIAN_ROLE,
+                guardianRole: GUARDIAN_ROLE,
                 executionDelay: 0 // Sync operations should be immediate
             });
         } else if (role == ADMIN_KERNEL_ROLE) {
             return RoleConfig({
                 adminRole: _ADMIN_ROLE,
-                guardianRole: ROLE_GUARDIAN_ROLE,
+                guardianRole: GUARDIAN_ROLE,
                 executionDelay: 1 days // Kernel admin operations require delay
             });
         } else if (role == ADMIN_ACCOUNTANT_ROLE) {
-            return
-                RoleConfig({
-                    adminRole: _ADMIN_ROLE,
-                    guardianRole: ROLE_GUARDIAN_ROLE,
-                    executionDelay: 1 days // Accountant admin operations require delay
-                });
+            return RoleConfig({
+                adminRole: _ADMIN_ROLE,
+                guardianRole: GUARDIAN_ROLE,
+                executionDelay: 1 days // Accountant admin operations require delay
+            });
         } else if (role == ADMIN_PROTOCOL_FEE_SETTER_ROLE) {
             return RoleConfig({
                 adminRole: _ADMIN_ROLE,
-                guardianRole: ROLE_GUARDIAN_ROLE,
+                guardianRole: GUARDIAN_ROLE,
                 executionDelay: 1 days // Fee changes require delay
             });
         } else if (role == ADMIN_ORACLE_QUOTER_ROLE) {
             return RoleConfig({
                 adminRole: _ADMIN_ROLE,
-                guardianRole: ROLE_GUARDIAN_ROLE,
+                guardianRole: GUARDIAN_ROLE,
                 executionDelay: 0 // Oracle updates should be immediate
             });
-        } else if (role == ROLE_GUARDIAN_ROLE) {
+        } else if (role == GUARDIAN_ROLE) {
             return RoleConfig({
                 adminRole: _ADMIN_ROLE,
                 guardianRole: _ADMIN_ROLE, // Only admin can cancel guardian operations
@@ -125,13 +124,13 @@ abstract contract RolesConfiguration {
             return
                 RoleConfig({
                     adminRole: DEPLOYER_ROLE_ADMIN_ROLE,
-                    guardianRole: ROLE_GUARDIAN_ROLE,
+                    guardianRole: GUARDIAN_ROLE,
                     executionDelay: 0 // Deployer operations should be immediate
                 });
         } else if (role == DEPLOYER_ROLE_ADMIN_ROLE) {
             return RoleConfig({
                 adminRole: _ADMIN_ROLE,
-                guardianRole: ROLE_GUARDIAN_ROLE,
+                guardianRole: GUARDIAN_ROLE,
                 executionDelay: 0 // Deployer admin operations should be immediate
             });
         } else {

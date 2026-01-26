@@ -386,7 +386,7 @@ contract DeployScript is Script, Create2DeployUtils, RolesConfiguration {
         RoleConfig memory oracleQuoterConfig = getRoleConfig(ADMIN_ORACLE_QUOTER_ROLE);
         RoleConfig memory lpRoleAdminConfig = getRoleConfig(LP_ROLE_ADMIN_ROLE);
         RoleConfig memory lpRoleConfig = getRoleConfig(LP_ROLE);
-        RoleConfig memory roleGuardianConfig = getRoleConfig(ROLE_GUARDIAN_ROLE);
+        RoleConfig memory roleGuardianConfig = getRoleConfig(GUARDIAN_ROLE);
         RoleConfig memory deployerConfig = getRoleConfig(DEPLOYER_ROLE);
         RoleConfig memory deployerAdminConfig = getRoleConfig(DEPLOYER_ROLE_ADMIN_ROLE);
 
@@ -444,7 +444,7 @@ contract DeployScript is Script, Create2DeployUtils, RolesConfiguration {
         });
 
         roleAssignments[9] = RoleAssignmentConfiguration({
-            role: ROLE_GUARDIAN_ROLE,
+            role: GUARDIAN_ROLE,
             roleAdminRole: roleGuardianConfig.adminRole,
             assignee: _addresses.roleGuardianAddress,
             executionDelay: roleGuardianConfig.executionDelay
