@@ -878,9 +878,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
 
         // Step 3: Mock maxWithdraw to return 0 (simulating illiquidity)
         vm.mockCall(
-            address(MOCK_UNDERLYING_ST_VAULT),
-            abi.encodeWithSelector(MOCK_UNDERLYING_ST_VAULT.maxWithdraw.selector, address(KERNEL)),
-            abi.encode(uint256(0))
+            address(MOCK_UNDERLYING_ST_VAULT), abi.encodeWithSelector(MOCK_UNDERLYING_ST_VAULT.maxWithdraw.selector, address(KERNEL)), abi.encode(uint256(0))
         );
 
         // Step 4: ST redeems - should receive vault shares instead of USDC
@@ -907,20 +905,10 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
             1, // Allow 1 wei tolerance for rounding
             "Depositor should receive vault shares"
         );
-        assertApproxEqAbs(
-            kernelVaultSharesBefore - kernelVaultSharesAfter,
-            expectedSharesTransferred,
-            1,
-            "Kernel should transfer vault shares"
-        );
+        assertApproxEqAbs(kernelVaultSharesBefore - kernelVaultSharesAfter, expectedSharesTransferred, 1, "Kernel should transfer vault shares");
 
         // Verify the redemption value is correct (user gets equivalent value in shares)
-        assertApproxEqAbs(
-            redeemResult.stAssets,
-            stDepositAmount,
-            AAVE_MAX_ABS_TRANCHE_UNIT_DELTA,
-            "Redemption should return correct asset value"
-        );
+        assertApproxEqAbs(redeemResult.stAssets, stDepositAmount, AAVE_MAX_ABS_TRANCHE_UNIT_DELTA, "Redemption should return correct asset value");
     }
 
     /// @notice Tests ST redemption with partial illiquidity
@@ -929,7 +917,9 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         uint256 _jtAssets,
         uint256 _stDepositPercentage,
         uint256 _liquidityPercentage
-    ) external {
+    )
+        external
+    {
         // Bound assets to reasonable range
         _jtAssets = bound(_jtAssets, 10e6, 1_000_000e6); // Between 10 USDC and 1M USDC
         _stDepositPercentage = bound(_stDepositPercentage, 10, 100);
@@ -997,11 +987,6 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         );
 
         // Verify the redemption value is correct
-        assertApproxEqAbs(
-            redeemResult.stAssets,
-            stDepositAmount,
-            AAVE_MAX_ABS_TRANCHE_UNIT_DELTA,
-            "Redemption should return correct asset value"
-        );
+        assertApproxEqAbs(redeemResult.stAssets, stDepositAmount, AAVE_MAX_ABS_TRANCHE_UNIT_DELTA, "Redemption should return correct asset value");
     }
 }
