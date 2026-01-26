@@ -74,8 +74,10 @@ abstract contract ERC4626_JT_Kernel is RoycoKernel {
 
     /// @inheritdoc RoycoKernel
     function _jtMaxWithdrawableGlobally(address) internal view override(RoycoKernel) returns (TRANCHE_UNIT) {
-        // Max withdraw takes global withdrawal limits into account
-        return toTrancheUnits(IERC4626(JT_VAULT).maxWithdraw(address(this)));
+        // If the underlying vault is illiquid, we transfer the owned shares to the receiver
+        // Therefore, the max withdrawable assets is equivalent to the number of shares owned by the kernel
+        ERC4626KernelState storage $ = ERC4626KernelStorageLib._getERC4626KernelStorage();
+        return toTrancheUnits(IERC4626(JT_VAULT).convertToAssets($.jtOwnedShares));
     }
 
     /// @inheritdoc RoycoKernel
