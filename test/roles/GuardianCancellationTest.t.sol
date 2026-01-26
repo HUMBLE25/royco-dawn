@@ -12,7 +12,7 @@ import { BaseTest } from "../base/BaseTest.t.sol";
 import { ERC4626Mock } from "../mock/ERC4626Mock.sol";
 
 /// @title GuardianCancellationTest
-/// @notice Tests that the ROLE_GUARDIAN_ROLE can cancel any and all delayed operations
+/// @notice Tests that the GUARDIAN_ROLE can cancel any and all delayed operations
 /// @dev Tests cover cancellation of operations for ADMIN_KERNEL_ROLE, ADMIN_ACCOUNTANT_ROLE,
 ///      ADMIN_PROTOCOL_FEE_SETTER_ROLE, and ADMIN_UPGRADER_ROLE
 contract GuardianCancellationTest is BaseTest {
