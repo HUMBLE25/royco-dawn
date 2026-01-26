@@ -143,7 +143,7 @@ contract DeployScript is Script, Create2DeployUtils, RolesConfiguration {
         address adminProtocolFeeSetterAddress;
         address adminOracleQuoterAddress;
         address lpRoleAdminAddress;
-        address roleGuardianAddress;
+        address guardianAddress;
         address deployerAddress;
         address deployerAdminAddress;
     }
@@ -446,7 +446,7 @@ contract DeployScript is Script, Create2DeployUtils, RolesConfiguration {
         roleAssignments[9] = RoleAssignmentConfiguration({
             role: GUARDIAN_ROLE,
             roleAdminRole: roleGuardianConfig.adminRole,
-            assignee: _addresses.roleGuardianAddress,
+            assignee: _addresses.guardianAddress,
             executionDelay: roleGuardianConfig.executionDelay
         });
 
@@ -667,57 +667,21 @@ contract DeployScript is Script, Create2DeployUtils, RolesConfiguration {
 
     /// @notice Reads role assignments from environment variables
     function _readRoleAssignmentsFromEnv() internal view returns (RoleAssignmentConfiguration[] memory) {
-        RoleAssignmentConfiguration[] memory roleAssignments = new RoleAssignmentConfiguration[](9);
-        roleAssignments[0] = RoleAssignmentConfiguration({
-            role: ADMIN_PAUSER_ROLE, roleAdminRole: 0, assignee: vm.envAddress("PAUSER_ADDRESS"), executionDelay: uint32(vm.envUint("PAUSER_EXECUTION_DELAY"))
-        });
-        roleAssignments[1] = RoleAssignmentConfiguration({
-            role: ADMIN_UPGRADER_ROLE,
-            roleAdminRole: 0,
-            assignee: vm.envAddress("UPGRADER_ADDRESS"),
-            executionDelay: uint32(vm.envUint("UPGRADER_EXECUTION_DELAY"))
-        });
-        roleAssignments[2] = RoleAssignmentConfiguration({
-            role: SYNC_ROLE, roleAdminRole: 0, assignee: vm.envAddress("SYNC_ROLE_ADDRESS"), executionDelay: uint32(vm.envUint("SYNC_ROLE_EXECUTION_DELAY"))
-        });
-        roleAssignments[3] = RoleAssignmentConfiguration({
-            role: ADMIN_KERNEL_ROLE,
-            roleAdminRole: 0,
-            assignee: vm.envAddress("ADMIN_KERNEL_ROLE_ADDRESS"),
-            executionDelay: uint32(vm.envUint("ADMIN_KERNEL_ROLE_EXECUTION_DELAY"))
-        });
-        roleAssignments[4] = RoleAssignmentConfiguration({
-            role: ADMIN_ORACLE_QUOTER_ROLE,
-            roleAdminRole: 0,
-            assignee: vm.envAddress("ADMIN_ORACLE_QUOTER_ROLE_ADDRESS"),
-            executionDelay: uint32(vm.envUint("ADMIN_ORACLE_QUOTER_ROLE_EXECUTION_DELAY"))
-        });
-        roleAssignments[5] = RoleAssignmentConfiguration({
-            role: ADMIN_ACCOUNTANT_ROLE,
-            roleAdminRole: 0,
-            assignee: vm.envAddress("ADMIN_ACCOUNTANT_ROLE_ADDRESS"),
-            executionDelay: uint32(vm.envUint("ADMIN_ACCOUNTANT_ROLE_EXECUTION_DELAY"))
-        });
-        roleAssignments[6] = RoleAssignmentConfiguration({
-            role: ADMIN_PROTOCOL_FEE_SETTER_ROLE,
-            roleAdminRole: 0,
-            assignee: vm.envAddress("ADMIN_PROTOCOL_FEE_SETTER_ROLE_ADDRESS"),
-            executionDelay: uint32(vm.envUint("ADMIN_PROTOCOL_FEE_SETTER_ROLE_EXECUTION_DELAY"))
-        });
-        roleAssignments[7] = RoleAssignmentConfiguration({
-            role: LP_ROLE_ADMIN_ROLE,
-            roleAdminRole: 0,
-            assignee: vm.envAddress("LP_ROLE_ADMIN_ROLE_ADDRESS"),
-            executionDelay: uint32(vm.envUint("LP_ROLE_ADMIN_ROLE_EXECUTION_DELAY"))
-        });
-        roleAssignments[8] = RoleAssignmentConfiguration({
-            role: LP_ROLE,
-            roleAdminRole: LP_ROLE_ADMIN_ROLE,
-            // LP roles are assigned later
-            assignee: address(0),
-            executionDelay: uint32(vm.envUint("LP_ROLE_EXECUTION_DELAY"))
-        });
-        return roleAssignments;
+        return generateRolesAssignments(
+            RoleAssignmentAddresses({
+                pauserAddress: vm.envAddress("PAUSER_ADDRESS"),
+                upgraderAddress: vm.envAddress("UPGRADER_ADDRESS"),
+                syncRoleAddress: vm.envAddress("SYNC_ROLE_ADDRESS"),
+                adminKernelAddress: vm.envAddress("ADMIN_KERNEL_ROLE_ADDRESS"),
+                adminAccountantAddress: vm.envAddress("ADMIN_ACCOUNTANT_ROLE_ADDRESS"),
+                adminProtocolFeeSetterAddress: vm.envAddress("ADMIN_PROTOCOL_FEE_SETTER_ROLE_ADDRESS"),
+                adminOracleQuoterAddress: vm.envAddress("ADMIN_ORACLE_QUOTER_ROLE_ADDRESS"),
+                lpRoleAdminAddress: vm.envAddress("LP_ROLE_ADMIN_ROLE_ADDRESS"),
+                guardianAddress: vm.envAddress("GUARDIAN_ADDRESS"),
+                deployerAddress: vm.envAddress("DEPLOYER_ADDRESS"),
+                deployerAdminAddress: vm.envAddress("DEPLOYER_ADMIN_ADDRESS")
+            })
+        );
     }
 
     /// @notice Reads YDM-specific parameters from environment variables

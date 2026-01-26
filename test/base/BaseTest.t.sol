@@ -460,7 +460,7 @@ abstract contract BaseTest is Test, RolesConfiguration, Assertions {
                 adminProtocolFeeSetterAddress: PROTOCOL_FEE_SETTER_ADDRESS,
                 adminOracleQuoterAddress: ORACLE_QUOTER_ADMIN_ADDRESS,
                 lpRoleAdminAddress: LP_ROLE_ADMIN_ADDRESS,
-                roleGuardianAddress: ROLE_GUARDIAN_ADDRESS,
+                guardianAddress: ROLE_GUARDIAN_ADDRESS,
                 deployerAddress: DEPLOYER_ADDRESS,
                 deployerAdminAddress: DEPLOYER_ADMIN_ADDRESS
             })
