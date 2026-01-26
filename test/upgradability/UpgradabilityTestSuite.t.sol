@@ -80,7 +80,7 @@ contract UpgradabilityTestSuite is BaseTest {
         bytes32 marketId = keccak256(abi.encodePacked("UpgradabilityTest", vm.getBlockTimestamp()));
 
         DeployScript.YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626SharesAdminOracleQuoterKernelParams memory kernelParams =
-            DeployScript.YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626SharesAdminOracleQuoterKernelParams({ initialConversionRateWAD: RAY });
+            DeployScript.YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626SharesAdminOracleQuoterKernelParams({ initialConversionRateRAY: RAY });
 
         DeployScript.AdaptiveCurveYDMParams memory ydmParams =
             DeployScript.AdaptiveCurveYDMParams({ jtYieldShareAtTargetUtilWAD: 0.3e18, jtYieldShareAtFullUtilWAD: 1e18 });

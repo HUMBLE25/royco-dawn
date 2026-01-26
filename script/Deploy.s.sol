@@ -97,12 +97,12 @@ contract DeployScript is Script, Create2DeployUtils, RolesConfiguration {
     struct YieldBearingERC20STYieldBearingERC20JTIdenticalAssetsChainlinkOracleQuoterKernelParams {
         address trancheAssetToReferenceAssetOracle;
         uint48 stalenessThresholdSeconds;
-        uint256 initialConversionRateWAD;
+        uint256 initialConversionRateRAY;
     }
 
     /// @notice Deployment parameters for YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter_Kernel
     struct YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626SharesAdminOracleQuoterKernelParams {
-        uint256 initialConversionRateWAD;
+        uint256 initialConversionRateRAY;
     }
 
     /// @notice Deployment parameters for StaticCurveYDM
@@ -628,13 +628,13 @@ contract DeployScript is Script, Create2DeployUtils, RolesConfiguration {
                 YieldBearingERC20STYieldBearingERC20JTIdenticalAssetsChainlinkOracleQuoterKernelParams({
                     trancheAssetToReferenceAssetOracle: vm.envAddress("TRANCHE_ASSET_TO_REFERENCE_ASSET_ORACLE_ADDRESS"),
                     stalenessThresholdSeconds: uint48(vm.envUint("STALENESS_THRESHOLD_SECONDS")),
-                    initialConversionRateWAD: vm.envUint("INITIAL_CONVERSION_RATE_WAD")
+                    initialConversionRateRAY: vm.envUint("INITIAL_CONVERSION_RATE_RAY")
                 });
             kernelSpecificParams = abi.encode(kernelParams);
         } else if (kernelType == KernelType.YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter) {
             YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626SharesAdminOracleQuoterKernelParams memory kernelParams =
                 YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626SharesAdminOracleQuoterKernelParams({
-                    initialConversionRateWAD: vm.envUint("INITIAL_CONVERSION_RATE_WAD")
+                    initialConversionRateRAY: vm.envUint("INITIAL_CONVERSION_RATE_RAY")
                 });
             kernelSpecificParams = abi.encode(kernelParams);
         }
@@ -994,7 +994,7 @@ contract DeployScript is Script, Create2DeployUtils, RolesConfiguration {
                     kernelParams,
                     kernelParams2.trancheAssetToReferenceAssetOracle,
                     kernelParams2.stalenessThresholdSeconds,
-                    kernelParams2.initialConversionRateWAD
+                    kernelParams2.initialConversionRateRAY
                 )
             );
         } else if (_kernelType == KernelType.YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter) {
@@ -1002,7 +1002,7 @@ contract DeployScript is Script, Create2DeployUtils, RolesConfiguration {
                 abi.decode(_kernelSpecificParams, (YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626SharesAdminOracleQuoterKernelParams));
             return abi.encodeCall(
                 YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter_Kernel.initialize,
-                (kernelParams, kernelParams2.initialConversionRateWAD)
+                (kernelParams, kernelParams2.initialConversionRateRAY)
             );
         } else {
             revert UnsupportedKernelType(_kernelType);
