@@ -6,6 +6,11 @@ import { WAD, ZERO_NAV_UNITS } from "./Constants.sol";
 import { ActionMetadataFormat, AssetClaims } from "./Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib } from "./Units.sol";
 
+/**
+ * @title UtilsLib
+ * @author Waymont
+ * @notice A library providing utility functions for the Royco protocol
+ */
 library UtilsLib {
     using UnitsMathLib for NAV_UNIT;
     using UnitsMathLib for TRANCHE_UNIT;
