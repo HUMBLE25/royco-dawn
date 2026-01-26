@@ -12,7 +12,7 @@ import { RoycoFactory } from "../../../src/factory/RoycoFactory.sol";
 import { IRoycoAccountant } from "../../../src/interfaces/IRoycoAccountant.sol";
 import { IRoycoKernel } from "../../../src/interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoVaultTranche } from "../../../src/interfaces/tranche/IRoycoVaultTranche.sol";
-import { ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, WAD, ZERO_NAV_UNITS, ZERO_TRANCHE_UNITS } from "../../../src/libraries/Constants.sol";
+import { SENTINEL_REQUEST_ID, WAD, ZERO_NAV_UNITS, ZERO_TRANCHE_UNITS } from "../../../src/libraries/Constants.sol";
 import { AssetClaims, MarketState, TrancheType } from "../../../src/libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib, toNAVUnits, toTrancheUnits, toUint256 } from "../../../src/libraries/Units.sol";
 
@@ -470,7 +470,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         vm.prank(ALICE_ADDRESS);
         (uint256 requestId,) = JT.requestRedeem(maxRedeem, ALICE_ADDRESS, ALICE_ADDRESS);
 
-        assertNotEq(requestId, ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, "Request ID must not be the discriminated ID");
+        assertNotEq(requestId, SENTINEL_REQUEST_ID, "Request ID must not be the discriminated ID");
 
         // Should not be claimable immediately
         assertEq(JT.claimableRedeemRequest(requestId, ALICE_ADDRESS), 0, "Should not be claimable immediately");

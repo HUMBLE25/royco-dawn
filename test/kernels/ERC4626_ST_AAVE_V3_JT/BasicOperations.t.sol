@@ -6,7 +6,7 @@ import { Math } from "../../../lib/openzeppelin-contracts/contracts/utils/math/M
 import { IRoycoAccountant } from "../../../src/interfaces/IRoycoAccountant.sol";
 import { IRoycoKernel } from "../../../src/interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoVaultTranche } from "../../../src/interfaces/tranche/IRoycoVaultTranche.sol";
-import { ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, WAD, ZERO_TRANCHE_UNITS } from "../../../src/libraries/Constants.sol";
+import { SENTINEL_REQUEST_ID, WAD, ZERO_TRANCHE_UNITS } from "../../../src/libraries/Constants.sol";
 import { AssetClaims, TrancheType } from "../../../src/libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, toTrancheUnits, toUint256 } from "../../../src/libraries/Units.sol";
 import { UnitsMathLib } from "../../../src/libraries/Units.sol";
@@ -372,7 +372,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
             uint256 requestId;
             {
                 (requestId,) = JT.requestRedeem(actualSharesToWithdraw, jtDepositor, jtDepositor);
-                assertNotEq(requestId, ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, "Request ID must not be the ERC-7540 controller discriminated request ID");
+                assertNotEq(requestId, SENTINEL_REQUEST_ID, "Request ID must not be the ERC-7540 controller discriminated request ID");
             }
 
             // Verify that the pending redeem request is equal to the shares to withdraw
@@ -472,9 +472,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
             vm.prank(jtDepositor);
             {
                 (requestIds[i],) = JT.requestRedeem(sharesToWithdrawForEachRequest[i], jtDepositor, jtDepositor);
-                assertNotEq(
-                    requestIds[i], ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, "Request ID must not be the ERC-7540 controller discriminated request ID"
-                );
+                assertNotEq(requestIds[i], SENTINEL_REQUEST_ID, "Request ID must not be the ERC-7540 controller discriminated request ID");
             }
 
             // Wait for the redemption delay
@@ -578,7 +576,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         uint256 requestId;
         {
             (requestId,) = JT.requestRedeem(sharesToWithdraw, jtDepositor, jtDepositor);
-            assertNotEq(requestId, ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, "Request ID must not be the ERC-7540 controller discriminated request ID");
+            assertNotEq(requestId, SENTINEL_REQUEST_ID, "Request ID must not be the ERC-7540 controller discriminated request ID");
         }
 
         // Verify that shares were locked (transferred to the tranche contract) since JT uses BURN_ON_CLAIM_REDEEM
@@ -719,7 +717,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         uint256 requestId;
         {
             (requestId,) = JT.requestRedeem(jtMaxRedeemAfterSTRedeem, jtDepositor, jtDepositor);
-            assertNotEq(requestId, ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, "Request ID must not be the ERC-7540 controller discriminated request ID");
+            assertNotEq(requestId, SENTINEL_REQUEST_ID, "Request ID must not be the ERC-7540 controller discriminated request ID");
         }
 
         // Wait for the redemption delay
