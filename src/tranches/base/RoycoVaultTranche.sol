@@ -196,8 +196,8 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         public
         virtual
         override
-        restricted
         whenNotPaused
+        restricted
         onlyCallerOrOperator(_controller)
         returns (uint256 shares, bytes memory metadata)
     {
@@ -255,9 +255,9 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         public
         virtual
         override
+        whenNotPaused
         restricted
         onlyCallerOrOperator(_controller)
-        whenNotPaused
         returns (AssetClaims memory claims, bytes memory metadata)
     {
         require(_receiver != address(0), ERC20InvalidReceiver(address(0)));
@@ -309,10 +309,10 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         external
         virtual
         override(IRoycoAsyncVault)
-        restricted
         whenNotPaused
-        onlyCallerOrOperator(_owner)
+        restricted
         executionIsAsync(Action.DEPOSIT)
+        onlyCallerOrOperator(_owner)
         returns (uint256 requestId, bytes memory metadata)
     {
         address kernel_ = kernel();
@@ -377,8 +377,8 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         external
         virtual
         override(IRoycoAsyncVault)
-        restricted
         whenNotPaused
+        restricted
         executionIsAsync(Action.REDEEM)
         returns (uint256 requestId, bytes memory metadata)
     {
@@ -471,10 +471,10 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         external
         virtual
         override(IRoycoAsyncCancellableVault)
-        restricted
         whenNotPaused
-        onlyCallerOrOperator(_controller)
+        restricted
         executionIsAsync(Action.DEPOSIT)
+        onlyCallerOrOperator(_controller)
     {
         if (TRANCHE_TYPE() == TrancheType.SENIOR) {
             IAsyncSTDepositKernel(kernel()).stCancelDepositRequest(msg.sender, _requestId, _controller);
@@ -532,10 +532,10 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         external
         virtual
         override(IRoycoAsyncCancellableVault)
-        restricted
         whenNotPaused
-        onlyCallerOrOperator(_controller)
+        restricted
         executionIsAsync(Action.DEPOSIT)
+        onlyCallerOrOperator(_controller)
     {
         require(_receiver != address(0), ERC20InvalidReceiver(address(0)));
         // Expect the kernel to transfer the assets to the receiver directly after the cancellation is processed
@@ -555,10 +555,10 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         external
         virtual
         override(IRoycoAsyncCancellableVault)
-        restricted
         whenNotPaused
-        onlyCallerOrOperator(_controller)
+        restricted
         executionIsAsync(Action.REDEEM)
+        onlyCallerOrOperator(_controller)
     {
         // Request the kernel to cancel a previously made redeem request on behalf of the user
         if (TRANCHE_TYPE() == TrancheType.SENIOR) {
@@ -618,10 +618,10 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         external
         virtual
         override(IRoycoAsyncCancellableVault)
-        restricted
         whenNotPaused
-        onlyCallerOrOperator(_owner)
+        restricted
         executionIsAsync(Action.REDEEM)
+        onlyCallerOrOperator(_owner)
     {
         // Get the number of shares in a canceled state for this request ID
         uint256 shares =
