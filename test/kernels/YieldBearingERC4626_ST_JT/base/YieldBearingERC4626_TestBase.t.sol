@@ -290,7 +290,7 @@ abstract contract YieldBearingERC4626_TestBase is AbstractKernelTestSuite {
 
         DeployScript.YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626SharesAdminOracleQuoterKernelParams memory kernelParams =
             DeployScript.YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626SharesAdminOracleQuoterKernelParams({
-                initialConversionRateWAD: initialConversionRate
+                initialConversionRateRAY: initialConversionRate
             });
 
         DeployScript.AdaptiveCurveYDMParams memory ydmParams = DeployScript.AdaptiveCurveYDMParams({

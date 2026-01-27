@@ -40,8 +40,8 @@ contract GrantLPRolesScript is Script, RolesConfiguration {
         }
 
         // Read deployer private key and broadcast
-        uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
-        grantLPRoles(factoryAddress, lpAddresses, deployerPrivateKey);
+        uint256 privateKey = vm.envUint("PRIVATE_KEY");
+        grantLPRoles(factoryAddress, lpAddresses, privateKey);
     }
 
     /**

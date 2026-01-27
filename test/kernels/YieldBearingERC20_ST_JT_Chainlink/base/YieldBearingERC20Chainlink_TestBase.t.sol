@@ -522,7 +522,7 @@ abstract contract YieldBearingERC20Chainlink_TestBase is AbstractKernelTestSuite
             DeployScript.YieldBearingERC20STYieldBearingERC20JTIdenticalAssetsChainlinkOracleQuoterKernelParams({
                 trancheAssetToReferenceAssetOracle: chainlinkOracle,
                 stalenessThresholdSeconds: _getStalenessThreshold(),
-                initialConversionRateWAD: initialConversionRate
+                initialConversionRateRAY: initialConversionRate
             });
 
         DeployScript.AdaptiveCurveYDMParams memory ydmParams = DeployScript.AdaptiveCurveYDMParams({
