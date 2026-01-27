@@ -43,6 +43,9 @@ contract RoycoFactory is AccessManager, RolesConfiguration, IRoycoFactory {
         // Validate the deployment
         _validateDeployment(roycoMarket);
 
+        // Ensure that the accountant can sync the market state
+        _grantRole(SYNC_ROLE, address(roycoMarket.accountant), 0, 0);
+
         // Configure the roles
         _configureRoles(roycoMarket, _params.roles);
 
