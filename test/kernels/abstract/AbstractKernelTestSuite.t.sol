@@ -609,32 +609,6 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         vm.stopPrank();
     }
 
-    function testFuzz_coverage_blocksExcessJTRedeem(uint256 _jtAmount, uint256 _stPercentage) external {
-        // Use /4 to leave room for ST deposit
-        _jtAmount = bound(_jtAmount, _minDepositAmount() * 10, config.initialFunding / 4);
-        _stPercentage = bound(_stPercentage, 50, 95); // High utilization
-
-        uint256 jtShares = _depositJT(ALICE_ADDRESS, _jtAmount);
-
-        TRANCHE_UNIT maxSTDeposit = ST.maxDeposit(BOB_ADDRESS);
-        uint256 stAmount = toUint256(maxSTDeposit) * _stPercentage / 100;
-
-        // Cap to what BOB actually has
-        if (stAmount > config.initialFunding) stAmount = config.initialFunding;
-        if (stAmount < _minDepositAmount()) return;
-
-        _depositST(BOB_ADDRESS, stAmount);
-
-        uint256 maxRedeem = JT.maxRedeem(ALICE_ADDRESS);
-
-        // If maxRedeem < jtShares, trying to redeem all should revert
-        if (maxRedeem < jtShares) {
-            vm.prank(ALICE_ADDRESS);
-            vm.expectRevert(abi.encodeWithSelector(IRoycoVaultTranche.MUST_REQUEST_WITHIN_MAX_REDEEM_AMOUNT.selector));
-            JT.requestRedeem(jtShares, ALICE_ADDRESS, ALICE_ADDRESS);
-        }
-    }
-
     function testFuzz_coverage_STRedeemUnlockJTRedeem(uint256 _jtAmount, uint256 _stPercentage) external {
         // Use /4 to leave room for ST deposit
         _jtAmount = bound(_jtAmount, _minDepositAmount() * 10, config.initialFunding / 4);
@@ -1263,6 +1237,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         TRANCHE_UNIT stMaxDeposit = ST.maxDeposit(BOB_ADDRESS);
         uint256 stAmount = toUint256(stMaxDeposit) * _stPercentage / 100;
         if (stAmount < _minDepositAmount()) return;
+        if (stAmount > config.initialFunding) stAmount = config.initialFunding;
 
         uint256 stShares = _depositST(BOB_ADDRESS, stAmount);
 
@@ -1582,15 +1557,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         assertLt(jtMaxRedeemAfter, jtShares, "JT maxRedeem should be limited");
 
         // ═══════════════════════════════════════════════════════════════════════════
-        // STEP 3: Try to redeem all JT - should fail
-        // ═══════════════════════════════════════════════════════════════════════════
-
-        vm.prank(ALICE_ADDRESS);
-        vm.expectRevert(abi.encodeWithSelector(IRoycoVaultTranche.MUST_REQUEST_WITHIN_MAX_REDEEM_AMOUNT.selector));
-        JT.requestRedeem(jtShares, ALICE_ADDRESS, ALICE_ADDRESS);
-
-        // ═══════════════════════════════════════════════════════════════════════════
-        // STEP 4: Additional JT deposit increases coverage
+        // STEP 3: Additional JT deposit increases coverage
         // ═══════════════════════════════════════════════════════════════════════════
 
         uint256 additionalJTShares = _depositJT(CHARLIE_ADDRESS, _additionalJTAmount);
@@ -1603,7 +1570,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         assertGt(aliceNewMaxRedeem, jtMaxRedeemAfter, "Alice JT maxRedeem should increase");
 
         // ═══════════════════════════════════════════════════════════════════════════
-        // STEP 5: ST redeems - unlocks JT
+        // STEP 4: ST redeems - unlocks JT
         // ═══════════════════════════════════════════════════════════════════════════
 
         vm.prank(BOB_ADDRESS);
@@ -1868,7 +1835,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         // Try to redeem more than owned - should revert
         vm.prank(ALICE_ADDRESS);
-        vm.expectRevert(abi.encodeWithSelector(IRoycoVaultTranche.MUST_REQUEST_WITHIN_MAX_REDEEM_AMOUNT.selector));
+        vm.expectRevert();
         JT.requestRedeem(jtShares + 1, ALICE_ADDRESS, ALICE_ADDRESS);
     }
 
@@ -1892,19 +1859,27 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         uint256 maxRedeemable = JT.maxRedeem(ALICE_ADDRESS);
         assertLt(maxRedeemable, jtShares, "maxRedeem should be less than total shares");
 
-        // Try to redeem more than maxRedeem - should revert
+        // Try to request redeem more than maxRedeem
         vm.prank(ALICE_ADDRESS);
-        vm.expectRevert(abi.encodeWithSelector(IRoycoVaultTranche.MUST_REQUEST_WITHIN_MAX_REDEEM_AMOUNT.selector));
-        JT.requestRedeem(jtShares, ALICE_ADDRESS, ALICE_ADDRESS);
+        (uint256 requestId,) = JT.requestRedeem(jtShares, ALICE_ADDRESS, ALICE_ADDRESS);
+
+        skip(_getJTRedemptionDelay() + 1);
+
+        assertLt(JT.claimableRedeemRequest(requestId, ALICE_ADDRESS), jtShares, "claimable should be less than total shares");
+
+        // Should revert on actual redeem
+        vm.prank(ALICE_ADDRESS);
+        vm.expectRevert();
+        JT.redeem(jtShares, ALICE_ADDRESS, ALICE_ADDRESS);
     }
 
     /// @notice Test that requestRedeem reverts when requesting exactly maxRedeem + 1
-    function testFuzz_redemptionLimit_revertsAtMaxRedeemPlusOne(uint256 _jtAmount, uint256 _stPercentage) external {
+    function testFuzz_redemptionLimit_revertsAtClaimablePlusOne(uint256 _jtAmount, uint256 _stPercentage) external {
         _jtAmount = bound(_jtAmount, _minDepositAmount() * 10, config.initialFunding / 4);
         _stPercentage = bound(_stPercentage, 30, 70);
 
         // Deposit JT
-        _depositJT(ALICE_ADDRESS, _jtAmount);
+        uint256 jtShares = _depositJT(ALICE_ADDRESS, _jtAmount);
 
         // Deposit ST to create coverage constraint
         TRANCHE_UNIT stMaxDeposit = ST.maxDeposit(BOB_ADDRESS);
@@ -1914,38 +1889,17 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         _depositST(BOB_ADDRESS, stAmount);
 
-        uint256 maxRedeemable = JT.maxRedeem(ALICE_ADDRESS);
-        if (maxRedeemable == 0) return;
-
-        // Try to redeem maxRedeem + 1 - should revert
+        // Try to redeem more than maxRedeem - should revert
         vm.prank(ALICE_ADDRESS);
-        vm.expectRevert(abi.encodeWithSelector(IRoycoVaultTranche.MUST_REQUEST_WITHIN_MAX_REDEEM_AMOUNT.selector));
-        JT.requestRedeem(maxRedeemable + 1, ALICE_ADDRESS, ALICE_ADDRESS);
-    }
+        (uint256 requestId,) = JT.requestRedeem(jtShares, ALICE_ADDRESS, ALICE_ADDRESS);
 
-    /// @notice Test that requestRedeem reverts when maxRedeem becomes 0 due to full coverage utilization
-    function testFuzz_redemptionLimit_revertsWhenMaxRedeemIsZero(uint256 _jtAmount) external {
-        _jtAmount = bound(_jtAmount, _minDepositAmount() * 10, config.initialFunding / 4);
+        skip(_getJTRedemptionDelay() + 1);
 
-        // Deposit JT
-        uint256 jtShares = _depositJT(ALICE_ADDRESS, _jtAmount);
+        uint256 claimableShares = JT.claimableRedeemRequest(requestId, ALICE_ADDRESS);
 
-        // Deposit ST to max capacity to fully utilize coverage
-        TRANCHE_UNIT stMaxDeposit = ST.maxDeposit(BOB_ADDRESS);
-        uint256 stAmount = toUint256(stMaxDeposit);
-        if (stAmount > config.initialFunding) stAmount = config.initialFunding;
-        if (stAmount < _minDepositAmount()) return;
-
-        _depositST(BOB_ADDRESS, stAmount);
-
-        uint256 maxRedeemable = JT.maxRedeem(ALICE_ADDRESS);
-
-        // If maxRedeem is 0, any request should revert
-        if (maxRedeemable == 0) {
-            vm.prank(ALICE_ADDRESS);
-            vm.expectRevert(abi.encodeWithSelector(IRoycoVaultTranche.MUST_REQUEST_WITHIN_MAX_REDEEM_AMOUNT.selector));
-            JT.requestRedeem(1, ALICE_ADDRESS, ALICE_ADDRESS);
-        }
+        vm.prank(ALICE_ADDRESS);
+        vm.expectRevert();
+        JT.redeem(claimableShares + 1, ALICE_ADDRESS, ALICE_ADDRESS);
     }
 
     /// @notice Test that requestRedeem reverts after loss tightens coverage
@@ -1979,32 +1933,15 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         // If the old maxRedeem is now above the new limit, it should revert
         if (maxRedeemBeforeLoss > maxRedeemAfterLoss && maxRedeemAfterLoss < jtShares) {
+            // Try to redeem more than maxRedeem - should revert
             vm.prank(ALICE_ADDRESS);
-            vm.expectRevert(abi.encodeWithSelector(IRoycoVaultTranche.MUST_REQUEST_WITHIN_MAX_REDEEM_AMOUNT.selector));
-            JT.requestRedeem(maxRedeemBeforeLoss, ALICE_ADDRESS, ALICE_ADDRESS);
-        }
-    }
+            (uint256 requestId,) = JT.requestRedeem(maxRedeemBeforeLoss, ALICE_ADDRESS, ALICE_ADDRESS);
 
-    /// @notice Test that second requestRedeem reverts if first request reduced available shares
-    function testFuzz_redemptionLimit_revertsOnSecondRequestExceedingRemaining(uint256 _jtAmount) external {
-        _jtAmount = bound(_jtAmount, _minDepositAmount() * 10, config.initialFunding / 4);
+            skip(_getJTRedemptionDelay() + 1);
 
-        // Deposit JT
-        uint256 jtShares = _depositJT(ALICE_ADDRESS, _jtAmount);
-
-        // First request: redeem half
-        uint256 firstRequest = jtShares / 2;
-        vm.prank(ALICE_ADDRESS);
-        JT.requestRedeem(firstRequest, ALICE_ADDRESS, ALICE_ADDRESS);
-
-        // After first request, maxRedeem should reflect remaining shares
-        uint256 remainingMaxRedeem = JT.maxRedeem(ALICE_ADDRESS);
-
-        // Second request for more than remaining should revert
-        if (remainingMaxRedeem < jtShares - firstRequest) {
             vm.prank(ALICE_ADDRESS);
-            vm.expectRevert(abi.encodeWithSelector(IRoycoVaultTranche.MUST_REQUEST_WITHIN_MAX_REDEEM_AMOUNT.selector));
-            JT.requestRedeem(jtShares - firstRequest, ALICE_ADDRESS, ALICE_ADDRESS);
+            vm.expectRevert();
+            JT.redeem(maxRedeemBeforeLoss, ALICE_ADDRESS, ALICE_ADDRESS);
         }
     }
 

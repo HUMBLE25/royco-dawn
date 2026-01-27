@@ -387,9 +387,6 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         // Must be requesting to redeem a non-zero number of shares
         require(_shares != 0, MUST_REQUEST_NON_ZERO_SHARES());
 
-        // Must be requesting to redeem a number of shares that is less than or equal to the maximum amount of shares that can be redeemed
-        require(_shares <= maxRedeem(_owner), MUST_REQUEST_WITHIN_MAX_REDEEM_AMOUNT());
-
         // Spend the caller's share allowance if the caller isn't the owner or an approved operator
         if (!_isCallerOrOperator(_owner)) {
             _spendAllowance(_owner, msg.sender, _shares);

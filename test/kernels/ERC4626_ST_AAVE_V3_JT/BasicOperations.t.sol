@@ -675,21 +675,6 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         _updateOnDeposit(stState, stDepositAmount, _toSTValue(stDepositAmount), stShares, TrancheType.SENIOR);
         _verifyPreviewNAVs(stState, jtState, AAVE_MAX_ABS_TRANCHE_UNIT_DELTA, AAVE_MAX_ABS_NAV_DELTA);
 
-        // Verify JT cannot exit now (coverage requirement blocks it)
-        {
-            uint256 jtMaxRedeemAfterSTDeposit = JT.maxRedeem(jtDepositor);
-            assertLt(jtMaxRedeemAfterSTDeposit, jtShares, "JT must not be able to redeem all shares after ST deposit");
-
-            uint256 snapshot = vm.snapshotState();
-
-            vm.startPrank(jtDepositor);
-            vm.expectRevert(abi.encodeWithSelector(IRoycoVaultTranche.MUST_REQUEST_WITHIN_MAX_REDEEM_AMOUNT.selector));
-            JT.requestRedeem(jtShares, jtDepositor, jtDepositor);
-            vm.stopPrank();
-
-            vm.revertToState(snapshot);
-        }
-
         // Step 3: ST redeems synchronously (immediately withdraws)
         uint256 stDepositorBalanceBeforeRedeem = USDC.balanceOf(stDepositor);
         vm.startPrank(stDepositor);
