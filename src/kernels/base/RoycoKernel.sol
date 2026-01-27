@@ -288,14 +288,6 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase, ReentrancyGuardTransie
         }
     }
 
-    /// @inheritdoc IRoycoKernel
-    function currentMarketUtilization() external view override(IRoycoKernel) returns (uint256 utilization) {
-        SyncedAccountingState memory state = _previewSyncTrancheAccounting();
-        IRoycoAccountant.RoycoAccountantState memory accountantState = _accountant().getState();
-
-        utilization = UtilsLib.computeUtilization(state.stRawNAV, state.jtRawNAV, accountantState.betaWAD, accountantState.coverageWAD, state.jtEffectiveNAV);
-    }
-
     // =============================
     // Senior Tranche Deposit and Redeem Functions
     // =============================

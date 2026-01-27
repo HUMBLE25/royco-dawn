@@ -3435,10 +3435,11 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
     // ============================================
 
     /// @notice Test currentMarketUtilization returns correct value for empty market
-    function test_currentMarketUtilization_emptyMarket() public view {
-        uint256 utilization = KERNEL.currentMarketUtilization();
+    function test_currentMarketUtilization_emptyMarket() public {
+        vm.prank(SYNC_ROLE_ADDRESS);
+        uint256 utilizationWAD = KERNEL.syncTrancheAccounting().utilizationWAD;
         // Empty market should have 0 utilization
-        assertEq(utilization, 0, "Empty market should have 0 utilization");
+        assertEq(utilizationWAD, 0, "Empty market should have 0 utilization");
     }
 
     /// @notice Test currentMarketUtilization after deposits
@@ -3450,12 +3451,13 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         _depositST(200_000e6, BOB_ADDRESS);
 
         // Get utilization
-        uint256 utilization = KERNEL.currentMarketUtilization();
+        vm.prank(SYNC_ROLE_ADDRESS);
+        uint256 utilizationWAD = KERNEL.syncTrancheAccounting().utilizationWAD;
 
         // Utilization = ((ST_RAW + JT_RAW * beta) * coverage) / JT_EFFECTIVE
         // Should be > 0 when there's capital
-        assertGt(utilization, 0, "Utilization should be > 0 after deposits");
-        assertLt(utilization, WAD, "Utilization should be < 100% for healthy market");
+        assertGt(utilizationWAD, 0, "Utilization should be > 0 after deposits");
+        assertLt(utilizationWAD, WAD, "Utilization should be < 100% for healthy market");
     }
 
     /// @notice Test currentMarketUtilization at high utilization
@@ -3471,9 +3473,10 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
             ST.deposit(maxStDeposit, BOB_ADDRESS, BOB_ADDRESS);
             vm.stopPrank();
 
-            uint256 utilization = KERNEL.currentMarketUtilization();
+            vm.prank(SYNC_ROLE_ADDRESS);
+            uint256 utilizationWAD = KERNEL.syncTrancheAccounting().utilizationWAD;
             // Should be close to WAD (100%) when at max ST deposit
-            assertGe(utilization, WAD * 9 / 10, "Utilization should be >= 90% at max ST deposit");
+            assertGe(utilizationWAD, WAD * 9 / 10, "Utilization should be >= 90% at max ST deposit");
         }
     }
 
@@ -3799,22 +3802,26 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
     /// @notice Test utilization computation at boundary conditions
     function test_utilizationBoundaries() public {
         // Empty market - no utilization
-        uint256 emptyUtil = KERNEL.currentMarketUtilization();
+        vm.prank(SYNC_ROLE_ADDRESS);
+        uint256 emptyUtil = KERNEL.syncTrancheAccounting().utilizationWAD;
         assertEq(emptyUtil, 0, "Empty market should have 0 utilization");
 
         // JT only - no ST means no utilization
         _depositJT(1_000_000e6, ALICE_ADDRESS);
-        uint256 jtOnlyUtil = KERNEL.currentMarketUtilization();
+        vm.prank(SYNC_ROLE_ADDRESS);
+        uint256 jtOnlyUtil = KERNEL.syncTrancheAccounting().utilizationWAD;
         assertEq(jtOnlyUtil, 0, "JT-only market should have 0 utilization");
 
         // Add ST - utilization should increase
         _depositST(100_000e6, BOB_ADDRESS);
-        uint256 withSTUtil = KERNEL.currentMarketUtilization();
+        vm.prank(SYNC_ROLE_ADDRESS);
+        uint256 withSTUtil = KERNEL.syncTrancheAccounting().utilizationWAD;
         assertGt(withSTUtil, 0, "Market with ST should have positive utilization");
 
         // Add more ST - utilization should increase more
         _depositST(400_000e6, BOB_ADDRESS);
-        uint256 moreSTUtil = KERNEL.currentMarketUtilization();
+        vm.prank(SYNC_ROLE_ADDRESS);
+        uint256 moreSTUtil = KERNEL.syncTrancheAccounting().utilizationWAD;
         assertGt(moreSTUtil, withSTUtil, "More ST should increase utilization");
     }
 
@@ -4345,16 +4352,17 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         _depositST(200_000e6, BOB_ADDRESS);
 
         // Utilization = (stRawNAV + jtRawNAV * beta) * coverage / jtEffectiveNAV
-        uint256 utilization = KERNEL.currentMarketUtilization();
+        vm.prank(SYNC_ROLE_ADDRESS);
+        uint256 utilizationWAD = KERNEL.syncTrancheAccounting().utilizationWAD;
 
         NAV_UNIT stRawNAV = ST.getRawNAV();
         NAV_UNIT jtRawNAV = JT.getRawNAV();
         NAV_UNIT jtEffNAV = JT.totalAssets().nav;
 
         uint256 numerator = (toUint256(stRawNAV) + toUint256(jtRawNAV) * BETA_WAD / WAD) * COVERAGE_WAD;
-        uint256 expectedUtilization = numerator / toUint256(jtEffNAV);
+        uint256 expectedUtilizationWAD = numerator / toUint256(jtEffNAV);
 
-        assertApproxEqRel(utilization, expectedUtilization, 1e15, "Utilization should match formula");
+        assertApproxEqRel(utilizationWAD, expectedUtilizationWAD, 1e15, "Utilization should match formula");
     }
 
     // ============================================
