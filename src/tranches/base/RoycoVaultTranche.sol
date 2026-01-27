@@ -178,7 +178,9 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
                 ? IRoycoKernel(kernel()).stConvertTrancheUnitsToNAVUnits(_assets)
                 : IRoycoKernel(kernel()).jtConvertTrancheUnitsToNAVUnits(_assets));
         (AssetClaims memory trancheClaims, uint256 trancheTotalShares) = _previewPostSyncTrancheState();
-        shares = _convertToShares(navAssets, trancheTotalShares, trancheClaims.nav, Math.Rounding.Floor);
+        // trancheTotalShares includes virtual shares, while _convertToShares expects the total supply without virtual shares
+        // Subtract the virtual shares from the total supply to get the total supply without virtual shares
+        shares = _convertToShares(navAssets, _withoutVirtualShares(trancheTotalShares), trancheClaims.nav, Math.Rounding.Floor);
     }
 
     /// @inheritdoc IRoycoAsyncVault
@@ -798,6 +800,11 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
     /// @dev Returns the specified share quantity added to the tranche's virtual shares
     function _withVirtualShares(uint256 _shares) internal view returns (uint256) {
         return _shares + 10 ** _decimalsOffset();
+    }
+
+    /// @dev Returns the specified share quantity subtracted from the tranche's virtual shares
+    function _withoutVirtualShares(uint256 _shares) internal view returns (uint256) {
+        return _shares - 10 ** _decimalsOffset();
     }
 
     /// @dev Returns the specified NAV added to the tranche's virtual NAV (1)
