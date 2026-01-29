@@ -101,9 +101,9 @@ abstract contract YieldBearingERC4626_TestBase is AbstractKernelTestSuite {
     }
 
     /// @notice Returns max NAV delta for comparisons
+    /// @dev Converts the tranche unit tolerance to NAV using the kernel's conversion
     function maxNAVDelta() public view virtual override returns (NAV_UNIT) {
-        // Default: 1e12 tolerance
-        return toNAVUnits(uint256(1e12));
+        return _toSTValue(maxTrancheUnitDelta());
     }
 
     // ═══════════════════════════════════════════════════════════════════════════

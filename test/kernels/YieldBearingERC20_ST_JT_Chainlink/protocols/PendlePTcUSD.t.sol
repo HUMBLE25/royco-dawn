@@ -82,9 +82,9 @@ contract PendlePTcUSD_Test is YieldBearingERC20Chainlink_TestBase {
     }
 
     /// @notice Returns max NAV delta for PT-cUSD
-    /// @dev Higher tolerance due to chainlink oracle rounding
-    function maxNAVDelta() public pure override returns (NAV_UNIT) {
-        return toNAVUnits(uint256(1e8));
+    /// @dev Converts the tranche unit tolerance to NAV using the kernel's conversion
+    function maxNAVDelta() public view override returns (NAV_UNIT) {
+        return _toSTValue(maxTrancheUnitDelta());
     }
 
     // ═══════════════════════════════════════════════════════════════════════════

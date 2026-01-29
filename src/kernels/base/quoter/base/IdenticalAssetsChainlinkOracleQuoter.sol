@@ -3,13 +3,12 @@ pragma solidity ^0.8.28;
 
 import { Math } from "../../../../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 import { AggregatorV3Interface } from "../../../../interfaces/external/chainlink/AggregatorV3Interface.sol";
-import { RAY } from "../../../../libraries/Constants.sol";
 import { IdenticalAssetsOracleQuoter } from "./IdenticalAssetsOracleQuoter.sol";
 
 /**
  * @title IdenticalAssetsChainlinkOracleQuoter
  * @notice Quoter to convert tranche units to/from NAV units using a Chainlink (compatible) oracle to convert tranche units to reference assets which uses an admin or oracle set rate to convert to NAV units
- * @dev Use case: Convert PT-USDE (Tranche unit) to USDE (Reference asset) using a Pendle oracle and convert USDE to USD (NAV unit) using an admin or oracle set rate
+ * @dev Use case: Convert PT-USDE (Tranche unit) to USDE (Reference asset) using a Chainlink (compatible) oracle and convert USDE to USD (NAV unit) using an admin or oracle set rate
  */
 abstract contract IdenticalAssetsChainlinkOracleQuoter is IdenticalAssetsOracleQuoter {
     using Math for uint256;
@@ -82,10 +81,9 @@ abstract contract IdenticalAssetsChainlinkOracleQuoter is IdenticalAssetsOracleQ
     /**
      * @notice Returns the conversion rate from tranche units to NAV units, scaled to RAY precision
      * @dev The conversion rate is calculated as Tranche Asset Price in Reference Asset * Reference Asset Price in NAV units
-     *      NAV units = Tranche Asset Price in Reference Asset * Reference Asset Price in NAV units
      * @return trancheToNAVUnitConversionRateRAY The conversion rate from tranche token units to NAV units, scaled to RAY precision
      */
-    function getTrancheUnitToNAVUnitConversionRate()
+    function getTrancheUnitToNAVUnitConversionRateRAY()
         public
         view
         virtual
@@ -97,16 +95,12 @@ abstract contract IdenticalAssetsChainlinkOracleQuoter is IdenticalAssetsOracleQ
         (uint256 trancheAssetPriceInReferenceAsset, uint256 precision) =
             _queryChainlinkOracle($.trancheAssetToReferenceAssetOracle, $.stalenessThresholdSeconds, $.trancheAssetToReferenceAssetOracleDecimalPrecision);
 
-        // Resolve the Reference Asset to NAV unit conversion rate
+        // Resolve the reference asset to NAV unit conversion rate, scaled to RAY precision
         uint256 referenceAssetToNAVUnitConversionRateRAY = getStoredConversionRateRAY();
-        if (referenceAssetToNAVUnitConversionRateRAY == SENTINEL_CONVERSION_RATE) {
-            // If the stored conversion rate is the sentinel value, query the oracle for the rate
-            // This is expected to return a RAY precision value
-            referenceAssetToNAVUnitConversionRateRAY = _getConversionRateFromOracle();
-        }
+        // If the stored conversion rate is the sentinel value, the cache hasn't been warmed, so query the oracle for the rate
+        if (referenceAssetToNAVUnitConversionRateRAY == SENTINEL_CONVERSION_RATE) referenceAssetToNAVUnitConversionRateRAY = _getConversionRateFromOracleRAY();
 
-        // Calculate the conversion rate from tranche token units to NAV units, scaled to RAY precision
-        // referenceAssetToNAVUnitConversionRateRAY is already scaled to RAY precision
+        // Calculate the conversion rate from tranche to NAV units, scaled to RAY precision
         trancheToNAVUnitConversionRateRAY = trancheAssetPriceInReferenceAsset.mulDiv(referenceAssetToNAVUnitConversionRateRAY, precision, Math.Rounding.Floor);
     }
 

@@ -157,8 +157,9 @@ contract FluidStETH_Test is ERC4626_TestBase {
         return toTrancheUnits(uint256(1e15));
     }
 
-    function maxNAVDelta() public pure override returns (NAV_UNIT) {
-        return toNAVUnits(uint256(1e15));
+    /// @dev Converts the tranche unit tolerance to NAV using the kernel's conversion
+    function maxNAVDelta() public view override returns (NAV_UNIT) {
+        return _toSTValue(maxTrancheUnitDelta());
     }
 
     // ═══════════════════════════════════════════════════════════════════════════

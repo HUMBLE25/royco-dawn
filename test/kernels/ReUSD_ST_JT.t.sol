@@ -98,8 +98,9 @@ contract reUSD_Test is AbstractKernelTestSuite {
     }
 
     /// @notice Returns max NAV delta for reUSD
-    function maxNAVDelta() public pure override returns (NAV_UNIT) {
-        return toNAVUnits(uint256(1e12));
+    /// @dev Converts the tranche unit tolerance to NAV using the kernel's conversion
+    function maxNAVDelta() public view override returns (NAV_UNIT) {
+        return _toSTValue(maxTrancheUnitDelta());
     }
 
     /// @notice Returns the JT redemption delay
@@ -116,7 +117,7 @@ contract reUSD_Test is AbstractKernelTestSuite {
         if (mockedICLConversionRate != 0) {
             return mockedICLConversionRate;
         }
-        return IdenticalAssetsOracleQuoter(address(KERNEL)).getTrancheUnitToNAVUnitConversionRate();
+        return IdenticalAssetsOracleQuoter(address(KERNEL)).getTrancheUnitToNAVUnitConversionRateRAY();
     }
 
     /// @notice Mocks the convertFromShares function on the ICL
@@ -167,7 +168,7 @@ contract reUSD_Test is AbstractKernelTestSuite {
         assertEq(storedRate, 0, "Stored rate should be 0 (sentinel, queries ICL)");
 
         // The actual conversion rate should be fetched from ICL
-        uint256 conversionRate = ReUSD_ST_ReUSD_JT_Kernel(address(KERNEL)).getTrancheUnitToNAVUnitConversionRate();
+        uint256 conversionRate = ReUSD_ST_ReUSD_JT_Kernel(address(KERNEL)).getTrancheUnitToNAVUnitConversionRateRAY();
         assertGt(conversionRate, 0, "Conversion rate should be positive");
     }
 

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import { IERC4626 } from "../../../../../lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
+import { IERC20Metadata, IERC4626 } from "../../../../../lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 import { Math } from "../../../../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
-import { RAY } from "../../../../libraries/Constants.sol";
+import { RAY, RAY_DECIMALS } from "../../../../libraries/Constants.sol";
 import { IdenticalAssetsOracleQuoter } from "./IdenticalAssetsOracleQuoter.sol";
 
 /**
@@ -15,31 +15,42 @@ import { IdenticalAssetsOracleQuoter } from "./IdenticalAssetsOracleQuoter.sol";
 abstract contract IdenticalERC4626SharesOracleQuoter is IdenticalAssetsOracleQuoter {
     using Math for uint256;
 
+    /// @dev The share amount to pass to convertToAssets() such that the result is scaled to RAY precision
+    uint256 internal immutable SHARES_TO_CONVERT_TO_ASSETS;
+
+    constructor() {
+        // NOTE: Both tranche assets are identical ERC4626 shares
+        // Compute the share amount to pass to convertToAssets() such that the result is scaled to RAY precision
+        // OUTPUT_DECIMALS = INPUT_DECIMALS + BASE_ASSET_DECIMALS - TRANCHE_DECIMALS
+        // For OUTPUT_DECIMALS to have RAY_DECIMALS of precision:
+        // INPUT_DECIMALS = RAY_DECIMALS + TRANCHE_DECIMALS - BASE_ASSET_DECIMALS
+        // OUTPUT_DECIMALS = (RAY_DECIMALS + TRANCHE_DECIMALS - BASE_ASSET_DECIMALS) + BASE_ASSET_DECIMALS - TRANCHE_DECIMALS
+        // OUTPUT_DECIMALS = RAY_DECIMALS
+        SHARES_TO_CONVERT_TO_ASSETS = 10 ** (RAY_DECIMALS + IERC4626(ST_ASSET).decimals() - IERC20Metadata(IERC4626(ST_ASSET).asset()).decimals());
+    }
+
     /**
      * @notice Returns the conversion rate from tranche units to NAV units, scaled to RAY precision
      * @dev This function assumes that the tranche token is an ERC4626 compliant vault
-     * @dev The conversion rate is calculated as value_of_vault_share_in_vault_asset * value_of_vault_asset_in_NAV_units, scaled to RAY precision
+     * @dev The conversion rate is calculated as the value of tranche asset in base asset * value of base asset in NAV units
      * @return trancheToNAVUnitConversionRateRAY The conversion rate from tranche token units to NAV units, scaled to RAY precision
      */
-    function getTrancheUnitToNAVUnitConversionRate()
+    function getTrancheUnitToNAVUnitConversionRateRAY()
         public
         view
         virtual
         override(IdenticalAssetsOracleQuoter)
         returns (uint256 trancheToNAVUnitConversionRateRAY)
     {
-        // Fetch the conversion rate from the vault asset (ERC4626) to it's underlying asset, scaled to RAY precision
-        uint256 trancheUnitToVaultAssetsConversionRateRAY = IERC4626(ST_ASSET).convertToAssets(RAY);
+        // Fetch the conversion rate from the tranche asset (ERC4626 share) to its underlying asset, scaled to RAY precision
+        uint256 trancheUnitToBaseAssetsConversionRateRAY = IERC4626(ST_ASSET).convertToAssets(SHARES_TO_CONVERT_TO_ASSETS);
 
-        // Resolve the vaultAsset to NAV unit conversion rate
-        uint256 vaultAssetToNAVUnitConversionRateRAY = getStoredConversionRateRAY();
-        if (vaultAssetToNAVUnitConversionRateRAY == SENTINEL_CONVERSION_RATE) {
-            // If the stored conversion rate is the sentinel value, query the oracle for the rate
-            // This is expected to return a RAY precision value
-            vaultAssetToNAVUnitConversionRateRAY = _getConversionRateFromOracle();
-        }
+        // Resolve the vault base asset to NAV unit conversion rate, scaled to RAY precision
+        uint256 baseAssetToNAVUnitConversionRateRAY = getStoredConversionRateRAY();
+        // If the stored conversion rate is the sentinel value, the cache hasn't been warmed, so query the oracle for the rate
+        if (baseAssetToNAVUnitConversionRateRAY == SENTINEL_CONVERSION_RATE) baseAssetToNAVUnitConversionRateRAY = _getConversionRateFromOracleRAY();
 
-        // Calculate the conversion rate from tranche token units to NAV units, scaled to RAY precision
-        trancheToNAVUnitConversionRateRAY = trancheUnitToVaultAssetsConversionRateRAY.mulDiv(vaultAssetToNAVUnitConversionRateRAY, RAY, Math.Rounding.Floor);
+        // Calculate the conversion rate from tranche to NAV units, scaled to RAY precision
+        trancheToNAVUnitConversionRateRAY = trancheUnitToBaseAssetsConversionRateRAY.mulDiv(baseAssetToNAVUnitConversionRateRAY, RAY, Math.Rounding.Floor);
     }
 }

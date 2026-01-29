@@ -37,7 +37,7 @@ abstract contract IdenticalAssetsAdminOracleQuoter is IdenticalAssetsOracleQuote
     }
 
     /// @inheritdoc IdenticalAssetsOracleQuoter
-    function _getConversionRateFromOracle() internal pure override(IdenticalAssetsOracleQuoter) returns (uint256) {
+    function _getConversionRateFromOracleRAY() internal pure override(IdenticalAssetsOracleQuoter) returns (uint256) {
         revert MUST_USE_ADMIN_ORACLE_INPUT();
     }
 }
