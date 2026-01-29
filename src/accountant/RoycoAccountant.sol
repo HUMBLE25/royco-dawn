@@ -811,7 +811,8 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
          * Ensure that the LLTV is set correctly (between the max allowed initial LTV and 100%)
          * Maximum Initial LTV Derivation:
          * Given:
-         *   LTV = ST_EFFECTIVE_NAV / (ST_EFFECTIVE_NAV + JT_EFFECTIVE_NAV)
+         *   LTV = ST_EFFECTIVE_NAV + ST_IMPERMANENT_LOSS / (ST_EFFECTIVE_NAV + JT_EFFECTIVE_NAV)
+         *   Note: ST_IMPERMANENT_LOSS == 0 initially since no losses have been incurred by ST
          *   Initial Utilization = ((ST_EFFECTIVE_NAV + JT_RAW_NAV * β) * COV) / JT_EFFECTIVE_NAV
          *   Note: JT_RAW_NAV == JT_EFFECTIVE_NAV initially since no losses have been incurred by ST
          *   Initial Utilization = ((ST_EFFECTIVE_NAV + JT_EFFECTIVE_NAV * β) * COV) / JT_EFFECTIVE_NAV
