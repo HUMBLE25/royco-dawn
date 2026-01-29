@@ -99,18 +99,15 @@ abstract contract ERC4626_JT_Kernel is RoycoKernel {
     }
 
     /// @inheritdoc RoycoKernel
-    /// @dev Uses redeem(shares) instead of withdraw(assets) to ensure each user pays their own exit fee.
-    ///      If withdraw(assets) were used, vaults with exit fees would burn extra shares to deliver exact assets,
-    ///      socializing the exit fee to remaining LPs. With redeem(shares), users receive fee-adjusted assets.
     function _jtWithdrawAssets(TRANCHE_UNIT _jtAssets, address _receiver) internal override(RoycoKernel) {
         ERC4626KernelState storage $ = ERC4626KernelStorageLib._getERC4626KernelStorage();
-        // Convert assets to shares - this represents the user's fair share of vault shares
+        // Convert assets to shares, representing the user's fair share of vault shares excluding fees/slippage
         uint256 sharesToRedeem = IERC4626(JT_VAULT).convertToShares(toUint256(_jtAssets));
         // Check if the vault has sufficient liquidity to redeem the shares
         uint256 maxRedeemableShares = IERC4626(JT_VAULT).maxRedeem(address(this));
         // If the vault has sufficient liquidity to redeem the shares, do so
         if (maxRedeemableShares >= sharesToRedeem) {
-            // Redeem shares - user receives fee-adjusted assets from the vault
+            // Redeem shares: user receives fee/slippage adjusted assets from the vault
             $.jtOwnedShares -= sharesToRedeem;
             IERC4626(JT_VAULT).redeem(sharesToRedeem, _receiver, address(this));
         } else {
