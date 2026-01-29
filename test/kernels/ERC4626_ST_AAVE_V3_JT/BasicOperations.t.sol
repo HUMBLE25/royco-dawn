@@ -829,7 +829,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
     }
 
     /// @notice Tests ST redemption when underlying vault is illiquid
-    /// @dev When maxWithdraw returns 0, the kernel should transfer vault shares instead of underlying assets
+    /// @dev When maxRedeem returns 0, the kernel should transfer vault shares instead of underlying assets
     function testFuzz_stRedeem_whenUnderlyingVaultIlliquid_shouldTransferShares(uint256 _jtAssets, uint256 _stDepositPercentage) external {
         // Bound assets to reasonable range
         _jtAssets = bound(_jtAssets, 1e6, 1_000_000e6); // Between 1 USDC and 1M USDC
@@ -869,9 +869,9 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         uint256 stDepositorVaultSharesBefore = MOCK_UNDERLYING_ST_VAULT.balanceOf(stDepositor);
         uint256 kernelVaultSharesBefore = MOCK_UNDERLYING_ST_VAULT.balanceOf(address(KERNEL));
 
-        // Step 3: Mock maxWithdraw to return 0 (simulating illiquidity)
+        // Step 3: Mock maxRedeem to return 0 (simulating illiquidity)
         vm.mockCall(
-            address(MOCK_UNDERLYING_ST_VAULT), abi.encodeWithSelector(MOCK_UNDERLYING_ST_VAULT.maxWithdraw.selector, address(KERNEL)), abi.encode(uint256(0))
+            address(MOCK_UNDERLYING_ST_VAULT), abi.encodeWithSelector(MOCK_UNDERLYING_ST_VAULT.maxRedeem.selector, address(KERNEL)), abi.encode(uint256(0))
         );
 
         // Step 4: ST redeems - should receive vault shares instead of USDC
@@ -905,7 +905,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
     }
 
     /// @notice Tests ST redemption with partial illiquidity
-    /// @dev When maxWithdraw returns less than requested, kernel should handle gracefully
+    /// @dev When maxRedeem returns less than requested shares, kernel should transfer shares directly
     function testFuzz_stRedeem_whenUnderlyingVaultPartiallyIlliquid_shouldTransferShares(
         uint256 _jtAssets,
         uint256 _stDepositPercentage,
@@ -946,17 +946,18 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
 
         _updateOnDeposit(stState, stDepositAmount, _toSTValue(stDepositAmount), stShares, TrancheType.SENIOR);
 
-        // Calculate partial liquidity amount
-        uint256 partialLiquidity = toUint256(stDepositAmount) * _liquidityPercentage / 100;
+        // Calculate partial liquidity amount (in shares for maxRedeem)
+        uint256 partialLiquidityAssets = toUint256(stDepositAmount) * _liquidityPercentage / 100;
+        uint256 partialLiquidityShares = MOCK_UNDERLYING_ST_VAULT.convertToShares(partialLiquidityAssets);
 
         // Record balances before redemption
         uint256 stDepositorVaultSharesBefore = MOCK_UNDERLYING_ST_VAULT.balanceOf(stDepositor);
 
-        // Step 3: Mock maxWithdraw to return partial liquidity
+        // Step 3: Mock maxRedeem to return partial liquidity (in shares)
         vm.mockCall(
             address(MOCK_UNDERLYING_ST_VAULT),
-            abi.encodeWithSelector(MOCK_UNDERLYING_ST_VAULT.maxWithdraw.selector, address(KERNEL)),
-            abi.encode(partialLiquidity)
+            abi.encodeWithSelector(MOCK_UNDERLYING_ST_VAULT.maxRedeem.selector, address(KERNEL)),
+            abi.encode(partialLiquidityShares)
         );
 
         // Step 4: ST redeems - since partial liquidity < requested, should transfer shares
