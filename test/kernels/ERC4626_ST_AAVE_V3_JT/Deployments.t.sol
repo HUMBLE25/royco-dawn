@@ -18,6 +18,7 @@ import {
     SyncedAccountingState,
     TrancheDeploymentParams
 } from "../../../src/libraries/Types.sol";
+import { toNAVUnits } from "../../../src/libraries/Units.sol";
 import { AdaptiveCurveYDM } from "../../../src/ydm/AdaptiveCurveYDM.sol";
 import { MainnetForkWithAaveTestBase } from "./base/MainnetForkWithAaveBaseTest.t.sol";
 
@@ -317,7 +318,8 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
                     ydmInitializationData: abi.encodeCall(AdaptiveCurveYDM.initializeYDMForMarket, (0.225e18, 1e18)),
                     fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
                     lltvWAD: LLTV,
-                    dustTolerance: DUST_TOLERANCE
+                    stNAVDustTolerance: toNAVUnits(uint256(10 ** 21)), // 10^(27-6) for USDC
+                    jtNAVDustTolerance: toNAVUnits(uint256(10 ** 21)) // 10^(27-6) for USDC
                 }),
                 OWNER_ADDRESS // invalid authority: must be FACTORY
             )
@@ -458,7 +460,8 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
                     ydmInitializationData: abi.encodeCall(AdaptiveCurveYDM.initializeYDMForMarket, (0.225e18, 1e18)),
                     fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
                     lltvWAD: LLTV,
-                    dustTolerance: DUST_TOLERANCE
+                    stNAVDustTolerance: toNAVUnits(uint256(10 ** 21)), // 10^(27-6) for USDC
+                    jtNAVDustTolerance: toNAVUnits(uint256(10 ** 21)) // 10^(27-6) for USDC
                 }),
                 address(FACTORY)
             )
@@ -587,7 +590,8 @@ contract DeploymentsTest is MainnetForkWithAaveTestBase {
                     ydmInitializationData: abi.encodeCall(AdaptiveCurveYDM.initializeYDMForMarket, (0.225e18, 1e18)),
                     fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
                     lltvWAD: LLTV,
-                    dustTolerance: DUST_TOLERANCE
+                    stNAVDustTolerance: toNAVUnits(uint256(10 ** 21)), // 10^(27-6) for USDC
+                    jtNAVDustTolerance: toNAVUnits(uint256(10 ** 21)) // 10^(27-6) for USDC
                 }),
                 address(FACTORY)
             )

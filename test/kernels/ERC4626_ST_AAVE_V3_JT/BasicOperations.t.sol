@@ -184,7 +184,12 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         {
             TRANCHE_UNIT maxDeposit = ST.maxDeposit(jtDepositor);
             // Allow 1 wei tolerance for rounding differences in conversion functions
-            assertApproxEqAbs(toUint256(maxDeposit), toUint256(expectedMaxDeposit), toUint256(DUST_TOLERANCE) + 1, "Max deposit must return JTEff * coverage");
+            assertApproxEqAbs(
+                toUint256(KERNEL.stConvertTrancheUnitsToNAVUnits(maxDeposit)),
+                toUint256(KERNEL.stConvertTrancheUnitsToNAVUnits(expectedMaxDeposit)),
+                toUint256(ACCOUNTANT.getState().stNAVDustTolerance) + 1,
+                "Max deposit must return JTEff * coverage"
+            );
         }
 
         // Try to deposit more than the max deposit, it should revert
@@ -234,9 +239,9 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
 
         // Verify that ST.maxDeposit went down (allow 1 wei tolerance for rounding)
         assertApproxEqAbs(
-            toUint256(ST.maxDeposit(stDepositor)),
-            toUint256(expectedMaxDeposit - depositAmount),
-            toUint256(DUST_TOLERANCE) + 1,
+            toUint256(KERNEL.stConvertTrancheUnitsToNAVUnits(ST.maxDeposit(stDepositor))),
+            toUint256(KERNEL.stConvertTrancheUnitsToNAVUnits(expectedMaxDeposit - depositAmount)),
+            toUint256(ACCOUNTANT.getState().stNAVDustTolerance) + 1,
             "Max deposit must decrease expected amount"
         );
 
@@ -655,7 +660,12 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         // Allow small tolerance for mulDiv floor rounding in maxRedeem calculation
         {
             uint256 initialJTMaxRedeem = JT.maxRedeem(jtDepositor);
-            assertApproxEqAbs(initialJTMaxRedeem, jtShares, toUint256(DUST_TOLERANCE) + 1, "JT must be able to redeem all shares initially (no ST deposits)");
+            assertApproxEqAbs(
+                toUint256(JT.convertToAssets(initialJTMaxRedeem).nav),
+                toUint256(JT.convertToAssets(jtShares).nav),
+                toUint256(ACCOUNTANT.getState().jtNAVDustTolerance) + 1,
+                "JT must be able to redeem all shares initially (no ST deposits)"
+            );
         }
 
         // Step 2: ST deposits (uses coverage, JT cannot exit now)
