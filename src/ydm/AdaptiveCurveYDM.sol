@@ -214,8 +214,9 @@ contract AdaptiveCurveYDM is IYDM {
     {
         // Compute the new JT yield share at the target by applying the exponentiated linear adaptation to the previous yield share
         // Exponentiation ensures that the JT yield share is always non-negative
-        // forge-lint: disable-next-item(unsafe-typecast)
+        // Clamp the linear adaptation to the maximum value to prevent overflows when applying expWAD
         _linearAdaptationWAD = _linearAdaptationWAD > MAX_LINEAR_ADAPTATION_WAD ? MAX_LINEAR_ADAPTATION_WAD : _linearAdaptationWAD;
+        // forge-lint: disable-next-item(unsafe-typecast)
         jtYieldShareAtTargetWAD = uint256((int256(_lastJtYieldShareAtTargetWAD) * FixedPointMathLib.expWad(_linearAdaptationWAD)) / WAD_INT);
         // Clamp the JT yield share to the market defined bounds
         if (jtYieldShareAtTargetWAD < MIN_JT_YIELD_SHARE_AT_TARGET) return MIN_JT_YIELD_SHARE_AT_TARGET;
