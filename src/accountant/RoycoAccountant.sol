@@ -768,7 +768,16 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
     }
 
     /// @inheritdoc IRoycoAccountant
-    function setCoverageConfig(uint64 _coverageWAD, uint96 _betaWAD, uint64 _lltvWAD) external override(IRoycoAccountant) restricted withSyncedAccounting {
+    function setCoverageConfiguration(
+        uint64 _coverageWAD,
+        uint96 _betaWAD,
+        uint64 _lltvWAD
+    )
+        external
+        override(IRoycoAccountant)
+        restricted
+        withSyncedAccounting
+    {
         // Validate the new coverage configuration
         _validateCoverageConfig(_coverageWAD, _betaWAD, _lltvWAD);
         // Set the new config

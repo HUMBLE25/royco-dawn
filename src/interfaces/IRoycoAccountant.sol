@@ -361,7 +361,7 @@ interface IRoycoAccountant {
      * @param _betaWAD The new beta parameter representing JT's sensitivity to downside stress, scaled to WAD precision
      * @param _lltvWAD The new liquidation loan to value (LLTV) for this market, scaled to WAD precision
      */
-    function setCoverageConfig(uint64 _coverageWAD, uint96 _betaWAD, uint64 _lltvWAD) external;
+    function setCoverageConfiguration(uint64 _coverageWAD, uint96 _betaWAD, uint64 _lltvWAD) external;
 
     /**
      * @notice Updates the fixed term duration for this market
