@@ -355,6 +355,15 @@ interface IRoycoAccountant {
     function setLLTV(uint64 _lltvWAD) external;
 
     /**
+     * @notice Updates the coverage configuration (coverage, beta, and LLTV) for this market
+     * @dev Only callable by a designated admin
+     * @param _coverageWAD The new coverage percentage, scaled to WAD precision
+     * @param _betaWAD The new beta parameter representing JT's sensitivity to downside stress, scaled to WAD precision
+     * @param _lltvWAD The new liquidation loan to value (LLTV) for this market, scaled to WAD precision
+     */
+    function setCoverageConfig(uint64 _coverageWAD, uint96 _betaWAD, uint64 _lltvWAD) external;
+
+    /**
      * @notice Updates the fixed term duration for this market
      * @dev Setting the fixed term duration to 0 will force the market into an eternally perpetual state
      * @dev Only callable by a designated admin

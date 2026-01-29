@@ -768,6 +768,20 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
     }
 
     /// @inheritdoc IRoycoAccountant
+    function setCoverageConfig(uint64 _coverageWAD, uint96 _betaWAD, uint64 _lltvWAD) external override(IRoycoAccountant) restricted withSyncedAccounting {
+        // Validate the new coverage configuration
+        _validateCoverageConfig(_coverageWAD, _betaWAD, _lltvWAD);
+        // Set the new config
+        RoycoAccountantState storage $ = _getRoycoAccountantStorage();
+        $.coverageWAD = _coverageWAD;
+        emit CoverageUpdated(_coverageWAD);
+        $.betaWAD = _betaWAD;
+        emit BetaUpdated(_betaWAD);
+        $.lltvWAD = _lltvWAD;
+        emit LLTVUpdated(_lltvWAD);
+    }
+
+    /// @inheritdoc IRoycoAccountant
     function setFixedTermDuration(uint24 _fixedTermDurationSeconds) external override(IRoycoAccountant) restricted withSyncedAccounting {
         RoycoAccountantState storage $ = _getRoycoAccountantStorage();
         $.fixedTermDurationSeconds = _fixedTermDurationSeconds;
@@ -811,9 +825,9 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
          * Ensure that the LLTV is set correctly (between the max allowed initial LTV and 100%)
          * Maximum Initial LTV Derivation:
          * Given:
-         *   LTV = ST_EFFECTIVE_NAV / (ST_EFFECTIVE_NAV + JT_EFFECTIVE_NAV)
+         *   LTV = (ST_EFFECTIVE_NAV + ST_IL) / (ST_EFFECTIVE_NAV + JT_EFFECTIVE_NAV)
          *   Initial Utilization = ((ST_EFFECTIVE_NAV + JT_RAW_NAV * β) * COV) / JT_EFFECTIVE_NAV
-         *   Note: JT_RAW_NAV == JT_EFFECTIVE_NAV initially since no losses have been incurred by ST
+         *   Note: Initially, JT_RAW_NAV == JT_EFFECTIVE_NAV and ST_IL == 0 since no losses have been incurred by ST
          *   Initial Utilization = ((ST_EFFECTIVE_NAV + JT_EFFECTIVE_NAV * β) * COV) / JT_EFFECTIVE_NAV
          *
          * At Utilization = 1 (boundary of proper collateralization), solving for JT_EFFECTIVE_NAV:
