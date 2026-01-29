@@ -279,7 +279,6 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
     )
         external
         override(IRoycoAccountant)
-        onlyRoycoKernel
         returns (SyncedAccountingState memory state)
     {
         // Execute a post-op NAV synchronization
