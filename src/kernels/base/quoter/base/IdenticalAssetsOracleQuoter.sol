@@ -91,16 +91,18 @@ abstract contract IdenticalAssetsOracleQuoter is RoycoKernel {
     /**
      * @notice Sets the tranche unit to NAV unit conversion rate
      * @dev Once this is set, the quoter will rely solely on this value instead of the overridden oracle query
-     * @dev Executes an accounting sync before setting the new conversion rate
+     * @dev Executes an accounting sync before and after setting the new conversion rate
      * @dev Only callable by a designated admin
      * @param _conversionRateRAY The conversion rate as defined by the oracle, scaled to RAY precision
      */
     function setConversionRate(uint256 _conversionRateRAY) public virtual restricted {
-        // Sync the tranche accounting up to the point of the conversion rate being set
+        // Sync the tranche accounting to reflect the PNL up to this point in time
         _preOpSyncTrancheAccounting();
         // Set the new conversion rate
         _getIdenticalAssetsOracleQuoterStorage().conversionRateRAY = _conversionRateRAY;
         emit ConversionRateUpdated(_conversionRateRAY);
+        // Sync the tranche accounting to reflect the PNL from the updated conversion rate
+        _preOpSyncTrancheAccounting();
     }
 
     /// @notice Returns the value of 1 Tranche Unit in NAV Units, scaled to RAY precision
