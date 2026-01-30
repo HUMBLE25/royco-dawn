@@ -101,9 +101,9 @@ abstract contract YieldBearingERC4626_TestBase is AbstractKernelTestSuite {
     }
 
     /// @notice Returns max NAV delta for comparisons
+    /// @dev Converts the tranche unit tolerance to NAV using the kernel's conversion
     function maxNAVDelta() public view virtual override returns (NAV_UNIT) {
-        // Default: 1e12 tolerance
-        return toNAVUnits(uint256(1e12));
+        return _toSTValue(maxTrancheUnitDelta());
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -290,7 +290,7 @@ abstract contract YieldBearingERC4626_TestBase is AbstractKernelTestSuite {
 
         DeployScript.YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626SharesAdminOracleQuoterKernelParams memory kernelParams =
             DeployScript.YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626SharesAdminOracleQuoterKernelParams({
-                initialConversionRateWAD: initialConversionRate
+                initialConversionRateRAY: initialConversionRate
             });
 
         DeployScript.AdaptiveCurveYDMParams memory ydmParams = DeployScript.AdaptiveCurveYDMParams({
@@ -310,7 +310,8 @@ abstract contract YieldBearingERC4626_TestBase is AbstractKernelTestSuite {
             juniorTrancheSymbol: string(abi.encodePacked("RJ-", cfg.name)),
             seniorAsset: cfg.stAsset,
             juniorAsset: cfg.jtAsset,
-            dustTolerance: DUST_TOLERANCE,
+            stNAVDustTolerance: toNAVUnits(10 ** (27 - cfg.stDecimals)),
+            jtNAVDustTolerance: toNAVUnits(10 ** (27 - cfg.jtDecimals)),
             kernelType: DeployScript.KernelType.YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter,
             kernelSpecificParams: abi.encode(kernelParams),
             protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS,

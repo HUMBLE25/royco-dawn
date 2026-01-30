@@ -12,7 +12,7 @@ import { RoycoFactory } from "../../../src/factory/RoycoFactory.sol";
 import { IRoycoAccountant } from "../../../src/interfaces/IRoycoAccountant.sol";
 import { IRoycoKernel } from "../../../src/interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoVaultTranche } from "../../../src/interfaces/tranche/IRoycoVaultTranche.sol";
-import { ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, WAD, ZERO_NAV_UNITS, ZERO_TRANCHE_UNITS } from "../../../src/libraries/Constants.sol";
+import { SENTINEL_REQUEST_ID, WAD, ZERO_NAV_UNITS, ZERO_TRANCHE_UNITS } from "../../../src/libraries/Constants.sol";
 import { AssetClaims, MarketState, TrancheType } from "../../../src/libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib, toNAVUnits, toTrancheUnits, toUint256 } from "../../../src/libraries/Units.sol";
 
@@ -470,7 +470,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         vm.prank(ALICE_ADDRESS);
         (uint256 requestId,) = JT.requestRedeem(maxRedeem, ALICE_ADDRESS, ALICE_ADDRESS);
 
-        assertNotEq(requestId, ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, "Request ID must not be the discriminated ID");
+        assertNotEq(requestId, SENTINEL_REQUEST_ID, "Request ID must not be the discriminated ID");
 
         // Should not be claimable immediately
         assertEq(JT.claimableRedeemRequest(requestId, ALICE_ADDRESS), 0, "Should not be claimable immediately");
@@ -522,7 +522,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
             assertApproxEqAbs(
                 maxRedeem,
                 sharesToWithdraw,
-                toUint256(ACCOUNTANT.getState().dustTolerance) + 1,
+                toUint256(ACCOUNTANT.getState().stNAVDustTolerance) + 1,
                 "Shares to withdraw should be approximately equal to max redeem if max redeem is less than shares to withdraw"
             );
             sharesToWithdraw = maxRedeem;
@@ -607,32 +607,6 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         vm.expectRevert(abi.encodeWithSelector(IRoycoAccountant.COVERAGE_REQUIREMENT_UNSATISFIED.selector));
         ST.deposit(toTrancheUnits(excessAmount), BOB_ADDRESS, BOB_ADDRESS);
         vm.stopPrank();
-    }
-
-    function testFuzz_coverage_blocksExcessJTRedeem(uint256 _jtAmount, uint256 _stPercentage) external {
-        // Use /4 to leave room for ST deposit
-        _jtAmount = bound(_jtAmount, _minDepositAmount() * 10, config.initialFunding / 4);
-        _stPercentage = bound(_stPercentage, 50, 95); // High utilization
-
-        uint256 jtShares = _depositJT(ALICE_ADDRESS, _jtAmount);
-
-        TRANCHE_UNIT maxSTDeposit = ST.maxDeposit(BOB_ADDRESS);
-        uint256 stAmount = toUint256(maxSTDeposit) * _stPercentage / 100;
-
-        // Cap to what BOB actually has
-        if (stAmount > config.initialFunding) stAmount = config.initialFunding;
-        if (stAmount < _minDepositAmount()) return;
-
-        _depositST(BOB_ADDRESS, stAmount);
-
-        uint256 maxRedeem = JT.maxRedeem(ALICE_ADDRESS);
-
-        // If maxRedeem < jtShares, trying to redeem all should revert
-        if (maxRedeem < jtShares) {
-            vm.prank(ALICE_ADDRESS);
-            vm.expectRevert(abi.encodeWithSelector(IRoycoVaultTranche.MUST_REQUEST_WITHIN_MAX_REDEEM_AMOUNT.selector));
-            JT.requestRedeem(jtShares, ALICE_ADDRESS, ALICE_ADDRESS);
-        }
     }
 
     function testFuzz_coverage_STRedeemUnlockJTRedeem(uint256 _jtAmount, uint256 _stPercentage) external {
@@ -1091,7 +1065,12 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         // Verify JT view functions
         assertEq(JT.balanceOf(ALICE_ADDRESS), jtShares, "JT balance should match shares");
         assertEq(JT.totalSupply(), jtShares, "JT totalSupply should match shares");
-        assertApproxEqAbs(JT.maxRedeem(ALICE_ADDRESS), jtShares, toUint256(ACCOUNTANT.getState().dustTolerance) + 1, "JT maxRedeem should equal shares");
+        assertApproxEqAbs(
+            toUint256(JT.convertToAssets(JT.maxRedeem(ALICE_ADDRESS)).nav),
+            toUint256(JT.convertToAssets(jtShares).nav),
+            toUint256(ACCOUNTANT.getState().jtNAVDustTolerance) + 1,
+            "JT maxRedeem should equal shares"
+        );
 
         // Verify ST maxDeposit is now enabled
         TRANCHE_UNIT stMaxDeposit = ST.maxDeposit(BOB_ADDRESS);
@@ -1263,6 +1242,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         TRANCHE_UNIT stMaxDeposit = ST.maxDeposit(BOB_ADDRESS);
         uint256 stAmount = toUint256(stMaxDeposit) * _stPercentage / 100;
         if (stAmount < _minDepositAmount()) return;
+        if (stAmount > config.initialFunding) stAmount = config.initialFunding;
 
         uint256 stShares = _depositST(BOB_ADDRESS, stAmount);
 
@@ -1417,7 +1397,12 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         // Verify initial state
         assertEq(JT.balanceOf(ALICE_ADDRESS), jtShares, "Should have JT shares");
-        assertApproxEqAbs(JT.maxRedeem(ALICE_ADDRESS), jtShares, toUint256(ACCOUNTANT.getState().dustTolerance) + 1, "Should be able to redeem all");
+        assertApproxEqAbs(
+            toUint256(JT.convertToAssets(JT.maxRedeem(ALICE_ADDRESS)).nav),
+            toUint256(JT.convertToAssets(jtShares).nav),
+            toUint256(ACCOUNTANT.getState().jtNAVDustTolerance) + 1,
+            "Should be able to redeem all"
+        );
 
         // ═══════════════════════════════════════════════════════════════════════════
         // STEP 2: Create multiple parallel redeem requests
@@ -1547,7 +1532,12 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         // Should be able to redeem normally
         uint256 maxRedeem = JT.maxRedeem(ALICE_ADDRESS);
-        assertApproxEqAbs(maxRedeem, jtShares, toUint256(ACCOUNTANT.getState().dustTolerance) + 1, "Should be able to redeem all shares again");
+        assertApproxEqAbs(
+            toUint256(JT.convertToAssets(maxRedeem).nav),
+            toUint256(JT.convertToAssets(jtShares).nav),
+            toUint256(ACCOUNTANT.getState().jtNAVDustTolerance) + 1,
+            "Should be able to redeem all shares again"
+        );
     }
 
     /// @notice High utilization scenario: Test coverage limits
@@ -1582,15 +1572,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         assertLt(jtMaxRedeemAfter, jtShares, "JT maxRedeem should be limited");
 
         // ═══════════════════════════════════════════════════════════════════════════
-        // STEP 3: Try to redeem all JT - should fail
-        // ═══════════════════════════════════════════════════════════════════════════
-
-        vm.prank(ALICE_ADDRESS);
-        vm.expectRevert(abi.encodeWithSelector(IRoycoVaultTranche.MUST_REQUEST_WITHIN_MAX_REDEEM_AMOUNT.selector));
-        JT.requestRedeem(jtShares, ALICE_ADDRESS, ALICE_ADDRESS);
-
-        // ═══════════════════════════════════════════════════════════════════════════
-        // STEP 4: Additional JT deposit increases coverage
+        // STEP 3: Additional JT deposit increases coverage
         // ═══════════════════════════════════════════════════════════════════════════
 
         uint256 additionalJTShares = _depositJT(CHARLIE_ADDRESS, _additionalJTAmount);
@@ -1603,7 +1585,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         assertGt(aliceNewMaxRedeem, jtMaxRedeemAfter, "Alice JT maxRedeem should increase");
 
         // ═══════════════════════════════════════════════════════════════════════════
-        // STEP 5: ST redeems - unlocks JT
+        // STEP 4: ST redeems - unlocks JT
         // ═══════════════════════════════════════════════════════════════════════════
 
         vm.prank(BOB_ADDRESS);
@@ -1613,8 +1595,10 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         uint256 aliceFinalMaxRedeem = JT.maxRedeem(ALICE_ADDRESS);
         uint256 charlieFinalMaxRedeem = JT.maxRedeem(CHARLIE_ADDRESS);
 
-        assertApproxEqAbs(aliceFinalMaxRedeem, jtShares, toUint256(ACCOUNTANT.getState().dustTolerance) + 1, "Alice should be able to redeem all");
-        assertApproxEqAbs(charlieFinalMaxRedeem, additionalJTShares, toUint256(ACCOUNTANT.getState().dustTolerance) + 1, "Charlie should be able to redeem all");
+        assertApproxEqAbs(aliceFinalMaxRedeem, jtShares, toUint256(ACCOUNTANT.getState().stNAVDustTolerance) + 1, "Alice should be able to redeem all");
+        assertApproxEqAbs(
+            charlieFinalMaxRedeem, additionalJTShares, toUint256(ACCOUNTANT.getState().stNAVDustTolerance) + 1, "Charlie should be able to redeem all"
+        );
 
         // Verify NAV conservation
         _assertNAVConservation();
@@ -1724,7 +1708,11 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         // Deposit JT for ALICE
         uint256 jtShares = _depositJT(ALICE_ADDRESS, _jtAmount);
-        assertApproxEqAbs(jtShares, JT.maxRedeem(ALICE_ADDRESS), toUint256(ACCOUNTANT.getState().dustTolerance) + 1);
+        assertApproxEqAbs(
+            toUint256(JT.convertToAssets(jtShares).nav),
+            toUint256(JT.convertToAssets(JT.maxRedeem(ALICE_ADDRESS)).nav),
+            toUint256(ACCOUNTANT.getState().jtNAVDustTolerance) + 1
+        );
         jtShares = JT.maxRedeem(ALICE_ADDRESS);
 
         // ALICE sets BOB as operator
@@ -1864,11 +1852,16 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         // maxRedeem should equal owned shares (no ST, no coverage constraint)
         uint256 maxRedeemable = JT.maxRedeem(ALICE_ADDRESS);
-        assertApproxEqAbs(maxRedeemable, jtShares, toUint256(ACCOUNTANT.getState().dustTolerance) + 1, "maxRedeem should equal owned shares");
+        assertApproxEqAbs(
+            toUint256(JT.convertToAssets(maxRedeemable).nav),
+            toUint256(JT.convertToAssets(jtShares).nav),
+            toUint256(ACCOUNTANT.getState().jtNAVDustTolerance) + 1,
+            "maxRedeem should equal owned shares"
+        );
 
         // Try to redeem more than owned - should revert
         vm.prank(ALICE_ADDRESS);
-        vm.expectRevert(abi.encodeWithSelector(IRoycoVaultTranche.MUST_REQUEST_WITHIN_MAX_REDEEM_AMOUNT.selector));
+        vm.expectRevert();
         JT.requestRedeem(jtShares + 1, ALICE_ADDRESS, ALICE_ADDRESS);
     }
 
@@ -1892,19 +1885,27 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         uint256 maxRedeemable = JT.maxRedeem(ALICE_ADDRESS);
         assertLt(maxRedeemable, jtShares, "maxRedeem should be less than total shares");
 
-        // Try to redeem more than maxRedeem - should revert
+        // Try to request redeem more than maxRedeem
         vm.prank(ALICE_ADDRESS);
-        vm.expectRevert(abi.encodeWithSelector(IRoycoVaultTranche.MUST_REQUEST_WITHIN_MAX_REDEEM_AMOUNT.selector));
-        JT.requestRedeem(jtShares, ALICE_ADDRESS, ALICE_ADDRESS);
+        (uint256 requestId,) = JT.requestRedeem(jtShares, ALICE_ADDRESS, ALICE_ADDRESS);
+
+        skip(_getJTRedemptionDelay() + 1);
+
+        assertLt(JT.claimableRedeemRequest(requestId, ALICE_ADDRESS), jtShares, "claimable should be less than total shares");
+
+        // Should revert on actual redeem
+        vm.prank(ALICE_ADDRESS);
+        vm.expectRevert();
+        JT.redeem(jtShares, ALICE_ADDRESS, ALICE_ADDRESS);
     }
 
     /// @notice Test that requestRedeem reverts when requesting exactly maxRedeem + 1
-    function testFuzz_redemptionLimit_revertsAtMaxRedeemPlusOne(uint256 _jtAmount, uint256 _stPercentage) external {
+    function testFuzz_redemptionLimit_revertsAtClaimablePlusOne(uint256 _jtAmount, uint256 _stPercentage) external {
         _jtAmount = bound(_jtAmount, _minDepositAmount() * 10, config.initialFunding / 4);
         _stPercentage = bound(_stPercentage, 30, 70);
 
         // Deposit JT
-        _depositJT(ALICE_ADDRESS, _jtAmount);
+        uint256 jtShares = _depositJT(ALICE_ADDRESS, _jtAmount);
 
         // Deposit ST to create coverage constraint
         TRANCHE_UNIT stMaxDeposit = ST.maxDeposit(BOB_ADDRESS);
@@ -1914,38 +1915,17 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         _depositST(BOB_ADDRESS, stAmount);
 
-        uint256 maxRedeemable = JT.maxRedeem(ALICE_ADDRESS);
-        if (maxRedeemable == 0) return;
-
-        // Try to redeem maxRedeem + 1 - should revert
+        // Try to redeem more than maxRedeem - should revert
         vm.prank(ALICE_ADDRESS);
-        vm.expectRevert(abi.encodeWithSelector(IRoycoVaultTranche.MUST_REQUEST_WITHIN_MAX_REDEEM_AMOUNT.selector));
-        JT.requestRedeem(maxRedeemable + 1, ALICE_ADDRESS, ALICE_ADDRESS);
-    }
+        (uint256 requestId,) = JT.requestRedeem(jtShares, ALICE_ADDRESS, ALICE_ADDRESS);
 
-    /// @notice Test that requestRedeem reverts when maxRedeem becomes 0 due to full coverage utilization
-    function testFuzz_redemptionLimit_revertsWhenMaxRedeemIsZero(uint256 _jtAmount) external {
-        _jtAmount = bound(_jtAmount, _minDepositAmount() * 10, config.initialFunding / 4);
+        skip(_getJTRedemptionDelay() + 1);
 
-        // Deposit JT
-        uint256 jtShares = _depositJT(ALICE_ADDRESS, _jtAmount);
+        uint256 claimableShares = JT.claimableRedeemRequest(requestId, ALICE_ADDRESS);
 
-        // Deposit ST to max capacity to fully utilize coverage
-        TRANCHE_UNIT stMaxDeposit = ST.maxDeposit(BOB_ADDRESS);
-        uint256 stAmount = toUint256(stMaxDeposit);
-        if (stAmount > config.initialFunding) stAmount = config.initialFunding;
-        if (stAmount < _minDepositAmount()) return;
-
-        _depositST(BOB_ADDRESS, stAmount);
-
-        uint256 maxRedeemable = JT.maxRedeem(ALICE_ADDRESS);
-
-        // If maxRedeem is 0, any request should revert
-        if (maxRedeemable == 0) {
-            vm.prank(ALICE_ADDRESS);
-            vm.expectRevert(abi.encodeWithSelector(IRoycoVaultTranche.MUST_REQUEST_WITHIN_MAX_REDEEM_AMOUNT.selector));
-            JT.requestRedeem(1, ALICE_ADDRESS, ALICE_ADDRESS);
-        }
+        vm.prank(ALICE_ADDRESS);
+        vm.expectRevert();
+        JT.redeem(claimableShares + 1, ALICE_ADDRESS, ALICE_ADDRESS);
     }
 
     /// @notice Test that requestRedeem reverts after loss tightens coverage
@@ -1979,32 +1959,15 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         // If the old maxRedeem is now above the new limit, it should revert
         if (maxRedeemBeforeLoss > maxRedeemAfterLoss && maxRedeemAfterLoss < jtShares) {
+            // Try to redeem more than maxRedeem - should revert
             vm.prank(ALICE_ADDRESS);
-            vm.expectRevert(abi.encodeWithSelector(IRoycoVaultTranche.MUST_REQUEST_WITHIN_MAX_REDEEM_AMOUNT.selector));
-            JT.requestRedeem(maxRedeemBeforeLoss, ALICE_ADDRESS, ALICE_ADDRESS);
-        }
-    }
+            (uint256 requestId,) = JT.requestRedeem(maxRedeemBeforeLoss, ALICE_ADDRESS, ALICE_ADDRESS);
 
-    /// @notice Test that second requestRedeem reverts if first request reduced available shares
-    function testFuzz_redemptionLimit_revertsOnSecondRequestExceedingRemaining(uint256 _jtAmount) external {
-        _jtAmount = bound(_jtAmount, _minDepositAmount() * 10, config.initialFunding / 4);
+            skip(_getJTRedemptionDelay() + 1);
 
-        // Deposit JT
-        uint256 jtShares = _depositJT(ALICE_ADDRESS, _jtAmount);
-
-        // First request: redeem half
-        uint256 firstRequest = jtShares / 2;
-        vm.prank(ALICE_ADDRESS);
-        JT.requestRedeem(firstRequest, ALICE_ADDRESS, ALICE_ADDRESS);
-
-        // After first request, maxRedeem should reflect remaining shares
-        uint256 remainingMaxRedeem = JT.maxRedeem(ALICE_ADDRESS);
-
-        // Second request for more than remaining should revert
-        if (remainingMaxRedeem < jtShares - firstRequest) {
             vm.prank(ALICE_ADDRESS);
-            vm.expectRevert(abi.encodeWithSelector(IRoycoVaultTranche.MUST_REQUEST_WITHIN_MAX_REDEEM_AMOUNT.selector));
-            JT.requestRedeem(jtShares - firstRequest, ALICE_ADDRESS, ALICE_ADDRESS);
+            vm.expectRevert();
+            JT.redeem(maxRedeemBeforeLoss, ALICE_ADDRESS, ALICE_ADDRESS);
         }
     }
 
@@ -2097,7 +2060,11 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         assertEq(JT.allowance(ALICE_ADDRESS, BOB_ADDRESS), jtShares, "Allowance should be set");
 
         // Check that maxRedeem is equal to the deposited shares
-        assertApproxEqAbs(JT.maxRedeem(ALICE_ADDRESS), jtShares, toUint256(ACCOUNTANT.getState().dustTolerance) + 1);
+        assertApproxEqAbs(
+            toUint256(JT.convertToAssets(JT.maxRedeem(ALICE_ADDRESS)).nav),
+            toUint256(JT.convertToAssets(jtShares).nav),
+            toUint256(ACCOUNTANT.getState().jtNAVDustTolerance) + 1
+        );
         jtShares = JT.maxRedeem(ALICE_ADDRESS);
 
         // BOB (not operator, but has allowance) calls requestRedeem - should succeed
@@ -2107,7 +2074,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         assertGt(requestId, 0, "Request should be created");
 
         // Allowance should be spent
-        assertTrue(JT.allowance(ALICE_ADDRESS, BOB_ADDRESS) <= toUint256(ACCOUNTANT.getState().dustTolerance) + 1, "Allowance should be spent");
+        assertTrue(JT.allowance(ALICE_ADDRESS, BOB_ADDRESS) <= toUint256(ACCOUNTANT.getState().stNAVDustTolerance) + 1, "Allowance should be spent");
     }
 
     /// @notice Test that allowance spending fails with insufficient allowance
@@ -2134,7 +2101,11 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         // Deposit JT for ALICE
         uint256 jtShares = _depositJT(ALICE_ADDRESS, _jtAmount);
-        assertApproxEqAbs(jtShares, JT.maxRedeem(ALICE_ADDRESS), toUint256(ACCOUNTANT.getState().dustTolerance) + 1);
+        assertApproxEqAbs(
+            toUint256(JT.convertToAssets(jtShares).nav),
+            toUint256(JT.convertToAssets(JT.maxRedeem(ALICE_ADDRESS)).nav),
+            toUint256(ACCOUNTANT.getState().jtNAVDustTolerance) + 1
+        );
         jtShares = JT.maxRedeem(ALICE_ADDRESS);
 
         // ALICE sets BOB as operator AND gives allowance
@@ -2221,7 +2192,11 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         NAV_UNIT stRawNavBefore = ST.getRawNAV();
         NAV_UNIT stEffectiveNavBefore = ST.totalAssets().nav;
 
-        assertApproxEqAbs(jtShares, JT.maxRedeem(ALICE_ADDRESS), toUint256(ACCOUNTANT.getState().dustTolerance) + 1);
+        assertApproxEqAbs(
+            toUint256(JT.convertToAssets(jtShares).nav),
+            toUint256(JT.convertToAssets(JT.maxRedeem(ALICE_ADDRESS)).nav),
+            toUint256(ACCOUNTANT.getState().jtNAVDustTolerance) + 1
+        );
         jtShares = JT.maxRedeem(ALICE_ADDRESS);
 
         // Request redeem
@@ -2330,7 +2305,12 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         // Get max redeemable with no ST (should be all shares)
         uint256 maxRedeemableNoST = JT.maxRedeem(ALICE_ADDRESS);
-        assertApproxEqAbs(maxRedeemableNoST, jtShares, toUint256(ACCOUNTANT.getState().dustTolerance) + 1, "Should be able to redeem all initially");
+        assertApproxEqAbs(
+            toUint256(JT.convertToAssets(maxRedeemableNoST).nav),
+            toUint256(JT.convertToAssets(jtShares).nav),
+            toUint256(ACCOUNTANT.getState().jtNAVDustTolerance) + 1,
+            "Should be able to redeem all initially"
+        );
         jtShares = maxRedeemableNoST;
 
         // Request redeem for all shares
@@ -2343,7 +2323,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         // Initially all should be claimable
         uint256 claimableInitial = JT.claimableRedeemRequest(requestId, ALICE_ADDRESS);
         uint256 pendingInitial = JT.pendingRedeemRequest(requestId, ALICE_ADDRESS);
-        assertApproxEqAbs(claimableInitial, jtShares, toUint256(ACCOUNTANT.getState().dustTolerance) + 1, "Initially all should be claimable");
+        assertApproxEqAbs(claimableInitial, jtShares, toUint256(ACCOUNTANT.getState().stNAVDustTolerance) + 1, "Initially all should be claimable");
         assertEq(pendingInitial, 0, "Initially nothing should be pending");
 
         // Now deposit ST which will tighten coverage
@@ -2360,7 +2340,9 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         uint256 pendingAfterST = JT.pendingRedeemRequest(requestId, ALICE_ADDRESS);
 
         // The sum should still equal the original request
-        assertApproxEqAbs(claimableAfterST + pendingAfterST, jtShares, toUint256(ACCOUNTANT.getState().dustTolerance) + 1, "Sum should equal original request");
+        assertApproxEqAbs(
+            claimableAfterST + pendingAfterST, jtShares, toUint256(ACCOUNTANT.getState().stNAVDustTolerance) + 1, "Sum should equal original request"
+        );
 
         // Pending should be positive (coverage locked some shares)
         assertGt(pendingAfterST, 0, "Some shares should be pending due to coverage");
@@ -2373,7 +2355,11 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         // Deposit JT
         uint256 jtShares = _depositJT(ALICE_ADDRESS, _jtAmount);
-        assertApproxEqAbs(jtShares, JT.maxRedeem(ALICE_ADDRESS), toUint256(ACCOUNTANT.getState().dustTolerance) + 1);
+        assertApproxEqAbs(
+            toUint256(JT.convertToAssets(jtShares).nav),
+            toUint256(JT.convertToAssets(JT.maxRedeem(ALICE_ADDRESS)).nav),
+            toUint256(ACCOUNTANT.getState().jtNAVDustTolerance) + 1
+        );
         // Set jtShares to the max redeemable amount
         jtShares = JT.maxRedeem(ALICE_ADDRESS);
 
@@ -2425,7 +2411,12 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         // maxRedeem should equal full balance
         uint256 maxRedeemable = JT.maxRedeem(ALICE_ADDRESS);
-        assertApproxEqAbs(maxRedeemable, jtShares, toUint256(ACCOUNTANT.getState().dustTolerance) + 1, "maxRedeem should equal full balance with no ST");
+        assertApproxEqAbs(
+            toUint256(JT.convertToAssets(maxRedeemable).nav),
+            toUint256(JT.convertToAssets(jtShares).nav),
+            toUint256(ACCOUNTANT.getState().jtNAVDustTolerance) + 1,
+            "maxRedeem should equal full balance with no ST"
+        );
     }
 
     /// @notice Test ST maxRedeem returns full balance (ST has no coverage constraint on itself)
@@ -2456,7 +2447,12 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         // Deposit JT
         uint256 jtShares = _depositJT(ALICE_ADDRESS, _jtAmount);
         uint256 maxRedeemBefore = JT.maxRedeem(ALICE_ADDRESS);
-        assertApproxEqAbs(maxRedeemBefore, jtShares, toUint256(ACCOUNTANT.getState().dustTolerance) + 1, "Initially should redeem all");
+        assertApproxEqAbs(
+            toUint256(JT.convertToAssets(maxRedeemBefore).nav),
+            toUint256(JT.convertToAssets(jtShares).nav),
+            toUint256(ACCOUNTANT.getState().jtNAVDustTolerance) + 1,
+            "Initially should redeem all"
+        );
 
         // Deposit ST in increments and verify maxRedeem decreases
         TRANCHE_UNIT stMaxDeposit = ST.maxDeposit(BOB_ADDRESS);
@@ -2505,7 +2501,12 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         // JT maxRedeem should increase
         uint256 maxRedeemAfterSTRedeem = JT.maxRedeem(ALICE_ADDRESS);
         assertGt(maxRedeemAfterSTRedeem, maxRedeemWithST, "JT maxRedeem should increase after ST redeems");
-        assertApproxEqAbs(maxRedeemAfterSTRedeem, jtShares, toUint256(ACCOUNTANT.getState().dustTolerance) + 2, "JT maxRedeem should return to full balance");
+        assertApproxEqAbs(
+            maxRedeemAfterSTRedeem,
+            jtShares,
+            toUint256(ACCOUNTANT.getState().stNAVDustTolerance + ACCOUNTANT.getState().jtNAVDustTolerance),
+            "JT maxRedeem should return to full balance"
+        );
     }
 
     /// @notice Test maxRedeem after yield still respects coverage
@@ -2770,10 +2771,10 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         NAV_UNIT stIL = ACCOUNTANT.getState().lastSTImpermanentLoss;
         NAV_UNIT jtCoverageIL = ACCOUNTANT.getState().lastJTCoverageImpermanentLoss;
         NAV_UNIT jtSelfIL = ACCOUNTANT.getState().lastJTSelfImpermanentLoss;
-        NAV_UNIT dustTolerance = ACCOUNTANT.getState().dustTolerance;
+        NAV_UNIT stNAVDustTolerance = ACCOUNTANT.getState().stNAVDustTolerance;
 
         assertEq(toUint256(stIL), 0, "ST IL should be 0 with no yield/loss");
-        assertLe(toUint256(jtCoverageIL), toUint256(dustTolerance), "JT coverage IL should be within dust tolerance");
-        assertLe(toUint256(jtSelfIL), toUint256(dustTolerance), "JT self IL should be within dust tolerance");
+        assertLe(toUint256(jtCoverageIL), toUint256(stNAVDustTolerance), "JT coverage IL should be within dust tolerance");
+        assertLe(toUint256(jtSelfIL), toUint256(stNAVDustTolerance), "JT self IL should be within dust tolerance");
     }
 }

@@ -142,15 +142,12 @@ abstract contract AaveV3_JT_Kernel is RoycoKernel {
 
     /// @inheritdoc RoycoKernel
     function _jtMaxWithdrawableGlobally(address) internal view override(RoycoKernel) returns (TRANCHE_UNIT) {
-        // Retrieve the Pool's data provider and asset
+        // If the reserve asset is paused, withdrawals and A Token transfers are forbidden
         IPoolDataProvider poolDataProvider = IPoolDataProvider(IPoolAddressesProvider(AAVE_V3_POOL_ADDRESSES_PROVIDER).getPoolDataProvider());
+        if (poolDataProvider.getPaused(JT_ASSET)) return ZERO_TRANCHE_UNITS;
 
-        // If the reserve asset is inactive or paused, withdrawals are forbidden
-        (,,,,,,,, bool isActive,) = poolDataProvider.getReserveConfigurationData(JT_ASSET);
-        if (!isActive || poolDataProvider.getPaused(JT_ASSET)) return ZERO_TRANCHE_UNITS;
-
-        // Return the unborrowed/reserve assets of the pool
-        return toTrancheUnits(IERC20(JT_ASSET).balanceOf(JT_ASSET_ATOKEN));
+        // Return the total tranche units (A Tokens) controlled by the kernel
+        return toTrancheUnits(IERC20(JT_ASSET_ATOKEN).balanceOf(address(this)));
     }
 
     /// @inheritdoc RoycoKernel

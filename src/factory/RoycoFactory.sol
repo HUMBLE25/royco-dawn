@@ -5,12 +5,12 @@ import { AccessManagedUpgradeable } from "../../lib/openzeppelin-contracts-upgra
 import { AccessManager } from "../../lib/openzeppelin-contracts/contracts/access/manager/AccessManager.sol";
 import { ERC1967Proxy } from "../../lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import { Create2 } from "../../lib/openzeppelin-contracts/contracts/utils/Create2.sol";
-import { RolesConfiguration } from "../../script/config/RolesConfiguration.sol";
 import { IRoycoAccountant } from "../../src/interfaces/IRoycoAccountant.sol";
 import { IRoycoFactory } from "../../src/interfaces/IRoycoFactory.sol";
 import { IRoycoKernel } from "../../src/interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoVaultTranche } from "../../src/interfaces/tranche/IRoycoVaultTranche.sol";
 import { MarketDeploymentParams, RolesTargetConfiguration, RoycoMarket } from "../../src/libraries/Types.sol";
+import { RolesConfiguration } from "./RolesConfiguration.sol";
 
 /**
  * @title RoycoFactory
@@ -42,6 +42,9 @@ contract RoycoFactory is AccessManager, RolesConfiguration, IRoycoFactory {
 
         // Validate the deployment
         _validateDeployment(roycoMarket);
+
+        // Ensure that the accountant can sync the market state
+        _grantRole(SYNC_ROLE, address(roycoMarket.accountant), 0, 0);
 
         // Configure the roles
         _configureRoles(roycoMarket, _params.roles);

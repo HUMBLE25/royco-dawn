@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
+import { ReentrancyGuardTransient } from "../../../lib/openzeppelin-contracts/contracts/utils/ReentrancyGuardTransient.sol";
 import { RoycoBase } from "../../base/RoycoBase.sol";
 import { IRoycoAccountant } from "../../interfaces/IRoycoAccountant.sol";
 import { ExecutionModel, IRoycoKernel, SharesRedemptionModel } from "../../interfaces/kernel/IRoycoKernel.sol";
@@ -18,7 +19,7 @@ import { UtilsLib } from "../../libraries/UtilsLib.sol";
  * @dev Provides the foundational logic for kernel contracts including pre and post operation NAV reconciliation, coverage enforcement logic,
  *      and base wiring for tranche synchronization. All concrete kernel implementations should inherit from the Royco Kernel.
  */
-abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
+abstract contract RoycoKernel is IRoycoKernel, RoycoBase, ReentrancyGuardTransient {
     using UnitsMathLib for NAV_UNIT;
     using UnitsMathLib for TRANCHE_UNIT;
     using UtilsLib for bytes;
@@ -251,9 +252,10 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         public
         virtual
         override(IRoycoKernel)
-        withQuoterCache
-        restricted
         whenNotPaused
+        restricted
+        nonReentrant
+        withQuoterCache
         returns (SyncedAccountingState memory state)
     {
         // Execute a pre-op accounting sync via the accountant
@@ -286,14 +288,6 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         }
     }
 
-    /// @inheritdoc IRoycoKernel
-    function currentMarketUtilization() external view override(IRoycoKernel) returns (uint256 utilization) {
-        SyncedAccountingState memory state = _previewSyncTrancheAccounting();
-        IRoycoAccountant.RoycoAccountantState memory accountantState = _accountant().getState();
-
-        utilization = UtilsLib.computeUtilization(state.stRawNAV, state.jtRawNAV, accountantState.betaWAD, accountantState.coverageWAD, state.jtEffectiveNAV);
-    }
-
     // =============================
     // Senior Tranche Deposit and Redeem Functions
     // =============================
@@ -311,6 +305,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         override(IRoycoKernel)
         whenNotPaused
         onlySeniorTranche
+        nonReentrant
         withQuoterCache
         returns (NAV_UNIT valueAllocated, NAV_UNIT navToMintAt, bytes memory)
     {
@@ -340,6 +335,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         override(IRoycoKernel)
         whenNotPaused
         onlySeniorTranche
+        nonReentrant
         withQuoterCache
         returns (AssetClaims memory userAssetClaims, bytes memory)
     {
@@ -382,6 +378,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         override(IRoycoKernel)
         whenNotPaused
         onlyJuniorTranche
+        nonReentrant
         withQuoterCache
         returns (NAV_UNIT valueAllocated, NAV_UNIT navToMintAt, bytes memory)
     {
@@ -419,6 +416,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         override(IRoycoKernel)
         whenNotPaused
         onlyJuniorTranche
+        nonReentrant
         withQuoterCache
         returns (uint256 requestId, bytes memory metadata)
     {
@@ -470,6 +468,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         override(IRoycoKernel)
         whenNotPaused
         onlyJuniorTranche
+        nonReentrant
         checkJTRedemptionRequestId(_controller, _requestId)
         withQuoterCache
     {
@@ -507,6 +506,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         override(IRoycoKernel)
         whenNotPaused
         onlyJuniorTranche
+        nonReentrant
         checkJTRedemptionRequestId(_controller, _requestId)
         withQuoterCache
         returns (uint256 shares)
@@ -534,6 +534,7 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase {
         override(IRoycoKernel)
         whenNotPaused
         onlyJuniorTranche
+        nonReentrant
         checkJTRedemptionRequestId(_controller, _requestId)
         withQuoterCache
         returns (AssetClaims memory userAssetClaims, bytes memory)

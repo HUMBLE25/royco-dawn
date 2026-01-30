@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import { Vm } from "../../../../lib/forge-std/src/Vm.sol";
 import { IERC20 } from "../../../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { DeployScript } from "../../../../script/Deploy.s.sol";
+import { RAY_DECIMALS } from "../../../../src/libraries/Constants.sol";
 import { NAV_UNIT, TRANCHE_UNIT, toNAVUnits, toTrancheUnits, toUint256 } from "../../../../src/libraries/Units.sol";
 import { BaseTest } from "../../../base/BaseTest.t.sol";
 import { ERC4626Mock } from "../../../mock/ERC4626Mock.sol";
@@ -11,7 +12,8 @@ import { ERC4626Mock } from "../../../mock/ERC4626Mock.sol";
 abstract contract MainnetForkWithAaveTestBase is BaseTest {
     /// @dev Maximum absolute delta for tranche unit comparisons (accounts for Aave rounding)
     TRANCHE_UNIT internal AAVE_MAX_ABS_TRANCHE_UNIT_DELTA = toTrancheUnits(3);
-    NAV_UNIT internal AAVE_MAX_ABS_NAV_DELTA = toNAVUnits(toUint256(AAVE_MAX_ABS_TRANCHE_UNIT_DELTA) * 10 ** 12); // NAVs are scaled to WAD and USDC has 6 decimals
+    /// @dev NAV delta scaled to RAY precision. For USDC (6 decimals): scale factor = 10^(RAY_DECIMALS - 6) = 10^21
+    NAV_UNIT internal AAVE_MAX_ABS_NAV_DELTA = toNAVUnits(toUint256(AAVE_MAX_ABS_TRANCHE_UNIT_DELTA) * 10 ** (RAY_DECIMALS - 6));
     uint256 internal constant MAX_REDEEM_RELATIVE_DELTA = 1 * BPS;
     uint256 internal constant MAX_CONVERT_TO_ASSETS_RELATIVE_DELTA = 1 * BPS;
     uint256 internal constant AAVE_PREVIEW_DEPOSIT_RELATIVE_DELTA = 1 * BPS;
@@ -109,7 +111,8 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
             juniorTrancheSymbol: JUNIOR_TRANCHE_SYMBOL,
             seniorAsset: ETHEREUM_MAINNET_USDC_ADDRESS,
             juniorAsset: ETHEREUM_MAINNET_USDC_ADDRESS,
-            dustTolerance: DUST_TOLERANCE,
+            stNAVDustTolerance: toNAVUnits(uint256(10 ** 21)), // 10^(27-6) for USDC
+            jtNAVDustTolerance: toNAVUnits(uint256(10 ** 21)), // 10^(27-6) for USDC
             kernelType: DeployScript.KernelType.ERC4626_ST_AaveV3_JT_InKindAssets,
             kernelSpecificParams: abi.encode(kernelParams),
             protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS,

@@ -6,7 +6,7 @@ import { Math } from "../../../lib/openzeppelin-contracts/contracts/utils/math/M
 import { IRoycoAccountant } from "../../../src/interfaces/IRoycoAccountant.sol";
 import { IRoycoKernel } from "../../../src/interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoVaultTranche } from "../../../src/interfaces/tranche/IRoycoVaultTranche.sol";
-import { ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, WAD, ZERO_NAV_UNITS, ZERO_TRANCHE_UNITS } from "../../../src/libraries/Constants.sol";
+import { SENTINEL_REQUEST_ID, WAD, ZERO_NAV_UNITS, ZERO_TRANCHE_UNITS } from "../../../src/libraries/Constants.sol";
 import { AssetClaims, MarketState, Operation, SyncedAccountingState, TrancheType } from "../../../src/libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, toNAVUnits, toTrancheUnits, toUint256 } from "../../../src/libraries/Units.sol";
 import { UnitsMathLib } from "../../../src/libraries/Units.sol";
@@ -51,12 +51,12 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
     /// @notice Test conversion of 1 unit (minimum non-zero)
     function test_conversion_oneUnit_correctScaling() public view {
         // USDC has 6 decimals, so 1 unit = 1e-6 USDC
-        // NAV is in WAD (18 decimals), so 1 USDC unit should become 1e12 NAV units
+        // NAV is in RAY (27 decimals), so 1 USDC unit should become 1e21 NAV units
         TRANCHE_UNIT oneUnit = toTrancheUnits(1);
         NAV_UNIT stNav = KERNEL.stConvertTrancheUnitsToNAVUnits(oneUnit);
 
-        // For 6 decimal asset, scale factor = 10^12
-        assertEq(toUint256(stNav), 1e12, "1 unit of 6-decimal asset must scale to 1e12 NAV");
+        // For 6 decimal asset, scale factor = 10^(27-6) = 10^21
+        assertEq(toUint256(stNav), 1e21, "1 unit of 6-decimal asset must scale to 1e21 NAV");
     }
 
     /// @notice Test round-trip conversion preserves value (asset -> NAV -> asset)
@@ -139,7 +139,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         // Max ST deposit should be JT_EFF_NAV / coverage
         // With coverage = 0.2 (20%), max ST = JT * 5
         NAV_UNIT jtEffNAV = JT.totalAssets().nav;
-        uint256 expectedMaxDeposit = toUint256(jtEffNAV) * WAD / COVERAGE_WAD / 1e12; // Convert NAV to USDC
+        uint256 expectedMaxDeposit = toUint256(jtEffNAV) * WAD / COVERAGE_WAD / 1e21; // Convert NAV (RAY) to USDC (6 decimals)
 
         TRANCHE_UNIT actualMaxDeposit = ST.maxDeposit(ALICE_ADDRESS);
 
@@ -216,7 +216,12 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
 
         // Initially JT can redeem all shares (allow small tolerance for mulDiv rounding in maxRedeem)
         uint256 initialMaxRedeem = JT.maxRedeem(jtDepositor);
-        assertApproxEqAbs(initialMaxRedeem, jtShares, toUint256(DUST_TOLERANCE) + 1, "JT must be able to redeem all shares initially");
+        assertApproxEqAbs(
+            toUint256(JT.convertToAssets(initialMaxRedeem).nav),
+            toUint256(JT.convertToAssets(jtShares).nav),
+            2 * 10 ** 21,
+            "JT must be able to redeem all shares initially"
+        );
 
         // ST deposits, using 50% of coverage capacity
         address stDepositor = BOB_ADDRESS;
@@ -1376,7 +1381,15 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
 
         // Max redeem returns approximately the balance (may be 1 wei less due to mulDiv floor rounding in coverage calculations)
         uint256 maxRedeem = JT.maxRedeem(jtDepositor);
-        assertApproxEqAbs(maxRedeem, shares, toUint256(DUST_TOLERANCE) + 1, "JT maxRedeem must equal balance");
+        NAV_UNIT maxRedeemNAV = JT.convertToAssets(maxRedeem).nav;
+        NAV_UNIT sharesNAV = JT.convertToAssets(shares).nav;
+
+        assertApproxEqAbs(
+            maxRedeemNAV,
+            sharesNAV,
+            toUint256(ACCOUNTANT.getState().stNAVDustTolerance + ACCOUNTANT.getState().jtNAVDustTolerance),
+            "JT maxRedeem must equal balance"
+        );
     }
 
     // ============================================
@@ -2329,7 +2342,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         _depositST(50_000e6, BOB_ADDRESS);
         AssetClaims memory afterSTDeposit = ST.totalAssets();
         assertApproxEqAbs(toUint256(afterSTDeposit.stAssets), 50_000e6, toUint256(AAVE_MAX_ABS_TRANCHE_UNIT_DELTA), "ST assets must match deposit");
-        assertApproxEqAbs(toUint256(afterSTDeposit.nav), 50_000e18, toUint256(AAVE_MAX_ABS_NAV_DELTA), "ST NAV must match deposit");
+        assertApproxEqAbs(toUint256(afterSTDeposit.nav), 50_000e27, toUint256(AAVE_MAX_ABS_NAV_DELTA), "ST NAV must match deposit");
     }
 
     /// @notice Test JT.totalAssets() returns correct values
@@ -2344,7 +2357,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         _depositJT(100_000e6, ALICE_ADDRESS);
         AssetClaims memory afterJTDeposit = JT.totalAssets();
         assertApproxEqAbs(toUint256(afterJTDeposit.jtAssets), 100_000e6, toUint256(AAVE_MAX_ABS_TRANCHE_UNIT_DELTA), "JT assets must match deposit");
-        assertApproxEqAbs(toUint256(afterJTDeposit.nav), 100_000e18, toUint256(AAVE_MAX_ABS_NAV_DELTA), "JT NAV must match deposit");
+        assertApproxEqAbs(toUint256(afterJTDeposit.nav), 100_000e27, toUint256(AAVE_MAX_ABS_NAV_DELTA), "JT NAV must match deposit");
     }
 
     /// @notice Test ST.maxDeposit() respects coverage constraint
@@ -2510,7 +2523,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         _depositST(50_000e6, BOB_ADDRESS);
 
         NAV_UNIT afterDepositRawNAV = ST.getRawNAV();
-        assertApproxEqAbs(toUint256(afterDepositRawNAV), 50_000e18, toUint256(AAVE_MAX_ABS_NAV_DELTA), "Raw NAV must match deposit");
+        assertApproxEqAbs(toUint256(afterDepositRawNAV), 50_000e27, toUint256(AAVE_MAX_ABS_NAV_DELTA), "Raw NAV must match deposit");
     }
 
     /// @notice Test JT.getRawNAV() returns correct value
@@ -2523,7 +2536,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         _depositJT(100_000e6, ALICE_ADDRESS);
 
         NAV_UNIT afterDepositRawNAV = JT.getRawNAV();
-        assertApproxEqAbs(toUint256(afterDepositRawNAV), 100_000e18, toUint256(AAVE_MAX_ABS_NAV_DELTA), "Raw NAV must match deposit");
+        assertApproxEqAbs(toUint256(afterDepositRawNAV), 100_000e27, toUint256(AAVE_MAX_ABS_NAV_DELTA), "Raw NAV must match deposit");
     }
 
     /// @notice Test ST.kernel() returns correct address
@@ -2693,7 +2706,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         SyncedAccountingState memory state = KERNEL.syncTrancheAccounting();
 
         // Verify: ST effective NAV increased, JT effective NAV may increase (yield share)
-        assertGt(toUint256(state.stEffectiveNAV), 50_000e18, "ST effective NAV must increase from gain");
+        assertGt(toUint256(state.stEffectiveNAV), 50_000e27, "ST effective NAV must increase from gain");
         assertEq(toUint256(state.stImpermanentLoss), 0, "No ST impermanent loss on gain");
         assertEq(toUint256(state.jtCoverageImpermanentLoss), 0, "No JT coverage IL on ST gain");
         assertEq(uint256(state.marketState), uint256(MarketState.PERPETUAL), "Market must stay PERPETUAL");
@@ -2735,8 +2748,8 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         SyncedAccountingState memory state = KERNEL.syncTrancheAccounting();
 
         // Verify: JT provided coverage, ST effective NAV unchanged
-        assertApproxEqAbs(toUint256(state.stEffectiveNAV), 50_000e18, toUint256(AAVE_MAX_ABS_NAV_DELTA), "ST effective NAV should be maintained");
-        assertLt(toUint256(state.jtEffectiveNAV), 100_000e18, "JT effective NAV must decrease from coverage");
+        assertApproxEqAbs(toUint256(state.stEffectiveNAV), 50_000e27, toUint256(AAVE_MAX_ABS_NAV_DELTA), "ST effective NAV should be maintained");
+        assertLt(toUint256(state.jtEffectiveNAV), 100_000e27, "JT effective NAV must decrease from coverage");
         assertGt(toUint256(state.jtCoverageImpermanentLoss), 0, "JT coverage IL must be recorded");
         assertEq(toUint256(state.stImpermanentLoss), 0, "No ST IL when fully covered");
         _verifyNAVConservation(state, "ST loss with JT coverage");
@@ -2780,7 +2793,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         SyncedAccountingState memory state = KERNEL.syncTrancheAccounting();
 
         // Verify: JT effective NAV decreased from providing coverage
-        assertLt(toUint256(state.jtEffectiveNAV), 100_000e18, "JT effective NAV must decrease from coverage");
+        assertLt(toUint256(state.jtEffectiveNAV), 100_000e27, "JT effective NAV must decrease from coverage");
         _verifyNAVConservation(state, "JT coverage provided");
     }
 
@@ -2802,7 +2815,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
             SyncedAccountingState memory state = KERNEL.syncTrancheAccounting();
 
             // Verify: JT effective NAV decreased significantly
-            assertLt(toUint256(state.jtEffectiveNAV), 100_000e18, "JT effective NAV must decrease");
+            assertLt(toUint256(state.jtEffectiveNAV), 100_000e27, "JT effective NAV must decrease");
             _verifyNAVConservation(state, "Large ST loss");
         }
     }
@@ -2821,7 +2834,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         SyncedAccountingState memory state = KERNEL.syncTrancheAccounting();
 
         // ST should have increased NAV
-        assertGt(toUint256(state.stEffectiveNAV), 50_000e18, "ST effective NAV must increase");
+        assertGt(toUint256(state.stEffectiveNAV), 50_000e27, "ST effective NAV must increase");
         assertEq(toUint256(state.stImpermanentLoss), 0, "No IL on gains");
         _verifyNAVConservation(state, "ST gain");
     }
@@ -2844,7 +2857,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         SyncedAccountingState memory state = KERNEL.syncTrancheAccounting();
 
         // Net result should be ST gain
-        assertGt(toUint256(state.stEffectiveNAV), 50_000e18, "ST effective NAV must increase from net gain");
+        assertGt(toUint256(state.stEffectiveNAV), 50_000e27, "ST effective NAV must increase from net gain");
         _verifyNAVConservation(state, "ST net gain after loss");
     }
 
@@ -3237,8 +3250,8 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         (SyncedAccountingState memory state,,) = KERNEL.previewSyncTrancheAccounting(TrancheType.SENIOR);
 
         // Verify state after ST deposit
-        assertApproxEqAbs(toUint256(state.stRawNAV), 50_000e18, toUint256(AAVE_MAX_ABS_NAV_DELTA), "ST raw NAV matches deposit");
-        assertApproxEqAbs(toUint256(state.stEffectiveNAV), 50_000e18, toUint256(AAVE_MAX_ABS_NAV_DELTA), "ST effective NAV matches deposit");
+        assertApproxEqAbs(toUint256(state.stRawNAV), 50_000e27, toUint256(AAVE_MAX_ABS_NAV_DELTA), "ST raw NAV matches deposit");
+        assertApproxEqAbs(toUint256(state.stEffectiveNAV), 50_000e27, toUint256(AAVE_MAX_ABS_NAV_DELTA), "ST effective NAV matches deposit");
         _verifyNAVConservation(state, "post-op ST deposit");
     }
 
@@ -3250,8 +3263,8 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         (SyncedAccountingState memory state,,) = KERNEL.previewSyncTrancheAccounting(TrancheType.JUNIOR);
 
         // Verify state after JT deposit
-        assertApproxEqAbs(toUint256(state.jtRawNAV), 100_000e18, toUint256(AAVE_MAX_ABS_NAV_DELTA), "JT raw NAV matches deposit");
-        assertApproxEqAbs(toUint256(state.jtEffectiveNAV), 100_000e18, toUint256(AAVE_MAX_ABS_NAV_DELTA), "JT effective NAV matches deposit");
+        assertApproxEqAbs(toUint256(state.jtRawNAV), 100_000e27, toUint256(AAVE_MAX_ABS_NAV_DELTA), "JT raw NAV matches deposit");
+        assertApproxEqAbs(toUint256(state.jtEffectiveNAV), 100_000e27, toUint256(AAVE_MAX_ABS_NAV_DELTA), "JT effective NAV matches deposit");
         _verifyNAVConservation(state, "post-op JT deposit");
     }
 
@@ -3267,7 +3280,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         (SyncedAccountingState memory state,,) = KERNEL.previewSyncTrancheAccounting(TrancheType.SENIOR);
 
         // Verify state after ST redeem
-        assertApproxEqAbs(toUint256(state.stRawNAV), 25_000e18, toUint256(AAVE_MAX_ABS_NAV_DELTA), "ST raw NAV halved after redeem");
+        assertApproxEqAbs(toUint256(state.stRawNAV), 25_000e27, toUint256(AAVE_MAX_ABS_NAV_DELTA), "ST raw NAV halved after redeem");
         _verifyNAVConservation(state, "post-op ST redeem");
     }
 
@@ -3291,7 +3304,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
 
         // Verify state after JT redeem - use relative tolerance due to Aave yield accrual during delay
         // JT raw NAV should be approximately half (within 1% due to yield)
-        assertApproxEqRel(toUint256(state.jtRawNAV), 50_000e18, 1e16, "JT raw NAV roughly halved after redeem (within 1% for yield)");
+        assertApproxEqRel(toUint256(state.jtRawNAV), 50_000e27, 1e16, "JT raw NAV roughly halved after redeem (within 1% for yield)");
         _verifyNAVConservation(state, "post-op JT redeem");
     }
 
@@ -3435,10 +3448,11 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
     // ============================================
 
     /// @notice Test currentMarketUtilization returns correct value for empty market
-    function test_currentMarketUtilization_emptyMarket() public view {
-        uint256 utilization = KERNEL.currentMarketUtilization();
+    function test_currentMarketUtilization_emptyMarket() public {
+        vm.prank(SYNC_ROLE_ADDRESS);
+        uint256 utilizationWAD = KERNEL.syncTrancheAccounting().utilizationWAD;
         // Empty market should have 0 utilization
-        assertEq(utilization, 0, "Empty market should have 0 utilization");
+        assertEq(utilizationWAD, 0, "Empty market should have 0 utilization");
     }
 
     /// @notice Test currentMarketUtilization after deposits
@@ -3450,12 +3464,13 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         _depositST(200_000e6, BOB_ADDRESS);
 
         // Get utilization
-        uint256 utilization = KERNEL.currentMarketUtilization();
+        vm.prank(SYNC_ROLE_ADDRESS);
+        uint256 utilizationWAD = KERNEL.syncTrancheAccounting().utilizationWAD;
 
         // Utilization = ((ST_RAW + JT_RAW * beta) * coverage) / JT_EFFECTIVE
         // Should be > 0 when there's capital
-        assertGt(utilization, 0, "Utilization should be > 0 after deposits");
-        assertLt(utilization, WAD, "Utilization should be < 100% for healthy market");
+        assertGt(utilizationWAD, 0, "Utilization should be > 0 after deposits");
+        assertLt(utilizationWAD, WAD, "Utilization should be < 100% for healthy market");
     }
 
     /// @notice Test currentMarketUtilization at high utilization
@@ -3471,9 +3486,10 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
             ST.deposit(maxStDeposit, BOB_ADDRESS, BOB_ADDRESS);
             vm.stopPrank();
 
-            uint256 utilization = KERNEL.currentMarketUtilization();
+            vm.prank(SYNC_ROLE_ADDRESS);
+            uint256 utilizationWAD = KERNEL.syncTrancheAccounting().utilizationWAD;
             // Should be close to WAD (100%) when at max ST deposit
-            assertGe(utilization, WAD * 9 / 10, "Utilization should be >= 90% at max ST deposit");
+            assertGe(utilizationWAD, WAD * 9 / 10, "Utilization should be >= 90% at max ST deposit");
         }
     }
 
@@ -3799,22 +3815,26 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
     /// @notice Test utilization computation at boundary conditions
     function test_utilizationBoundaries() public {
         // Empty market - no utilization
-        uint256 emptyUtil = KERNEL.currentMarketUtilization();
+        vm.prank(SYNC_ROLE_ADDRESS);
+        uint256 emptyUtil = KERNEL.syncTrancheAccounting().utilizationWAD;
         assertEq(emptyUtil, 0, "Empty market should have 0 utilization");
 
         // JT only - no ST means no utilization
         _depositJT(1_000_000e6, ALICE_ADDRESS);
-        uint256 jtOnlyUtil = KERNEL.currentMarketUtilization();
+        vm.prank(SYNC_ROLE_ADDRESS);
+        uint256 jtOnlyUtil = KERNEL.syncTrancheAccounting().utilizationWAD;
         assertEq(jtOnlyUtil, 0, "JT-only market should have 0 utilization");
 
         // Add ST - utilization should increase
         _depositST(100_000e6, BOB_ADDRESS);
-        uint256 withSTUtil = KERNEL.currentMarketUtilization();
+        vm.prank(SYNC_ROLE_ADDRESS);
+        uint256 withSTUtil = KERNEL.syncTrancheAccounting().utilizationWAD;
         assertGt(withSTUtil, 0, "Market with ST should have positive utilization");
 
         // Add more ST - utilization should increase more
         _depositST(400_000e6, BOB_ADDRESS);
-        uint256 moreSTUtil = KERNEL.currentMarketUtilization();
+        vm.prank(SYNC_ROLE_ADDRESS);
+        uint256 moreSTUtil = KERNEL.syncTrancheAccounting().utilizationWAD;
         assertGt(moreSTUtil, withSTUtil, "More ST should increase utilization");
     }
 
@@ -4071,7 +4091,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         assertEq(uint256(state.lastMarketState), uint256(MarketState.PERPETUAL), "Initial state should be PERPETUAL");
     }
 
-    /// @notice Test transition to FIXED_TERM when jtCoverageIL > dustTolerance
+    /// @notice Test transition to FIXED_TERM when jtCoverageIL > stNAVDustTolerance
     function test_marketState_transitionToFixedTerm_onSignificantCoverageIL() public {
         // Setup market
         _depositJT(1_000_000e6, ALICE_ADDRESS);
@@ -4081,7 +4101,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         IRoycoAccountant.RoycoAccountantState memory stateBefore = ACCOUNTANT.getState();
         assertEq(uint256(stateBefore.lastMarketState), uint256(MarketState.PERPETUAL), "Should start PERPETUAL");
 
-        // Simulate significant ST loss to create IL > dustTolerance
+        // Simulate significant ST loss to create IL > stNAVDustTolerance
         uint256 significantLoss = 50_000e6; // Large loss
         vm.prank(address(MOCK_UNDERLYING_ST_VAULT));
         USDC.transfer(address(1), significantLoss); // Transfer USDC out of vault to simulate loss
@@ -4091,8 +4111,8 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
 
         IRoycoAccountant.RoycoAccountantState memory stateAfter = ACCOUNTANT.getState();
 
-        // If jtCoverageIL > dustTolerance, should be FIXED_TERM
-        if (toUint256(stateAfter.lastJTCoverageImpermanentLoss) > toUint256(stateAfter.dustTolerance)) {
+        // If jtCoverageIL > stNAVDustTolerance, should be FIXED_TERM
+        if (toUint256(stateAfter.lastJTCoverageImpermanentLoss) > toUint256(stateAfter.stNAVDustTolerance)) {
             assertEq(uint256(stateAfter.lastMarketState), uint256(MarketState.FIXED_TERM), "Should transition to FIXED_TERM");
             assertGt(stateAfter.fixedTermEndTimestamp, 0, "fixedTermEndTimestamp should be set");
         }
@@ -4127,11 +4147,11 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         }
     }
 
-    /// @notice Test hysteresis: staying FIXED_TERM when 0 < IL <= dustTolerance
+    /// @notice Test hysteresis: staying FIXED_TERM when 0 < IL <= stNAVDustTolerance
     function test_marketState_hysteresis_staysFixedTermWithDustIL() public {
         // The asymmetry is intentional:
         // - To EXIT FIXED_TERM: IL must be exactly 0
-        // - To STAY in PERPETUAL: IL <= dustTolerance is OK
+        // - To STAY in PERPETUAL: IL <= stNAVDustTolerance is OK
         // This prevents state oscillation
 
         _depositJT(1_000_000e6, ALICE_ADDRESS);
@@ -4139,8 +4159,8 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
 
         IRoycoAccountant.RoycoAccountantState memory state = ACCOUNTANT.getState();
 
-        // Verify dustTolerance is readable (may be 0 in some test setups)
-        assertTrue(toUint256(state.dustTolerance) >= 0, "dustTolerance should be non-negative");
+        // Verify stNAVDustTolerance is readable (may be 0 in some test setups)
+        assertTrue(toUint256(state.stNAVDustTolerance) >= 0, "stNAVDustTolerance should be non-negative");
 
         // The market state should be PERPETUAL initially
         assertEq(uint256(state.lastMarketState), uint256(MarketState.PERPETUAL), "Should be PERPETUAL initially");
@@ -4298,7 +4318,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
     function test_coverageMath_maxSTDeposit_formula() public {
         _depositJT(1_000_000e6, ALICE_ADDRESS);
 
-        // maxSTDeposit = (jtEffectiveNAV / coverage) - stRawNAV - jtRawNAV * beta - dustTolerance
+        // maxSTDeposit = (jtEffectiveNAV / coverage) - stRawNAV - jtRawNAV * beta - stNAVDustTolerance
         NAV_UNIT jtEffNAV = JT.totalAssets().nav;
         NAV_UNIT stRawNAV = ST.getRawNAV();
         NAV_UNIT jtRawNAV = JT.getRawNAV();
@@ -4308,10 +4328,10 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         // Calculate expected max deposit
         uint256 totalCoveredAssets = toUint256(jtEffNAV) * WAD / COVERAGE_WAD;
         uint256 jtCoverageRequired = toUint256(jtRawNAV) * BETA_WAD / WAD;
-        uint256 dustTolerance = toUint256(state.dustTolerance);
+        uint256 stNAVDustTolerance = toUint256(state.stNAVDustTolerance);
 
-        uint256 expectedMaxNAV = totalCoveredAssets - jtCoverageRequired - toUint256(stRawNAV) - dustTolerance;
-        uint256 expectedMaxTrancheUnits = expectedMaxNAV / 1e12; // Convert from NAV to USDC
+        uint256 expectedMaxNAV = totalCoveredAssets - jtCoverageRequired - toUint256(stRawNAV) - stNAVDustTolerance;
+        uint256 expectedMaxTrancheUnits = expectedMaxNAV / 1e21; // Convert from NAV (27 decimals) to USDC (6 decimals)
 
         TRANCHE_UNIT actualMaxDeposit = ST.maxDeposit(BOB_ADDRESS);
 
@@ -4325,7 +4345,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         _depositST(100_000e6, BOB_ADDRESS);
 
         // The max JT withdrawal should be reduced due to coverage requirement
-        // (and dustTolerance buffer if configured)
+        // (and stNAVDustTolerance buffer if configured)
 
         uint256 jtShares = JT.balanceOf(ALICE_ADDRESS);
         uint256 maxRedeem = JT.maxRedeem(ALICE_ADDRESS);
@@ -4335,8 +4355,8 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
 
         IRoycoAccountant.RoycoAccountantState memory state = ACCOUNTANT.getState();
 
-        // Verify dustTolerance is readable (may be 0 in some configurations)
-        assertTrue(toUint256(state.dustTolerance) >= 0, "dustTolerance should be non-negative");
+        // Verify stNAVDustTolerance is readable (may be 0 in some configurations)
+        assertTrue(toUint256(state.stNAVDustTolerance) >= 0, "stNAVDustTolerance should be non-negative");
     }
 
     /// @notice Test coverage utilization calculation
@@ -4345,16 +4365,17 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         _depositST(200_000e6, BOB_ADDRESS);
 
         // Utilization = (stRawNAV + jtRawNAV * beta) * coverage / jtEffectiveNAV
-        uint256 utilization = KERNEL.currentMarketUtilization();
+        vm.prank(SYNC_ROLE_ADDRESS);
+        uint256 utilizationWAD = KERNEL.syncTrancheAccounting().utilizationWAD;
 
         NAV_UNIT stRawNAV = ST.getRawNAV();
         NAV_UNIT jtRawNAV = JT.getRawNAV();
         NAV_UNIT jtEffNAV = JT.totalAssets().nav;
 
         uint256 numerator = (toUint256(stRawNAV) + toUint256(jtRawNAV) * BETA_WAD / WAD) * COVERAGE_WAD;
-        uint256 expectedUtilization = numerator / toUint256(jtEffNAV);
+        uint256 expectedUtilizationWAD = numerator / toUint256(jtEffNAV);
 
-        assertApproxEqRel(utilization, expectedUtilization, 1e15, "Utilization should match formula");
+        assertApproxEqRel(utilizationWAD, expectedUtilizationWAD, 1e15, "Utilization should match formula");
     }
 
     // ============================================
@@ -4371,12 +4392,12 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         assertTrue(state.fixedTermDurationSeconds >= 0, "fixedTermDurationSeconds should be readable");
     }
 
-    /// @notice Test setDustTolerance exists and is readable
-    function test_admin_setDustTolerance() public view {
-        // Verify dustTolerance is readable from the accountant state
+    /// @notice Test setSeniorTrancheDustTolerance exists and is readable
+    function test_admin_setSeniorTrancheDustTolerance() public view {
+        // Verify stNAVDustTolerance is readable from the accountant state
         IRoycoAccountant.RoycoAccountantState memory state = ACCOUNTANT.getState();
-        // dustTolerance should exist (may be 0 in this test setup)
-        assertTrue(toUint256(state.dustTolerance) >= 0, "dustTolerance should be readable");
+        // stNAVDustTolerance should exist (may be 0 in this test setup)
+        assertTrue(toUint256(state.stNAVDustTolerance) >= 0, "stNAVDustTolerance should be readable");
     }
 
     /// @notice Test coverage and beta configuration is readable
@@ -4436,7 +4457,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         ACCOUNTANT.setFixedTermDuration(1 days);
 
         vm.expectRevert();
-        ACCOUNTANT.setDustTolerance(toNAVUnits(uint256(100)));
+        ACCOUNTANT.setSeniorTrancheDustTolerance(toNAVUnits(uint256(100)));
 
         vm.expectRevert();
         ACCOUNTANT.setSeniorTrancheProtocolFee(0.01e18);
@@ -4582,13 +4603,13 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
     /// @notice Test behavior with very small deposits near dust tolerance
     function test_edgeCase_smallDepositsNearDustTolerance() public {
         IRoycoAccountant.RoycoAccountantState memory state = ACCOUNTANT.getState();
-        uint256 dustTolerance = toUint256(state.dustTolerance);
+        uint256 stNAVDustTolerance = toUint256(state.stNAVDustTolerance);
 
         // Deposit JT
         _depositJT(1_000_000e6, ALICE_ADDRESS);
 
         // Try depositing ST amount near dust tolerance (in NAV terms)
-        uint256 smallSTAmount = dustTolerance / 1e12 + 1; // Just above dust in USDC terms
+        uint256 smallSTAmount = stNAVDustTolerance / 1e12 + 1; // Just above dust in USDC terms
 
         TRANCHE_UNIT maxStDeposit = ST.maxDeposit(BOB_ADDRESS);
         if (toUint256(maxStDeposit) >= smallSTAmount) {

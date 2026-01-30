@@ -5,9 +5,11 @@ import { Math } from "../../lib/openzeppelin-contracts/contracts/utils/math/Math
 
 /// @notice Common unit of account for Royco NAV values (e.g., USD, BTC) used consistently across a market's tranches
 /// @dev `NAV_UNIT` must be expressed in the same underlying unit and precision for both ST and JT within a market
+/// @dev `NAV_UNIT` always has RAY decimals (27) of precision
 type NAV_UNIT is uint256;
 
 /// @notice Unit for tranche asset amounts (native token units for a specific tranche)
+/// @dev `TRANCHE_UNIT` always has the same precision as the asset it represents (base asset of the tranche)
 type TRANCHE_UNIT is uint256;
 
 /// @title UnitsMathLib

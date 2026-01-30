@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import { IAccessManager } from "../lib/openzeppelin-contracts/contracts/access/manager/IAccessManager.sol";
-import { RolesConfiguration } from "./config/RolesConfiguration.sol";
+import { RolesConfiguration } from "../src/factory/RolesConfiguration.sol";
 import { Script } from "lib/forge-std/src/Script.sol";
 import { console2 } from "lib/forge-std/src/console2.sol";
 
@@ -40,8 +40,8 @@ contract GrantLPRolesScript is Script, RolesConfiguration {
         }
 
         // Read deployer private key and broadcast
-        uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
-        grantLPRoles(factoryAddress, lpAddresses, deployerPrivateKey);
+        uint256 privateKey = vm.envUint("PRIVATE_KEY");
+        grantLPRoles(factoryAddress, lpAddresses, privateKey);
     }
 
     /**

@@ -83,8 +83,10 @@ abstract contract ERC4626_ST_Kernel is RoycoKernel {
 
     /// @inheritdoc RoycoKernel
     function _stMaxWithdrawableGlobally(address) internal view override(RoycoKernel) returns (TRANCHE_UNIT) {
-        // Max withdraw takes global withdrawal limits into account
-        return toTrancheUnits(IERC4626(ST_VAULT).maxWithdraw(address(this)));
+        // If the underlying vault is illiquid, we transfer the owned shares to the receiver
+        // Therefore, the max withdrawable assets is equivalent to the number of shares owned by the kernel
+        ERC4626KernelState storage $ = ERC4626KernelStorageLib._getERC4626KernelStorage();
+        return toTrancheUnits(IERC4626(ST_VAULT).convertToAssets($.stOwnedShares));
     }
 
     /// @inheritdoc RoycoKernel
@@ -108,17 +110,19 @@ abstract contract ERC4626_ST_Kernel is RoycoKernel {
     /// @inheritdoc RoycoKernel
     function _stWithdrawAssets(TRANCHE_UNIT _stAssets, address _receiver) internal override(RoycoKernel) {
         ERC4626KernelState storage $ = ERC4626KernelStorageLib._getERC4626KernelStorage();
-        // Get the currently withdrawable liquidity from the vault
-        TRANCHE_UNIT maxWithdrawableAssets = toTrancheUnits(IERC4626(ST_VAULT).maxWithdraw(address(this)));
-        // If the vault has sufficient liquidity to withdraw the specified assets, do so
-        if (maxWithdrawableAssets >= _stAssets) {
-            $.stOwnedShares -= IERC4626(ST_VAULT).withdraw(toUint256(_stAssets), _receiver, address(this));
-            // If the vault has insufficient liquidity to withdraw the specified assets, transfer the equivalent number of shares to the receiver
+        // Convert assets to shares, representing the user's fair share of vault shares excluding fees/slippage
+        uint256 sharesToRedeem = IERC4626(ST_VAULT).convertToShares(toUint256(_stAssets));
+        // Check if the vault has sufficient liquidity to redeem the shares
+        uint256 maxRedeemableShares = IERC4626(ST_VAULT).maxRedeem(address(this));
+        // If the vault has sufficient liquidity to redeem the shares, do so
+        if (maxRedeemableShares >= sharesToRedeem) {
+            // Redeem shares: user receives fee/slippage adjusted assets from the vault
+            $.stOwnedShares -= sharesToRedeem;
+            IERC4626(ST_VAULT).redeem(sharesToRedeem, _receiver, address(this));
         } else {
-            // Transfer the assets equivalent of shares to the receiver
-            uint256 sharesEquivalentToWithdraw = IERC4626(ST_VAULT).convertToShares(toUint256(_stAssets));
-            $.stOwnedShares -= sharesEquivalentToWithdraw;
-            IERC20(address(ST_VAULT)).safeTransfer(_receiver, sharesEquivalentToWithdraw);
+            // If the vault has insufficient liquidity, transfer the shares directly to the receiver
+            $.stOwnedShares -= sharesToRedeem;
+            IERC20(address(ST_VAULT)).safeTransfer(_receiver, sharesToRedeem);
         }
     }
 

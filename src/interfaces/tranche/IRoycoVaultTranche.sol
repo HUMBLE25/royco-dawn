@@ -41,9 +41,6 @@ interface IRoycoVaultTranche is IERC20Metadata, IRoycoAsyncVault, IRoycoAsyncCan
     /// @notice Thrown when the address being checked is the null address
     error NULL_ADDRESS();
 
-    /// @notice Thrown when the requested redeem amount is greater than the maximum amount of shares that can be redeemed
-    error MUST_REQUEST_WITHIN_MAX_REDEEM_AMOUNT();
-
     /// @notice Thrown when the specified action is disabled
     error DISABLED();
 

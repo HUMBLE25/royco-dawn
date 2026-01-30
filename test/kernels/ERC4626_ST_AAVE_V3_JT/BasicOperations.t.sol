@@ -6,7 +6,7 @@ import { Math } from "../../../lib/openzeppelin-contracts/contracts/utils/math/M
 import { IRoycoAccountant } from "../../../src/interfaces/IRoycoAccountant.sol";
 import { IRoycoKernel } from "../../../src/interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoVaultTranche } from "../../../src/interfaces/tranche/IRoycoVaultTranche.sol";
-import { ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, WAD, ZERO_TRANCHE_UNITS } from "../../../src/libraries/Constants.sol";
+import { SENTINEL_REQUEST_ID, WAD, ZERO_TRANCHE_UNITS } from "../../../src/libraries/Constants.sol";
 import { AssetClaims, TrancheType } from "../../../src/libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, toTrancheUnits, toUint256 } from "../../../src/libraries/Units.sol";
 import { UnitsMathLib } from "../../../src/libraries/Units.sol";
@@ -184,7 +184,12 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         {
             TRANCHE_UNIT maxDeposit = ST.maxDeposit(jtDepositor);
             // Allow 1 wei tolerance for rounding differences in conversion functions
-            assertApproxEqAbs(toUint256(maxDeposit), toUint256(expectedMaxDeposit), toUint256(DUST_TOLERANCE) + 1, "Max deposit must return JTEff * coverage");
+            assertApproxEqAbs(
+                toUint256(KERNEL.stConvertTrancheUnitsToNAVUnits(maxDeposit)),
+                toUint256(KERNEL.stConvertTrancheUnitsToNAVUnits(expectedMaxDeposit)),
+                toUint256(ACCOUNTANT.getState().stNAVDustTolerance) + 1,
+                "Max deposit must return JTEff * coverage"
+            );
         }
 
         // Try to deposit more than the max deposit, it should revert
@@ -234,9 +239,9 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
 
         // Verify that ST.maxDeposit went down (allow 1 wei tolerance for rounding)
         assertApproxEqAbs(
-            toUint256(ST.maxDeposit(stDepositor)),
-            toUint256(expectedMaxDeposit - depositAmount),
-            toUint256(DUST_TOLERANCE) + 1,
+            toUint256(KERNEL.stConvertTrancheUnitsToNAVUnits(ST.maxDeposit(stDepositor))),
+            toUint256(KERNEL.stConvertTrancheUnitsToNAVUnits(expectedMaxDeposit - depositAmount)),
+            toUint256(ACCOUNTANT.getState().stNAVDustTolerance) + 1,
             "Max deposit must decrease expected amount"
         );
 
@@ -372,7 +377,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
             uint256 requestId;
             {
                 (requestId,) = JT.requestRedeem(actualSharesToWithdraw, jtDepositor, jtDepositor);
-                assertNotEq(requestId, ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, "Request ID must not be the ERC-7540 controller discriminated request ID");
+                assertNotEq(requestId, SENTINEL_REQUEST_ID, "Request ID must not be the ERC-7540 controller discriminated request ID");
             }
 
             // Verify that the pending redeem request is equal to the shares to withdraw
@@ -472,9 +477,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
             vm.prank(jtDepositor);
             {
                 (requestIds[i],) = JT.requestRedeem(sharesToWithdrawForEachRequest[i], jtDepositor, jtDepositor);
-                assertNotEq(
-                    requestIds[i], ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, "Request ID must not be the ERC-7540 controller discriminated request ID"
-                );
+                assertNotEq(requestIds[i], SENTINEL_REQUEST_ID, "Request ID must not be the ERC-7540 controller discriminated request ID");
             }
 
             // Wait for the redemption delay
@@ -578,7 +581,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         uint256 requestId;
         {
             (requestId,) = JT.requestRedeem(sharesToWithdraw, jtDepositor, jtDepositor);
-            assertNotEq(requestId, ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, "Request ID must not be the ERC-7540 controller discriminated request ID");
+            assertNotEq(requestId, SENTINEL_REQUEST_ID, "Request ID must not be the ERC-7540 controller discriminated request ID");
         }
 
         // Verify that shares were locked (transferred to the tranche contract) since JT uses BURN_ON_CLAIM_REDEEM
@@ -657,7 +660,12 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         // Allow small tolerance for mulDiv floor rounding in maxRedeem calculation
         {
             uint256 initialJTMaxRedeem = JT.maxRedeem(jtDepositor);
-            assertApproxEqAbs(initialJTMaxRedeem, jtShares, toUint256(DUST_TOLERANCE) + 1, "JT must be able to redeem all shares initially (no ST deposits)");
+            assertApproxEqAbs(
+                toUint256(JT.convertToAssets(initialJTMaxRedeem).nav),
+                toUint256(JT.convertToAssets(jtShares).nav),
+                toUint256(ACCOUNTANT.getState().jtNAVDustTolerance) + 1,
+                "JT must be able to redeem all shares initially (no ST deposits)"
+            );
         }
 
         // Step 2: ST deposits (uses coverage, JT cannot exit now)
@@ -676,21 +684,6 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
 
         _updateOnDeposit(stState, stDepositAmount, _toSTValue(stDepositAmount), stShares, TrancheType.SENIOR);
         _verifyPreviewNAVs(stState, jtState, AAVE_MAX_ABS_TRANCHE_UNIT_DELTA, AAVE_MAX_ABS_NAV_DELTA);
-
-        // Verify JT cannot exit now (coverage requirement blocks it)
-        {
-            uint256 jtMaxRedeemAfterSTDeposit = JT.maxRedeem(jtDepositor);
-            assertLt(jtMaxRedeemAfterSTDeposit, jtShares, "JT must not be able to redeem all shares after ST deposit");
-
-            uint256 snapshot = vm.snapshotState();
-
-            vm.startPrank(jtDepositor);
-            vm.expectRevert(abi.encodeWithSelector(IRoycoVaultTranche.MUST_REQUEST_WITHIN_MAX_REDEEM_AMOUNT.selector));
-            JT.requestRedeem(jtShares, jtDepositor, jtDepositor);
-            vm.stopPrank();
-
-            vm.revertToState(snapshot);
-        }
 
         // Step 3: ST redeems synchronously (immediately withdraws)
         uint256 stDepositorBalanceBeforeRedeem = USDC.balanceOf(stDepositor);
@@ -719,7 +712,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         uint256 requestId;
         {
             (requestId,) = JT.requestRedeem(jtMaxRedeemAfterSTRedeem, jtDepositor, jtDepositor);
-            assertNotEq(requestId, ERC_7540_CONTROLLER_DISCRIMINATED_REQUEST_ID, "Request ID must not be the ERC-7540 controller discriminated request ID");
+            assertNotEq(requestId, SENTINEL_REQUEST_ID, "Request ID must not be the ERC-7540 controller discriminated request ID");
         }
 
         // Wait for the redemption delay
@@ -833,5 +826,161 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         vm.startPrank(jtDepositor);
         JT.redeem(jtShares, jtDepositor, jtDepositor, requestId);
         vm.stopPrank();
+    }
+
+    /// @notice Tests ST redemption when underlying vault is illiquid
+    /// @dev When maxRedeem returns 0, the kernel should transfer vault shares instead of underlying assets
+    function testFuzz_stRedeem_whenUnderlyingVaultIlliquid_shouldTransferShares(uint256 _jtAssets, uint256 _stDepositPercentage) external {
+        // Bound assets to reasonable range
+        _jtAssets = bound(_jtAssets, 1e6, 1_000_000e6); // Between 1 USDC and 1M USDC
+        _stDepositPercentage = bound(_stDepositPercentage, 1, 100);
+
+        TRANCHE_UNIT jtAssets = toTrancheUnits(_jtAssets);
+
+        address jtDepositor = ALICE_ADDRESS;
+        address stDepositor = BOB_ADDRESS;
+
+        // Step 1: JT deposits (provides coverage for ST)
+        vm.startPrank(jtDepositor);
+        USDC.approve(address(JT), _jtAssets);
+        (uint256 jtShares,) = JT.deposit(jtAssets, jtDepositor, jtDepositor);
+        vm.stopPrank();
+
+        _updateOnDeposit(jtState, jtAssets, _toJTValue(jtAssets), jtShares, TrancheType.JUNIOR);
+
+        // Step 2: ST deposits
+        TRANCHE_UNIT expectedMaxSTDeposit = ST.maxDeposit(stDepositor);
+        TRANCHE_UNIT stDepositAmount = expectedMaxSTDeposit.mulDiv(_stDepositPercentage, 100, Math.Rounding.Floor);
+
+        // Ensure at least some deposit
+        if (stDepositAmount == ZERO_TRANCHE_UNITS) {
+            stDepositAmount = toTrancheUnits(1);
+        }
+
+        vm.startPrank(stDepositor);
+        USDC.approve(address(ST), toUint256(stDepositAmount));
+        (uint256 stShares,) = ST.deposit(stDepositAmount, stDepositor, stDepositor);
+        vm.stopPrank();
+
+        _updateOnDeposit(stState, stDepositAmount, _toSTValue(stDepositAmount), stShares, TrancheType.SENIOR);
+
+        // Record balances before redemption
+        uint256 stDepositorUsdcBefore = USDC.balanceOf(stDepositor);
+        uint256 stDepositorVaultSharesBefore = MOCK_UNDERLYING_ST_VAULT.balanceOf(stDepositor);
+        uint256 kernelVaultSharesBefore = MOCK_UNDERLYING_ST_VAULT.balanceOf(address(KERNEL));
+
+        // Step 3: Mock maxRedeem to return 0 (simulating illiquidity)
+        vm.mockCall(
+            address(MOCK_UNDERLYING_ST_VAULT), abi.encodeWithSelector(MOCK_UNDERLYING_ST_VAULT.maxRedeem.selector, address(KERNEL)), abi.encode(uint256(0))
+        );
+
+        // Step 4: ST redeems - should receive vault shares instead of USDC
+        vm.startPrank(stDepositor);
+        (AssetClaims memory redeemResult,) = ST.redeem(stShares, stDepositor, stDepositor);
+        vm.stopPrank();
+
+        // Clear the mock
+        vm.clearMockedCalls();
+
+        // Step 5: Verify that vault shares were transferred (not USDC)
+        uint256 stDepositorUsdcAfter = USDC.balanceOf(stDepositor);
+        uint256 stDepositorVaultSharesAfter = MOCK_UNDERLYING_ST_VAULT.balanceOf(stDepositor);
+        uint256 kernelVaultSharesAfter = MOCK_UNDERLYING_ST_VAULT.balanceOf(address(KERNEL));
+
+        // USDC balance should not have increased (illiquid vault can't pay out)
+        assertEq(stDepositorUsdcAfter, stDepositorUsdcBefore, "USDC balance should not change when vault is illiquid");
+
+        // Vault shares should have been transferred from kernel to depositor
+        uint256 expectedSharesTransferred = MOCK_UNDERLYING_ST_VAULT.convertToShares(toUint256(redeemResult.stAssets));
+        assertApproxEqAbs(
+            stDepositorVaultSharesAfter - stDepositorVaultSharesBefore,
+            expectedSharesTransferred,
+            1, // Allow 1 wei tolerance for rounding
+            "Depositor should receive vault shares"
+        );
+        assertApproxEqAbs(kernelVaultSharesBefore - kernelVaultSharesAfter, expectedSharesTransferred, 1, "Kernel should transfer vault shares");
+
+        // Verify the redemption value is correct (user gets equivalent value in shares)
+        assertApproxEqAbs(redeemResult.stAssets, stDepositAmount, AAVE_MAX_ABS_TRANCHE_UNIT_DELTA, "Redemption should return correct asset value");
+    }
+
+    /// @notice Tests ST redemption with partial illiquidity
+    /// @dev When maxRedeem returns less than requested shares, kernel should transfer shares directly
+    function testFuzz_stRedeem_whenUnderlyingVaultPartiallyIlliquid_shouldTransferShares(
+        uint256 _jtAssets,
+        uint256 _stDepositPercentage,
+        uint256 _liquidityPercentage
+    )
+        external
+    {
+        // Bound assets to reasonable range
+        _jtAssets = bound(_jtAssets, 10e6, 1_000_000e6); // Between 10 USDC and 1M USDC
+        _stDepositPercentage = bound(_stDepositPercentage, 10, 100);
+        _liquidityPercentage = bound(_liquidityPercentage, 1, 99); // Partial liquidity (1-99%)
+
+        TRANCHE_UNIT jtAssets = toTrancheUnits(_jtAssets);
+
+        address jtDepositor = ALICE_ADDRESS;
+        address stDepositor = BOB_ADDRESS;
+
+        // Step 1: JT deposits (provides coverage for ST)
+        vm.startPrank(jtDepositor);
+        USDC.approve(address(JT), _jtAssets);
+        (uint256 jtShares,) = JT.deposit(jtAssets, jtDepositor, jtDepositor);
+        vm.stopPrank();
+
+        _updateOnDeposit(jtState, jtAssets, _toJTValue(jtAssets), jtShares, TrancheType.JUNIOR);
+
+        // Step 2: ST deposits
+        TRANCHE_UNIT expectedMaxSTDeposit = ST.maxDeposit(stDepositor);
+        TRANCHE_UNIT stDepositAmount = expectedMaxSTDeposit.mulDiv(_stDepositPercentage, 100, Math.Rounding.Floor);
+
+        if (stDepositAmount == ZERO_TRANCHE_UNITS) {
+            stDepositAmount = toTrancheUnits(10e6);
+        }
+
+        vm.startPrank(stDepositor);
+        USDC.approve(address(ST), toUint256(stDepositAmount));
+        (uint256 stShares,) = ST.deposit(stDepositAmount, stDepositor, stDepositor);
+        vm.stopPrank();
+
+        _updateOnDeposit(stState, stDepositAmount, _toSTValue(stDepositAmount), stShares, TrancheType.SENIOR);
+
+        // Calculate partial liquidity amount (in shares for maxRedeem)
+        uint256 partialLiquidityAssets = toUint256(stDepositAmount) * _liquidityPercentage / 100;
+        uint256 partialLiquidityShares = MOCK_UNDERLYING_ST_VAULT.convertToShares(partialLiquidityAssets);
+
+        // Record balances before redemption
+        uint256 stDepositorVaultSharesBefore = MOCK_UNDERLYING_ST_VAULT.balanceOf(stDepositor);
+
+        // Step 3: Mock maxRedeem to return partial liquidity (in shares)
+        vm.mockCall(
+            address(MOCK_UNDERLYING_ST_VAULT),
+            abi.encodeWithSelector(MOCK_UNDERLYING_ST_VAULT.maxRedeem.selector, address(KERNEL)),
+            abi.encode(partialLiquidityShares)
+        );
+
+        // Step 4: ST redeems - since partial liquidity < requested, should transfer shares
+        vm.startPrank(stDepositor);
+        (AssetClaims memory redeemResult,) = ST.redeem(stShares, stDepositor, stDepositor);
+        vm.stopPrank();
+
+        // Clear the mock
+        vm.clearMockedCalls();
+
+        // Step 5: Verify that vault shares were transferred (since partialLiquidity < stDepositAmount)
+        uint256 stDepositorVaultSharesAfter = MOCK_UNDERLYING_ST_VAULT.balanceOf(stDepositor);
+
+        // Vault shares should have been transferred
+        uint256 expectedSharesTransferred = MOCK_UNDERLYING_ST_VAULT.convertToShares(toUint256(redeemResult.stAssets));
+        assertApproxEqAbs(
+            stDepositorVaultSharesAfter - stDepositorVaultSharesBefore,
+            expectedSharesTransferred,
+            1,
+            "Depositor should receive vault shares when partially illiquid"
+        );
+
+        // Verify the redemption value is correct
+        assertApproxEqAbs(redeemResult.stAssets, stDepositAmount, AAVE_MAX_ABS_TRANCHE_UNIT_DELTA, "Redemption should return correct asset value");
     }
 }

@@ -157,12 +157,6 @@ interface IRoycoKernel {
         returns (SyncedAccountingState memory state, AssetClaims memory claims, uint256 totalTrancheShares);
 
     /**
-     * @notice Returns the current market utilization
-     * @return utilization The current market utilization as a percentage
-     */
-    function currentMarketUtilization() external view returns (uint256 utilization);
-
-    /**
      * @notice Returns the maximum amount of assets that can be deposited into the senior tranche
      * @param _receiver The address that is depositing the assets
      * @return assets The maximum amount of assets that can be deposited into the senior tranche, denominated in the senior tranche's tranche units

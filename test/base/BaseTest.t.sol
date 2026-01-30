@@ -7,9 +7,8 @@ import { ERC20Mock } from "../../lib/openzeppelin-contracts/contracts/mocks/toke
 import { ERC1967Proxy } from "../../lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import { DeployScript } from "../../script/Deploy.s.sol";
 import { GrantLPRolesScript } from "../../script/GrantLPRoles.s.sol";
-import { RolesConfiguration } from "../../script/config/RolesConfiguration.sol";
 import { RoycoAccountant } from "../../src/accountant/RoycoAccountant.sol";
-import { RoycoFactory } from "../../src/factory/RoycoFactory.sol";
+import { RolesConfiguration, RoycoFactory } from "../../src/factory/RoycoFactory.sol";
 import { IRoycoAccountant } from "../../src/interfaces/IRoycoAccountant.sol";
 import { IYDM } from "../../src/interfaces/IYDM.sol";
 import { IRoycoKernel } from "../../src/interfaces/kernel/IRoycoKernel.sol";
@@ -460,7 +459,7 @@ abstract contract BaseTest is Test, RolesConfiguration, Assertions {
                 adminProtocolFeeSetterAddress: PROTOCOL_FEE_SETTER_ADDRESS,
                 adminOracleQuoterAddress: ORACLE_QUOTER_ADMIN_ADDRESS,
                 lpRoleAdminAddress: LP_ROLE_ADMIN_ADDRESS,
-                roleGuardianAddress: ROLE_GUARDIAN_ADDRESS,
+                guardianAddress: ROLE_GUARDIAN_ADDRESS,
                 deployerAddress: DEPLOYER_ADDRESS,
                 deployerAdminAddress: DEPLOYER_ADMIN_ADDRESS
             })

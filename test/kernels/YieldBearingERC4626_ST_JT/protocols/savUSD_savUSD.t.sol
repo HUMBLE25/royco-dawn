@@ -59,8 +59,9 @@ contract savUSD_savUSD_Test is YieldBearingERC4626_TestBase {
     }
 
     /// @notice Returns max NAV delta for sAVUSD
-    function maxNAVDelta() public pure override returns (NAV_UNIT) {
-        return toNAVUnits(uint256(1e12));
+    /// @dev Converts the tranche unit tolerance to NAV using the kernel's conversion
+    function maxNAVDelta() public view override returns (NAV_UNIT) {
+        return _toSTValue(maxTrancheUnitDelta());
     }
 
     // ═══════════════════════════════════════════════════════════════════════════

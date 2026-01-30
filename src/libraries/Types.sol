@@ -11,10 +11,10 @@ import { NAV_UNIT, TRANCHE_UNIT } from "./Units.sol";
  * @notice Defines the operational state of a Royco market
  * @custom:state PERPETUAL
  *      Normal operating state where market forces govern behavior
+ *      - The market is healthy (no losses over dust tolerance) or it is severely undercollateralized (LLTV breach) or uncollateralized (ST IL or JT_EFFECTIVE_NAV == 0)
  *      - Both tranches liquid (within coverage constraints)
  *      - JT redemptions subject to async delay for coverage protection
  *      - Adaptive curve YDM adapts based on utilization
- *      - No active JT coverage obligation or the market is distressed (LLTV breach or ST losses)
  * @custom:state FIXED_TERM
  *      Temporary recovery state triggered when JT provides coverage for ST drawdown
  *      - ST experienced a fully covered drawdown but the market is still healthy in terms of its LLTV

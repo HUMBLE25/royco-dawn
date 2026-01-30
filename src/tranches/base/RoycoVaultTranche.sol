@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import { console2 } from "../../../lib/forge-std/src/console2.sol";
 import { ERC20Upgradeable, IERC20, IERC20Metadata } from "../../../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/ERC20Upgradeable.sol";
 import { ERC20PausableUpgradeable } from "../../../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/ERC20PausableUpgradeable.sol";
 import { ERC20PermitUpgradeable } from "../../../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
@@ -135,7 +134,6 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
     /// @inheritdoc IRoycoVaultTranche
     function maxRedeem(address _owner) public view virtual override(IRoycoVaultTranche) returns (uint256 shares) {
         shares = _maxRedeem(_owner, balanceOf(_owner));
-        console2.log("maxRedeem", shares);
     }
 
     /// @inheritdoc IRoycoVaultTranche
@@ -180,7 +178,9 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
                 ? IRoycoKernel(kernel()).stConvertTrancheUnitsToNAVUnits(_assets)
                 : IRoycoKernel(kernel()).jtConvertTrancheUnitsToNAVUnits(_assets));
         (AssetClaims memory trancheClaims, uint256 trancheTotalShares) = _previewPostSyncTrancheState();
-        shares = _convertToShares(navAssets, trancheTotalShares, trancheClaims.nav, Math.Rounding.Floor);
+        // trancheTotalShares includes virtual shares, while _convertToShares expects the total supply without virtual shares
+        // Subtract the virtual shares from the total supply to get the total supply without virtual shares
+        shares = _convertToShares(navAssets, _withoutVirtualShares(trancheTotalShares), trancheClaims.nav, Math.Rounding.Floor);
     }
 
     /// @inheritdoc IRoycoAsyncVault
@@ -198,8 +198,8 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         public
         virtual
         override
-        restricted
         whenNotPaused
+        restricted
         onlyCallerOrOperator(_controller)
         returns (uint256 shares, bytes memory metadata)
     {
@@ -257,9 +257,9 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         public
         virtual
         override
+        whenNotPaused
         restricted
         onlyCallerOrOperator(_controller)
-        whenNotPaused
         returns (AssetClaims memory claims, bytes memory metadata)
     {
         require(_receiver != address(0), ERC20InvalidReceiver(address(0)));
@@ -311,10 +311,10 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         external
         virtual
         override(IRoycoAsyncVault)
-        restricted
         whenNotPaused
-        onlyCallerOrOperator(_owner)
+        restricted
         executionIsAsync(Action.DEPOSIT)
+        onlyCallerOrOperator(_owner)
         returns (uint256 requestId, bytes memory metadata)
     {
         address kernel_ = kernel();
@@ -379,16 +379,13 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         external
         virtual
         override(IRoycoAsyncVault)
-        restricted
         whenNotPaused
+        restricted
         executionIsAsync(Action.REDEEM)
         returns (uint256 requestId, bytes memory metadata)
     {
         // Must be requesting to redeem a non-zero number of shares
         require(_shares != 0, MUST_REQUEST_NON_ZERO_SHARES());
-
-        // Must be requesting to redeem a number of shares that is less than or equal to the maximum amount of shares that can be redeemed
-        require(_shares <= maxRedeem(_owner), MUST_REQUEST_WITHIN_MAX_REDEEM_AMOUNT());
 
         // Spend the caller's share allowance if the caller isn't the owner or an approved operator
         if (!_isCallerOrOperator(_owner)) {
@@ -476,10 +473,10 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         external
         virtual
         override(IRoycoAsyncCancellableVault)
-        restricted
         whenNotPaused
-        onlyCallerOrOperator(_controller)
+        restricted
         executionIsAsync(Action.DEPOSIT)
+        onlyCallerOrOperator(_controller)
     {
         if (TRANCHE_TYPE() == TrancheType.SENIOR) {
             IAsyncSTDepositKernel(kernel()).stCancelDepositRequest(msg.sender, _requestId, _controller);
@@ -537,10 +534,10 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         external
         virtual
         override(IRoycoAsyncCancellableVault)
-        restricted
         whenNotPaused
-        onlyCallerOrOperator(_controller)
+        restricted
         executionIsAsync(Action.DEPOSIT)
+        onlyCallerOrOperator(_controller)
     {
         require(_receiver != address(0), ERC20InvalidReceiver(address(0)));
         // Expect the kernel to transfer the assets to the receiver directly after the cancellation is processed
@@ -560,10 +557,10 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         external
         virtual
         override(IRoycoAsyncCancellableVault)
-        restricted
         whenNotPaused
-        onlyCallerOrOperator(_controller)
+        restricted
         executionIsAsync(Action.REDEEM)
+        onlyCallerOrOperator(_controller)
     {
         // Request the kernel to cancel a previously made redeem request on behalf of the user
         if (TRANCHE_TYPE() == TrancheType.SENIOR) {
@@ -623,10 +620,10 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         external
         virtual
         override(IRoycoAsyncCancellableVault)
-        restricted
         whenNotPaused
-        onlyCallerOrOperator(_owner)
+        restricted
         executionIsAsync(Action.REDEEM)
+        onlyCallerOrOperator(_owner)
     {
         // Get the number of shares in a canceled state for this request ID
         uint256 shares =
@@ -803,6 +800,11 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
     /// @dev Returns the specified share quantity added to the tranche's virtual shares
     function _withVirtualShares(uint256 _shares) internal view returns (uint256) {
         return _shares + 10 ** _decimalsOffset();
+    }
+
+    /// @dev Returns the specified share quantity subtracted from the tranche's virtual shares
+    function _withoutVirtualShares(uint256 _shares) internal view returns (uint256) {
+        return _shares - 10 ** _decimalsOffset();
     }
 
     /// @dev Returns the specified NAV added to the tranche's virtual NAV (1)
