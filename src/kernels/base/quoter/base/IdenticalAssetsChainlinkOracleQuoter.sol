@@ -113,6 +113,11 @@ abstract contract IdenticalAssetsChainlinkOracleQuoter is IdenticalAssetsOracleQ
         _setTrancheAssetToReferenceAssetOracle(_trancheAssetToReferenceAssetOracle, _stalenessThresholdSeconds);
     }
 
+    /// @dev Returns the chainlink oracle configuration for this quoter
+    function getChainlinkOracleConfiguration() external view returns (IdenticalAssetsChainlinkOracleQuoterState memory) {
+        return _getIdenticalAssetsChainlinkOracleQuoterStorage();
+    }
+
     /**
      * @notice Queries the chainlink oracle for the price
      * @dev The price is returned as the answer from the latest round
