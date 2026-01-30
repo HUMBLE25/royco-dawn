@@ -184,7 +184,12 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         {
             TRANCHE_UNIT maxDeposit = ST.maxDeposit(jtDepositor);
             // Allow 1 wei tolerance for rounding differences in conversion functions
-            assertApproxEqAbs(toUint256(maxDeposit), toUint256(expectedMaxDeposit), toUint256(DUST_TOLERANCE) + 1, "Max deposit must return JTEff * coverage");
+            assertApproxEqAbs(
+                toUint256(KERNEL.stConvertTrancheUnitsToNAVUnits(maxDeposit)),
+                toUint256(KERNEL.stConvertTrancheUnitsToNAVUnits(expectedMaxDeposit)),
+                toUint256(ACCOUNTANT.getState().stNAVDustTolerance) + 1,
+                "Max deposit must return JTEff * coverage"
+            );
         }
 
         // Try to deposit more than the max deposit, it should revert
@@ -234,9 +239,9 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
 
         // Verify that ST.maxDeposit went down (allow 1 wei tolerance for rounding)
         assertApproxEqAbs(
-            toUint256(ST.maxDeposit(stDepositor)),
-            toUint256(expectedMaxDeposit - depositAmount),
-            toUint256(DUST_TOLERANCE) + 1,
+            toUint256(KERNEL.stConvertTrancheUnitsToNAVUnits(ST.maxDeposit(stDepositor))),
+            toUint256(KERNEL.stConvertTrancheUnitsToNAVUnits(expectedMaxDeposit - depositAmount)),
+            toUint256(ACCOUNTANT.getState().stNAVDustTolerance) + 1,
             "Max deposit must decrease expected amount"
         );
 
@@ -655,7 +660,12 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         // Allow small tolerance for mulDiv floor rounding in maxRedeem calculation
         {
             uint256 initialJTMaxRedeem = JT.maxRedeem(jtDepositor);
-            assertApproxEqAbs(initialJTMaxRedeem, jtShares, toUint256(DUST_TOLERANCE) + 1, "JT must be able to redeem all shares initially (no ST deposits)");
+            assertApproxEqAbs(
+                toUint256(JT.convertToAssets(initialJTMaxRedeem).nav),
+                toUint256(JT.convertToAssets(jtShares).nav),
+                toUint256(ACCOUNTANT.getState().jtNAVDustTolerance) + 1,
+                "JT must be able to redeem all shares initially (no ST deposits)"
+            );
         }
 
         // Step 2: ST deposits (uses coverage, JT cannot exit now)
@@ -819,7 +829,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
     }
 
     /// @notice Tests ST redemption when underlying vault is illiquid
-    /// @dev When maxWithdraw returns 0, the kernel should transfer vault shares instead of underlying assets
+    /// @dev When maxRedeem returns 0, the kernel should transfer vault shares instead of underlying assets
     function testFuzz_stRedeem_whenUnderlyingVaultIlliquid_shouldTransferShares(uint256 _jtAssets, uint256 _stDepositPercentage) external {
         // Bound assets to reasonable range
         _jtAssets = bound(_jtAssets, 1e6, 1_000_000e6); // Between 1 USDC and 1M USDC
@@ -859,9 +869,9 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         uint256 stDepositorVaultSharesBefore = MOCK_UNDERLYING_ST_VAULT.balanceOf(stDepositor);
         uint256 kernelVaultSharesBefore = MOCK_UNDERLYING_ST_VAULT.balanceOf(address(KERNEL));
 
-        // Step 3: Mock maxWithdraw to return 0 (simulating illiquidity)
+        // Step 3: Mock maxRedeem to return 0 (simulating illiquidity)
         vm.mockCall(
-            address(MOCK_UNDERLYING_ST_VAULT), abi.encodeWithSelector(MOCK_UNDERLYING_ST_VAULT.maxWithdraw.selector, address(KERNEL)), abi.encode(uint256(0))
+            address(MOCK_UNDERLYING_ST_VAULT), abi.encodeWithSelector(MOCK_UNDERLYING_ST_VAULT.maxRedeem.selector, address(KERNEL)), abi.encode(uint256(0))
         );
 
         // Step 4: ST redeems - should receive vault shares instead of USDC
@@ -895,7 +905,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
     }
 
     /// @notice Tests ST redemption with partial illiquidity
-    /// @dev When maxWithdraw returns less than requested, kernel should handle gracefully
+    /// @dev When maxRedeem returns less than requested shares, kernel should transfer shares directly
     function testFuzz_stRedeem_whenUnderlyingVaultPartiallyIlliquid_shouldTransferShares(
         uint256 _jtAssets,
         uint256 _stDepositPercentage,
@@ -936,17 +946,18 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
 
         _updateOnDeposit(stState, stDepositAmount, _toSTValue(stDepositAmount), stShares, TrancheType.SENIOR);
 
-        // Calculate partial liquidity amount
-        uint256 partialLiquidity = toUint256(stDepositAmount) * _liquidityPercentage / 100;
+        // Calculate partial liquidity amount (in shares for maxRedeem)
+        uint256 partialLiquidityAssets = toUint256(stDepositAmount) * _liquidityPercentage / 100;
+        uint256 partialLiquidityShares = MOCK_UNDERLYING_ST_VAULT.convertToShares(partialLiquidityAssets);
 
         // Record balances before redemption
         uint256 stDepositorVaultSharesBefore = MOCK_UNDERLYING_ST_VAULT.balanceOf(stDepositor);
 
-        // Step 3: Mock maxWithdraw to return partial liquidity
+        // Step 3: Mock maxRedeem to return partial liquidity (in shares)
         vm.mockCall(
             address(MOCK_UNDERLYING_ST_VAULT),
-            abi.encodeWithSelector(MOCK_UNDERLYING_ST_VAULT.maxWithdraw.selector, address(KERNEL)),
-            abi.encode(partialLiquidity)
+            abi.encodeWithSelector(MOCK_UNDERLYING_ST_VAULT.maxRedeem.selector, address(KERNEL)),
+            abi.encode(partialLiquidityShares)
         );
 
         // Step 4: ST redeems - since partial liquidity < requested, should transfer shares

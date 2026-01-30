@@ -72,8 +72,10 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         emit BetaUpdated(_params.betaWAD);
         $.ydm = _params.ydm;
         emit YDMUpdated(_params.ydm);
-        $.dustTolerance = _params.dustTolerance;
-        emit DustToleranceUpdated(_params.dustTolerance);
+        $.stNAVDustTolerance = _params.stNAVDustTolerance;
+        emit SeniorTrancheDustToleranceUpdated(_params.stNAVDustTolerance);
+        $.jtNAVDustTolerance = _params.jtNAVDustTolerance;
+        emit JuniorTrancheDustToleranceUpdated(_params.jtNAVDustTolerance);
     }
 
     /// @inheritdoc IRoycoAccountant
@@ -277,7 +279,6 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
     )
         external
         override(IRoycoAccountant)
-        onlyRoycoKernel
         returns (SyncedAccountingState memory state)
     {
         // Execute a post-op NAV synchronization
@@ -333,8 +334,8 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         // Compute the assets required to cover current junior tranche exposure
         NAV_UNIT jtCoverageRequired = _jtRawNAV.mulDiv($.betaWAD, WAD, Math.Rounding.Ceil);
         // Compute the amount of assets that can be deposited into senior while retaining full coverage
-        // Also account for the market's dust tolerance to preclude reverts due to rounding after ST deposit
-        maxSTDeposit = totalCoveredAssets.saturatingSub(jtCoverageRequired).saturatingSub(_stRawNAV).saturatingSub($.dustTolerance);
+        // Also account for ST's dust tolerance to preclude reverts due to rounding after ST deposit
+        maxSTDeposit = totalCoveredAssets.saturatingSub(jtCoverageRequired).saturatingSub(_stRawNAV).saturatingSub($.stNAVDustTolerance);
     }
 
     /**
@@ -378,17 +379,10 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         // Split it into individual tranche's claims
         stClaimable = totalNAVClaimable.mulDiv(kS_WAD, WAD, Math.Rounding.Floor);
         jtClaimable = totalNAVClaimable.mulDiv(kJ_WAD, WAD, Math.Rounding.Floor);
-
-        // Check for any dust tolerance in this market
-        NAV_UNIT dustTolerance = $.dustTolerance;
-        if (dustTolerance == ZERO_NAV_UNITS) return (totalNAVClaimable, stClaimable, jtClaimable);
-        // Compute the prorata dust tolerance for each tranche, being conservative with rounding
-        NAV_UNIT stClaimableDustTolerance = dustTolerance.mulDiv(stClaimable, totalNAVClaimable, Math.Rounding.Ceil);
-        NAV_UNIT jtClaimableDustTolerance = dustTolerance.mulDiv(jtClaimable, totalNAVClaimable, Math.Rounding.Ceil);
         // Account for the market's dust tolerance to preclude reverts due to rounding after JT withdrawal
-        totalNAVClaimable = totalNAVClaimable.saturatingSub(dustTolerance);
-        stClaimable = stClaimable.saturatingSub(stClaimableDustTolerance);
-        jtClaimable = jtClaimable.saturatingSub(jtClaimableDustTolerance);
+        // Apply both dust tolerances since JT withdrawals can include yield and IL repayments from ST in addition to its own NAV
+        stClaimable = stClaimable.saturatingSub($.stNAVDustTolerance);
+        jtClaimable = jtClaimable.saturatingSub($.jtNAVDustTolerance);
     }
 
     /**
@@ -508,8 +502,8 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
             /// @dev STEP_JT_ACCRUES_RESIDUAL_GAINS: JT accrues any remaining appreciation after clearing ST IL and JT self inflicted IL
             if (jtGain != ZERO_NAV_UNITS) {
                 jtNetGain = jtGain;
-                // Compute the protocol fee taken on this JT yield accrual - will be used to mint JT shares to the protocol fee recipient at the updated JT effective NAV
-                jtProtocolFeeAccrued = jtNetGain.mulDiv($.jtProtocolFeeWAD, WAD, Math.Rounding.Floor);
+                // Compute the protocol fee taken on this JT yield accrual if it is not attributable to any rounding/dust
+                if (jtNetGain > $.jtNAVDustTolerance) jtProtocolFeeAccrued = jtNetGain.mulDiv($.jtProtocolFeeWAD, WAD, Math.Rounding.Floor);
                 // Book the residual gains to the JT
                 jtEffectiveNAV = (jtEffectiveNAV + jtNetGain);
             }
@@ -562,6 +556,8 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
             }
             /// @dev STEP_DISTRIBUTE_YIELD: There are no remaining impermanent losses that ST yield is obligated to repay, the residual gains will be used to distribute yield to both tranches
             if (stGain != ZERO_NAV_UNITS) {
+                // Mark yield as distributed if the gain is not attributable to any rounding/dust
+                if (stGain > $.stNAVDustTolerance) yieldDistributed = true;
                 // Compute the time weighted average JT share of yield
                 uint256 elapsed = block.timestamp - $.lastDistributionTimestamp;
                 // If the last yield distribution happened in the same block, use the instantaneous JT yield share. Else, use the time-weighted average JT yield share since the last distribution
@@ -577,17 +573,15 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
                 }
                 // Apply the yield split to JT's effective NAV
                 if (jtGain != ZERO_NAV_UNITS) {
-                    // Compute the protocol fee taken on this JT yield accrual (will be used to mint shares to the protocol fee recipient) at the updated JT effective NAV
-                    jtProtocolFeeAccrued = (jtProtocolFeeAccrued + jtGain.mulDiv($.jtProtocolFeeWAD, WAD, Math.Rounding.Floor));
+                    // Compute the protocol fee taken on this JT yield accrual if it is not attributable to any rounding/dust
+                    if (yieldDistributed) jtProtocolFeeAccrued = (jtProtocolFeeAccrued + jtGain.mulDiv($.jtProtocolFeeWAD, WAD, Math.Rounding.Floor));
                     jtEffectiveNAV = (jtEffectiveNAV + jtGain);
                     stGain = (stGain - jtGain);
                 }
-                // Compute the protocol fee taken on this ST yield accrual (will be used to mint shares to the protocol fee recipient) at the updated JT effective NAV
-                stProtocolFeeAccrued = stGain.mulDiv($.stProtocolFeeWAD, WAD, Math.Rounding.Floor);
+                // Compute the protocol fee taken on this ST yield accrual if it is not attributable to any rounding/dust
+                if (yieldDistributed) stProtocolFeeAccrued = stGain.mulDiv($.stProtocolFeeWAD, WAD, Math.Rounding.Floor);
                 // Book the residual gain to the ST
                 stEffectiveNAV = (stEffectiveNAV + stGain);
-                // Mark yield as distributed
-                yieldDistributed = true;
             }
         }
 
@@ -611,8 +605,8 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
             jtCoverageImpermanentLoss = ZERO_NAV_UNITS;
             // Reset the fixed term end timestamp
             fixedTermEndTimestamp = 0;
-        } else if (jtCoverageImpermanentLoss <= $.dustTolerance) {
-            // JT coverage IL is either non-existant or can be attributed to dust losses (eg. rounding in the underlying ST NAV)
+        } else if (jtCoverageImpermanentLoss <= $.stNAVDustTolerance) {
+            // JT coverage IL is either non-existant or can be attributed to dust ST losses (eg. rounding in the underlying ST NAV)
             // If market was in a perpetual state or the coverage IL was completely wiped, transition to a perpetual state
             if (initialMarketState == MarketState.PERPETUAL || jtCoverageImpermanentLoss == ZERO_NAV_UNITS) {
                 resultingMarketState = MarketState.PERPETUAL;
@@ -773,6 +767,29 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
     }
 
     /// @inheritdoc IRoycoAccountant
+    function setCoverageConfiguration(
+        uint64 _coverageWAD,
+        uint96 _betaWAD,
+        uint64 _lltvWAD
+    )
+        external
+        override(IRoycoAccountant)
+        restricted
+        withSyncedAccounting
+    {
+        // Validate the new coverage configuration
+        _validateCoverageConfig(_coverageWAD, _betaWAD, _lltvWAD);
+        // Set the new config
+        RoycoAccountantState storage $ = _getRoycoAccountantStorage();
+        $.coverageWAD = _coverageWAD;
+        emit CoverageUpdated(_coverageWAD);
+        $.betaWAD = _betaWAD;
+        emit BetaUpdated(_betaWAD);
+        $.lltvWAD = _lltvWAD;
+        emit LLTVUpdated(_lltvWAD);
+    }
+
+    /// @inheritdoc IRoycoAccountant
     function setFixedTermDuration(uint24 _fixedTermDurationSeconds) external override(IRoycoAccountant) restricted withSyncedAccounting {
         RoycoAccountantState storage $ = _getRoycoAccountantStorage();
         $.fixedTermDurationSeconds = _fixedTermDurationSeconds;
@@ -785,9 +802,15 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
     }
 
     /// @inheritdoc IRoycoAccountant
-    function setDustTolerance(NAV_UNIT _dustTolerance) external override(IRoycoAccountant) restricted withSyncedAccounting {
-        _getRoycoAccountantStorage().dustTolerance = _dustTolerance;
-        emit DustToleranceUpdated(_dustTolerance);
+    function setSeniorTrancheDustTolerance(NAV_UNIT _stNAVDustTolerance) external override(IRoycoAccountant) restricted withSyncedAccounting {
+        _getRoycoAccountantStorage().stNAVDustTolerance = _stNAVDustTolerance;
+        emit SeniorTrancheDustToleranceUpdated(_stNAVDustTolerance);
+    }
+
+    /// @inheritdoc IRoycoAccountant
+    function setJuniorTrancheDustTolerance(NAV_UNIT _jtNAVDustTolerance) external override(IRoycoAccountant) restricted withSyncedAccounting {
+        _getRoycoAccountantStorage().jtNAVDustTolerance = _jtNAVDustTolerance;
+        emit JuniorTrancheDustToleranceUpdated(_jtNAVDustTolerance);
     }
 
     /// @inheritdoc IRoycoAccountant
@@ -810,9 +833,9 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
          * Ensure that the LLTV is set correctly (between the max allowed initial LTV and 100%)
          * Maximum Initial LTV Derivation:
          * Given:
-         *   LTV = ST_EFFECTIVE_NAV / (ST_EFFECTIVE_NAV + JT_EFFECTIVE_NAV)
+         *   LTV = (ST_EFFECTIVE_NAV + ST_IL) / (ST_EFFECTIVE_NAV + JT_EFFECTIVE_NAV)
          *   Initial Utilization = ((ST_EFFECTIVE_NAV + JT_RAW_NAV * β) * COV) / JT_EFFECTIVE_NAV
-         *   Note: JT_RAW_NAV == JT_EFFECTIVE_NAV initially since no losses have been incurred by ST
+         *   Note: Initially, JT_RAW_NAV == JT_EFFECTIVE_NAV and ST_IL == 0 since no losses have been incurred by ST
          *   Initial Utilization = ((ST_EFFECTIVE_NAV + JT_EFFECTIVE_NAV * β) * COV) / JT_EFFECTIVE_NAV
          *
          * At Utilization = 1 (boundary of proper collateralization), solving for JT_EFFECTIVE_NAV:

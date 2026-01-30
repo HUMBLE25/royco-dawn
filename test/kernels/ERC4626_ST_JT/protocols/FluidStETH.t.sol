@@ -157,8 +157,9 @@ contract FluidStETH_Test is ERC4626_TestBase {
         return toTrancheUnits(uint256(1e15));
     }
 
-    function maxNAVDelta() public pure override returns (NAV_UNIT) {
-        return toNAVUnits(uint256(1e15));
+    /// @dev Converts the tranche unit tolerance to NAV using the kernel's conversion
+    function maxNAVDelta() public view override returns (NAV_UNIT) {
+        return _toSTValue(maxTrancheUnitDelta());
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -191,7 +192,8 @@ contract FluidStETH_Test is ERC4626_TestBase {
             juniorTrancheSymbol: string(abi.encodePacked("RJ-", cfg.name)),
             seniorAsset: cfg.stAsset,
             juniorAsset: cfg.jtAsset,
-            dustTolerance: toNAVUnits(uint256(5)),
+            stNAVDustTolerance: toNAVUnits(5 * 10 ** (27 - cfg.stDecimals)), // 5 wei tolerance for stETH's 1-2 wei rounding per op
+            jtNAVDustTolerance: toNAVUnits(5 * 10 ** (27 - cfg.jtDecimals)), // 5 wei tolerance for stETH's 1-2 wei rounding per op
             kernelType: DeployScript.KernelType.ERC4626_ST_ERC4626_JT_InKindAssets,
             kernelSpecificParams: abi.encode(kernelParams),
             protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS,
@@ -586,7 +588,7 @@ contract FluidStETH_Test is ERC4626_TestBase {
         IRoycoAccountant.RoycoAccountantState memory stateAfter = ACCOUNTANT.getState();
 
         // If there's JT coverage IL > dust tolerance, should be FIXED_TERM
-        if (toUint256(stateAfter.lastJTCoverageImpermanentLoss) > toUint256(ACCOUNTANT.getState().dustTolerance)) {
+        if (toUint256(stateAfter.lastJTCoverageImpermanentLoss) > toUint256(ACCOUNTANT.getState().stNAVDustTolerance)) {
             assertEq(uint256(stateAfter.lastMarketState), uint256(MarketState.FIXED_TERM), "Should transition to FIXED_TERM after loss");
         }
 
@@ -663,7 +665,7 @@ contract FluidStETH_Test is ERC4626_TestBase {
         IRoycoAccountant.RoycoAccountantState memory stateAfterYield = ACCOUNTANT.getState();
 
         // If coverage is restored (JT coverage IL <= dust tolerance), should be PERPETUAL
-        if (toUint256(stateAfterYield.lastJTCoverageImpermanentLoss) <= toUint256(stateAfterYield.dustTolerance)) {
+        if (toUint256(stateAfterYield.lastJTCoverageImpermanentLoss) <= toUint256(stateAfterYield.stNAVDustTolerance)) {
             // Note: May still be FIXED_TERM until IL is completely zero per the accountant logic
             emit log_named_uint("JT Coverage IL after yield", toUint256(stateAfterYield.lastJTCoverageImpermanentLoss));
         }
@@ -930,7 +932,7 @@ contract FluidStETH_Test is ERC4626_TestBase {
         emit log_named_uint("Accumulated Coverage IL", finalJTCoverageIL - initialJTCoverageIL);
 
         // Verify dust tolerance is not exceeded
-        assertLe(finalJTCoverageIL, toUint256(ACCOUNTANT.getState().dustTolerance), "Coverage IL should stay within dust tolerance for yield-only cycles");
+        assertLe(finalJTCoverageIL, toUint256(ACCOUNTANT.getState().stNAVDustTolerance), "Coverage IL should stay within dust tolerance for yield-only cycles");
 
         _assertNAVConservation();
     }

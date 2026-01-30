@@ -147,7 +147,7 @@ abstract contract AaveV3_JT_Kernel is RoycoKernel {
         if (poolDataProvider.getPaused(JT_ASSET)) return ZERO_TRANCHE_UNITS;
 
         // Return the total tranche units (A Tokens) controlled by the kernel
-        return toTrancheUnits(IERC20(JT_ASSET).balanceOf(JT_ASSET_ATOKEN));
+        return toTrancheUnits(IERC20(JT_ASSET_ATOKEN).balanceOf(address(this)));
     }
 
     /// @inheritdoc RoycoKernel

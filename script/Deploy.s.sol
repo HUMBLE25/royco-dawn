@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import { IAccessManager } from "../lib/openzeppelin-contracts/contracts/access/manager/IAccessManager.sol";
 import { UUPSUpgradeable } from "../lib/openzeppelin-contracts/contracts/proxy/utils/UUPSUpgradeable.sol";
 import { RoycoAccountant } from "../src/accountant/RoycoAccountant.sol";
-import { RoycoFactory } from "../src/factory/RoycoFactory.sol";
+import { RolesConfiguration, RoycoFactory } from "../src/factory/RoycoFactory.sol";
 import { IRoycoAccountant } from "../src/interfaces/IRoycoAccountant.sol";
 import { IRoycoAuth } from "../src/interfaces/IRoycoAuth.sol";
 import { IYDM } from "../src/interfaces/IYDM.sol";
@@ -31,7 +31,6 @@ import { RoycoJuniorTranche } from "../src/tranches/RoycoJuniorTranche.sol";
 import { RoycoSeniorTranche } from "../src/tranches/RoycoSeniorTranche.sol";
 import { AdaptiveCurveYDM } from "../src/ydm/AdaptiveCurveYDM.sol";
 import { StaticCurveYDM } from "../src/ydm/StaticCurveYDM.sol";
-import { RolesConfiguration } from "./config/RolesConfiguration.sol";
 import { Create2DeployUtils } from "./utils/Create2DeployUtils.sol";
 import { Script } from "lib/forge-std/src/Script.sol";
 import { console2 } from "lib/forge-std/src/console2.sol";
@@ -168,7 +167,8 @@ contract DeployScript is Script, Create2DeployUtils, RolesConfiguration {
         string juniorTrancheSymbol;
         address seniorAsset;
         address juniorAsset;
-        NAV_UNIT dustTolerance;
+        NAV_UNIT stNAVDustTolerance;
+        NAV_UNIT jtNAVDustTolerance;
         // Kernel params
         KernelType kernelType;
         bytes kernelSpecificParams; // Encoded kernel-specific params
@@ -364,7 +364,7 @@ contract DeployScript is Script, Create2DeployUtils, RolesConfiguration {
         accountantRoleValues[8] = ADMIN_PAUSER_ROLE;
         accountantSelectors[9] = UUPSUpgradeable.upgradeToAndCall.selector;
         accountantRoleValues[9] = ADMIN_UPGRADER_ROLE;
-        accountantSelectors[10] = IRoycoAccountant.setDustTolerance.selector;
+        accountantSelectors[10] = IRoycoAccountant.setSeniorTrancheDustTolerance.selector;
         accountantRoleValues[10] = ADMIN_ACCOUNTANT_ROLE;
 
         roles[index++] = RolesTargetConfiguration({ target: _accountant, selectors: accountantSelectors, roles: accountantRoleValues });
@@ -658,7 +658,8 @@ contract DeployScript is Script, Create2DeployUtils, RolesConfiguration {
             betaWAD: uint96(vm.envUint("BETA_WAD")),
             lltvWAD: uint64(vm.envUint("LLTV_WAD")),
             fixedTermDurationSeconds: uint24(vm.envUint("FIXED_TERM_DURATION_SECONDS")),
-            dustTolerance: toNAVUnits(vm.envUint("DUST_TOLERANCE")),
+            stNAVDustTolerance: toNAVUnits(vm.envUint("ST_DUST_TOLERANCE")),
+            jtNAVDustTolerance: toNAVUnits(vm.envUint("JT_DUST_TOLERANCE")),
             ydmType: YDMType(vm.envUint("YDM_TYPE")),
             ydmSpecificParams: _readYDMParamsFromEnv(YDMType(vm.envUint("YDM_TYPE"))),
             roleAssignments: _readRoleAssignmentsFromEnv()
@@ -1013,7 +1014,8 @@ contract DeployScript is Script, Create2DeployUtils, RolesConfiguration {
             ydm: _ydmAddress,
             ydmInitializationData: _buildYDMInitializationData(_params.ydmType, _params.ydmSpecificParams),
             fixedTermDurationSeconds: _params.fixedTermDurationSeconds,
-            dustTolerance: _params.dustTolerance
+            stNAVDustTolerance: _params.stNAVDustTolerance,
+            jtNAVDustTolerance: _params.jtNAVDustTolerance
         });
 
         return abi.encodeCall(RoycoAccountant.initialize, (accountantParams, _factoryAddress));

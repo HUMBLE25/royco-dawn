@@ -61,7 +61,7 @@ contract RoycoAccountantTest is BaseTest {
         uint96 betaWAD,
         address ydm,
         uint24 fixedTermDuration,
-        NAV_UNIT dustTolerance,
+        NAV_UNIT stNAVDustTolerance,
         uint64 lltvWAD,
         uint64 jtYieldAtTarget,
         uint64 jtYieldAtFull
@@ -81,7 +81,8 @@ contract RoycoAccountantTest is BaseTest {
             ydmInitializationData: ydmInitData,
             fixedTermDurationSeconds: fixedTermDuration,
             lltvWAD: lltvWAD,
-            dustTolerance: dustTolerance
+            stNAVDustTolerance: stNAVDustTolerance,
+            jtNAVDustTolerance: DUST_TOLERANCE
         });
 
         bytes memory initData = abi.encodeCall(RoycoAccountant.initialize, (params, address(accessManager)));
@@ -213,7 +214,8 @@ contract RoycoAccountantTest is BaseTest {
             ydmInitializationData: "",
             fixedTermDurationSeconds: FIXED_TERM_DURATION_SECONDS,
             lltvWAD: LLTV_WAD,
-            dustTolerance: DUST_TOLERANCE
+            stNAVDustTolerance: DUST_TOLERANCE,
+            jtNAVDustTolerance: DUST_TOLERANCE
         });
 
         bytes memory initData = abi.encodeCall(RoycoAccountant.initialize, (params, address(accessManager)));

@@ -80,7 +80,8 @@ contract GuardianCancellationTest is BaseTest {
             juniorTrancheSymbol: JUNIOR_TRANCHE_SYMBOL,
             seniorAsset: ETHEREUM_MAINNET_USDC_ADDRESS,
             juniorAsset: ETHEREUM_MAINNET_USDC_ADDRESS,
-            dustTolerance: DUST_TOLERANCE,
+            stNAVDustTolerance: DUST_TOLERANCE,
+            jtNAVDustTolerance: DUST_TOLERANCE,
             kernelType: DeployScript.KernelType.ERC4626_ST_AaveV3_JT_InKindAssets,
             kernelSpecificParams: abi.encode(kernelParams),
             protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS,
@@ -245,10 +246,10 @@ contract GuardianCancellationTest is BaseTest {
         FACTORY.execute(address(ACCOUNTANT), data);
     }
 
-    /// @notice Test that guardian can cancel a scheduled accountant admin operation (setDustTolerance)
+    /// @notice Test that guardian can cancel a scheduled accountant admin operation (setSeniorTrancheDustTolerance)
     function test_guardian_canCancelAccountantAdminSetDustTolerance() public {
         NAV_UNIT newDustTolerance = toNAVUnits(uint256(100));
-        bytes memory data = abi.encodeCall(ACCOUNTANT.setDustTolerance, (newDustTolerance));
+        bytes memory data = abi.encodeCall(ACCOUNTANT.setSeniorTrancheDustTolerance, (newDustTolerance));
 
         // Schedule the operation as accountant admin
         vm.prank(ACCOUNTANT_ADMIN_ADDRESS);

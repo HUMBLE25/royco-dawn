@@ -49,7 +49,7 @@ contract ReUSD_ST_ReUSD_JT_Kernel is YieldBearingERC20_ST_YieldBearingERC20_JT_I
         require(_reusd != address(0) && _reusdUsdQuoteToken != address(0) && _insuranceCapitalLayer != address(0), NULL_ADDRESS());
         REUSD = _reusd;
         REUSD_QUOTE_TOKEN = _reusdUsdQuoteToken;
-        // ICL output = input * rate * 10^(quote_dec - reUSD_dec), so input = 10^(RAY + reUSD_dec - quote_dec) yields rate * RAY
+        // ICL output = input * rate * 10^(QUOTE_DECIMALS - REUSD_DECIMALS), so input = 10^(RAY_DECIMALS + REUSD_DECIMALS - QUOTE_DECIMALS) yields rate * RAY
         REUSD_AMOUNT_FOR_RAY_PRECISION_CONVERSION_RATE =
             10 ** (RAY_DECIMALS + IERC20Metadata(_reusd).decimals() - IERC20Metadata(_reusdUsdQuoteToken).decimals());
         INSURANCE_CAPITAL_LAYER = _insuranceCapitalLayer;
@@ -65,9 +65,9 @@ contract ReUSD_ST_ReUSD_JT_Kernel is YieldBearingERC20_ST_YieldBearingERC20_JT_I
     }
 
     /// @inheritdoc IdenticalAssetsOracleQuoter
-    function _getConversionRateFromOracle() internal view override returns (uint256) {
-        // ICL output = input * rate * 10^(quote_dec - reUSD_dec)
-        // With input = 10^(RAY + reUSD_dec - quote_dec), output = rate * RAY
+    function _getConversionRateFromOracleRAY() internal view override returns (uint256) {
+        // ICL output = input * rate * 10^(QUOTE_DECIMALS - REUSD_DECIMALS)
+        // With input = 10^(RAY_DECIMALS + REUSD_DECIMALS - QUOTE_DECIMALS), output = rate * RAY
         return IInsuranceCapitalLayer(INSURANCE_CAPITAL_LAYER).convertFromShares(REUSD_QUOTE_TOKEN, REUSD_AMOUNT_FOR_RAY_PRECISION_CONVERSION_RATE);
     }
 }

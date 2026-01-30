@@ -6,8 +6,7 @@ import { Vm } from "../../lib/forge-std/src/Vm.sol";
 import { IAccessManager } from "../../lib/openzeppelin-contracts/contracts/access/manager/IAccessManager.sol";
 import { IERC20 } from "../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { DeployScript } from "../../script/Deploy.s.sol";
-import { RolesConfiguration } from "../../script/config/RolesConfiguration.sol";
-import { RoycoFactory } from "../../src/factory/RoycoFactory.sol";
+import { RolesConfiguration, RoycoFactory } from "../../src/factory/RoycoFactory.sol";
 import { IRoycoAccountant } from "../../src/interfaces/IRoycoAccountant.sol";
 import { IRoycoKernel } from "../../src/interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoVaultTranche } from "../../src/interfaces/tranche/IRoycoVaultTranche.sol";
@@ -215,7 +214,8 @@ contract DeploymentScriptRerunTest is Test, RolesConfiguration {
             juniorTrancheSymbol: _juniorTrancheSymbol,
             seniorAsset: ETHEREUM_MAINNET_USDC_ADDRESS,
             juniorAsset: ETHEREUM_MAINNET_USDC_ADDRESS,
-            dustTolerance: DUST_TOLERANCE,
+            stNAVDustTolerance: DUST_TOLERANCE,
+            jtNAVDustTolerance: DUST_TOLERANCE,
             kernelType: DeployScript.KernelType.ERC4626_ST_AaveV3_JT_InKindAssets,
             kernelSpecificParams: abi.encode(kernelParams),
             protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS,

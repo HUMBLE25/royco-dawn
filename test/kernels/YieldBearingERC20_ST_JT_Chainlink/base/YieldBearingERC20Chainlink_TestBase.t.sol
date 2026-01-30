@@ -116,9 +116,9 @@ abstract contract YieldBearingERC20Chainlink_TestBase is AbstractKernelTestSuite
     }
 
     /// @notice Returns max NAV delta for comparisons
+    /// @dev Converts the tranche unit tolerance to NAV using the kernel's conversion
     function maxNAVDelta() public view virtual override returns (NAV_UNIT) {
-        // Default: 1e12 tolerance
-        return toNAVUnits(uint256(1e12));
+        return _toSTValue(maxTrancheUnitDelta());
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -389,22 +389,22 @@ abstract contract YieldBearingERC20Chainlink_TestBase is AbstractKernelTestSuite
         vm.clearMockedCalls();
 
         // Mock a stale price (updatedAt is old)
-        uint256 staleTimestamp = vm.getBlockTimestamp() - 400 days; // Very stale
+        vm.warp(vm.getBlockTimestamp() + _getStalenessThreshold() + 1);
         vm.mockCall(
             chainlinkOracle,
             abi.encodeWithSelector(AggregatorV3Interface.latestRoundData.selector),
             abi.encode(
                 uint80(1), // roundId
                 int256(1e18), // answer (positive)
-                staleTimestamp, // startedAt
-                staleTimestamp, // updatedAt (stale!)
+                0, // startedAt
+                0, // updatedAt (stale!)
                 uint80(1) // answeredInRound
             )
         );
 
         // Try to get conversion rate - should revert with PRICE_STALE
         vm.expectRevert(IdenticalAssetsChainlinkOracleQuoter.PRICE_STALE.selector);
-        YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel(address(KERNEL)).getTrancheUnitToNAVUnitConversionRate();
+        YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel(address(KERNEL)).getTrancheUnitToNAVUnitConversionRateRAY();
     }
 
     /// @notice Tests that zero/negative price causes PRICE_INVALID revert
@@ -426,7 +426,7 @@ abstract contract YieldBearingERC20Chainlink_TestBase is AbstractKernelTestSuite
         );
 
         vm.expectRevert(IdenticalAssetsChainlinkOracleQuoter.PRICE_INVALID.selector);
-        YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel(address(KERNEL)).getTrancheUnitToNAVUnitConversionRate();
+        YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel(address(KERNEL)).getTrancheUnitToNAVUnitConversionRateRAY();
     }
 
     /// @notice Tests that negative price causes PRICE_INVALID revert
@@ -448,7 +448,7 @@ abstract contract YieldBearingERC20Chainlink_TestBase is AbstractKernelTestSuite
         );
 
         vm.expectRevert(IdenticalAssetsChainlinkOracleQuoter.PRICE_INVALID.selector);
-        YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel(address(KERNEL)).getTrancheUnitToNAVUnitConversionRate();
+        YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel(address(KERNEL)).getTrancheUnitToNAVUnitConversionRateRAY();
     }
 
     /// @notice Tests that incomplete round causes PRICE_INCOMPLETE revert
@@ -470,7 +470,7 @@ abstract contract YieldBearingERC20Chainlink_TestBase is AbstractKernelTestSuite
         );
 
         vm.expectRevert(IdenticalAssetsChainlinkOracleQuoter.PRICE_INCOMPLETE.selector);
-        YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel(address(KERNEL)).getTrancheUnitToNAVUnitConversionRate();
+        YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel(address(KERNEL)).getTrancheUnitToNAVUnitConversionRateRAY();
     }
 
     /// @notice Tests that valid oracle data passes all checks
@@ -492,7 +492,7 @@ abstract contract YieldBearingERC20Chainlink_TestBase is AbstractKernelTestSuite
 
         // Should not revert
         uint256 rate = YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel(address(KERNEL))
-            .getTrancheUnitToNAVUnitConversionRate();
+            .getTrancheUnitToNAVUnitConversionRateRAY();
         assertGt(rate, 0, "Conversion rate should be positive");
     }
 
@@ -542,7 +542,8 @@ abstract contract YieldBearingERC20Chainlink_TestBase is AbstractKernelTestSuite
             juniorTrancheSymbol: string(abi.encodePacked("RJ-", cfg.name)),
             seniorAsset: cfg.stAsset,
             juniorAsset: cfg.jtAsset,
-            dustTolerance: DUST_TOLERANCE,
+            stNAVDustTolerance: toNAVUnits(10 ** (27 - cfg.stDecimals)),
+            jtNAVDustTolerance: toNAVUnits(10 ** (27 - cfg.jtDecimals)),
             kernelType: DeployScript.KernelType.YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkOracleQuoter,
             kernelSpecificParams: abi.encode(kernelParams),
             protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS,
