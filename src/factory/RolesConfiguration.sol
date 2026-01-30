@@ -12,6 +12,10 @@ abstract contract RolesConfiguration {
     /// ================================
     /// ROLE CONSTANTS
     /// ================================
+    /// @notice Default admin role (OpenZeppelin AccessManager uses 0 for admin)
+    /// @dev Named differently to avoid conflict with AccessManager.ADMIN_ROLE when inherited together
+    uint64 internal constant _ADMIN_ROLE = 0;
+
     /// Common roles
     uint64 public constant ADMIN_PAUSER_ROLE = uint64(uint256(keccak256(abi.encode("ROYCO_ADMIN_PAUSER_ROLE"))));
     uint64 public constant ADMIN_UPGRADER_ROLE = uint64(uint256(keccak256(abi.encode("ROYCO_ADMIN_UPGRADER_ROLE"))));
@@ -40,13 +44,6 @@ abstract contract RolesConfiguration {
     /// Guardian role - can cancel delayed operations for all roles
     uint64 public constant GUARDIAN_ROLE = uint64(uint256(keccak256(abi.encode("ROYCO_GUARDIAN_ROLE"))));
 
-    /// ================================
-    /// ROLE CONSTANTS END
-    /// ================================
-
-    /// @notice Error when an unknown role is requested
-    error UnknownRole(uint64 role);
-
     /// @notice Configuration for a single role
     struct RoleConfig {
         uint64 adminRole; // The role that can grant/revoke this role (0 for ADMIN_ROLE)
@@ -54,9 +51,8 @@ abstract contract RolesConfiguration {
         uint32 executionDelay; // Delay in seconds before role operations take effect
     }
 
-    /// @notice Default admin role (OpenZeppelin AccessManager uses 0 for admin)
-    /// @dev Named differently to avoid conflict with AccessManager.ADMIN_ROLE when inherited together
-    uint64 internal constant _ADMIN_ROLE = 0;
+    /// @notice Error when an unknown role is requested
+    error UNKNOWN_ROLE(uint64 role);
 
     /**
      * @notice Returns the configuration for a given role
@@ -134,7 +130,7 @@ abstract contract RolesConfiguration {
                 executionDelay: 0 // Deployer admin operations should be immediate
             });
         } else {
-            revert UnknownRole(role);
+            revert UNKNOWN_ROLE(role);
         }
     }
 }
