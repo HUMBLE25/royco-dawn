@@ -28,7 +28,7 @@ contract PendlePTcUSD_Test is YieldBearingERC20Chainlink_TestBase {
     address internal constant PT_CUSD = 0x545A490f9ab534AdF409A2E682bc4098f49952e3;
 
     /// @notice Chainlink oracle for PT-cUSD/SY-cUSD price
-    address internal constant PT_CUSD_CHAINLINK_ORACLE = 0x04D840b7495b1e2EE4855B63B50F96c298651e99;
+    address internal constant PT_CUSD_CHAINLINK_ORACLE = 0x6DA10958c691454BE7eb5f3e3B91b5713e542b17;
 
     // ═══════════════════════════════════════════════════════════════════════════
     // PROTOCOL CONFIGURATION
@@ -38,7 +38,7 @@ contract PendlePTcUSD_Test is YieldBearingERC20Chainlink_TestBase {
     function getProtocolConfig() public pure override returns (ProtocolConfig memory) {
         return ProtocolConfig({
             name: "PT-cUSD",
-            forkBlock: 24_273_218,
+            forkBlock: 24_344_233,
             forkRpcUrlEnvVar: "MAINNET_RPC_URL",
             stAsset: PT_CUSD,
             jtAsset: PT_CUSD,
@@ -57,7 +57,7 @@ contract PendlePTcUSD_Test is YieldBearingERC20Chainlink_TestBase {
     /// @dev Use a very long threshold for testing since we mock the oracle
     /// This avoids PRICE_STALE errors when tests warp time
     function _getStalenessThreshold() internal pure override returns (uint48) {
-        return 365 days;
+        return type(uint48).max;
     }
 
     /// @notice Returns the initial SY-cUSD->USD conversion rate

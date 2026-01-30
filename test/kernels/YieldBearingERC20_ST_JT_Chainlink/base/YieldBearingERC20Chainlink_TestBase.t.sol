@@ -389,15 +389,15 @@ abstract contract YieldBearingERC20Chainlink_TestBase is AbstractKernelTestSuite
         vm.clearMockedCalls();
 
         // Mock a stale price (updatedAt is old)
-        uint256 staleTimestamp = vm.getBlockTimestamp() - 400 days; // Very stale
+        vm.warp(vm.getBlockTimestamp() + _getStalenessThreshold() + 1);
         vm.mockCall(
             chainlinkOracle,
             abi.encodeWithSelector(AggregatorV3Interface.latestRoundData.selector),
             abi.encode(
                 uint80(1), // roundId
                 int256(1e18), // answer (positive)
-                staleTimestamp, // startedAt
-                staleTimestamp, // updatedAt (stale!)
+                0, // startedAt
+                0, // updatedAt (stale!)
                 uint80(1) // answeredInRound
             )
         );

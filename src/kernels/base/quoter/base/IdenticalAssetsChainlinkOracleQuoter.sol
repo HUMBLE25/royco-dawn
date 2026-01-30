@@ -133,7 +133,7 @@ abstract contract IdenticalAssetsChainlinkOracleQuoter is IdenticalAssetsOracleQ
     {
         (uint80 roundId, int256 answer,, uint256 updatedAt, uint80 answeredInRound) = AggregatorV3Interface(_oracle).latestRoundData();
 
-        require(updatedAt >= block.timestamp - _stalenessThresholdSeconds, PRICE_STALE());
+        require(updatedAt + _stalenessThresholdSeconds >= block.timestamp, PRICE_STALE());
         require(answer > 0, PRICE_INVALID());
         require(answeredInRound >= roundId, PRICE_INCOMPLETE());
 
