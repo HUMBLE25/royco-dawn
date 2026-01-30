@@ -428,7 +428,6 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         RoycoAccountantState storage $ = _getRoycoAccountantStorage();
 
         // Cache the last checkpointed market state, effective NAV, and impermanent losses for each tranche
-        initialMarketState = $.lastMarketState;
         NAV_UNIT stEffectiveNAV = $.lastSTEffectiveNAV;
         NAV_UNIT jtEffectiveNAV = $.lastJTEffectiveNAV;
         NAV_UNIT stImpermanentLoss = $.lastSTImpermanentLoss;
@@ -436,19 +435,6 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         NAV_UNIT jtSelfImpermanentLoss = $.lastJTSelfImpermanentLoss;
         NAV_UNIT stProtocolFeeAccrued;
         NAV_UNIT jtProtocolFeeAccrued;
-
-        // If the market was in a fixed term state that has elapsed, we must transition this market to a perpetual state
-        uint32 fixedTermEndTimestamp = $.fixedTermEndTimestamp;
-        if (initialMarketState == MarketState.FIXED_TERM && fixedTermEndTimestamp <= block.timestamp) {
-            initialMarketState = MarketState.PERPETUAL;
-            // Transitioning from a fixed term to a perpetual state resets JT IL incurred during the term:
-            // 1. ST LPs can now realize JT coverage
-            // 2. New JT LPs can help reinstate the market into a fully collateralized/covered state
-            jtCoverageImpermanentLossErased = jtCoverageImpermanentLoss;
-            jtCoverageImpermanentLoss = ZERO_NAV_UNITS;
-            // Reset the fixed term end timestamp
-            fixedTermEndTimestamp = 0;
-        }
 
         // Compute the deltas in the raw NAVs of each tranche
         // The deltas represent the unrealized PNL of the underlying investment since the last NAV checkpoints
@@ -589,22 +575,29 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         require((_stRawNAV + _jtRawNAV) == (stEffectiveNAV + jtEffectiveNAV), NAV_CONSERVATION_VIOLATION());
 
         // Determine the resulting market state:
-        // 1. Forced Perpetual: LLTV has been breached (undercollateralized) or ST IL exists (distressed), or the fixed term duration is set to 0
+        // 1. Forced Perpetual: The fixed term duration is set to 0 (permanently perpetual), current fixed term elapsed, or LLTV has been breached (undercollateralized) or ST IL exists (distressed)
         // 2. Normal Perpetual: JT coverage IL is within dust tolerance (staying perpetual) or fully recovered (exiting fixed term for perpetual)
         // 3. Fixed term: The JT coverage IL is above the dust tolerance of the market, fixed term duration hasn't elapsed, LLTV hasn't been breached, and ST IL nonexistant
+        initialMarketState = $.lastMarketState;
         MarketState resultingMarketState;
+        uint32 fixedTermEndTimestamp = $.fixedTermEndTimestamp;
         uint24 fixedTermDurationSeconds = $.fixedTermDurationSeconds;
         uint256 ltvWAD = UtilsLib.computeLTV(stEffectiveNAV, stImpermanentLoss, jtEffectiveNAV);
-        if (stImpermanentLoss != ZERO_NAV_UNITS || ltvWAD >= $.lltvWAD || fixedTermDurationSeconds == 0) {
+        // If the market is permanently perpetual, the fixed term elapsed, undercollateralized, or distressed, the market must be in a a perpetual state
+        if (
+            fixedTermDurationSeconds == 0 || (initialMarketState == MarketState.FIXED_TERM && fixedTermEndTimestamp <= block.timestamp) || ltvWAD >= $.lltvWAD
+                || stImpermanentLoss != ZERO_NAV_UNITS
+        ) {
             resultingMarketState = MarketState.PERPETUAL;
             // JT coverage impermanent loss has to be explicitly cleared in this branch:
             // If LLTV has been breached without existant ST IL, the market is approaching an uncollateralized state: ST needs to be able to withdraw to avoid losses and the YDM needs to kick in to reinstate proper collateralization
             // If ST IL exists, the market is in a distressed state: STs need to be able to book losses and any future appreciation will go to making ST whole again
             // If the fixed term duration is 0, the market is permanently in a perpetual state and never incurs any JT coverage IL
-            jtCoverageImpermanentLossErased = jtCoverageImpermanentLossErased + jtCoverageImpermanentLoss;
+            jtCoverageImpermanentLossErased = jtCoverageImpermanentLoss;
             jtCoverageImpermanentLoss = ZERO_NAV_UNITS;
             // Reset the fixed term end timestamp
             fixedTermEndTimestamp = 0;
+            // If the market has less than dust coverage provided by JT
         } else if (jtCoverageImpermanentLoss <= $.stNAVDustTolerance) {
             // JT coverage IL is either non-existant or can be attributed to dust ST losses (eg. rounding in the underlying ST NAV)
             // If market was in a perpetual state or the coverage IL was completely wiped, transition to a perpetual state
@@ -612,8 +605,8 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
                 resultingMarketState = MarketState.PERPETUAL;
                 // Reset the fixed term end timestamp
                 fixedTermEndTimestamp = 0;
-            } else {
                 // If market was in a fixed term state, remain in it until dust tolerance is completely restored
+            } else {
                 // This ensures that we always have a buffer of at least the dust tolerance when entering a fresh perpetual state
                 resultingMarketState = MarketState.FIXED_TERM;
                 // Fees are not taken in a fixed term state
@@ -795,6 +788,7 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         $.fixedTermDurationSeconds = _fixedTermDurationSeconds;
         // If the specified duration is 0, the market will permanently be in a perpetual state
         if (_fixedTermDurationSeconds == 0) {
+            emit JTCoverageImpermanentLossErased($.lastJTCoverageImpermanentLoss);
             $.lastJTCoverageImpermanentLoss = ZERO_NAV_UNITS;
             $.lastMarketState = MarketState.PERPETUAL;
         }
