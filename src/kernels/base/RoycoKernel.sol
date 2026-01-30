@@ -159,7 +159,9 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase, ReentrancyGuardTransie
     /// @inheritdoc IRoycoKernel
     /// @dev ST deposits are allowed if the market is in a PERPETUAL or FIXED_TERM state, granted that the market's coverage requirement is satisfied post-deposit
     function stMaxDeposit(address _receiver) public view virtual override(IRoycoKernel) returns (TRANCHE_UNIT) {
-        // Since ST deposits are unrestricted in any market state, return the global max deposit
+        // If ST IL exists, ST deposits are disabled to preclude existing ST's from getting diluted and realizing losses
+        if (_previewSyncTrancheAccounting().stImpermanentLoss != ZERO_NAV_UNITS) return ZERO_TRANCHE_UNITS;
+        // ST deposits are enabled as long as ST IL is nonexistant and coverage is satisfied
         NAV_UNIT stMaxDepositableNAV = _accountant().maxSTDepositGivenCoverage(_getSeniorTrancheRawNAV(), _getJuniorTrancheRawNAV());
         return UnitsMathLib.min(_stMaxDepositGlobally(_receiver), stConvertNAVUnitsToTrancheUnits(stMaxDepositableNAV));
     }
@@ -309,17 +311,17 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase, ReentrancyGuardTransie
         withQuoterCache
         returns (NAV_UNIT valueAllocated, NAV_UNIT navToMintAt, bytes memory)
     {
+        SyncedAccountingState memory state = _preOpSyncTrancheAccounting();
+        // If ST IL exists, ST deposits are disabled to preclude existing ST's from getting diluted and realizing losses
+        require(state.stImpermanentLoss == ZERO_NAV_UNITS, ST_DEPOSIT_DISABLED_IN_LOSS());
         // Execute a pre-op sync on accounting
-        navToMintAt = (_preOpSyncTrancheAccounting()).stEffectiveNAV;
+        navToMintAt = state.stEffectiveNAV;
 
         // Deposit the assets into the underlying ST investment
-        NAV_UNIT stDepositPreOpNAV = _stDepositAssets(_assets);
+        valueAllocated = _stDepositAssets(_assets);
 
         // Execute a post-op sync on accounting and enforce the market's coverage requirement
-        NAV_UNIT stPostDepositNAV =
-        (_postOpSyncTrancheAccountingAndEnforceCoverage(Operation.ST_DEPOSIT, stDepositPreOpNAV, ZERO_NAV_UNITS, ZERO_NAV_UNITS, ZERO_NAV_UNITS)).stEffectiveNAV;
-        // The value allocated after any fees/slippage incurred on deposit
-        valueAllocated = stPostDepositNAV - navToMintAt;
+        _postOpSyncTrancheAccountingAndEnforceCoverage(Operation.ST_DEPOSIT, valueAllocated, ZERO_NAV_UNITS, ZERO_NAV_UNITS, ZERO_NAV_UNITS);
     }
 
     /// @inheritdoc IRoycoKernel
@@ -390,13 +392,10 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase, ReentrancyGuardTransie
         require(state.marketState == MarketState.PERPETUAL, JT_DEPOSIT_DISABLED_IN_FIXED_TERM_STATE());
 
         // Deposit the assets into the underlying JT investment
-        NAV_UNIT jtDepositPreOpNAV = _jtDepositAssets(_assets);
+        valueAllocated = _jtDepositAssets(_assets);
 
-        // Execute a post-op sync on accounting and enforce the market's coverage requirement
-        NAV_UNIT jtPostDepositNAV =
-        (_postOpSyncTrancheAccounting(Operation.JT_DEPOSIT, ZERO_NAV_UNITS, jtDepositPreOpNAV, ZERO_NAV_UNITS, ZERO_NAV_UNITS)).jtEffectiveNAV;
-        // The value allocated after any fees/slippage incurred on deposit
-        valueAllocated = jtPostDepositNAV - navToMintAt;
+        // Execute a post-op sync on accounting
+        _postOpSyncTrancheAccounting(Operation.JT_DEPOSIT, ZERO_NAV_UNITS, valueAllocated, ZERO_NAV_UNITS, ZERO_NAV_UNITS);
     }
 
     /// @inheritdoc IRoycoKernel
