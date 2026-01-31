@@ -75,15 +75,25 @@ abstract contract YieldBearingERC20Chainlink_TestBase is AbstractKernelTestSuite
         _simulateChainlinkYield(_percentageWAD);
     }
 
-    /// @notice Simulates loss for ST by decreasing the chainlink oracle price
+    /// @notice Simulates loss for ST by randomly decreasing either chainlink price or stored rate
+    /// @dev Randomly selects between chainlink and admin oracle legs for better test coverage
     function simulateSTLoss(uint256 _percentageWAD) public virtual override {
-        _simulateChainlinkLoss(_percentageWAD);
+        if (vm.randomUint() % 2 == 0) {
+            _simulateChainlinkLoss(_percentageWAD);
+        } else {
+            simulateStoredRateLoss(_percentageWAD);
+        }
     }
 
-    /// @notice Simulates loss for JT by decreasing the chainlink oracle price
-    /// @dev For identical assets, ST and JT share the same conversion rate
+    /// @notice Simulates loss for JT by randomly decreasing either chainlink price or stored rate
+    /// @dev For identical assets, ST and JT share the same conversion rate.
+    ///      Randomly selects between chainlink and admin oracle legs for better test coverage.
     function simulateJTLoss(uint256 _percentageWAD) public virtual override {
-        _simulateChainlinkLoss(_percentageWAD);
+        if (vm.randomUint() % 2 == 0) {
+            _simulateChainlinkLoss(_percentageWAD);
+        } else {
+            simulateStoredRateLoss(_percentageWAD);
+        }
     }
 
     /// @notice Sets the conversion rate for ST (via chainlink mock)

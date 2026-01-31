@@ -590,9 +590,10 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         ) {
             resultingMarketState = MarketState.PERPETUAL;
             // JT coverage impermanent loss has to be explicitly cleared in this branch:
+            // If the fixed term duration is 0, the market is permanently in a perpetual state and never incurs any JT coverage IL
+            // If the current fixed term has elapsed, the market needs to transition to a perpetual state since the transient JT protection period is complete
             // If LLTV has been breached without existant ST IL, the market is approaching an uncollateralized state: ST needs to be able to withdraw to avoid losses and the YDM needs to kick in to reinstate proper collateralization
             // If ST IL exists, the market is in a distressed state: STs need to be able to book losses and any future appreciation will go to making ST whole again
-            // If the fixed term duration is 0, the market is permanently in a perpetual state and never incurs any JT coverage IL
             jtCoverageImpermanentLossErased = jtCoverageImpermanentLoss;
             jtCoverageImpermanentLoss = ZERO_NAV_UNITS;
             // Reset the fixed term end timestamp
