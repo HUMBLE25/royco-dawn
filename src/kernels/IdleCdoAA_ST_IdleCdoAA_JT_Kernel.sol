@@ -11,15 +11,18 @@ import {
 } from "./base/recipe/YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsOracleQuoter_Kernel.sol";
 
 /**
- * @title IdleCDO_ST_IdleCDO_JT_Kernel
+ * @title IdleCdoAA_ST_IdleCdoAA_JT_Kernel
  * @author Ankur Dubey, Shivaansh Kapoor
  * @notice The senior and junior tranches transfer in an IdleCDO's AA tranche
  * @notice The NAV can be expressed in any quote token supported by an IdleCDO's AA tranche
  * @dev Example: Pareto's Falconx's Prime Brokerage Vault at https://app.pareto.credit/vault#0xC26A6Fa2C37b38E549a4a1807543801Db684f99C
  * @dev https://docs.idle.finance/
  */
-contract IdleCDO_ST_IdleCDO_JT_Kernel is YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsOracleQuoter_Kernel {
+contract IdleCdoAA_ST_IdleCdoAA_JT_Kernel is YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsOracleQuoter_Kernel {
+    /// @notice The address of the IdleCDO
     address public immutable IDLE_CDO;
+
+    /// @notice The virtual price multiplier for the IdleCDO's AA tranche to convert to RAY precision
     uint256 public immutable IDLE_CDO_VIRTUAL_PRICE_MULTIPLIER_FOR_RAY_PRECISION;
 
     /// @notice Thrown when the AA tranche token is different from the ST and JT asset
@@ -62,7 +65,7 @@ contract IdleCDO_ST_IdleCDO_JT_Kernel is YieldBearingERC20_ST_YieldBearingERC20_
 
     /// @inheritdoc IdenticalAssetsOracleQuoter
     function _getConversionRateFromOracleRAY() internal view override returns (uint256) {
-        // Virtual Price = IdleCDO.token() decimals
+        // Virtual Price returns IdleCDO.token() decimals
         // We multiply the virtual price by the virtual price multiplier convert to RAY precision
         return IIdleCDO(IDLE_CDO).virtualPrice(ST_ASSET) * IDLE_CDO_VIRTUAL_PRICE_MULTIPLIER_FOR_RAY_PRECISION;
     }

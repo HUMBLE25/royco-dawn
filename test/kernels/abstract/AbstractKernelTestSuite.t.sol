@@ -6,7 +6,6 @@ import { Vm } from "../../../lib/forge-std/src/Vm.sol";
 import { console2 } from "../../../lib/forge-std/src/console2.sol";
 import { IERC20 } from "../../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { Math } from "../../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
-
 import { DeployScript } from "../../../script/Deploy.s.sol";
 import { RoycoFactory } from "../../../src/factory/RoycoFactory.sol";
 import { IRoycoAccountant } from "../../../src/interfaces/IRoycoAccountant.sol";
@@ -15,7 +14,6 @@ import { IRoycoVaultTranche } from "../../../src/interfaces/tranche/IRoycoVaultT
 import { SENTINEL_REQUEST_ID, WAD, ZERO_NAV_UNITS, ZERO_TRANCHE_UNITS } from "../../../src/libraries/Constants.sol";
 import { AssetClaims, MarketState, TrancheType } from "../../../src/libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib, toNAVUnits, toTrancheUnits, toUint256 } from "../../../src/libraries/Units.sol";
-
 import { BaseTest } from "../../base/BaseTest.t.sol";
 import { IKernelTestHooks } from "../../interfaces/IKernelTestHooks.sol";
 
@@ -1021,7 +1019,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         assertApproxEqAbs(rawSum, effectiveSum, toUint256(maxNAVDelta()) * 2, "NAV conservation violated");
     }
 
-    function _minDepositAmount() internal view returns (uint256) {
+    function _minDepositAmount() internal view virtual returns (uint256) {
         // Minimum deposit to avoid dust issues
         return 10 ** (config.stDecimals > 6 ? config.stDecimals - 6 : 0) * 1000; // At least 1000 smallest units
     }
