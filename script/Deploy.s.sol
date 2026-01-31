@@ -14,6 +14,7 @@ import { IRoycoAsyncVault } from "../src/interfaces/tranche/IRoycoAsyncVault.sol
 import { IRoycoVaultTranche } from "../src/interfaces/tranche/IRoycoVaultTranche.sol";
 import { ERC4626_ST_AaveV3_JT_InKindAssets_Kernel } from "../src/kernels/ERC4626_ST_AaveV3_JT_InKindAssets_Kernel.sol";
 import { ERC4626_ST_ERC4626_JT_InKindAssets_Kernel } from "../src/kernels/ERC4626_ST_ERC4626_JT_InKindAssets_Kernel.sol";
+import { IdleCdoAA_ST_IdleCdoAA_JT_Kernel } from "../src/kernels/IdleCdoAA_ST_IdleCdoAA_JT_Kernel.sol";
 import { ReUSD_ST_ReUSD_JT_Kernel } from "../src/kernels/ReUSD_ST_ReUSD_JT_Kernel.sol";
 import {
     YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel
@@ -64,7 +65,8 @@ contract DeployScript is Script, Create2DeployUtils, RolesConfiguration {
         ERC4626_ST_ERC4626_JT_InKindAssets,
         ReUSD_ST_ReUSD_JT,
         YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkOracleQuoter,
-        YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter
+        YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter,
+        IdleCdoAA_ST_IdleCdoAA_JT
     }
 
     /// @notice Enum for YDM types
@@ -102,6 +104,11 @@ contract DeployScript is Script, Create2DeployUtils, RolesConfiguration {
     /// @notice Deployment parameters for YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter_Kernel
     struct YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626SharesAdminOracleQuoterKernelParams {
         uint256 initialConversionRateRAY;
+    }
+
+    /// @notice Deployment parameters for IdleCdoAA_ST_IdleCdoAA_JT_Kernel
+    struct IdleCdoAASTIdleCdoAAJTKernelParams {
+        address idleCDO;
     }
 
     /// @notice Deployment parameters for StaticCurveYDM
@@ -637,6 +644,9 @@ contract DeployScript is Script, Create2DeployUtils, RolesConfiguration {
                     initialConversionRateRAY: vm.envUint("INITIAL_CONVERSION_RATE_RAY")
                 });
             kernelSpecificParams = abi.encode(kernelParams);
+        } else if (kernelType == KernelType.IdleCdoAA_ST_IdleCdoAA_JT) {
+            IdleCdoAASTIdleCdoAAJTKernelParams memory kernelParams = IdleCdoAASTIdleCdoAAJTKernelParams({ idleCDO: vm.envAddress("IDLE_CDO_ADDRESS") });
+            kernelSpecificParams = abi.encode(kernelParams);
         }
 
         return DeploymentParams({
@@ -816,6 +826,8 @@ contract DeployScript is Script, Create2DeployUtils, RolesConfiguration {
             return address(_deployYieldBearingERC20STYieldBearingERC20JTIdenticalAssetsChainlinkOracleQuoterKernelImpl(constructionParams));
         } else if (_kernelType == KernelType.YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter) {
             return address(_deployYieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626SharesAdminOracleQuoterKernelImpl(constructionParams));
+        } else if (_kernelType == KernelType.IdleCdoAA_ST_IdleCdoAA_JT) {
+            return address(_deployIdleCdoAASTIdleCdoAAJTKernelImpl(constructionParams, _kernelSpecificParams));
         } else {
             revert UnsupportedKernelType(_kernelType);
         }
@@ -926,6 +938,26 @@ contract DeployScript is Script, Create2DeployUtils, RolesConfiguration {
         return YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter_Kernel(addr);
     }
 
+    function _deployIdleCdoAASTIdleCdoAAJTKernelImpl(
+        IRoycoKernel.RoycoKernelConstructionParams memory _constructionParams,
+        bytes memory _params
+    )
+        internal
+        returns (IdleCdoAA_ST_IdleCdoAA_JT_Kernel)
+    {
+        IdleCdoAASTIdleCdoAAJTKernelParams memory kernelParams = abi.decode(_params, (IdleCdoAASTIdleCdoAAJTKernelParams));
+
+        bytes memory creationCode = abi.encodePacked(type(IdleCdoAA_ST_IdleCdoAA_JT_Kernel).creationCode, abi.encode(_constructionParams, kernelParams.idleCDO));
+
+        (address addr, bool alreadyDeployed) = deployWithSanityChecks(KERNEL_IMPL_SALT, creationCode, false);
+        if (alreadyDeployed) {
+            console2.log("Kernel implementation already deployed at:", addr);
+        } else {
+            console2.log("Kernel implementation deployed at:", addr);
+        }
+        return IdleCdoAA_ST_IdleCdoAA_JT_Kernel(addr);
+    }
+
     function _buildKernelInitializationData(
         KernelType _kernelType,
         bytes memory _kernelSpecificParams,
@@ -969,6 +1001,8 @@ contract DeployScript is Script, Create2DeployUtils, RolesConfiguration {
                 YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter_Kernel.initialize,
                 (kernelParams, kernelParams2.initialConversionRateRAY)
             );
+        } else if (_kernelType == KernelType.IdleCdoAA_ST_IdleCdoAA_JT) {
+            return abi.encodeCall(IdleCdoAA_ST_IdleCdoAA_JT_Kernel.initialize, (kernelParams));
         } else {
             revert UnsupportedKernelType(_kernelType);
         }
