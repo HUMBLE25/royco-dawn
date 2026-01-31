@@ -1,4 +1,4 @@
-## Royco Dawn
+## Royco Dawn [![CI](https://github.com/roycoprotocol/royco-dawn/actions/workflows/test.yml/badge.svg)](https://github.com/roycoprotocol/royco-dawn/actions/workflows/test.yml)
 
 ```
 //........................................................................................................................................................................................................
