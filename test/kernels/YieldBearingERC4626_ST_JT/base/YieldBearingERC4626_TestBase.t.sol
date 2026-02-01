@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import { IERC4626 } from "../../../../lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
+import { IERC20Metadata, IERC4626 } from "../../../../lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 
 import { DeployScript } from "../../../../script/Deploy.s.sol";
 import {
     YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter_Kernel
 } from "../../../../src/kernels/YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter_Kernel.sol";
-import { RAY, WAD } from "../../../../src/libraries/Constants.sol";
+import { RAY, RAY_DECIMALS, WAD } from "../../../../src/libraries/Constants.sol";
 import { NAV_UNIT, TRANCHE_UNIT, toNAVUnits, toTrancheUnits, toUint256 } from "../../../../src/libraries/Units.sol";
 
 import { AbstractKernelTestSuite } from "../../abstract/AbstractKernelTestSuite.t.sol";
@@ -126,14 +126,20 @@ abstract contract YieldBearingERC4626_TestBase is AbstractKernelTestSuite {
         _mockConvertToAssets(newSharePrice);
     }
 
+    /// @notice Computes the share amount to pass to convertToAssets() to get RAY-scaled output
+    /// @dev This matches the kernel's SHARES_TO_CONVERT_TO_ASSETS calculation
+    function _getSharesToConvertToAssets() internal view returns (uint256) {
+        return 10 ** (RAY_DECIMALS + IERC4626(config.stAsset).decimals() - IERC20Metadata(IERC4626(config.stAsset).asset()).decimals());
+    }
+
     /// @notice Gets the current share price (either mocked or from the actual vault)
     /// @return The share price in RAY precision
     function _getCurrentSharePriceRAY() internal view returns (uint256) {
         if (mockedSharePriceRAY != 0) {
             return mockedSharePriceRAY;
         }
-        // Get the actual share price from the vault
-        return IERC4626(config.stAsset).convertToAssets(RAY);
+        // Get the actual share price from the vault using the same input the kernel uses
+        return IERC4626(config.stAsset).convertToAssets(_getSharesToConvertToAssets());
     }
 
     /// @notice Mocks the convertToAssets function on the vault
@@ -141,9 +147,9 @@ abstract contract YieldBearingERC4626_TestBase is AbstractKernelTestSuite {
     function _mockConvertToAssets(uint256 _newSharePriceRAY) internal {
         mockedSharePriceRAY = _newSharePriceRAY;
 
-        // Mock convertToAssets(RAY) to return the new share price
-        // The kernel calls: IERC4626(ST_ASSET).convertToAssets(RAY)
-        vm.mockCall(config.stAsset, abi.encodeWithSelector(IERC4626.convertToAssets.selector, RAY), abi.encode(_newSharePriceRAY));
+        // Mock convertToAssets with the same input the kernel uses (SHARES_TO_CONVERT_TO_ASSETS)
+        uint256 sharesToConvert = _getSharesToConvertToAssets();
+        vm.mockCall(config.stAsset, abi.encodeWithSelector(IERC4626.convertToAssets.selector, sharesToConvert), abi.encode(_newSharePriceRAY));
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -178,6 +184,113 @@ abstract contract YieldBearingERC4626_TestBase is AbstractKernelTestSuite {
     function _setConversionRate(uint256 _newRateRAY) internal {
         vm.prank(ORACLE_QUOTER_ADMIN_ADDRESS);
         YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter_Kernel(address(KERNEL)).setConversionRate(_newRateRAY);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // STORED CONVERSION RATE TESTS (baseAsset-to-NAV component)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// @notice Tests that stored conversion rate yield increases NAV
+    /// @dev This tests the baseAsset-to-NAV component of the conversion rate
+    function testFuzz_storedConversionRate_yield_updatesNAV(uint256 _jtAmount, uint256 _yieldBps) external {
+        _jtAmount = bound(_jtAmount, _minDepositAmount(), config.initialFunding / 2);
+        _yieldBps = bound(_yieldBps, 10, 1000); // 0.1% to 10% yield
+
+        _depositJT(ALICE_ADDRESS, _jtAmount);
+
+        NAV_UNIT navBefore = JT.totalAssets().nav;
+        uint256 rateBefore = _getConversionRate();
+
+        // Simulate yield by increasing the stored conversion rate
+        uint256 yieldWAD = _yieldBps * 1e14; // Convert bps to WAD
+        _simulateYield(yieldWAD);
+
+        uint256 rateAfter = _getConversionRate();
+        assertGt(rateAfter, rateBefore, "Stored rate should increase after yield");
+
+        // Trigger sync
+        vm.prank(SYNC_ROLE_ADDRESS);
+        KERNEL.syncTrancheAccounting();
+
+        NAV_UNIT navAfter = JT.totalAssets().nav;
+        assertGt(navAfter, navBefore, "NAV should increase after stored conversion rate yield");
+    }
+
+    /// @notice Tests that stored conversion rate loss decreases NAV
+    /// @dev This tests the baseAsset-to-NAV component of the conversion rate
+    function testFuzz_storedConversionRate_loss_updatesNAV(uint256 _jtAmount, uint256 _lossBps) external {
+        _jtAmount = bound(_jtAmount, _minDepositAmount(), config.initialFunding / 2);
+        _lossBps = bound(_lossBps, 10, 500); // 0.1% to 5% loss
+
+        _depositJT(ALICE_ADDRESS, _jtAmount);
+
+        NAV_UNIT navBefore = JT.totalAssets().nav;
+        uint256 rateBefore = _getConversionRate();
+
+        // Simulate loss by decreasing the stored conversion rate
+        uint256 lossWAD = _lossBps * 1e14; // Convert bps to WAD
+        _simulateLoss(lossWAD);
+
+        uint256 rateAfter = _getConversionRate();
+        assertLt(rateAfter, rateBefore, "Stored rate should decrease after loss");
+
+        // Trigger sync
+        vm.prank(SYNC_ROLE_ADDRESS);
+        KERNEL.syncTrancheAccounting();
+
+        NAV_UNIT navAfter = JT.totalAssets().nav;
+        assertLt(navAfter, navBefore, "NAV should decrease after stored conversion rate loss");
+    }
+
+    /// @notice Tests that stored conversion rate yield with ST deposits distributes correctly
+    function testFuzz_storedConversionRate_yield_distributesToJT(uint256 _jtAmount, uint256 _stPercentage, uint256 _yieldBps) external {
+        _jtAmount = bound(_jtAmount, _minDepositAmount(), config.initialFunding / 2);
+        _stPercentage = bound(_stPercentage, 10, 50);
+        _yieldBps = bound(_yieldBps, 10, 1000); // 0.1% to 10% yield
+
+        _depositJT(ALICE_ADDRESS, _jtAmount);
+
+        TRANCHE_UNIT maxSTDeposit = ST.maxDeposit(BOB_ADDRESS);
+        uint256 stAmount = toUint256(maxSTDeposit) * _stPercentage / 100;
+
+        if (stAmount < _minDepositAmount()) return;
+
+        _depositST(BOB_ADDRESS, stAmount);
+
+        NAV_UNIT jtNavBefore = JT.totalAssets().nav;
+
+        // Simulate yield via stored conversion rate
+        uint256 yieldWAD = _yieldBps * 1e14;
+        _simulateYield(yieldWAD);
+
+        // Warp time for yield distribution
+        vm.warp(vm.getBlockTimestamp() + 1 days);
+
+        // Trigger sync
+        vm.prank(SYNC_ROLE_ADDRESS);
+        KERNEL.syncTrancheAccounting();
+
+        NAV_UNIT jtNavAfter = JT.totalAssets().nav;
+
+        // JT should receive portion of yield based on YDM
+        assertGe(jtNavAfter, jtNavBefore, "JT NAV should increase or stay same from stored rate yield");
+    }
+
+    /// @notice Tests NAV conservation after stored conversion rate changes
+    function testFuzz_storedConversionRate_NAVConservation(uint256 _jtAmount, uint256 _yieldBps) external {
+        _jtAmount = bound(_jtAmount, _minDepositAmount(), config.initialFunding / 2);
+        _yieldBps = bound(_yieldBps, 10, 1000);
+
+        _depositJT(ALICE_ADDRESS, _jtAmount);
+
+        // Simulate yield via stored conversion rate
+        uint256 yieldWAD = _yieldBps * 1e14;
+        _simulateYield(yieldWAD);
+
+        vm.prank(SYNC_ROLE_ADDRESS);
+        KERNEL.syncTrancheAccounting();
+
+        _assertNAVConservation();
     }
 
     // ═══════════════════════════════════════════════════════════════════════════

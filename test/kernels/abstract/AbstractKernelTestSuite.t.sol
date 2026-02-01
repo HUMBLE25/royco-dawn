@@ -1126,6 +1126,9 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         // STEP 5: ST redeems - synchronous
         // ═══════════════════════════════════════════════════════════════════════════
 
+        // Capture JT maxRedeem before ST redeems (after yield) for comparison
+        uint256 jtMaxRedeemBeforeSTRedeems = JT.maxRedeem(ALICE_ADDRESS);
+
         uint256 stMaxRedeem = ST.maxRedeem(BOB_ADDRESS);
         assertEq(stMaxRedeem, stShares, "ST should be able to redeem all shares");
 
@@ -1151,9 +1154,20 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         uint256 stFeeShares = ST.balanceOf(PROTOCOL_FEE_RECIPIENT_ADDRESS);
         assertEq(ST.totalSupply(), stFeeShares, "ST totalSupply should only be fee shares");
 
-        // Verify JT can now redeem more
+        // Redeem protocol fee shares so all ST NAV is cleared
+        if (stFeeShares > 0) {
+            // Grant LP role to protocol fee recipient so they can redeem
+            address[] memory feeRecipientArray = new address[](1);
+            feeRecipientArray[0] = PROTOCOL_FEE_RECIPIENT_ADDRESS;
+            LP_ROLES_SCRIPT.grantLPRoles(address(FACTORY), feeRecipientArray, LP_ROLE_ADMIN.privateKey);
+
+            vm.prank(PROTOCOL_FEE_RECIPIENT_ADDRESS);
+            ST.redeem(stFeeShares, PROTOCOL_FEE_RECIPIENT_ADDRESS, PROTOCOL_FEE_RECIPIENT_ADDRESS);
+        }
+
+        // Verify JT can now redeem more (all ST shares including fees have been redeemed)
         uint256 jtMaxRedeemAfterSTRedeem = JT.maxRedeem(ALICE_ADDRESS);
-        assertGt(jtMaxRedeemAfterSTRedeem, jtMaxRedeemAfterST, "JT maxRedeem should increase after ST redeems");
+        assertGt(jtMaxRedeemAfterSTRedeem, jtMaxRedeemBeforeSTRedeems, "JT maxRedeem should increase after all ST redeems");
 
         // ═══════════════════════════════════════════════════════════════════════════
         // STEP 6: JT redeems - asynchronous with delay
