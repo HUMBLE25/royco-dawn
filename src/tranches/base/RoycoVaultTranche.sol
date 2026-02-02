@@ -615,7 +615,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
     function claimCancelRedeemRequest(
         uint256 _requestId,
         address _receiver,
-        address _owner
+        address _controller
     )
         external
         virtual
@@ -623,13 +623,13 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         whenNotPaused
         restricted
         executionIsAsync(Action.REDEEM)
-        onlyCallerOrOperator(_owner)
+        onlyCallerOrOperator(_controller)
     {
         // Get the number of shares in a canceled state for this request ID
         uint256 shares =
             (TRANCHE_TYPE() == TrancheType.SENIOR
-                ? IAsyncSTRedemptionKernel(kernel()).stClaimCancelRedeemRequest(_requestId, _owner)
-                : IRoycoKernel(kernel()).jtClaimCancelRedeemRequest(_requestId, _owner));
+                ? IAsyncSTRedemptionKernel(kernel()).stClaimCancelRedeemRequest(_requestId, _controller)
+                : IRoycoKernel(kernel()).jtClaimCancelRedeemRequest(_requestId, _controller));
 
         // Ensure a non-zero amount can be claimed
         require(shares != 0, MUST_CLAIM_NON_ZERO_SHARES());
@@ -643,7 +643,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
             _transfer(address(this), _receiver, shares);
         }
 
-        emit CancelRedeemClaim(_owner, _receiver, _requestId, msg.sender, shares);
+        emit CancelRedeemClaim(_controller, _receiver, _requestId, msg.sender, shares);
     }
 
     /// @inheritdoc IRoycoVaultTranche

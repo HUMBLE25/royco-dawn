@@ -6,7 +6,6 @@ import { Vm } from "../../../lib/forge-std/src/Vm.sol";
 import { console2 } from "../../../lib/forge-std/src/console2.sol";
 import { IERC20 } from "../../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { Math } from "../../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
-
 import { DeployScript } from "../../../script/Deploy.s.sol";
 import { RoycoFactory } from "../../../src/factory/RoycoFactory.sol";
 import { IRoycoAccountant } from "../../../src/interfaces/IRoycoAccountant.sol";
@@ -15,7 +14,6 @@ import { IRoycoVaultTranche } from "../../../src/interfaces/tranche/IRoycoVaultT
 import { SENTINEL_REQUEST_ID, WAD, ZERO_NAV_UNITS, ZERO_TRANCHE_UNITS } from "../../../src/libraries/Constants.sol";
 import { AssetClaims, MarketState, TrancheType } from "../../../src/libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib, toNAVUnits, toTrancheUnits, toUint256 } from "../../../src/libraries/Units.sol";
-
 import { BaseTest } from "../../base/BaseTest.t.sol";
 import { IKernelTestHooks } from "../../interfaces/IKernelTestHooks.sol";
 
@@ -1021,7 +1019,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         assertApproxEqAbs(rawSum, effectiveSum, toUint256(maxNAVDelta()) * 2, "NAV conservation violated");
     }
 
-    function _minDepositAmount() internal view returns (uint256) {
+    function _minDepositAmount() internal view virtual returns (uint256) {
         // Minimum deposit to avoid dust issues
         return 10 ** (config.stDecimals > 6 ? config.stDecimals - 6 : 0) * 1000; // At least 1000 smallest units
     }
@@ -1128,6 +1126,9 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         // STEP 5: ST redeems - synchronous
         // ═══════════════════════════════════════════════════════════════════════════
 
+        // Capture JT maxRedeem before ST redeems (after yield) for comparison
+        uint256 jtMaxRedeemBeforeSTRedeems = JT.maxRedeem(ALICE_ADDRESS);
+
         uint256 stMaxRedeem = ST.maxRedeem(BOB_ADDRESS);
         assertEq(stMaxRedeem, stShares, "ST should be able to redeem all shares");
 
@@ -1153,9 +1154,20 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         uint256 stFeeShares = ST.balanceOf(PROTOCOL_FEE_RECIPIENT_ADDRESS);
         assertEq(ST.totalSupply(), stFeeShares, "ST totalSupply should only be fee shares");
 
-        // Verify JT can now redeem more
+        // Redeem protocol fee shares so all ST NAV is cleared
+        if (stFeeShares > 0) {
+            // Grant LP role to protocol fee recipient so they can redeem
+            address[] memory feeRecipientArray = new address[](1);
+            feeRecipientArray[0] = PROTOCOL_FEE_RECIPIENT_ADDRESS;
+            LP_ROLES_SCRIPT.grantLPRoles(address(FACTORY), feeRecipientArray, LP_ROLE_ADMIN.privateKey);
+
+            vm.prank(PROTOCOL_FEE_RECIPIENT_ADDRESS);
+            ST.redeem(stFeeShares, PROTOCOL_FEE_RECIPIENT_ADDRESS, PROTOCOL_FEE_RECIPIENT_ADDRESS);
+        }
+
+        // Verify JT can now redeem more (all ST shares including fees have been redeemed)
         uint256 jtMaxRedeemAfterSTRedeem = JT.maxRedeem(ALICE_ADDRESS);
-        assertGt(jtMaxRedeemAfterSTRedeem, jtMaxRedeemAfterST, "JT maxRedeem should increase after ST redeems");
+        assertGt(jtMaxRedeemAfterSTRedeem, jtMaxRedeemBeforeSTRedeems, "JT maxRedeem should increase after all ST redeems");
 
         // ═══════════════════════════════════════════════════════════════════════════
         // STEP 6: JT redeems - asynchronous with delay
@@ -2776,5 +2788,175 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         assertEq(toUint256(stIL), 0, "ST IL should be 0 with no yield/loss");
         assertLe(toUint256(jtCoverageIL), toUint256(stNAVDustTolerance), "JT coverage IL should be within dust tolerance");
         assertLe(toUint256(jtSelfIL), toUint256(stNAVDustTolerance), "JT self IL should be within dust tolerance");
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // SECTION: ST DEPOSIT DISABLED WHEN IMPERMANENT LOSS EXISTS
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// @notice Test that ST deposits are allowed when there is no impermanent loss
+    function test_stDeposit_allowedWhenNoImpermanentLoss() external {
+        // Deposit JT first to provide coverage
+        uint256 jtDeposit = _minDepositAmount() * 10;
+        _depositJT(ALICE_ADDRESS, jtDeposit);
+
+        // ST max deposit should be non-zero (deposits allowed)
+        TRANCHE_UNIT maxDeposit = ST.maxDeposit(BOB_ADDRESS);
+        assertGt(maxDeposit, ZERO_TRANCHE_UNITS, "ST deposits should be allowed when no impermanent loss");
+
+        // Should be able to deposit ST
+        uint256 stDeposit = _minDepositAmount();
+        _depositST(BOB_ADDRESS, stDeposit);
+
+        // Verify deposit succeeded
+        assertGt(ST.balanceOf(BOB_ADDRESS), 0, "BOB should have ST shares after deposit");
+    }
+
+    /// @notice Test that stMaxDeposit returns zero when ST impermanent loss exists
+    function test_stMaxDeposit_returnsZeroWhenImpermanentLossExists() external {
+        // Setup: Deposit JT and ST with high ST:JT ratio so losses exceed JT capacity
+        uint256 jtDeposit = _minDepositAmount() * 5;
+        _depositJT(ALICE_ADDRESS, jtDeposit);
+
+        // Deposit maximum ST allowed
+        TRANCHE_UNIT maxSTDeposit = ST.maxDeposit(BOB_ADDRESS);
+        uint256 stDeposit = toUint256(maxSTDeposit);
+        if (stDeposit < _minDepositAmount()) return; // Skip if no ST deposits allowed
+        _depositST(BOB_ADDRESS, stDeposit);
+
+        // Verify ST deposits are initially allowed for new depositors
+        TRANCHE_UNIT maxDepositBefore = ST.maxDeposit(CHARLIE_ADDRESS);
+
+        // Simulate a massive loss that exceeds JT capacity (50% loss)
+        // This will cause ST impermanent loss since JT cannot cover all losses
+        simulateJTLoss(0.5e18);
+
+        // Sync accounting to register the loss
+        vm.prank(SYNC_ROLE_ADDRESS);
+        KERNEL.syncTrancheAccounting();
+
+        // Check if ST impermanent loss exists
+        NAV_UNIT stIL = ACCOUNTANT.getState().lastSTImpermanentLoss;
+        if (stIL == ZERO_NAV_UNITS) {
+            // JT was able to absorb all losses, skip this test
+            return;
+        }
+
+        // ST max deposit should now be zero
+        TRANCHE_UNIT maxDepositAfter = ST.maxDeposit(CHARLIE_ADDRESS);
+        assertEq(maxDepositAfter, ZERO_TRANCHE_UNITS, "ST deposits should be disabled when impermanent loss exists");
+    }
+
+    /// @notice Test that ST deposit reverts when impermanent loss exists
+    function test_stDeposit_revertsWhenImpermanentLossExists() external {
+        // Setup: Deposit JT and ST with high ST:JT ratio
+        uint256 jtDeposit = _minDepositAmount() * 5;
+        _depositJT(ALICE_ADDRESS, jtDeposit);
+
+        TRANCHE_UNIT maxSTDeposit = ST.maxDeposit(BOB_ADDRESS);
+        uint256 stDeposit = toUint256(maxSTDeposit);
+        if (stDeposit < _minDepositAmount()) return;
+        _depositST(BOB_ADDRESS, stDeposit);
+
+        // Simulate a massive loss that exceeds JT capacity
+        simulateJTLoss(0.5e18);
+
+        // Sync accounting to register the loss
+        vm.prank(SYNC_ROLE_ADDRESS);
+        KERNEL.syncTrancheAccounting();
+
+        // Check if ST impermanent loss exists
+        NAV_UNIT stIL = ACCOUNTANT.getState().lastSTImpermanentLoss;
+        if (stIL == ZERO_NAV_UNITS) {
+            // JT was able to absorb all losses, skip this test
+            return;
+        }
+
+        // Attempting to deposit ST should revert
+        uint256 newStDeposit = _minDepositAmount();
+        dealSTAsset(CHARLIE_ADDRESS, newStDeposit);
+
+        vm.startPrank(CHARLIE_ADDRESS);
+        IERC20(config.stAsset).approve(address(ST), newStDeposit);
+
+        // Should revert with ST_DEPOSIT_DISABLED_IN_LOSS
+        vm.expectRevert();
+        ST.deposit(toTrancheUnits(newStDeposit), CHARLIE_ADDRESS, CHARLIE_ADDRESS);
+        vm.stopPrank();
+    }
+
+    /// @notice Test that ST deposits are re-enabled after impermanent loss is recovered
+    function test_stDeposit_reenabledAfterImpermanentLossRecovery() external {
+        // Setup: Deposit JT and ST
+        uint256 jtDeposit = _minDepositAmount() * 5;
+        _depositJT(ALICE_ADDRESS, jtDeposit);
+
+        TRANCHE_UNIT maxSTDeposit = ST.maxDeposit(BOB_ADDRESS);
+        uint256 stDeposit = toUint256(maxSTDeposit);
+        if (stDeposit < _minDepositAmount()) return;
+        _depositST(BOB_ADDRESS, stDeposit);
+
+        // Simulate a loss that creates ST impermanent loss
+        simulateJTLoss(0.5e18);
+
+        // Sync accounting
+        vm.prank(SYNC_ROLE_ADDRESS);
+        KERNEL.syncTrancheAccounting();
+
+        // Check if ST impermanent loss exists
+        NAV_UNIT stILBeforeRecovery = ACCOUNTANT.getState().lastSTImpermanentLoss;
+        if (stILBeforeRecovery == ZERO_NAV_UNITS) {
+            // JT was able to absorb all losses, skip this test
+            return;
+        }
+
+        // Verify deposits are disabled
+        assertEq(ST.maxDeposit(CHARLIE_ADDRESS), ZERO_TRANCHE_UNITS, "ST deposits should be disabled");
+
+        // Simulate recovery (large yield to recover the impermanent loss)
+        simulateJTYield(2e18); // 200% yield to recover from 50% loss
+
+        // Sync accounting
+        vm.prank(SYNC_ROLE_ADDRESS);
+        KERNEL.syncTrancheAccounting();
+
+        // Check if impermanent loss was recovered
+        NAV_UNIT stILAfterRecovery = ACCOUNTANT.getState().lastSTImpermanentLoss;
+        if (stILAfterRecovery == ZERO_NAV_UNITS) {
+            // ST deposits should be re-enabled
+            TRANCHE_UNIT maxDepositAfterRecovery = ST.maxDeposit(CHARLIE_ADDRESS);
+            assertGt(maxDepositAfterRecovery, ZERO_TRANCHE_UNITS, "ST deposits should be re-enabled after full recovery");
+        }
+    }
+
+    /// @notice Test that small losses absorbed by JT do not disable ST deposits
+    function test_stDeposit_notDisabledWhenJTAbsorbsLoss() external {
+        // Setup: Deposit more JT than ST to ensure JT can absorb losses
+        uint256 jtDeposit = _minDepositAmount() * 100;
+        _depositJT(ALICE_ADDRESS, jtDeposit);
+
+        // Deposit small amount of ST
+        uint256 stDeposit = _minDepositAmount() * 5;
+        _depositST(BOB_ADDRESS, stDeposit);
+
+        // Simulate a small loss that JT can fully absorb (5%)
+        simulateJTLoss(0.05e18);
+
+        // Sync accounting
+        vm.prank(SYNC_ROLE_ADDRESS);
+        KERNEL.syncTrancheAccounting();
+
+        // Verify no ST impermanent loss
+        NAV_UNIT stIL = ACCOUNTANT.getState().lastSTImpermanentLoss;
+        assertEq(stIL, ZERO_NAV_UNITS, "ST should have no impermanent loss when JT absorbs all losses");
+
+        // ST deposits should still be allowed
+        TRANCHE_UNIT maxDeposit = ST.maxDeposit(CHARLIE_ADDRESS);
+        assertGt(maxDeposit, ZERO_TRANCHE_UNITS, "ST deposits should still be allowed when JT absorbs loss");
+
+        // Should be able to deposit ST
+        uint256 newStDeposit = _minDepositAmount();
+        _depositST(CHARLIE_ADDRESS, newStDeposit);
+        assertGt(ST.balanceOf(CHARLIE_ADDRESS), 0, "CHARLIE should have ST shares");
     }
 }

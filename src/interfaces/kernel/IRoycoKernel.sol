@@ -66,6 +66,9 @@ interface IRoycoKernel {
     /// @notice Thrown when trying to cancel a redemption request that has already been canceled
     error REDEMPTION_REQUEST_CANCELED();
 
+    /// @notice Thrown when a ST LP is attempting to deposit when ST impermanent loss exists
+    error ST_DEPOSIT_DISABLED_IN_LOSS();
+
     /// @notice Thrown when a ST LP is attempting to redeem in a fixed term market state
     error ST_REDEEM_DISABLED_IN_FIXED_TERM_STATE();
 
