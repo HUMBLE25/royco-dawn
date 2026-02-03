@@ -225,7 +225,7 @@ contract DeployScript is Script, Create2DeployUtils, RolesConfiguration {
         (RoycoMarket memory market, address kernelImpl) = _deployMarket(factory, accountantImpl, stTrancheImpl, jtTrancheImpl, address(ydm), _params, deployer);
 
         // Transfer factory ownership to factory admin
-        _transferFactoryOwnership(factory, _params.factoryAdmin);
+        _transferFactoryOwnership(factory, deployer, _params.factoryAdmin);
 
         // Build deployment result
         DeploymentResult memory result = DeploymentResult({
@@ -1087,7 +1087,7 @@ contract DeployScript is Script, Create2DeployUtils, RolesConfiguration {
         return abi.encodeCall(RoycoJuniorTranche.initialize, (trancheParams, _params.juniorAsset, _factoryAddress, _marketId));
     }
 
-    function _transferFactoryOwnership(RoycoFactory _factory, address _newAdmin) internal {
+    function _transferFactoryOwnership(RoycoFactory _factory, address _deployer, address _newAdmin) internal {
         // Check if new admin is already admin
         (bool isNewAdminAdmin,) = IAccessManager(address(_factory)).hasRole(0, _newAdmin);
         if (isNewAdminAdmin) {
@@ -1101,7 +1101,7 @@ contract DeployScript is Script, Create2DeployUtils, RolesConfiguration {
         IAccessManager(address(_factory)).grantRole(0, _newAdmin, 0);
 
         // Revoke ADMIN_ROLE from old admin (the deploy script itself)
-        IAccessManager(address(_factory)).revokeRole(0, address(this));
+        IAccessManager(address(_factory)).revokeRole(0, _deployer);
 
         console2.log("Factory ownership transferred successfully");
         console2.log("New factory admin:", _newAdmin);
