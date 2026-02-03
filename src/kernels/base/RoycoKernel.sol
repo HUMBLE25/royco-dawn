@@ -475,7 +475,6 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase, ReentrancyGuardTransie
         onlyJuniorTranche
         nonReentrant
         checkJTRedemptionRequestId(_controller, _requestId)
-        withQuoterCache
     {
         RedemptionRequest storage request = RoycoKernelStorageLib._getRoycoKernelStorage().jtControllerToIdToRedemptionRequest[_controller][_requestId];
         // Cannot cancel an already canceled request
@@ -513,7 +512,6 @@ abstract contract RoycoKernel is IRoycoKernel, RoycoBase, ReentrancyGuardTransie
         onlyJuniorTranche
         nonReentrant
         checkJTRedemptionRequestId(_controller, _requestId)
-        withQuoterCache
         returns (uint256 shares)
     {
         RoycoKernelState storage $ = RoycoKernelStorageLib._getRoycoKernelStorage();
