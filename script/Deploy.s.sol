@@ -51,12 +51,12 @@ contract DeployScript is Script, Create2DeployUtils, RolesConfiguration {
     error RoleAssignmentAssigneeAddressIsZero(address assignee);
 
     // Deployment salts for CREATE2
-    bytes32 constant ACCOUNTANT_IMPL_SALT = keccak256("ROYCO_ACCOUNTANT_IMPLEMENTATION_V1");
-    bytes32 constant KERNEL_IMPL_SALT = keccak256("ROYCO_KERNEL_IMPLEMENTATION_V1");
-    bytes32 constant ST_TRANCHE_IMPL_SALT = keccak256("ROYCO_ST_TRANCHE_IMPLEMENTATION_V1");
-    bytes32 constant JT_TRANCHE_IMPL_SALT = keccak256("ROYCO_JT_TRANCHE_IMPLEMENTATION_V1");
-    bytes32 constant YDM_SALT = keccak256("ROYCO_YDM_IMPLEMENTATION_V1");
-    bytes32 constant FACTORY_SALT_BASE = keccak256("ROYCO_FACTORY_IMPLEMENTATION_V1");
+    bytes32 constant ACCOUNTANT_IMPL_SALT = keccak256("ROYCO_ACCOUNTANT_IMPLEMENTATION_V2");
+    bytes32 constant KERNEL_IMPL_SALT = keccak256("ROYCO_KERNEL_IMPLEMENTATION_V2");
+    bytes32 constant ST_TRANCHE_IMPL_SALT = keccak256("ROYCO_ST_TRANCHE_IMPLEMENTATION_V2");
+    bytes32 constant JT_TRANCHE_IMPL_SALT = keccak256("ROYCO_JT_TRANCHE_IMPLEMENTATION_V2");
+    bytes32 constant YDM_SALT = keccak256("ROYCO_YDM_IMPLEMENTATION_V2");
+    bytes32 constant FACTORY_SALT_BASE = keccak256("ROYCO_FACTORY_IMPLEMENTATION_V2");
     bytes32 constant MARKET_DEPLOYMENT_SALT = keccak256("ROYCO_MARKET_DEPLOYMENT_V2");
 
     /// @notice Enum for kernel types
