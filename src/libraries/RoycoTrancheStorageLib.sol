@@ -20,9 +20,7 @@ import { TrancheType } from "./Types.sol";
  */
 struct RoycoTrancheState {
     address kernel;
-    uint8 underlyingAssetDecimals;
     address asset;
-    uint8 decimalsOffset;
     bytes32 marketId;
     ExecutionModel DEPOSIT_EXECUTION_MODEL;
     ExecutionModel WITHDRAW_EXECUTION_MODEL;
@@ -47,27 +45,14 @@ library RoycoTrancheStorageLib {
      * @param _kernel The address of the kernel contract handling strategy logic
      * @param _asset The address of the tranche's deposit asset
      * @param _marketId The identifier of the Royco market this tranche is linked to
-     * @param _underlyingAssetDecimals The decimals of the tranche's underlying asset
-     * @param _decimalsOffset Decimals offset for share token precision
      * @param _trancheType The type of the tranche
      */
-    function __RoycoTranche_init(
-        address _kernel,
-        address _asset,
-        bytes32 _marketId,
-        uint8 _underlyingAssetDecimals,
-        uint8 _decimalsOffset,
-        TrancheType _trancheType
-    )
-        internal
-    {
+    function __RoycoTranche_init(address _kernel, address _asset, bytes32 _marketId, TrancheType _trancheType) internal {
         // Set the initial state of the tranche
         RoycoTrancheState storage $ = _getRoycoTrancheStorage();
         $.kernel = _kernel;
         $.asset = _asset;
         $.marketId = _marketId;
-        $.underlyingAssetDecimals = _underlyingAssetDecimals;
-        $.decimalsOffset = _decimalsOffset;
         $.REQUEST_REDEEM_SHARES_ST_BEHAVIOR = IRoycoKernel(_kernel).ST_REQUEST_REDEEM_SHARES_BEHAVIOR();
         $.REQUEST_REDEEM_SHARES_JT_BEHAVIOR = IRoycoKernel(_kernel).JT_REQUEST_REDEEM_SHARES_BEHAVIOR();
         if (_trancheType == TrancheType.SENIOR) {
