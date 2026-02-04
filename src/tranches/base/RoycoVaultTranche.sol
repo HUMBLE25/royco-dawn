@@ -12,7 +12,7 @@ import { IAsyncSTDepositKernel } from "../../interfaces/kernel/IAsyncSTDepositKe
 import { IAsyncSTRedemptionKernel } from "../../interfaces/kernel/IAsyncSTRedemptionKernel.sol";
 import { ExecutionModel, IRoycoKernel, SharesRedemptionModel } from "../../interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoAsyncCancellableVault, IRoycoAsyncVault, IRoycoVaultTranche } from "../../interfaces/tranche/IRoycoVaultTranche.sol";
-import { ZERO_NAV_UNITS } from "../../libraries/Constants.sol";
+import { WAD_DECIMALS, ZERO_NAV_UNITS } from "../../libraries/Constants.sol";
 import { RoycoTrancheStorageLib } from "../../libraries/RoycoTrancheStorageLib.sol";
 import { Action, AssetClaims, SyncedAccountingState, TrancheDeploymentParams, TrancheType } from "../../libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib, toNAVUnits, toTrancheUnits, toUint256 } from "../../libraries/Units.sol";
@@ -685,9 +685,9 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
 
     /// @inheritdoc IERC20Metadata
     function decimals() public view virtual override(ERC20Upgradeable, IERC20Metadata) returns (uint8) {
-        // We assume that the Kernel uses WAD precision for the NAV units
-        // Since virtual shares are set to 1, the shares are minted in the same precision as the NAV units, ie WAD precision
-        return 18;
+        // The Kernel always uses WAD precision for the NAV units
+        // Since virtual assets and shares are set to 1, the shares are minted in the same precision as the NAV units (WAD precision)
+        return uint8(WAD_DECIMALS);
     }
 
     /// @inheritdoc IRoycoVaultTranche
