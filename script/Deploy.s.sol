@@ -32,6 +32,7 @@ import { RoycoJuniorTranche } from "../src/tranches/RoycoJuniorTranche.sol";
 import { RoycoSeniorTranche } from "../src/tranches/RoycoSeniorTranche.sol";
 import { AdaptiveCurveYDM } from "../src/ydm/AdaptiveCurveYDM.sol";
 import { StaticCurveYDM } from "../src/ydm/StaticCurveYDM.sol";
+import { DeploymentConfig } from "./config/DeploymentConfig.sol";
 import { Create2DeployUtils } from "./utils/Create2DeployUtils.sol";
 import { Script } from "lib/forge-std/src/Script.sol";
 import { console2 } from "lib/forge-std/src/console2.sol";
@@ -42,7 +43,7 @@ interface IKernelOracleQuoterAdmin {
     function setTrancheAssetToReferenceAssetOracle(address _trancheAssetToReferenceAssetOracle, uint48 _stalenessThresholdSeconds) external;
 }
 
-contract DeployScript is Script, Create2DeployUtils, RolesConfiguration {
+contract DeployScript is Script, Create2DeployUtils, RolesConfiguration, DeploymentConfig {
     // Custom errors
     error UnsupportedKernelType(KernelType kernelType);
     error UnsupportedYDMType(YDMType ydmType);
@@ -200,11 +201,143 @@ contract DeployScript is Script, Create2DeployUtils, RolesConfiguration {
         // Read deployer private key
         uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
 
-        // Read all deployment parameters from environment variables
-        DeploymentParams memory params = _readDeploymentParamsFromEnv();
+        // Read market name from config
+        string memory marketName = vm.envString("MARKET_NAME");
 
-        // Deploy using the main deploy function
-        deploy(params, deployerPrivateKey);
+        console2.log("Deploying market from config:", marketName);
+        deployFromConfig(marketName, deployerPrivateKey);
+    }
+
+    /// @notice Deploy a market using Solidity configuration
+    /// @param marketName The name of the market to deploy (must match a config in DeploymentConfig)
+    /// @param deployerPrivateKey The private key of the deployer
+    /// @return result The deployment result containing all deployed contract addresses
+    function deployFromConfig(string memory marketName, uint256 deployerPrivateKey) public returns (DeploymentResult memory) {
+        ChainConfig memory chainConfig = getChainConfig(block.chainid);
+        MarketDeploymentConfig memory marketConfig = getMarketConfig(marketName);
+
+        // Build role assignments from chain config
+        RoleAssignmentConfiguration[] memory roleAssignments = generateRolesAssignments(
+            RoleAssignmentAddresses({
+                pauserAddress: chainConfig.pauserAddress,
+                upgraderAddress: chainConfig.upgraderAddress,
+                syncRoleAddress: chainConfig.syncRoleAddress,
+                adminKernelAddress: chainConfig.adminKernelAddress,
+                adminAccountantAddress: chainConfig.adminAccountantAddress,
+                adminProtocolFeeSetterAddress: chainConfig.adminProtocolFeeSetterAddress,
+                adminOracleQuoterAddress: chainConfig.adminOracleQuoterAddress,
+                lpRoleAdminAddress: chainConfig.lpRoleAdminAddress,
+                guardianAddress: chainConfig.guardianAddress,
+                deployerAddress: chainConfig.deployerAddress,
+                deployerAdminAddress: chainConfig.deployerAdminAddress
+            })
+        );
+
+        // Build DeploymentParams
+        DeploymentParams memory params = DeploymentParams({
+            factoryAdmin: chainConfig.factoryAdmin,
+            marketId: keccak256(abi.encodePacked(marketConfig.marketName, "-", block.timestamp)),
+            seniorTrancheName: marketConfig.seniorTrancheName,
+            seniorTrancheSymbol: marketConfig.seniorTrancheSymbol,
+            juniorTrancheName: marketConfig.juniorTrancheName,
+            juniorTrancheSymbol: marketConfig.juniorTrancheSymbol,
+            seniorAsset: marketConfig.seniorAsset,
+            juniorAsset: marketConfig.juniorAsset,
+            stNAVDustTolerance: toNAVUnits(marketConfig.stDustTolerance),
+            jtNAVDustTolerance: toNAVUnits(marketConfig.jtDustTolerance),
+            kernelType: marketConfig.kernelType,
+            kernelSpecificParams: marketConfig.kernelSpecificParams,
+            protocolFeeRecipient: chainConfig.protocolFeeRecipient,
+            jtRedemptionDelayInSeconds: marketConfig.jtRedemptionDelaySeconds,
+            stProtocolFeeWAD: marketConfig.stProtocolFeeWAD,
+            jtProtocolFeeWAD: marketConfig.jtProtocolFeeWAD,
+            coverageWAD: marketConfig.coverageWAD,
+            betaWAD: marketConfig.betaWAD,
+            lltvWAD: marketConfig.lltvWAD,
+            fixedTermDurationSeconds: marketConfig.fixedTermDurationSeconds,
+            ydmType: marketConfig.ydmType,
+            ydmSpecificParams: marketConfig.ydmSpecificParams,
+            roleAssignments: roleAssignments
+        });
+
+        // Print all deployment parameters before deployment
+        _printDeploymentParams(params, chainConfig);
+
+        return deploy(params, deployerPrivateKey);
+    }
+
+    /// @notice Prints all deployment parameters for verification before deployment
+    function _printDeploymentParams(DeploymentParams memory params, ChainConfig memory chainConfig) internal view {
+        console2.log("=== DEPLOYMENT PARAMETERS ===");
+        console2.log("");
+
+        // Chain & Market Info
+        console2.log("--- Chain & Market Info ---");
+        console2.log("Chain ID:", block.chainid);
+        console2.log("Market ID:");
+        console2.logBytes32(params.marketId);
+        console2.log("");
+
+        // Factory Config
+        console2.log("--- Factory Config ---");
+        console2.log("Factory Admin:", params.factoryAdmin);
+        console2.log("Protocol Fee Recipient:", params.protocolFeeRecipient);
+        console2.log("");
+
+        // Tranche Metadata
+        console2.log("--- Tranche Metadata ---");
+        console2.log("Senior Tranche Name:", params.seniorTrancheName);
+        console2.log("Senior Tranche Symbol:", params.seniorTrancheSymbol);
+        console2.log("Junior Tranche Name:", params.juniorTrancheName);
+        console2.log("Junior Tranche Symbol:", params.juniorTrancheSymbol);
+        console2.log("");
+
+        // Assets
+        console2.log("--- Assets ---");
+        console2.log("Senior Asset:", params.seniorAsset);
+        console2.log("Junior Asset:", params.juniorAsset);
+        console2.log("ST Dust Tolerance (NAV):", NAV_UNIT.unwrap(params.stNAVDustTolerance));
+        console2.log("JT Dust Tolerance (NAV):", NAV_UNIT.unwrap(params.jtNAVDustTolerance));
+        console2.log("");
+
+        // Kernel Config
+        console2.log("--- Kernel Config ---");
+        console2.log("Kernel Type:", uint256(params.kernelType));
+        console2.log("JT Redemption Delay (seconds):", uint256(params.jtRedemptionDelayInSeconds));
+        console2.log("");
+
+        // Accountant Config
+        console2.log("--- Accountant Config ---");
+        console2.log("ST Protocol Fee (WAD):", uint256(params.stProtocolFeeWAD));
+        console2.log("JT Protocol Fee (WAD):", uint256(params.jtProtocolFeeWAD));
+        console2.log("Coverage (WAD):", uint256(params.coverageWAD));
+        console2.log("Beta (WAD):", uint256(params.betaWAD));
+        console2.log("LLTV (WAD):", uint256(params.lltvWAD));
+        console2.log("Fixed Term Duration (seconds):", uint256(params.fixedTermDurationSeconds));
+        console2.log("");
+
+        // YDM Config
+        console2.log("--- YDM Config ---");
+        console2.log("YDM Type:", uint256(params.ydmType));
+        console2.log("");
+
+        // Role Assignments
+        console2.log("--- Role Assignments ---");
+        console2.log("Pauser:", chainConfig.pauserAddress);
+        console2.log("Upgrader:", chainConfig.upgraderAddress);
+        console2.log("Sync Role:", chainConfig.syncRoleAddress);
+        console2.log("Admin Kernel:", chainConfig.adminKernelAddress);
+        console2.log("Admin Accountant:", chainConfig.adminAccountantAddress);
+        console2.log("Admin Protocol Fee Setter:", chainConfig.adminProtocolFeeSetterAddress);
+        console2.log("Admin Oracle Quoter:", chainConfig.adminOracleQuoterAddress);
+        console2.log("LP Role Admin:", chainConfig.lpRoleAdminAddress);
+        console2.log("Guardian:", chainConfig.guardianAddress);
+        console2.log("Deployer:", chainConfig.deployerAddress);
+        console2.log("Deployer Admin:", chainConfig.deployerAdminAddress);
+        console2.log("");
+
+        console2.log("=============================");
+        console2.log("");
     }
 
     /// @notice Main deployment function that accepts all parameters
@@ -608,113 +741,6 @@ contract DeployScript is Script, Create2DeployUtils, RolesConfiguration {
         grantAllRoles(factory, _params, _deployer);
 
         return (deployedContracts, kernelImpl);
-    }
-
-    /// @notice Reads all deployment parameters from environment variables
-    function _readDeploymentParamsFromEnv() internal view returns (DeploymentParams memory) {
-        KernelType kernelType = KernelType(vm.envUint("KERNEL_TYPE"));
-
-        bytes memory kernelSpecificParams;
-        if (kernelType == KernelType.ERC4626_ST_AaveV3_JT_InKindAssets) {
-            ERC4626STAaveV3JTInKindAssetsKernelParams memory kernelParams =
-                ERC4626STAaveV3JTInKindAssetsKernelParams({ stVault: vm.envAddress("ST_VAULT_ADDRESS"), aaveV3Pool: vm.envAddress("AAVE_V3_POOL_ADDRESS") });
-            kernelSpecificParams = abi.encode(kernelParams);
-        } else if (kernelType == KernelType.ERC4626_ST_ERC4626_JT_InKindAssets) {
-            ERC4626STERC4626JTInKindAssetsKernelParams memory kernelParams =
-                ERC4626STERC4626JTInKindAssetsKernelParams({ stVault: vm.envAddress("ST_VAULT_ADDRESS"), jtVault: vm.envAddress("JT_VAULT_ADDRESS") });
-            kernelSpecificParams = abi.encode(kernelParams);
-        } else if (kernelType == KernelType.ReUSD_ST_ReUSD_JT) {
-            ReUSDSTReUSDJTKernelParams memory kernelParams = ReUSDSTReUSDJTKernelParams({
-                reusd: vm.envAddress("REUSD_ADDRESS"),
-                reusdUsdQuoteToken: vm.envAddress("REUSD_USD_QUOTE_TOKEN_ADDRESS"),
-                insuranceCapitalLayer: vm.envAddress("INSURANCE_CAPITAL_LAYER_ADDRESS")
-            });
-            kernelSpecificParams = abi.encode(kernelParams);
-        } else if (kernelType == KernelType.YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkOracleQuoter) {
-            YieldBearingERC20STYieldBearingERC20JTIdenticalAssetsChainlinkOracleQuoterKernelParams memory kernelParams =
-                YieldBearingERC20STYieldBearingERC20JTIdenticalAssetsChainlinkOracleQuoterKernelParams({
-                    trancheAssetToReferenceAssetOracle: vm.envAddress("TRANCHE_ASSET_TO_REFERENCE_ASSET_ORACLE_ADDRESS"),
-                    stalenessThresholdSeconds: uint48(vm.envUint("STALENESS_THRESHOLD_SECONDS")),
-                    initialConversionRateWAD: vm.envUint("INITIAL_CONVERSION_RATE_WAD")
-                });
-            kernelSpecificParams = abi.encode(kernelParams);
-        } else if (kernelType == KernelType.YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter) {
-            YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626SharesAdminOracleQuoterKernelParams memory kernelParams =
-                YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626SharesAdminOracleQuoterKernelParams({
-                    initialConversionRateWAD: vm.envUint("INITIAL_CONVERSION_RATE_WAD")
-                });
-            kernelSpecificParams = abi.encode(kernelParams);
-        } else if (kernelType == KernelType.IdleCdoAA_ST_IdleCdoAA_JT) {
-            IdleCdoAASTIdleCdoAAJTKernelParams memory kernelParams = IdleCdoAASTIdleCdoAAJTKernelParams({ idleCDO: vm.envAddress("IDLE_CDO_ADDRESS") });
-            kernelSpecificParams = abi.encode(kernelParams);
-        }
-
-        return DeploymentParams({
-            factoryAdmin: vm.envAddress("FACTORY_ADMIN"),
-            marketId: vm.envBytes32("MARKET_ID"),
-            seniorTrancheName: vm.envString("SENIOR_TRANCHE_NAME"),
-            seniorTrancheSymbol: vm.envString("SENIOR_TRANCHE_SYMBOL"),
-            juniorTrancheName: vm.envString("JUNIOR_TRANCHE_NAME"),
-            juniorTrancheSymbol: vm.envString("JUNIOR_TRANCHE_SYMBOL"),
-            seniorAsset: vm.envAddress("SENIOR_ASSET"),
-            juniorAsset: vm.envAddress("JUNIOR_ASSET"),
-            kernelType: kernelType,
-            kernelSpecificParams: kernelSpecificParams,
-            protocolFeeRecipient: vm.envAddress("PROTOCOL_FEE_RECIPIENT"),
-            jtRedemptionDelayInSeconds: uint24(vm.envUint("JT_REDEMPTION_DELAY_SECONDS")),
-            stProtocolFeeWAD: uint64(vm.envUint("ST_PROTOCOL_FEE_WAD")),
-            jtProtocolFeeWAD: uint64(vm.envUint("JT_PROTOCOL_FEE_WAD")),
-            coverageWAD: uint64(vm.envUint("COVERAGE_WAD")),
-            betaWAD: uint96(vm.envUint("BETA_WAD")),
-            lltvWAD: uint64(vm.envUint("LLTV_WAD")),
-            fixedTermDurationSeconds: uint24(vm.envUint("FIXED_TERM_DURATION_SECONDS")),
-            stNAVDustTolerance: toNAVUnits(vm.envUint("ST_DUST_TOLERANCE")),
-            jtNAVDustTolerance: toNAVUnits(vm.envUint("JT_DUST_TOLERANCE")),
-            ydmType: YDMType(vm.envUint("YDM_TYPE")),
-            ydmSpecificParams: _readYDMParamsFromEnv(YDMType(vm.envUint("YDM_TYPE"))),
-            roleAssignments: _readRoleAssignmentsFromEnv()
-        });
-    }
-
-    /// @notice Reads role assignments from environment variables
-    function _readRoleAssignmentsFromEnv() internal view returns (RoleAssignmentConfiguration[] memory) {
-        return generateRolesAssignments(
-            RoleAssignmentAddresses({
-                pauserAddress: vm.envAddress("PAUSER_ADDRESS"),
-                upgraderAddress: vm.envAddress("UPGRADER_ADDRESS"),
-                syncRoleAddress: vm.envAddress("SYNC_ROLE_ADDRESS"),
-                adminKernelAddress: vm.envAddress("ADMIN_KERNEL_ROLE_ADDRESS"),
-                adminAccountantAddress: vm.envAddress("ADMIN_ACCOUNTANT_ROLE_ADDRESS"),
-                adminProtocolFeeSetterAddress: vm.envAddress("ADMIN_PROTOCOL_FEE_SETTER_ROLE_ADDRESS"),
-                adminOracleQuoterAddress: vm.envAddress("ADMIN_ORACLE_QUOTER_ROLE_ADDRESS"),
-                lpRoleAdminAddress: vm.envAddress("LP_ROLE_ADMIN_ROLE_ADDRESS"),
-                guardianAddress: vm.envAddress("GUARDIAN_ADDRESS"),
-                deployerAddress: vm.envAddress("DEPLOYER_ADDRESS"),
-                deployerAdminAddress: vm.envAddress("DEPLOYER_ADMIN_ADDRESS")
-            })
-        );
-    }
-
-    /// @notice Reads YDM-specific parameters from environment variables
-    /// @param _ydmType The YDM type
-    /// @return params Encoded YDM-specific parameters
-    function _readYDMParamsFromEnv(YDMType _ydmType) internal view returns (bytes memory params) {
-        if (_ydmType == YDMType.StaticCurve) {
-            StaticCurveYDMParams memory ydmParams = StaticCurveYDMParams({
-                jtYieldShareAtZeroUtilWAD: uint64(vm.envUint("YDM_JT_YIELD_SHARE_AT_ZERO_UTIL_WAD")),
-                jtYieldShareAtTargetUtilWAD: uint64(vm.envUint("YDM_JT_YIELD_SHARE_AT_TARGET_UTIL_WAD")),
-                jtYieldShareAtFullUtilWAD: uint64(vm.envUint("YDM_JT_YIELD_SHARE_AT_FULL_UTIL_WAD"))
-            });
-            params = abi.encode(ydmParams);
-        } else if (_ydmType == YDMType.AdaptiveCurve) {
-            AdaptiveCurveYDMParams memory ydmParams = AdaptiveCurveYDMParams({
-                jtYieldShareAtTargetUtilWAD: uint64(vm.envUint("YDM_JT_YIELD_SHARE_AT_TARGET_UTIL_WAD")),
-                jtYieldShareAtFullUtilWAD: uint64(vm.envUint("YDM_JT_YIELD_SHARE_AT_FULL_UTIL_WAD"))
-            });
-            params = abi.encode(ydmParams);
-        } else {
-            revert UnsupportedYDMType(_ydmType);
-        }
     }
 
     /// @notice Deploys accountant implementation
