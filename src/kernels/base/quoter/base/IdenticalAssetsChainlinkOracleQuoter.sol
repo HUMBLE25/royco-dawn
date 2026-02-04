@@ -15,7 +15,7 @@ abstract contract IdenticalAssetsChainlinkOracleQuoter is IdenticalAssetsOracleQ
 
     /// @dev Storage slot for IdenticalAssetsChainlinkOracleQuoterState using ERC-7201 pattern
     // keccak256(abi.encode(uint256(keccak256("Royco.storage.IdenticalAssetsChainlinkOracleQuoterState")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant IDENTICAL_ASSETS_CHAINLINK_ORACLE_QUOTER_STORAGE_SLOT = 0x36321e8ea9ef16a1b272d9cece1e9b80ed6532a47572ae703d9c65a3a5fa1800;
+    bytes32 private constant IDENTICAL_ASSETS_CHAINLINK_ORACLE_QUOTER_STORAGE_SLOT = 0x36321e8ea9ef16a1b182d9cece1e9b80ed6532a47572ae703d9c65a3a5fa1800;
 
     /// @dev Storage state for the Royco identical assets chainlink oracle quoter
     /// @custom:storage-location erc7201:Royco.storage.IdenticalAssetsChainlinkOracleQuoterState
@@ -47,19 +47,19 @@ abstract contract IdenticalAssetsChainlinkOracleQuoter is IdenticalAssetsOracleQ
 
     /**
      * @notice Initializes the identical assets chainlink oracle quoter and the base identical assets oracle quoter
-     * @param _initialConversionRateRAY The initial conversion rate as defined by the oracle, scaled to RAY precision
+     * @param _initialConversionRateWAD The initial conversion rate as defined by the oracle, scaled to WAD precision
      * @param _trancheAssetToReferenceAssetOracle The tranche asset to reference asset oracle
      * @param _stalenessThresholdSeconds The staleness threshold in seconds
      */
     function __IdenticalAssetsChainlinkOracleQuoter_init(
-        uint256 _initialConversionRateRAY,
+        uint256 _initialConversionRateWAD,
         address _trancheAssetToReferenceAssetOracle,
         uint48 _stalenessThresholdSeconds
     )
         internal
         onlyInitializing
     {
-        __IdenticalAssetsOracleQuoter_init_unchained(_initialConversionRateRAY);
+        __IdenticalAssetsOracleQuoter_init_unchained(_initialConversionRateWAD);
         __IdenticalAssetsChainlinkOracleQuoter_init_unchained(_trancheAssetToReferenceAssetOracle, _stalenessThresholdSeconds);
     }
 
@@ -79,29 +79,29 @@ abstract contract IdenticalAssetsChainlinkOracleQuoter is IdenticalAssetsOracleQ
     }
 
     /**
-     * @notice Returns the conversion rate from tranche units to NAV units, scaled to RAY precision
+     * @notice Returns the conversion rate from tranche units to NAV units, scaled to WAD precision
      * @dev The conversion rate is calculated as Tranche Asset Price in Reference Asset * Reference Asset Price in NAV units
-     * @return trancheToNAVUnitConversionRateRAY The conversion rate from tranche token units to NAV units, scaled to RAY precision
+     * @return trancheToNAVUnitConversionRateWAD The conversion rate from tranche token units to NAV units, scaled to WAD precision
      */
-    function getTrancheUnitToNAVUnitConversionRateRAY()
+    function getTrancheUnitToNAVUnitConversionRateWAD()
         public
         view
         virtual
         override(IdenticalAssetsOracleQuoter)
-        returns (uint256 trancheToNAVUnitConversionRateRAY)
+        returns (uint256 trancheToNAVUnitConversionRateWAD)
     {
         // Fetch the Tranche Asset to the reference asset
         IdenticalAssetsChainlinkOracleQuoterState storage $ = _getIdenticalAssetsChainlinkOracleQuoterStorage();
         (uint256 trancheAssetPriceInReferenceAsset, uint256 precision) =
             _queryChainlinkOracle($.trancheAssetToReferenceAssetOracle, $.stalenessThresholdSeconds, $.trancheAssetToReferenceAssetOracleDecimalPrecision);
 
-        // Resolve the reference asset to NAV unit conversion rate, scaled to RAY precision
-        uint256 referenceAssetToNAVUnitConversionRateRAY = getStoredConversionRateRAY();
+        // Resolve the reference asset to NAV unit conversion rate, scaled to WAD precision
+        uint256 referenceAssetToNAVUnitConversionRateWAD = getStoredConversionRateWAD();
         // If the stored conversion rate is the sentinel value, the cache hasn't been warmed, so query the oracle for the rate
-        if (referenceAssetToNAVUnitConversionRateRAY == SENTINEL_CONVERSION_RATE) referenceAssetToNAVUnitConversionRateRAY = _getConversionRateFromOracleRAY();
+        if (referenceAssetToNAVUnitConversionRateWAD == SENTINEL_CONVERSION_RATE) referenceAssetToNAVUnitConversionRateWAD = _getConversionRateFromOracleWAD();
 
-        // Calculate the conversion rate from tranche to NAV units, scaled to RAY precision
-        trancheToNAVUnitConversionRateRAY = trancheAssetPriceInReferenceAsset.mulDiv(referenceAssetToNAVUnitConversionRateRAY, precision, Math.Rounding.Floor);
+        // Calculate the conversion rate from tranche to NAV units, scaled to WAD precision
+        trancheToNAVUnitConversionRateWAD = trancheAssetPriceInReferenceAsset.mulDiv(referenceAssetToNAVUnitConversionRateWAD, precision, Math.Rounding.Floor);
     }
 
     /**

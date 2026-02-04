@@ -2,15 +2,15 @@
 pragma solidity ^0.8.28;
 
 import { IERC20Metadata } from "../../../../../lib/openzeppelin-contracts/contracts/interfaces/IERC20Metadata.sol";
-import { RAY } from "../../../../libraries/Constants.sol";
+import { WAD } from "../../../../libraries/Constants.sol";
 import { Math, NAV_UNIT, TRANCHE_UNIT, UnitsMathLib, toNAVUnits, toTrancheUnits, toUint256 } from "../../../../libraries/Units.sol";
 import { RoycoKernel } from "../../RoycoKernel.sol";
 
 /**
  * @title IdenticalAssetsOracleQuoter
  * @notice Quoter to convert tranche units to/from NAV units using an oracle for markets where both tranches use the same tranche units
- * @dev NAV units always have RAY precision
- * @dev The quoter reads the conversion rate from the specified oracle in RAY precision.
+ * @dev NAV units always have WAD precision
+ * @dev The quoter reads the conversion rate from the specified oracle in WAD precision.
  *      The kernel admin can optionally override the conversion rate with a fixed value.
  *      Supported use-cases include:
  *      - Identical Yield Bearing ERC20 for ST And JT: Yield Bearing ERC20 and Tranche Unit (FalconXUSDC, reUSD, etc.), NAV Unit (USD)
@@ -21,7 +21,7 @@ abstract contract IdenticalAssetsOracleQuoter is RoycoKernel {
 
     /// @dev Storage slot for IdenticalAssetsOracleQuoterState using ERC-7201 pattern
     // keccak256(abi.encode(uint256(keccak256("Royco.storage.IdenticalAssetsOracleQuoterState")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant IDENTICAL_ASSETS_ORACLE_QUOTER_STORAGE_SLOT = 0xca94f7ca84d231255275e1b9f26a7020d13b86fcd22e881d1138f23eeb47cf00;
+    bytes32 private constant IDENTICAL_ASSETS_ORACLE_QUOTER_STORAGE_SLOT = 0xca94f7ca84d231255185e1b9f26a7020d13b86fcd22e881d1138f23eeb47cf00;
 
     /// @notice A sentinel value for the conversion rate, indicating that the conversion rate should be queried in real time from the specified oracle
     uint256 internal constant SENTINEL_CONVERSION_RATE = 0;
@@ -33,17 +33,17 @@ abstract contract IdenticalAssetsOracleQuoter is RoycoKernel {
     uint256 internal immutable TRANCHE_UNIT_SCALE_FACTOR;
 
     /// @dev The cached tranche unit to NAV unit conversion rate
-    uint256 internal transient cachedTrancheUnitToNAVUnitConversionRateRAY;
+    uint256 internal transient cachedTrancheUnitToNAVUnitConversionRateWAD;
 
     /// @dev Storage state for the Royco identical assets overridable oracle quoter
     /// @custom:storage-location erc7201:Royco.storage.IdenticalAssetsOracleQuoterState
     struct IdenticalAssetsOracleQuoterState {
-        uint256 conversionRateRAY;
+        uint256 conversionRateWAD;
     }
 
     /// @notice Emitted when the tranche unit to NAV unit conversion rate is updated
-    /// @param _conversionRateRAY The updated conversion rate as defined by the oracle, scaled to RAY precision
-    event ConversionRateUpdated(uint256 _conversionRateRAY);
+    /// @param _conversionRateWAD The updated conversion rate as defined by the oracle, scaled to WAD precision
+    event ConversionRateUpdated(uint256 _conversionRateWAD);
 
     /// @notice Thrown when the senior and junior tranche assets are not identical
     error TRANCHE_ASSETS_MUST_BE_IDENTICAL();
@@ -59,13 +59,13 @@ abstract contract IdenticalAssetsOracleQuoter is RoycoKernel {
 
     /**
      * @notice Initializes the identical assets oracle quoter
-     * @param _initialConversionRateRAY The initial conversion rate as defined by the oracle, scaled to RAY precision
+     * @param _initialConversionRateWAD The initial conversion rate as defined by the oracle, scaled to WAD precision
      */
-    function __IdenticalAssetsOracleQuoter_init_unchained(uint256 _initialConversionRateRAY) internal onlyInitializing {
+    function __IdenticalAssetsOracleQuoter_init_unchained(uint256 _initialConversionRateWAD) internal onlyInitializing {
         // Premptively return if this quoter is reliant on an oracle instead of an admin set conversion rate
-        if (_initialConversionRateRAY == SENTINEL_CONVERSION_RATE) return;
-        _getIdenticalAssetsOracleQuoterStorage().conversionRateRAY = _initialConversionRateRAY;
-        emit ConversionRateUpdated(_initialConversionRateRAY);
+        if (_initialConversionRateWAD == SENTINEL_CONVERSION_RATE) return;
+        _getIdenticalAssetsOracleQuoterStorage().conversionRateWAD = _initialConversionRateWAD;
+        emit ConversionRateUpdated(_initialConversionRateWAD);
     }
 
     /// @inheritdoc RoycoKernel
@@ -93,32 +93,32 @@ abstract contract IdenticalAssetsOracleQuoter is RoycoKernel {
      * @dev Once this is set, the quoter will rely solely on this value instead of the overridden oracle query
      * @dev Executes an accounting sync before and after setting the new conversion rate
      * @dev Only callable by a designated admin
-     * @param _conversionRateRAY The conversion rate as defined by the oracle, scaled to RAY precision
+     * @param _conversionRateWAD The conversion rate as defined by the oracle, scaled to WAD precision
      */
-    function setConversionRate(uint256 _conversionRateRAY) public virtual restricted {
+    function setConversionRate(uint256 _conversionRateWAD) public virtual restricted {
         // Sync the tranche accounting to reflect the PNL up to this point in time
         _preOpSyncTrancheAccounting();
         // Set the new conversion rate
-        _getIdenticalAssetsOracleQuoterStorage().conversionRateRAY = _conversionRateRAY;
-        emit ConversionRateUpdated(_conversionRateRAY);
+        _getIdenticalAssetsOracleQuoterStorage().conversionRateWAD = _conversionRateWAD;
+        emit ConversionRateUpdated(_conversionRateWAD);
         // Sync the tranche accounting to reflect the PNL from the updated conversion rate
         _preOpSyncTrancheAccounting();
     }
 
-    /// @notice Returns the value of 1 Tranche Unit in NAV Units, scaled to RAY precision
+    /// @notice Returns the value of 1 Tranche Unit in NAV Units, scaled to WAD precision
     /// @dev If the override is set, it will return the override value, otherwise it will return the value queried from the oracle
-    /// @return trancheToNAVUnitConversionRateRAY The tranche unit to NAV unit conversion rate
-    function getTrancheUnitToNAVUnitConversionRateRAY() public view virtual returns (uint256 trancheToNAVUnitConversionRateRAY) {
+    /// @return trancheToNAVUnitConversionRateWAD The tranche unit to NAV unit conversion rate
+    function getTrancheUnitToNAVUnitConversionRateWAD() public view virtual returns (uint256 trancheToNAVUnitConversionRateWAD) {
         // If there is an admin set conversion rate, use that, else query the oracle for the rate
-        trancheToNAVUnitConversionRateRAY = getStoredConversionRateRAY();
-        if (trancheToNAVUnitConversionRateRAY != SENTINEL_CONVERSION_RATE) return trancheToNAVUnitConversionRateRAY;
-        return _getConversionRateFromOracleRAY();
+        trancheToNAVUnitConversionRateWAD = getStoredConversionRateWAD();
+        if (trancheToNAVUnitConversionRateWAD != SENTINEL_CONVERSION_RATE) return trancheToNAVUnitConversionRateWAD;
+        return _getConversionRateFromOracleWAD();
     }
 
-    /// @notice Returns the stored conversion rate, scaled to RAY precision
-    /// @return conversionRateRAY The stored conversion rate, scaled to RAY precision
-    function getStoredConversionRateRAY() public view returns (uint256) {
-        return _getIdenticalAssetsOracleQuoterStorage().conversionRateRAY;
+    /// @notice Returns the stored conversion rate, scaled to WAD precision
+    /// @return conversionRateWAD The stored conversion rate, scaled to WAD precision
+    function getStoredConversionRateWAD() public view returns (uint256) {
+        return _getIdenticalAssetsOracleQuoterStorage().conversionRateWAD;
     }
 
     /**
@@ -128,7 +128,7 @@ abstract contract IdenticalAssetsOracleQuoter is RoycoKernel {
      */
     function _initializeQuoterCache() internal virtual override {
         // Get the tranche unit to NAV unit conversion rate and set the cached flag
-        cachedTrancheUnitToNAVUnitConversionRateRAY = getTrancheUnitToNAVUnitConversionRateRAY() | CACHED_TRANCHE_UNIT_TO_NAV_UNIT_CONVERSION_RATE_MASK;
+        cachedTrancheUnitToNAVUnitConversionRateWAD = getTrancheUnitToNAVUnitConversionRateWAD() | CACHED_TRANCHE_UNIT_TO_NAV_UNIT_CONVERSION_RATE_MASK;
     }
 
     /**
@@ -137,42 +137,42 @@ abstract contract IdenticalAssetsOracleQuoter is RoycoKernel {
      * @dev This function is called at the end of a transaction to clear the cached tranche unit to NAV unit conversion rate
      */
     function _clearQuoterCache() internal virtual override {
-        cachedTrancheUnitToNAVUnitConversionRateRAY = 0;
+        cachedTrancheUnitToNAVUnitConversionRateWAD = 0;
     }
 
     /**
      * @notice Returns the cached tranche unit to NAV unit conversion rate
      * @dev If the cache is set (indicated by the mask bit), returns the cached value.
-     *      Otherwise falls back to getTrancheUnitToNAVUnitConversionRateRAY() for view function compatibility.
+     *      Otherwise falls back to getTrancheUnitToNAVUnitConversionRateWAD() for view function compatibility.
      * @return The tranche unit to NAV unit conversion rate
      */
-    function _getCachedTrancheUnitToNAVUnitConversionRateRAY() internal view returns (uint256) {
-        uint256 _cachedTrancheUnitToNAVUnitConversionRateRAY = cachedTrancheUnitToNAVUnitConversionRateRAY;
+    function _getCachedTrancheUnitToNAVUnitConversionRateWAD() internal view returns (uint256) {
+        uint256 _cachedTrancheUnitToNAVUnitConversionRateWAD = cachedTrancheUnitToNAVUnitConversionRateWAD;
         // If the cache mask bit is set, use the cached value
-        if (_cachedTrancheUnitToNAVUnitConversionRateRAY & CACHED_TRANCHE_UNIT_TO_NAV_UNIT_CONVERSION_RATE_MASK != 0) {
-            return _cachedTrancheUnitToNAVUnitConversionRateRAY ^ CACHED_TRANCHE_UNIT_TO_NAV_UNIT_CONVERSION_RATE_MASK;
+        if (_cachedTrancheUnitToNAVUnitConversionRateWAD & CACHED_TRANCHE_UNIT_TO_NAV_UNIT_CONVERSION_RATE_MASK != 0) {
+            return _cachedTrancheUnitToNAVUnitConversionRateWAD ^ CACHED_TRANCHE_UNIT_TO_NAV_UNIT_CONVERSION_RATE_MASK;
         }
         // Otherwise fall back to querying the rate directly (for view functions)
-        return getTrancheUnitToNAVUnitConversionRateRAY();
+        return getTrancheUnitToNAVUnitConversionRateWAD();
     }
 
-    /// @dev Converts tranche units to NAV units for both tranches since they use identical assets, scaled to RAY precision
+    /// @dev Converts tranche units to NAV units for both tranches since they use identical assets, scaled to WAD precision
     function _convertTrancheUnitsToNAVUnits(TRANCHE_UNIT _assets) internal view returns (NAV_UNIT) {
-        return toNAVUnits(toUint256(_assets.mulDiv(_getCachedTrancheUnitToNAVUnitConversionRateRAY(), TRANCHE_UNIT_SCALE_FACTOR, Math.Rounding.Floor)));
+        return toNAVUnits(toUint256(_assets.mulDiv(_getCachedTrancheUnitToNAVUnitConversionRateWAD(), TRANCHE_UNIT_SCALE_FACTOR, Math.Rounding.Floor)));
     }
 
     /// @dev Converts NAV units to tranche units for both tranches since they use identical assets, scaled to TRANCHE_UNIT precision
     function _convertNAVUnitsToTrancheUnits(NAV_UNIT _nav) internal view returns (TRANCHE_UNIT) {
-        return toTrancheUnits(toUint256(_nav.mulDiv(TRANCHE_UNIT_SCALE_FACTOR, _getCachedTrancheUnitToNAVUnitConversionRateRAY(), Math.Rounding.Floor)));
+        return toTrancheUnits(toUint256(_nav.mulDiv(TRANCHE_UNIT_SCALE_FACTOR, _getCachedTrancheUnitToNAVUnitConversionRateWAD(), Math.Rounding.Floor)));
     }
 
     /**
-     * @notice Returns a conversion rate, scaled to RAY precision
+     * @notice Returns a conversion rate, scaled to WAD precision
      * @dev Depending on the concrete implementation, this may return the value of 1 tranche unit or an intermediate reference asset in NAV Units
      * @dev This function should be overridden if the conversion rate needs to be fetched from an oracle
-     * @return conversionRateRAY The conversion rate from tranche units to NAV units, scaled to RAY precision
+     * @return conversionRateWAD The conversion rate from tranche units to NAV units, scaled to WAD precision
      */
-    function _getConversionRateFromOracleRAY() internal view virtual returns (uint256 conversionRateRAY);
+    function _getConversionRateFromOracleWAD() internal view virtual returns (uint256 conversionRateWAD);
 
     /**
      * @notice Returns a storage pointer to the IdenticalAssetsOracleQuoterState storage

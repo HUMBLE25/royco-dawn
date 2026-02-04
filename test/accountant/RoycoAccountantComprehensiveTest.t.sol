@@ -1636,10 +1636,10 @@ contract RoycoAccountantRevertTest is BaseTest {
 
     /// @notice Fuzz test post-op invalid state transitions
     function testFuzz_revert_postOpSync_invalidState(uint256 initialST, uint256 initialJT, uint256 newST, uint256 newJT, uint8 opType) public {
-        initialST = bound(initialST, 10e18, 1e27);
-        initialJT = bound(initialJT, 10e18, 1e27);
-        newST = bound(newST, 1e18, 1e27);
-        newJT = bound(newJT, 1e18, 1e27);
+        initialST = bound(initialST, 10e18, 1e18);
+        initialJT = bound(initialJT, 10e18, 1e18);
+        newST = bound(newST, 1e18, 1e18);
+        newJT = bound(newJT, 1e18, 1e18);
         opType = uint8(bound(opType, 0, 3));
 
         vm.prank(MOCK_KERNEL);
@@ -2010,7 +2010,7 @@ contract RoycoAccountantLLTVInvariantTest is BaseTest {
     address internal MOCK_KERNEL;
     uint64 internal LLTV_WAD = 0.95e18;
     uint256 internal constant MIN_NAV = 1e6;
-    uint256 internal constant MAX_NAV = 1e27;
+    uint256 internal constant MAX_NAV = 1e18;
 
     function setUp() public {
         _setUpRoyco();
@@ -2791,7 +2791,7 @@ contract RoycoAccountantEdgeCaseTest is BaseTest {
     }
 
     // =========================================================================
-    // maxSTDepositGivenCoverage Tests (Line 278)
+    // maxSTDepositGivenCoverage Tests (Line 188)
     // =========================================================================
 
     function test_maxSTDepositGivenCoverage() public {
@@ -2913,7 +2913,7 @@ contract RoycoAccountantEdgeCaseTest is BaseTest {
 
         // Extreme imbalance: tiny ST claim, huge JT claim
         uint256 jtClaimOnST = 1; // 1 wei
-        uint256 jtClaimOnJT = 1e27; // Huge
+        uint256 jtClaimOnJT = 1e18; // Huge
 
         (NAV_UNIT totalNAVClaimable, NAV_UNIT stClaimable, NAV_UNIT jtClaimable) =
             accountant.maxJTWithdrawalGivenCoverage(_nav(100e18), _nav(100e18), _nav(jtClaimOnST), _nav(jtClaimOnJT));

@@ -18,26 +18,26 @@ abstract contract IdenticalAssetsAdminOracleQuoter is IdenticalAssetsOracleQuote
     /**
      * @notice Initializes the identical assets admin oracle quoter
      * @dev The conversion rate cannot be set to the sentinel value (0)
-     * @param _initialConversionRateRAY The initial reference asset to NAV unit conversion rate, scaled to RAY precision, scaled to RAY precision
+     * @param _initialConversionRateWAD The initial reference asset to NAV unit conversion rate, scaled to WAD precision, scaled to WAD precision
      */
-    function __IdenticalAssetsAdminOracleQuoter_init(uint256 _initialConversionRateRAY) internal onlyInitializing {
+    function __IdenticalAssetsAdminOracleQuoter_init(uint256 _initialConversionRateWAD) internal onlyInitializing {
         // Validate the conversion rate
-        require(_initialConversionRateRAY != SENTINEL_CONVERSION_RATE, INVALID_CONVERSION_RATE());
+        require(_initialConversionRateWAD != SENTINEL_CONVERSION_RATE, INVALID_CONVERSION_RATE());
         // Initialize the oracle quoter with the initial admin set rate
-        __IdenticalAssetsOracleQuoter_init_unchained(_initialConversionRateRAY);
+        __IdenticalAssetsOracleQuoter_init_unchained(_initialConversionRateWAD);
     }
 
     /// @inheritdoc IdenticalAssetsOracleQuoter
     /// @dev The conversion rate cannot be set to the sentinel value (0)
-    function setConversionRate(uint256 _conversionRateRAY) public virtual override(IdenticalAssetsOracleQuoter) restricted {
+    function setConversionRate(uint256 _conversionRateWAD) public virtual override(IdenticalAssetsOracleQuoter) restricted {
         // Validate the conversion rate
-        require(_conversionRateRAY != SENTINEL_CONVERSION_RATE, INVALID_CONVERSION_RATE());
+        require(_conversionRateWAD != SENTINEL_CONVERSION_RATE, INVALID_CONVERSION_RATE());
         // Update the oracle quoter with the initial admin set rate
-        IdenticalAssetsOracleQuoter.setConversionRate(_conversionRateRAY);
+        IdenticalAssetsOracleQuoter.setConversionRate(_conversionRateWAD);
     }
 
     /// @inheritdoc IdenticalAssetsOracleQuoter
-    function _getConversionRateFromOracleRAY() internal pure override(IdenticalAssetsOracleQuoter) returns (uint256) {
+    function _getConversionRateFromOracleWAD() internal pure override(IdenticalAssetsOracleQuoter) returns (uint256) {
         revert MUST_USE_ADMIN_ORACLE_INPUT();
     }
 }

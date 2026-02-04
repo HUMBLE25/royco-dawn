@@ -25,12 +25,12 @@ contract YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdm
     /**
      * @notice Initializes the Royco Kernel
      * @param _params The standard initialization parameters for the Royco Kernel
-     * @param _initialConversionRateRAY The initial reference asset to NAV unit conversion rate, scaled to RAY precision
+     * @param _initialConversionRateWAD The initial reference asset to NAV unit conversion rate, scaled to WAD precision
      */
-    function initialize(RoycoKernelInitParams calldata _params, uint256 _initialConversionRateRAY) external initializer {
+    function initialize(RoycoKernelInitParams calldata _params, uint256 _initialConversionRateWAD) external initializer {
         // Initialize the base kernel state
         __RoycoKernel_init(_params);
         // Initialize the identical ERC4626 shares to admin oracle quoter
-        __IdenticalERC4626SharesAdminOracleQuoter_init(_initialConversionRateRAY);
+        __IdenticalERC4626SharesAdminOracleQuoter_init(_initialConversionRateWAD);
     }
 }

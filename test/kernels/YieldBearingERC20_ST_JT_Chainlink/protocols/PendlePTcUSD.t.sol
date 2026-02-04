@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 import { IERC20Metadata } from "../../../../lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 import { AggregatorV3Interface } from "../../../../src/interfaces/external/chainlink/AggregatorV3Interface.sol";
-import { RAY } from "../../../../src/libraries/Constants.sol";
+import { WAD } from "../../../../src/libraries/Constants.sol";
 import { NAV_UNIT, TRANCHE_UNIT, toNAVUnits, toTrancheUnits } from "../../../../src/libraries/Units.sol";
 
 import { YieldBearingERC20Chainlink_TestBase } from "../base/YieldBearingERC20Chainlink_TestBase.t.sol";
@@ -63,7 +63,7 @@ contract PendlePTcUSD_Test is YieldBearingERC20Chainlink_TestBase {
     /// @notice Returns the initial SY-cUSD->USD conversion rate
     /// @dev For SY-cUSD (a stablecoin derivative), this is approximately 1:1
     function _getInitialConversionRate() internal pure override returns (uint256) {
-        return RAY;
+        return WAD;
     }
 
     /// @notice Returns the JT redemption delay
@@ -117,8 +117,8 @@ contract PendlePTcUSD_Test is YieldBearingERC20Chainlink_TestBase {
     function test_PTcUSD_initialConversionRate() external view {
         uint256 storedRate = _getStoredConversionRate();
 
-        // The stored rate is the SY-cUSD->USD rate, scaled by RAY
-        assertEq(storedRate, RAY, "Stored rate should be RAY (1:1 for stablecoin derivative)");
+        // The stored rate is the SY-cUSD->USD rate, scaled by WAD
+        assertEq(storedRate, WAD, "Stored rate should be WAD (1:1 for stablecoin derivative)");
     }
 
     /// @notice Test that simulated yield via chainlink price works correctly for PT-cUSD

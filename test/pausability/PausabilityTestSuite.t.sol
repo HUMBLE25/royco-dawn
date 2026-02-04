@@ -10,7 +10,7 @@ import { DeployScript } from "../../script/Deploy.s.sol";
 import { IRoycoAuth } from "../../src/interfaces/IRoycoAuth.sol";
 import { IRoycoKernel } from "../../src/interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoVaultTranche } from "../../src/interfaces/tranche/IRoycoVaultTranche.sol";
-import { RAY } from "../../src/libraries/Constants.sol";
+import { WAD } from "../../src/libraries/Constants.sol";
 import { TRANCHE_UNIT, toTrancheUnits } from "../../src/libraries/Units.sol";
 
 import { BaseTest } from "../base/BaseTest.t.sol";
@@ -29,7 +29,7 @@ contract PausabilityTestSuite is BaseTest {
     // ═══════════════════════════════════════════════════════════════════════════
 
     address internal constant SNUSD = 0x08EFCC2F3e61185D0EA7F8830B3FEc9Bfa2EE313;
-    uint256 internal constant FORK_BLOCK = 24_270_513;
+    uint256 internal constant FORK_BLOCK = 24_180_513;
 
     // ═══════════════════════════════════════════════════════════════════════════
     // SETUP
@@ -58,7 +58,7 @@ contract PausabilityTestSuite is BaseTest {
         bytes32 marketId = keccak256(abi.encodePacked("PausabilityTest", vm.getBlockTimestamp()));
 
         DeployScript.YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626SharesAdminOracleQuoterKernelParams memory kernelParams =
-            DeployScript.YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626SharesAdminOracleQuoterKernelParams({ initialConversionRateRAY: RAY });
+            DeployScript.YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626SharesAdminOracleQuoterKernelParams({ initialConversionRateWAD: WAD });
 
         DeployScript.AdaptiveCurveYDMParams memory ydmParams =
             DeployScript.AdaptiveCurveYDMParams({ jtYieldShareAtTargetUtilWAD: 0.3e18, jtYieldShareAtFullUtilWAD: 1e18 });

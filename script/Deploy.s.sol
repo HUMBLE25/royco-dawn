@@ -38,7 +38,7 @@ import { console2 } from "lib/forge-std/src/console2.sol";
 
 /// @notice Interface for kernel oracle quoter admin functions
 interface IKernelOracleQuoterAdmin {
-    function setConversionRate(uint256 _conversionRateRAY) external;
+    function setConversionRate(uint256 _conversionRateWAD) external;
     function setTrancheAssetToReferenceAssetOracle(address _trancheAssetToReferenceAssetOracle, uint48 _stalenessThresholdSeconds) external;
 }
 
@@ -98,12 +98,12 @@ contract DeployScript is Script, Create2DeployUtils, RolesConfiguration {
     struct YieldBearingERC20STYieldBearingERC20JTIdenticalAssetsChainlinkOracleQuoterKernelParams {
         address trancheAssetToReferenceAssetOracle;
         uint48 stalenessThresholdSeconds;
-        uint256 initialConversionRateRAY;
+        uint256 initialConversionRateWAD;
     }
 
     /// @notice Deployment parameters for YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter_Kernel
     struct YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626SharesAdminOracleQuoterKernelParams {
-        uint256 initialConversionRateRAY;
+        uint256 initialConversionRateWAD;
     }
 
     /// @notice Deployment parameters for IdleCdoAA_ST_IdleCdoAA_JT_Kernel
@@ -635,13 +635,13 @@ contract DeployScript is Script, Create2DeployUtils, RolesConfiguration {
                 YieldBearingERC20STYieldBearingERC20JTIdenticalAssetsChainlinkOracleQuoterKernelParams({
                     trancheAssetToReferenceAssetOracle: vm.envAddress("TRANCHE_ASSET_TO_REFERENCE_ASSET_ORACLE_ADDRESS"),
                     stalenessThresholdSeconds: uint48(vm.envUint("STALENESS_THRESHOLD_SECONDS")),
-                    initialConversionRateRAY: vm.envUint("INITIAL_CONVERSION_RATE_RAY")
+                    initialConversionRateWAD: vm.envUint("INITIAL_CONVERSION_RATE_WAD")
                 });
             kernelSpecificParams = abi.encode(kernelParams);
         } else if (kernelType == KernelType.YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter) {
             YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626SharesAdminOracleQuoterKernelParams memory kernelParams =
                 YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626SharesAdminOracleQuoterKernelParams({
-                    initialConversionRateRAY: vm.envUint("INITIAL_CONVERSION_RATE_RAY")
+                    initialConversionRateWAD: vm.envUint("INITIAL_CONVERSION_RATE_WAD")
                 });
             kernelSpecificParams = abi.encode(kernelParams);
         } else if (kernelType == KernelType.IdleCdoAA_ST_IdleCdoAA_JT) {
@@ -991,7 +991,7 @@ contract DeployScript is Script, Create2DeployUtils, RolesConfiguration {
                     kernelParams,
                     kernelParams2.trancheAssetToReferenceAssetOracle,
                     kernelParams2.stalenessThresholdSeconds,
-                    kernelParams2.initialConversionRateRAY
+                    kernelParams2.initialConversionRateWAD
                 )
             );
         } else if (_kernelType == KernelType.YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter) {
@@ -999,7 +999,7 @@ contract DeployScript is Script, Create2DeployUtils, RolesConfiguration {
                 abi.decode(_kernelSpecificParams, (YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626SharesAdminOracleQuoterKernelParams));
             return abi.encodeCall(
                 YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter_Kernel.initialize,
-                (kernelParams, kernelParams2.initialConversionRateRAY)
+                (kernelParams, kernelParams2.initialConversionRateWAD)
             );
         } else if (_kernelType == KernelType.IdleCdoAA_ST_IdleCdoAA_JT) {
             return abi.encodeCall(IdleCdoAA_ST_IdleCdoAA_JT_Kernel.initialize, (kernelParams));

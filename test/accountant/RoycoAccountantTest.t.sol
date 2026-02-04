@@ -1313,7 +1313,7 @@ contract RoycoAccountantTest is BaseTest {
     }
 
     function test_edgeCase_largeNumbers() public {
-        uint256 largeNav = 1e27;
+        uint256 largeNav = 1e18;
 
         IRoycoAccountant largeAccountant = _deployAccountant(
             MOCK_KERNEL,

@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import { IERC4626 } from "../../../../lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 
-import { RAY } from "../../../../src/libraries/Constants.sol";
+import { WAD } from "../../../../src/libraries/Constants.sol";
 import { NAV_UNIT, TRANCHE_UNIT, toNAVUnits, toTrancheUnits } from "../../../../src/libraries/Units.sol";
 
 import { YieldBearingERC4626_TestBase } from "../base/YieldBearingERC4626_TestBase.t.sol";
@@ -43,10 +43,10 @@ contract Tokemak_autoUSD_Test is YieldBearingERC4626_TestBase {
         });
     }
 
-    /// @notice Returns the initial USDC->USD conversion rate (in RAY precision)
-    /// @dev For USDC (a stablecoin), this is 1:1, so we return RAY (1e27)
+    /// @notice Returns the initial USDC->USD conversion rate (in WAD precision)
+    /// @dev For USDC (a stablecoin), this is 1:1, so we return WAD (1e18)
     function _getInitialConversionRate() internal pure override returns (uint256) {
-        return RAY; // 1:1 USDC to USD
+        return WAD; // 1:1 USDC to USD
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -83,9 +83,9 @@ contract Tokemak_autoUSD_Test is YieldBearingERC4626_TestBase {
     function test_autoUSD_initialConversionRate() external view {
         uint256 storedRate = _getConversionRate();
 
-        // The stored rate is the USDC->USD rate in RAY precision
-        // For a stablecoin, this should be 1e27 (1:1)
-        assertEq(storedRate, RAY, "Stored rate should be RAY (1:1 for stablecoin)");
+        // The stored rate is the USDC->USD rate in WAD precision
+        // For a stablecoin, this should be 1e18 (1:1)
+        assertEq(storedRate, WAD, "Stored rate should be WAD (1:1 for stablecoin)");
     }
 
     /// @notice Test that simulated yield works correctly for autoUSD
