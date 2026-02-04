@@ -25,6 +25,15 @@ abstract contract DeploymentConfig {
     address internal constant DEPLOYER = 0x35518D5E1fD8105FC325c5c171c329c3B10b254c;
 
     // ═══════════════════════════════════════════════════════════════════════════
+    // MARKET NAMES
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    string internal constant STCUSD = "stcUSD";
+    string internal constant SNUSD = "sNUSD";
+    string internal constant SAVUSD = "savUSD";
+    string internal constant AUTOUSD = "autoUSD";
+
+    // ═══════════════════════════════════════════════════════════════════════════
     // CHAIN-SPECIFIC CONFIG (defined once per chain)
     // ═══════════════════════════════════════════════════════════════════════════
 
@@ -161,13 +170,13 @@ abstract contract DeploymentConfig {
     // ═══════════════════════════════════════════════════════════════════════════
 
     function _initializeMarketConfigs() internal {
-        _marketConfigs["stcUSD"] = MarketDeploymentConfig({
-            marketName: "stcUSD",
+        _marketConfigs[STCUSD] = MarketDeploymentConfig({
+            marketName: STCUSD,
             chainId: MAINNET,
-            seniorTrancheName: "Royco Dawn Senior stcUSD",
-            seniorTrancheSymbol: "ST-stcUSD",
-            juniorTrancheName: "Royco Dawn Junior stcUSD",
-            juniorTrancheSymbol: "JT-stcUSD",
+            seniorTrancheName: _seniorTrancheName(STCUSD),
+            seniorTrancheSymbol: _seniorTrancheSymbol(STCUSD),
+            juniorTrancheName: _juniorTrancheName(STCUSD),
+            juniorTrancheSymbol: _juniorTrancheSymbol(STCUSD),
             seniorAsset: 0x88887bE419578051FF9F4eb6C858A951921D8888,
             juniorAsset: 0x88887bE419578051FF9F4eb6C858A951921D8888,
             stDustTolerance: 3,
@@ -187,13 +196,13 @@ abstract contract DeploymentConfig {
             ydmSpecificParams: abi.encode(DeployScript.AdaptiveCurveYDMParams({ jtYieldShareAtTargetUtilWAD: 0.053e18, jtYieldShareAtFullUtilWAD: 1e18 }))
         });
 
-        _marketConfigs["sNUSD"] = MarketDeploymentConfig({
-            marketName: "sNUSD",
+        _marketConfigs[SNUSD] = MarketDeploymentConfig({
+            marketName: SNUSD,
             chainId: MAINNET,
-            seniorTrancheName: "Royco Dawn Senior sNUSD",
-            seniorTrancheSymbol: "ST-sNUSD",
-            juniorTrancheName: "Royco Dawn Junior sNUSD",
-            juniorTrancheSymbol: "JT-sNUSD",
+            seniorTrancheName: _seniorTrancheName(SNUSD),
+            seniorTrancheSymbol: _seniorTrancheSymbol(SNUSD),
+            juniorTrancheName: _juniorTrancheName(SNUSD),
+            juniorTrancheSymbol: _juniorTrancheSymbol(SNUSD),
             seniorAsset: 0x08EFCC2F3e61185D0EA7F8830B3FEc9Bfa2EE313,
             juniorAsset: 0x08EFCC2F3e61185D0EA7F8830B3FEc9Bfa2EE313,
             stDustTolerance: 3,
@@ -213,13 +222,13 @@ abstract contract DeploymentConfig {
             ydmSpecificParams: abi.encode(DeployScript.AdaptiveCurveYDMParams({ jtYieldShareAtTargetUtilWAD: 0.1236e18, jtYieldShareAtFullUtilWAD: 1e18 }))
         });
 
-        _marketConfigs["savUSD"] = MarketDeploymentConfig({
-            marketName: "savUSD",
+        _marketConfigs[SAVUSD] = MarketDeploymentConfig({
+            marketName: SAVUSD,
             chainId: AVALANCHE,
-            seniorTrancheName: "Royco Dawn Senior savUSD",
-            seniorTrancheSymbol: "ST-savUSD",
-            juniorTrancheName: "Royco Dawn Junior savUSD",
-            juniorTrancheSymbol: "JT-savUSD",
+            seniorTrancheName: _seniorTrancheName(SAVUSD),
+            seniorTrancheSymbol: _seniorTrancheSymbol(SAVUSD),
+            juniorTrancheName: _juniorTrancheName(SAVUSD),
+            juniorTrancheSymbol: _juniorTrancheSymbol(SAVUSD),
             seniorAsset: 0x06d47F3fb376649c3A9Dafe069B3D6E35572219E,
             juniorAsset: 0x06d47F3fb376649c3A9Dafe069B3D6E35572219E,
             stDustTolerance: 3,
@@ -239,13 +248,13 @@ abstract contract DeploymentConfig {
             ydmSpecificParams: abi.encode(DeployScript.AdaptiveCurveYDMParams({ jtYieldShareAtTargetUtilWAD: 0.1357e18, jtYieldShareAtFullUtilWAD: 1e18 }))
         });
 
-        _marketConfigs["autoUSD"] = MarketDeploymentConfig({
-            marketName: "autoUSD",
+        _marketConfigs[AUTOUSD] = MarketDeploymentConfig({
+            marketName: AUTOUSD,
             chainId: MAINNET,
-            seniorTrancheName: "Royco Dawn Senior autoUSD",
-            seniorTrancheSymbol: "ST-autoUSD",
-            juniorTrancheName: "Royco Dawn Junior autoUSD",
-            juniorTrancheSymbol: "JT-autoUSD",
+            seniorTrancheName: _seniorTrancheName(AUTOUSD),
+            seniorTrancheSymbol: _seniorTrancheSymbol(AUTOUSD),
+            juniorTrancheName: _juniorTrancheName(AUTOUSD),
+            juniorTrancheSymbol: _juniorTrancheSymbol(AUTOUSD),
             seniorAsset: 0xa7569A44f348d3D70d8ad5889e50F78E33d80D35,
             juniorAsset: 0xa7569A44f348d3D70d8ad5889e50F78E33d80D35,
             stDustTolerance: 3,
@@ -265,4 +274,33 @@ abstract contract DeploymentConfig {
             ydmSpecificParams: abi.encode(DeployScript.AdaptiveCurveYDMParams({ jtYieldShareAtTargetUtilWAD: 0.0661e18, jtYieldShareAtFullUtilWAD: 1e18 }))
         });
     }
+
+    /// @notice Returns the senior tranche name for a given market name
+    /// @param marketName The name of the market
+    /// @return The senior tranche name
+    function _seniorTrancheName(string memory marketName) internal pure returns (string memory) {
+        return string(abi.encodePacked("Royco Senior Tranche ", marketName));
+    }
+
+    /// @notice Returns the junior tranche name for a given market name
+    /// @param marketName The name of the market
+    /// @return The junior tranche name
+    function _juniorTrancheName(string memory marketName) internal pure returns (string memory) {
+        return string(abi.encodePacked("Royco Junior Tranche ", marketName));
+    }
+
+    /// @notice Returns the senior tranche symbol for a given market name
+    /// @param marketName The name of the market
+    /// @return The senior tranche symbol
+    function _seniorTrancheSymbol(string memory marketName) internal pure returns (string memory) {
+        return string(abi.encodePacked("ROY-ST-", marketName));
+    }
+
+    /// @notice Returns the junior tranche symbol for a given market name
+    /// @param marketName The name of the market
+    /// @return The junior tranche symbol
+    function _juniorTrancheSymbol(string memory marketName) internal pure returns (string memory) {
+        return string(abi.encodePacked("ROY-JT-", marketName));
+    }
 }
+
