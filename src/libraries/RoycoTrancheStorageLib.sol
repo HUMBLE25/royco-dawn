@@ -8,10 +8,8 @@ import { TrancheType } from "./Types.sol";
  * @notice Storage state for Royco Tranche contracts
  * @custom:storage-location erc7201:Royco.storage.RoycoTrancheState
  * @custom:field kernel - The address of the kernel contract handling strategy logic
- * @custom:field underlyingAssetDecimals - The decimals of the tranche's underlying asset
  * @custom:field asset - The address of the tranche's deposit asset
  * @custom:field marketId - The identifier of the Royco market this tranche is linked to
- * @custom:field decimalsOffset - Decimals offset for share token precision
  * @custom:field DEPOSIT_EXECUTION_MODEL - The kernel execution model for deposit operations
  * @custom:field WITHDRAW_EXECUTION_MODEL - The kernel execution model for withdrawal operations
  * @custom:field REQUEST_REDEEM_SHARES_ST_BEHAVIOR - The behavior of the shares when a redeem request is made for the senior tranche

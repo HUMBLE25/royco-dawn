@@ -791,13 +791,13 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
 
     /// @dev Returns the specified share quantity added to the tranche's virtual shares
     function _withVirtualShares(uint256 _shares) internal view returns (uint256) {
-        // Assume that NAV units are WAD precision, therefore virtual shares are 10 ^ (WAD_DECIMALS - 18) = 1
+        // NAV units are always in WAD precision, therefore virtual shares are 10 ^ (WAD_DECIMALS - 18) = 1
         return _shares + 1;
     }
 
     /// @dev Returns the specified share quantity subtracted from the tranche's virtual shares
     function _withoutVirtualShares(uint256 _shares) internal view returns (uint256) {
-        // Assume that NAV units are WAD precision, therefore virtual shares are 10 ^ (WAD_DECIMALS - 18) = 1
+        // NAV units are always in WAD precision, therefore virtual shares are 10 ^ (WAD_DECIMALS - 18) = 1
         return _shares - 1;
     }
 
