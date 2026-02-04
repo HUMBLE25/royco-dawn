@@ -332,7 +332,8 @@ contract RoycoAccountant is IRoycoAccountant, RoycoBase {
         // Compute the total covered assets by the junior tranche loss absorption buffer
         NAV_UNIT totalCoveredAssets = state.jtEffectiveNAV.mulDiv(WAD, $.coverageWAD, Math.Rounding.Floor);
         // Compute the assets required to cover current junior tranche exposure
-        NAV_UNIT jtCoverageRequired = _jtRawNAV.mulDiv($.betaWAD, WAD, Math.Rounding.Ceil);
+        // Also account for JT's dust tolerance to preclude reverts due to rounding after ST deposit (if both are exposed to the same underlying rounding)
+        NAV_UNIT jtCoverageRequired = _jtRawNAV.mulDiv($.betaWAD, WAD, Math.Rounding.Ceil) + $.jtNAVDustTolerance;
         // Compute the amount of assets that can be deposited into senior while retaining full coverage
         // Also account for ST's dust tolerance to preclude reverts due to rounding after ST deposit
         maxSTDeposit = totalCoveredAssets.saturatingSub(jtCoverageRequired).saturatingSub(_stRawNAV).saturatingSub($.stNAVDustTolerance);

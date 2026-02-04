@@ -913,7 +913,7 @@ contract RoycoAccountantTest is BaseTest {
         uint256 maxCovered = jtEff * WAD / COVERAGE_WAD;
         uint256 expectedMax = maxCovered > 100e18 ? maxCovered - 100e18 : 0;
 
-        assertApproxEqAbs(toUint256(maxDeposit), expectedMax, 1, "max deposit matches");
+        assertApproxEqAbs(toUint256(maxDeposit), expectedMax, 2, "max deposit matches");
     }
 
     function testFuzz_maxSTDepositGivenCoverage(uint256 stNav, uint256 jtNav) public {

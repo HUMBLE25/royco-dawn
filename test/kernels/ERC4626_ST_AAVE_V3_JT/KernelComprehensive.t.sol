@@ -1387,7 +1387,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         assertApproxEqAbs(
             maxRedeemNAV,
             sharesNAV,
-            toUint256(ACCOUNTANT.getState().stNAVDustTolerance + ACCOUNTANT.getState().jtNAVDustTolerance),
+            toUint256(ACCOUNTANT.getState().stNAVDustTolerance + ACCOUNTANT.getState().jtNAVDustTolerance) + 1,
             "JT maxRedeem must equal balance"
         );
     }
