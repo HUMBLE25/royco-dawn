@@ -14,7 +14,7 @@ import { IRoycoVaultTranche } from "../../src/interfaces/tranche/IRoycoVaultTran
 import {
     YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter_Kernel
 } from "../../src/kernels/YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter_Kernel.sol";
-import { RAY } from "../../src/libraries/Constants.sol";
+import { WAD } from "../../src/libraries/Constants.sol";
 import { RoycoKernelInitParams } from "../../src/libraries/RoycoKernelStorageLib.sol";
 import { TrancheDeploymentParams } from "../../src/libraries/Types.sol";
 import { TRANCHE_UNIT, toTrancheUnits, toUint256 } from "../../src/libraries/Units.sol";
@@ -35,7 +35,7 @@ contract UpgradabilityTestSuite is BaseTest {
     // ═══════════════════════════════════════════════════════════════════════════
 
     address internal constant SNUSD = 0x08EFCC2F3e61185D0EA7F8830B3FEc9Bfa2EE313;
-    uint256 internal constant FORK_BLOCK = 24_270_513;
+    uint256 internal constant FORK_BLOCK = 24_180_513;
 
     // ═══════════════════════════════════════════════════════════════════════════
     // NEW IMPLEMENTATION CONTRACTS FOR UPGRADE TESTING
@@ -80,7 +80,7 @@ contract UpgradabilityTestSuite is BaseTest {
         bytes32 marketId = keccak256(abi.encodePacked("UpgradabilityTest", vm.getBlockTimestamp()));
 
         DeployScript.YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626SharesAdminOracleQuoterKernelParams memory kernelParams =
-            DeployScript.YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626SharesAdminOracleQuoterKernelParams({ initialConversionRateRAY: RAY });
+            DeployScript.YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626SharesAdminOracleQuoterKernelParams({ initialConversionRateWAD: WAD });
 
         DeployScript.AdaptiveCurveYDMParams memory ydmParams =
             DeployScript.AdaptiveCurveYDMParams({ jtYieldShareAtTargetUtilWAD: 0.3e18, jtYieldShareAtFullUtilWAD: 1e18 });
@@ -208,7 +208,7 @@ contract UpgradabilityTestSuite is BaseTest {
         });
 
         vm.expectRevert(Initializable.InvalidInitialization.selector);
-        YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter_Kernel(KERNEL_IMPL).initialize(params, RAY);
+        YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter_Kernel(KERNEL_IMPL).initialize(params, WAD);
     }
 
     /// @notice Test that new ST implementation cannot be initialized
@@ -257,7 +257,7 @@ contract UpgradabilityTestSuite is BaseTest {
         });
 
         vm.expectRevert(Initializable.InvalidInitialization.selector);
-        YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter_Kernel(newKernelImpl).initialize(params, RAY);
+        YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter_Kernel(newKernelImpl).initialize(params, WAD);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════

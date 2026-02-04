@@ -187,7 +187,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
             assertApproxEqAbs(
                 toUint256(KERNEL.stConvertTrancheUnitsToNAVUnits(maxDeposit)),
                 toUint256(KERNEL.stConvertTrancheUnitsToNAVUnits(expectedMaxDeposit)),
-                toUint256(ACCOUNTANT.getState().stNAVDustTolerance) + 1,
+                toUint256(ACCOUNTANT.getState().stNAVDustTolerance) + toUint256(ACCOUNTANT.getState().jtNAVDustTolerance),
                 "Max deposit must return JTEff * coverage"
             );
         }
@@ -241,7 +241,7 @@ contract BasicOperationsTest is MainnetForkWithAaveTestBase {
         assertApproxEqAbs(
             toUint256(KERNEL.stConvertTrancheUnitsToNAVUnits(ST.maxDeposit(stDepositor))),
             toUint256(KERNEL.stConvertTrancheUnitsToNAVUnits(expectedMaxDeposit - depositAmount)),
-            toUint256(ACCOUNTANT.getState().stNAVDustTolerance) + 1,
+            toUint256(ACCOUNTANT.getState().stNAVDustTolerance + ACCOUNTANT.getState().jtNAVDustTolerance) + 1,
             "Max deposit must decrease expected amount"
         );
 

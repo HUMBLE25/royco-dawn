@@ -13,34 +13,34 @@ import { IdenticalAssetsOracleQuoter } from "./base/IdenticalAssetsOracleQuoter.
 abstract contract IdenticalAssetsChainlinkToAdminOracleQuoter is IdenticalAssetsChainlinkOracleQuoter, IdenticalAssetsAdminOracleQuoter {
     /**
      * @notice Initializes the identical assets chainlink oracle quoter and the base identical assets oracle quoter
-     * @param _initialConversionRateRAY The initial conversion rate as defined by the oracle, scaled to RAY precision
+     * @param _initialConversionRateWAD The initial conversion rate as defined by the oracle, scaled to WAD precision
      * @param _trancheAssetToReferenceAssetOracle The tranche asset to reference asset oracle
      * @param _stalenessThresholdSeconds The staleness threshold in seconds
      */
     function __IdenticalAssetsChainlinkToAdminOracleQuoter_init(
-        uint256 _initialConversionRateRAY,
+        uint256 _initialConversionRateWAD,
         address _trancheAssetToReferenceAssetOracle,
         uint48 _stalenessThresholdSeconds
     )
         internal
         onlyInitializing
     {
-        __IdenticalAssetsAdminOracleQuoter_init(_initialConversionRateRAY);
+        __IdenticalAssetsAdminOracleQuoter_init(_initialConversionRateWAD);
         __IdenticalAssetsChainlinkOracleQuoter_init_unchained(_trancheAssetToReferenceAssetOracle, _stalenessThresholdSeconds);
     }
 
     /// @inheritdoc IdenticalAssetsAdminOracleQuoter
-    function setConversionRate(uint256 _conversionRateRAY) public override(IdenticalAssetsOracleQuoter, IdenticalAssetsAdminOracleQuoter) restricted {
-        IdenticalAssetsAdminOracleQuoter.setConversionRate(_conversionRateRAY);
+    function setConversionRate(uint256 _conversionRateWAD) public override(IdenticalAssetsOracleQuoter, IdenticalAssetsAdminOracleQuoter) restricted {
+        IdenticalAssetsAdminOracleQuoter.setConversionRate(_conversionRateWAD);
     }
 
     /// @inheritdoc IdenticalAssetsChainlinkOracleQuoter
-    function getTrancheUnitToNAVUnitConversionRateRAY()
+    function getTrancheUnitToNAVUnitConversionRateWAD()
         public
         view
         override(IdenticalAssetsOracleQuoter, IdenticalAssetsChainlinkOracleQuoter)
-        returns (uint256 trancheToNAVUnitConversionRateRAY)
+        returns (uint256 trancheToNAVUnitConversionRateWAD)
     {
-        return IdenticalAssetsChainlinkOracleQuoter.getTrancheUnitToNAVUnitConversionRateRAY();
+        return IdenticalAssetsChainlinkOracleQuoter.getTrancheUnitToNAVUnitConversionRateWAD();
     }
 }

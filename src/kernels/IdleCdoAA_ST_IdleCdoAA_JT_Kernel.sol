@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import { IERC20Metadata } from "../../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/ERC20Upgradeable.sol";
 import { IIdleCDO } from "../interfaces/external/idle-finance/IIdleCDO.sol";
-import { RAY_DECIMALS } from "../libraries/Constants.sol";
+import { WAD_DECIMALS } from "../libraries/Constants.sol";
 import { RoycoKernelInitParams } from "../libraries/RoycoKernelStorageLib.sol";
 import { IdenticalAssetsOracleQuoter } from "./base/quoter/base/IdenticalAssetsOracleQuoter.sol";
 import {
@@ -22,8 +22,8 @@ contract IdleCdoAA_ST_IdleCdoAA_JT_Kernel is YieldBearingERC20_ST_YieldBearingER
     /// @notice The address of the IdleCDO
     address public immutable IDLE_CDO;
 
-    /// @notice The virtual price multiplier for the IdleCDO's AA tranche to convert to RAY precision
-    uint256 public immutable IDLE_CDO_VIRTUAL_PRICE_MULTIPLIER_FOR_RAY_PRECISION;
+    /// @notice The virtual price multiplier for the IdleCDO's AA tranche to convert to WAD precision
+    uint256 public immutable IDLE_CDO_VIRTUAL_PRICE_MULTIPLIER_FOR_WAD_PRECISION;
 
     /// @notice Thrown when the AA tranche token is different from the ST and JT asset
     error CDO_AA_TRANCHE_TOKEN_MISMATCH();
@@ -49,9 +49,9 @@ contract IdleCdoAA_ST_IdleCdoAA_JT_Kernel is YieldBearingERC20_ST_YieldBearingER
         address aaTrancheToken = IIdleCDO(IDLE_CDO).AATranche();
         require(aaTrancheToken == ST_ASSET && aaTrancheToken == JT_ASSET, CDO_AA_TRANCHE_TOKEN_MISMATCH());
 
-        // Compute the virtual price multiplier for the IdleCDO's AA tranche to convert to RAY precision
+        // Compute the virtual price multiplier for the IdleCDO's AA tranche to convert to WAD precision
         uint256 quoteTokenDecimals = IERC20Metadata(IIdleCDO(IDLE_CDO).token()).decimals();
-        IDLE_CDO_VIRTUAL_PRICE_MULTIPLIER_FOR_RAY_PRECISION = 10 ** (RAY_DECIMALS - quoteTokenDecimals);
+        IDLE_CDO_VIRTUAL_PRICE_MULTIPLIER_FOR_WAD_PRECISION = 10 ** (WAD_DECIMALS - quoteTokenDecimals);
     }
 
     /**
@@ -64,9 +64,9 @@ contract IdleCdoAA_ST_IdleCdoAA_JT_Kernel is YieldBearingERC20_ST_YieldBearingER
     }
 
     /// @inheritdoc IdenticalAssetsOracleQuoter
-    function _getConversionRateFromOracleRAY() internal view override returns (uint256) {
+    function _getConversionRateFromOracleWAD() internal view override returns (uint256) {
         // Virtual Price returns IdleCDO.token() decimals
-        // We multiply the virtual price by the virtual price multiplier convert to RAY precision
-        return IIdleCDO(IDLE_CDO).virtualPrice(ST_ASSET) * IDLE_CDO_VIRTUAL_PRICE_MULTIPLIER_FOR_RAY_PRECISION;
+        // We multiply the virtual price by the virtual price multiplier convert to WAD precision
+        return IIdleCDO(IDLE_CDO).virtualPrice(ST_ASSET) * IDLE_CDO_VIRTUAL_PRICE_MULTIPLIER_FOR_WAD_PRECISION;
     }
 }

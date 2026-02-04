@@ -7,7 +7,7 @@ import { DeployScript } from "../../../../script/Deploy.s.sol";
 import {
     YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter_Kernel
 } from "../../../../src/kernels/YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter_Kernel.sol";
-import { RAY, RAY_DECIMALS, WAD } from "../../../../src/libraries/Constants.sol";
+import { WAD, WAD, WAD_DECIMALS } from "../../../../src/libraries/Constants.sol";
 import { NAV_UNIT, TRANCHE_UNIT, toNAVUnits, toTrancheUnits, toUint256 } from "../../../../src/libraries/Units.sol";
 
 import { AbstractKernelTestSuite } from "../../abstract/AbstractKernelTestSuite.t.sol";
@@ -18,28 +18,28 @@ import { AbstractKernelTestSuite } from "../../abstract/AbstractKernelTestSuite.
 ///
 /// IMPORTANT: This kernel stores the `vaultAsset-to-NAV` conversion rate (e.g., NUSD->USD for sNUSD).
 /// The actual tranche-to-NAV conversion combines:
-///   1. ERC4626.convertToAssets(RAY) - share to vault asset rate
-///   2. storedRate (in RAY) - vault asset to NAV rate
-/// Result: trancheToNAV = shareToAsset * storedRate / RAY
+///   1. ERC4626.convertToAssets(WAD) - share to vault asset rate
+///   2. storedRate (in WAD) - vault asset to NAV rate
+/// Result: trancheToNAV = shareToAsset * storedRate / WAD
 abstract contract YieldBearingERC4626_TestBase is AbstractKernelTestSuite {
     // ═══════════════════════════════════════════════════════════════════════════
     // STATE FOR MOCKED SHARE PRICE
     // ═══════════════════════════════════════════════════════════════════════════
 
-    /// @notice Tracks the mocked share price (in RAY precision)
+    /// @notice Tracks the mocked share price (in WAD precision)
     /// @dev When non-zero, this value is used to mock convertToAssets() calls
-    uint256 internal mockedSharePriceRAY;
+    uint256 internal mockedSharePriceWAD;
 
     // ═══════════════════════════════════════════════════════════════════════════
     // CONFIGURATION (To be overridden by protocol-specific implementations)
     // ═══════════════════════════════════════════════════════════════════════════
 
-    /// @notice Returns the initial vault-asset-to-NAV conversion rate (in RAY precision)
-    /// @dev For stablecoins like sNUSD (where NUSD ≈ USD), this should be RAY (1e27)
+    /// @notice Returns the initial vault-asset-to-NAV conversion rate (in WAD precision)
+    /// @dev For stablecoins like sNUSD (where NUSD ≈ USD), this should be WAD (1e18)
     /// Override this for non-stablecoin vaults where the vault asset has a different NAV
     function _getInitialConversionRate() internal view virtual returns (uint256) {
-        // Default: 1:1 conversion in RAY precision (for stablecoins)
-        return RAY;
+        // Default: 1:1 conversion in WAD precision (for stablecoins)
+        return WAD;
     }
 
     /// @notice Returns the JT redemption delay
@@ -73,15 +73,15 @@ abstract contract YieldBearingERC4626_TestBase is AbstractKernelTestSuite {
         _simulateLoss(_percentageWAD);
     }
 
-    /// @notice Sets the conversion rate for ST (in RAY precision)
-    function setSTConversionRate(uint256 _rateRAY) public virtual {
-        _setConversionRate(_rateRAY);
+    /// @notice Sets the conversion rate for ST (in WAD precision)
+    function setSTConversionRate(uint256 _rateWAD) public virtual {
+        _setConversionRate(_rateWAD);
     }
 
-    /// @notice Sets the conversion rate for JT (in RAY precision)
+    /// @notice Sets the conversion rate for JT (in WAD precision)
     /// @dev For identical assets, this is the same as ST
-    function setJTConversionRate(uint256 _rateRAY) public virtual {
-        _setConversionRate(_rateRAY);
+    function setJTConversionRate(uint256 _rateWAD) public virtual {
+        _setConversionRate(_rateWAD);
     }
 
     /// @notice Deals ST asset to an address
@@ -113,7 +113,7 @@ abstract contract YieldBearingERC4626_TestBase is AbstractKernelTestSuite {
     /// @notice Simulates vault share price yield by mocking convertToAssets()
     /// @param _percentageWAD The percentage increase in WAD (e.g., 0.05e18 = 5%)
     function simulateVaultSharePriceYield(uint256 _percentageWAD) public virtual {
-        uint256 currentSharePrice = _getCurrentSharePriceRAY();
+        uint256 currentSharePrice = _getCurrentSharePriceWAD();
         uint256 newSharePrice = currentSharePrice * (WAD + _percentageWAD) / WAD;
         _mockConvertToAssets(newSharePrice);
     }
@@ -121,35 +121,35 @@ abstract contract YieldBearingERC4626_TestBase is AbstractKernelTestSuite {
     /// @notice Simulates vault share price loss by mocking convertToAssets()
     /// @param _percentageWAD The percentage decrease in WAD (e.g., 0.05e18 = 5%)
     function simulateVaultSharePriceLoss(uint256 _percentageWAD) public virtual {
-        uint256 currentSharePrice = _getCurrentSharePriceRAY();
+        uint256 currentSharePrice = _getCurrentSharePriceWAD();
         uint256 newSharePrice = currentSharePrice * (WAD - _percentageWAD) / WAD;
         _mockConvertToAssets(newSharePrice);
     }
 
-    /// @notice Computes the share amount to pass to convertToAssets() to get RAY-scaled output
+    /// @notice Computes the share amount to pass to convertToAssets() to get WAD-scaled output
     /// @dev This matches the kernel's SHARES_TO_CONVERT_TO_ASSETS calculation
     function _getSharesToConvertToAssets() internal view returns (uint256) {
-        return 10 ** (RAY_DECIMALS + IERC4626(config.stAsset).decimals() - IERC20Metadata(IERC4626(config.stAsset).asset()).decimals());
+        return 10 ** (WAD_DECIMALS + IERC4626(config.stAsset).decimals() - IERC20Metadata(IERC4626(config.stAsset).asset()).decimals());
     }
 
     /// @notice Gets the current share price (either mocked or from the actual vault)
-    /// @return The share price in RAY precision
-    function _getCurrentSharePriceRAY() internal view returns (uint256) {
-        if (mockedSharePriceRAY != 0) {
-            return mockedSharePriceRAY;
+    /// @return The share price in WAD precision
+    function _getCurrentSharePriceWAD() internal view returns (uint256) {
+        if (mockedSharePriceWAD != 0) {
+            return mockedSharePriceWAD;
         }
         // Get the actual share price from the vault using the same input the kernel uses
         return IERC4626(config.stAsset).convertToAssets(_getSharesToConvertToAssets());
     }
 
     /// @notice Mocks the convertToAssets function on the vault
-    /// @param _newSharePriceRAY The new share price in RAY precision
-    function _mockConvertToAssets(uint256 _newSharePriceRAY) internal {
-        mockedSharePriceRAY = _newSharePriceRAY;
+    /// @param _newSharePriceWAD The new share price in WAD precision
+    function _mockConvertToAssets(uint256 _newSharePriceWAD) internal {
+        mockedSharePriceWAD = _newSharePriceWAD;
 
         // Mock convertToAssets with the same input the kernel uses (SHARES_TO_CONVERT_TO_ASSETS)
         uint256 sharesToConvert = _getSharesToConvertToAssets();
-        vm.mockCall(config.stAsset, abi.encodeWithSelector(IERC4626.convertToAssets.selector, sharesToConvert), abi.encode(_newSharePriceRAY));
+        vm.mockCall(config.stAsset, abi.encodeWithSelector(IERC4626.convertToAssets.selector, sharesToConvert), abi.encode(_newSharePriceWAD));
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -174,16 +174,16 @@ abstract contract YieldBearingERC4626_TestBase is AbstractKernelTestSuite {
         _setConversionRate(newRate);
     }
 
-    /// @notice Gets the current conversion rate using the kernel's getter (in RAY precision)
+    /// @notice Gets the current conversion rate using the kernel's getter (in WAD precision)
     function _getConversionRate() internal view returns (uint256) {
-        return YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter_Kernel(address(KERNEL)).getStoredConversionRateRAY();
+        return YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter_Kernel(address(KERNEL)).getStoredConversionRateWAD();
     }
 
-    /// @notice Sets the conversion rate using the kernel's setter (in RAY precision)
+    /// @notice Sets the conversion rate using the kernel's setter (in WAD precision)
     /// @dev Requires ADMIN_ORACLE_QUOTER_ROLE, which is granted to ORACLE_QUOTER_ADMIN_ADDRESS
-    function _setConversionRate(uint256 _newRateRAY) internal {
+    function _setConversionRate(uint256 _newRateWAD) internal {
         vm.prank(ORACLE_QUOTER_ADMIN_ADDRESS);
-        YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter_Kernel(address(KERNEL)).setConversionRate(_newRateRAY);
+        YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter_Kernel(address(KERNEL)).setConversionRate(_newRateWAD);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -398,12 +398,12 @@ abstract contract YieldBearingERC4626_TestBase is AbstractKernelTestSuite {
 
         bytes32 marketId = keccak256(abi.encodePacked(cfg.name, "-", cfg.name, "-", vm.getBlockTimestamp()));
 
-        // Get initial conversion rate (vault asset to NAV, in RAY precision)
+        // Get initial conversion rate (vault asset to NAV, in WAD precision)
         uint256 initialConversionRate = _getInitialConversionRate();
 
         DeployScript.YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626SharesAdminOracleQuoterKernelParams memory kernelParams =
             DeployScript.YieldBearingERC4626STYieldBearingERC4626JTIdenticalERC4626SharesAdminOracleQuoterKernelParams({
-                initialConversionRateRAY: initialConversionRate
+                initialConversionRateWAD: initialConversionRate
             });
 
         DeployScript.AdaptiveCurveYDMParams memory ydmParams = DeployScript.AdaptiveCurveYDMParams({
@@ -423,8 +423,8 @@ abstract contract YieldBearingERC4626_TestBase is AbstractKernelTestSuite {
             juniorTrancheSymbol: string(abi.encodePacked("RJ-", cfg.name)),
             seniorAsset: cfg.stAsset,
             juniorAsset: cfg.jtAsset,
-            stNAVDustTolerance: toNAVUnits(10 ** (27 - cfg.stDecimals)),
-            jtNAVDustTolerance: toNAVUnits(10 ** (27 - cfg.jtDecimals)),
+            stNAVDustTolerance: toNAVUnits(10 ** (18 - cfg.stDecimals)),
+            jtNAVDustTolerance: toNAVUnits(10 ** (18 - cfg.jtDecimals)),
             kernelType: DeployScript.KernelType.YieldBearingERC4626_ST_YieldBearingERC4626_JT_IdenticalERC4626SharesAdminOracleQuoter,
             kernelSpecificParams: abi.encode(kernelParams),
             protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS,

@@ -47,3 +47,4 @@ show_logs = true
 
 [etherscan]
 mainnet = { key = "${ETHERSCAN_API_KEY}" }
+avalanche = { key = "${AVALANCHE_API_KEY}" }

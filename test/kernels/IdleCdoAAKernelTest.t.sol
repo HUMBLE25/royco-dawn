@@ -9,7 +9,7 @@ import { IRoycoAccountant } from "../../src/interfaces/IRoycoAccountant.sol";
 import { IIdleCDO } from "../../src/interfaces/external/idle-finance/IIdleCDO.sol";
 import { IdleCdoAA_ST_IdleCdoAA_JT_Kernel } from "../../src/kernels/IdleCdoAA_ST_IdleCdoAA_JT_Kernel.sol";
 import { IdenticalAssetsOracleQuoter } from "../../src/kernels/base/quoter/base/IdenticalAssetsOracleQuoter.sol";
-import { RAY_DECIMALS, WAD, ZERO_NAV_UNITS, ZERO_TRANCHE_UNITS } from "../../src/libraries/Constants.sol";
+import { WAD, WAD_DECIMALS, ZERO_NAV_UNITS, ZERO_TRANCHE_UNITS } from "../../src/libraries/Constants.sol";
 import { AssetClaims } from "../../src/libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib, toNAVUnits, toTrancheUnits, toUint256 } from "../../src/libraries/Units.sol";
 import { AbstractKernelTestSuite } from "./abstract/AbstractKernelTestSuite.t.sol";
@@ -39,13 +39,13 @@ contract IdleCdoAAKernelTest is AbstractKernelTestSuite {
     uint24 internal constant LOCAL_JT_REDEMPTION_DELAY_SECONDS = 7 days;
 
     /// @dev Fork block for mainnet
-    uint256 internal constant FORK_BLOCK = 24_277_000;
+    uint256 internal constant FORK_BLOCK = 24_187_000;
 
     /// @dev AA tranche token decimals (18 for Pareto AA tranche)
     uint8 internal constant AA_TRANCHE_DECIMALS = 18;
 
-    /// @dev Scale factor to convert from AA tranche token decimals to RAY precision
-    uint256 internal constant SCALE_FACTOR = 10 ** (RAY_DECIMALS - 6);
+    /// @dev Scale factor to convert from AA tranche token decimals to WAD precision
+    uint256 internal constant SCALE_FACTOR = 10 ** (WAD_DECIMALS - 6);
 
     // ═══════════════════════════════════════════════════════════════════════════
     // STATE
@@ -243,7 +243,7 @@ contract IdleCdoAAKernelTest is AbstractKernelTestSuite {
     /// @notice Test that kernel has correct virtual price multiplier
     function test_kernel_hasCorrectVirtualPriceMultiplier() public view {
         IdleCdoAA_ST_IdleCdoAA_JT_Kernel kernel = IdleCdoAA_ST_IdleCdoAA_JT_Kernel(address(KERNEL));
-        assertEq(kernel.IDLE_CDO_VIRTUAL_PRICE_MULTIPLIER_FOR_RAY_PRECISION(), SCALE_FACTOR, "Kernel should have correct virtual price multiplier");
+        assertEq(kernel.IDLE_CDO_VIRTUAL_PRICE_MULTIPLIER_FOR_WAD_PRECISION(), SCALE_FACTOR, "Kernel should have correct virtual price multiplier");
     }
 
     /// @notice Test that ST and JT assets are both the AA tranche token
@@ -260,14 +260,14 @@ contract IdleCdoAAKernelTest is AbstractKernelTestSuite {
         uint256 virtualPrice = CDO.virtualPrice(AA_TRANCHE_TOKEN);
 
         // Get conversion rate from kernel (should be virtualPrice * multiplier)
-        uint256 expectedConversionRateRAY = virtualPrice * kernel.IDLE_CDO_VIRTUAL_PRICE_MULTIPLIER_FOR_RAY_PRECISION();
+        uint256 expectedConversionRateWAD = virtualPrice * kernel.IDLE_CDO_VIRTUAL_PRICE_MULTIPLIER_FOR_WAD_PRECISION();
 
         // Convert 1 unit and check
         TRANCHE_UNIT oneUnit = toTrancheUnits(10 ** AA_TRANCHE_DECIMALS);
         NAV_UNIT navUnits = KERNEL.stConvertTrancheUnitsToNAVUnits(oneUnit);
 
-        // NAV should equal expectedConversionRateRAY (since we're converting 1 full token)
-        assertApproxEqRel(toUint256(navUnits), expectedConversionRateRAY, 0.001e18, "Conversion should match CDO virtual price");
+        // NAV should equal expectedConversionRateWAD (since we're converting 1 full token)
+        assertApproxEqRel(toUint256(navUnits), expectedConversionRateWAD, 0.001e18, "Conversion should match CDO virtual price");
     }
 
     /// @notice Test that ST and JT conversions are identical (same asset)
@@ -294,7 +294,7 @@ contract IdleCdoAAKernelTest is AbstractKernelTestSuite {
             NAV_UNIT nav = KERNEL.stConvertTrancheUnitsToNAVUnits(original);
             TRANCHE_UNIT back = KERNEL.stConvertNAVUnitsToTrancheUnits(nav);
 
-            assertEq(back, original, "Round-trip conversion must preserve value");
+            assertApproxEqAbs(back, original, 1, "Round-trip conversion must preserve value");
         }
     }
 
@@ -304,16 +304,16 @@ contract IdleCdoAAKernelTest is AbstractKernelTestSuite {
 
     /// @notice Test that oracle quoter admin can override conversion rate
     function test_setConversionRate_adminCanOverride() public {
-        // New conversion rate: 1.5 RAY (50% premium over 1:1)
-        uint256 newConversionRateRAY = 1.5e27;
+        // New conversion rate: 1.5 WAD (50% premium over 1:1)
+        uint256 newConversionRateWAD = 1.5e18;
 
         // Set conversion rate as oracle quoter admin
         vm.prank(ORACLE_QUOTER_ADMIN_ADDRESS);
-        IdenticalAssetsOracleQuoter(address(KERNEL)).setConversionRate(newConversionRateRAY);
+        IdenticalAssetsOracleQuoter(address(KERNEL)).setConversionRate(newConversionRateWAD);
 
         // Verify the stored rate is updated
-        uint256 storedRate = IdenticalAssetsOracleQuoter(address(KERNEL)).getStoredConversionRateRAY();
-        assertEq(storedRate, newConversionRateRAY, "Stored conversion rate should be updated");
+        uint256 storedRate = IdenticalAssetsOracleQuoter(address(KERNEL)).getStoredConversionRateWAD();
+        assertEq(storedRate, newConversionRateWAD, "Stored conversion rate should be updated");
     }
 
     /// @notice Test that overridden conversion rate is used in conversions
@@ -324,10 +324,10 @@ contract IdleCdoAAKernelTest is AbstractKernelTestSuite {
 
         // Set a new conversion rate: 2x the current virtual price
         uint256 virtualPrice = CDO.virtualPrice(AA_TRANCHE_TOKEN);
-        uint256 newConversionRateRAY = virtualPrice * SCALE_FACTOR * 2;
+        uint256 newConversionRateWAD = virtualPrice * SCALE_FACTOR * 2;
 
         vm.prank(ORACLE_QUOTER_ADMIN_ADDRESS);
-        IdenticalAssetsOracleQuoter(address(KERNEL)).setConversionRate(newConversionRateRAY);
+        IdenticalAssetsOracleQuoter(address(KERNEL)).setConversionRate(newConversionRateWAD);
 
         // Get new conversion for 1 token
         NAV_UNIT newNav = KERNEL.stConvertTrancheUnitsToNAVUnits(oneToken);
@@ -338,17 +338,17 @@ contract IdleCdoAAKernelTest is AbstractKernelTestSuite {
 
     /// @notice Test that non-admin cannot override conversion rate
     function test_setConversionRate_revertsForNonAdmin() public {
-        uint256 newConversionRateRAY = 1.5e27;
+        uint256 newConversionRateWAD = 1.5e18;
 
         vm.prank(ALICE_ADDRESS);
         vm.expectRevert();
-        IdenticalAssetsOracleQuoter(address(KERNEL)).setConversionRate(newConversionRateRAY);
+        IdenticalAssetsOracleQuoter(address(KERNEL)).setConversionRate(newConversionRateWAD);
     }
 
     /// @notice Test setting conversion rate to sentinel value resets to oracle
     function test_setConversionRate_sentinelResetsToOracle() public {
         // First override the rate
-        uint256 overrideRate = 2e27;
+        uint256 overrideRate = 2e18;
         vm.prank(ORACLE_QUOTER_ADMIN_ADDRESS);
         IdenticalAssetsOracleQuoter(address(KERNEL)).setConversionRate(overrideRate);
 

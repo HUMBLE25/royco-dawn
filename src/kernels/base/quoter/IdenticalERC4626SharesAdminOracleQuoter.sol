@@ -14,24 +14,24 @@ import { IdenticalERC4626SharesOracleQuoter } from "./base/IdenticalERC4626Share
 abstract contract IdenticalERC4626SharesAdminOracleQuoter is IdenticalERC4626SharesOracleQuoter, IdenticalAssetsAdminOracleQuoter {
     /**
      * @notice Initializes the identical assets chainlink oracle quoter and the base identical assets oracle quoter
-     * @param _initialConversionRateRAY The initial conversion rate as defined by the oracle, scaled to RAY precision
+     * @param _initialConversionRateWAD The initial conversion rate as defined by the oracle, scaled to WAD precision
      */
-    function __IdenticalERC4626SharesAdminOracleQuoter_init(uint256 _initialConversionRateRAY) internal onlyInitializing {
-        __IdenticalAssetsAdminOracleQuoter_init(_initialConversionRateRAY);
+    function __IdenticalERC4626SharesAdminOracleQuoter_init(uint256 _initialConversionRateWAD) internal onlyInitializing {
+        __IdenticalAssetsAdminOracleQuoter_init(_initialConversionRateWAD);
     }
 
     /// @inheritdoc IdenticalAssetsAdminOracleQuoter
-    function setConversionRate(uint256 _conversionRateRAY) public override(IdenticalAssetsOracleQuoter, IdenticalAssetsAdminOracleQuoter) restricted {
-        IdenticalAssetsAdminOracleQuoter.setConversionRate(_conversionRateRAY);
+    function setConversionRate(uint256 _conversionRateWAD) public override(IdenticalAssetsOracleQuoter, IdenticalAssetsAdminOracleQuoter) restricted {
+        IdenticalAssetsAdminOracleQuoter.setConversionRate(_conversionRateWAD);
     }
 
     /// @inheritdoc IdenticalERC4626SharesOracleQuoter
-    function getTrancheUnitToNAVUnitConversionRateRAY()
+    function getTrancheUnitToNAVUnitConversionRateWAD()
         public
         view
         override(IdenticalAssetsOracleQuoter, IdenticalERC4626SharesOracleQuoter)
-        returns (uint256 trancheToNAVUnitConversionRateRAY)
+        returns (uint256 trancheToNAVUnitConversionRateWAD)
     {
-        return IdenticalERC4626SharesOracleQuoter.getTrancheUnitToNAVUnitConversionRateRAY();
+        return IdenticalERC4626SharesOracleQuoter.getTrancheUnitToNAVUnitConversionRateWAD();
     }
 }

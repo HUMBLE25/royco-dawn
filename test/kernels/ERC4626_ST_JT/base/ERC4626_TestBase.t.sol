@@ -29,7 +29,7 @@ abstract contract ERC4626_TestBase is AbstractKernelTestSuite {
     uint256 internal mockedJTSharePrice;
 
     /// @dev ERC7201 storage slot for ERC4626KernelState (from ERC4626KernelStorageLib)
-    bytes32 private constant ERC4626_KERNEL_STORAGE_SLOT = 0x31dcae1a6c8e7be3177d6c56be6f186dd279c19bdd7d7f4820a1be934a634800;
+    bytes32 private constant ERC4626_KERNEL_STORAGE_SLOT = 0x31dcae1a6c8e7be3177d6c56be6f186dd189c19bdd7d7f4820a1be934a634800;
 
     // ═══════════════════════════════════════════════════════════════════════════
     // CONFIGURATION (To be overridden by protocol-specific implementations)
@@ -292,8 +292,8 @@ abstract contract ERC4626_TestBase is AbstractKernelTestSuite {
             juniorTrancheSymbol: string(abi.encodePacked("RJ-", cfg.name)),
             seniorAsset: cfg.stAsset,
             juniorAsset: cfg.jtAsset,
-            stNAVDustTolerance: toNAVUnits(10 ** (27 - cfg.stDecimals)),
-            jtNAVDustTolerance: toNAVUnits(10 ** (27 - cfg.jtDecimals)),
+            stNAVDustTolerance: toNAVUnits(10 ** (18 - cfg.stDecimals)),
+            jtNAVDustTolerance: toNAVUnits(10 ** (18 - cfg.jtDecimals)),
             kernelType: DeployScript.KernelType.ERC4626_ST_ERC4626_JT_InKindAssets,
             kernelSpecificParams: abi.encode(kernelParams),
             protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS,

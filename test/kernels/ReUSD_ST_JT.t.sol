@@ -6,7 +6,7 @@ import { DeployScript } from "../../script/Deploy.s.sol";
 import { IInsuranceCapitalLayer } from "../../src/interfaces/external/reUSD/IInsuranceCapitalLayer.sol";
 import { ReUSD_ST_ReUSD_JT_Kernel } from "../../src/kernels/ReUSD_ST_ReUSD_JT_Kernel.sol";
 import { IdenticalAssetsOracleQuoter } from "../../src/kernels/base/quoter/base/IdenticalAssetsOracleQuoter.sol";
-import { RAY, WAD } from "../../src/libraries/Constants.sol";
+import { WAD, WAD } from "../../src/libraries/Constants.sol";
 import { NAV_UNIT, TRANCHE_UNIT, toNAVUnits, toTrancheUnits, toUint256 } from "../../src/libraries/Units.sol";
 
 import { AbstractKernelTestSuite } from "./abstract/AbstractKernelTestSuite.t.sol";
@@ -48,7 +48,7 @@ contract reUSD_Test is AbstractKernelTestSuite {
     function getProtocolConfig() public pure override returns (ProtocolConfig memory) {
         return ProtocolConfig({
             name: "reUSD",
-            forkBlock: 24_277_000,
+            forkBlock: 24_187_000,
             forkRpcUrlEnvVar: "MAINNET_RPC_URL",
             stAsset: REUSD,
             jtAsset: REUSD,
@@ -117,13 +117,13 @@ contract reUSD_Test is AbstractKernelTestSuite {
         if (mockedICLConversionRate != 0) {
             return mockedICLConversionRate;
         }
-        return IdenticalAssetsOracleQuoter(address(KERNEL)).getTrancheUnitToNAVUnitConversionRateRAY();
+        return IdenticalAssetsOracleQuoter(address(KERNEL)).getTrancheUnitToNAVUnitConversionRateWAD();
     }
 
     /// @notice Mocks the convertFromShares function on the ICL
-    function _mockICLConversionRate(uint256 _newRateRAY) internal {
-        mockedICLConversionRate = _newRateRAY;
-        vm.mockCall(ICL, IInsuranceCapitalLayer.convertFromShares.selector, abi.encode(_newRateRAY));
+    function _mockICLConversionRate(uint256 _newRateWAD) internal {
+        mockedICLConversionRate = _newRateWAD;
+        vm.mockCall(ICL, IInsuranceCapitalLayer.convertFromShares.selector, abi.encode(_newRateWAD));
     }
 
     /// @notice Simulates yield by increasing the ICL conversion rate
@@ -157,18 +157,18 @@ contract reUSD_Test is AbstractKernelTestSuite {
 
     /// @notice Verifies that the ICL is correctly configured
     function test_reUSD_ICLConfiguration() external view {
-        uint256 rate = IInsuranceCapitalLayer(ICL).convertFromShares(USDC, RAY);
+        uint256 rate = IInsuranceCapitalLayer(ICL).convertFromShares(USDC, WAD);
         assertGt(rate, 0, "ICL should return positive conversion rate");
     }
 
     /// @notice Verifies initial conversion rate is set correctly (from ICL)
     function test_reUSD_initialConversionRate() external view {
         // The stored rate should be 0 (sentinel) meaning it queries ICL
-        uint256 storedRate = ReUSD_ST_ReUSD_JT_Kernel(address(KERNEL)).getStoredConversionRateRAY();
+        uint256 storedRate = ReUSD_ST_ReUSD_JT_Kernel(address(KERNEL)).getStoredConversionRateWAD();
         assertEq(storedRate, 0, "Stored rate should be 0 (sentinel, queries ICL)");
 
         // The actual conversion rate should be fetched from ICL
-        uint256 conversionRate = ReUSD_ST_ReUSD_JT_Kernel(address(KERNEL)).getTrancheUnitToNAVUnitConversionRateRAY();
+        uint256 conversionRate = ReUSD_ST_ReUSD_JT_Kernel(address(KERNEL)).getTrancheUnitToNAVUnitConversionRateWAD();
         assertGt(conversionRate, 0, "Conversion rate should be positive");
     }
 
@@ -220,12 +220,12 @@ contract reUSD_Test is AbstractKernelTestSuite {
 
     /// @notice Tests that admin can set conversion rate override
     function test_setConversionRate_success() external {
-        uint256 newRate = 1.05e27;
+        uint256 newRate = 1.05e18;
 
         vm.prank(ORACLE_QUOTER_ADMIN_ADDRESS);
         ReUSD_ST_ReUSD_JT_Kernel(address(KERNEL)).setConversionRate(newRate);
 
-        uint256 storedRate = ReUSD_ST_ReUSD_JT_Kernel(address(KERNEL)).getStoredConversionRateRAY();
+        uint256 storedRate = ReUSD_ST_ReUSD_JT_Kernel(address(KERNEL)).getStoredConversionRateWAD();
         assertEq(storedRate, newRate, "Stored rate should match set rate");
     }
 
@@ -233,7 +233,7 @@ contract reUSD_Test is AbstractKernelTestSuite {
     function test_setConversionRate_revertsOnUnauthorized() external {
         vm.prank(ALICE_ADDRESS);
         vm.expectRevert();
-        ReUSD_ST_ReUSD_JT_Kernel(address(KERNEL)).setConversionRate(1e27);
+        ReUSD_ST_ReUSD_JT_Kernel(address(KERNEL)).setConversionRate(1e18);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -264,8 +264,8 @@ contract reUSD_Test is AbstractKernelTestSuite {
             juniorTrancheSymbol: string(abi.encodePacked("RJ-", cfg.name)),
             seniorAsset: cfg.stAsset,
             juniorAsset: cfg.jtAsset,
-            stNAVDustTolerance: toNAVUnits(10 ** (27 - cfg.stDecimals)),
-            jtNAVDustTolerance: toNAVUnits(10 ** (27 - cfg.jtDecimals)),
+            stNAVDustTolerance: toNAVUnits(10 ** (18 - cfg.stDecimals)),
+            jtNAVDustTolerance: toNAVUnits(10 ** (18 - cfg.jtDecimals)),
             kernelType: DeployScript.KernelType.ReUSD_ST_ReUSD_JT,
             kernelSpecificParams: abi.encode(kernelParams),
             protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS,

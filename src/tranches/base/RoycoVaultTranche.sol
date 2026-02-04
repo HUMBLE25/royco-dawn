@@ -12,7 +12,7 @@ import { IAsyncSTDepositKernel } from "../../interfaces/kernel/IAsyncSTDepositKe
 import { IAsyncSTRedemptionKernel } from "../../interfaces/kernel/IAsyncSTRedemptionKernel.sol";
 import { ExecutionModel, IRoycoKernel, SharesRedemptionModel } from "../../interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoAsyncCancellableVault, IRoycoAsyncVault, IRoycoVaultTranche } from "../../interfaces/tranche/IRoycoVaultTranche.sol";
-import { ZERO_NAV_UNITS } from "../../libraries/Constants.sol";
+import { WAD_DECIMALS, ZERO_NAV_UNITS } from "../../libraries/Constants.sol";
 import { RoycoTrancheStorageLib } from "../../libraries/RoycoTrancheStorageLib.sol";
 import { Action, AssetClaims, SyncedAccountingState, TrancheDeploymentParams, TrancheType } from "../../libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib, toNAVUnits, toTrancheUnits, toUint256 } from "../../libraries/Units.sol";
@@ -97,12 +97,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
      * @param _marketId The identifier of the Royco market this tranche is linked to
      */
     function __RoycoTranche_init_unchained(address _asset, address _kernelAddress, bytes32 _marketId) internal onlyInitializing {
-        // Calculate the vault's decimal offset (curb inflation attacks)
-        uint8 underlyingAssetDecimals = IERC20Metadata(_asset).decimals();
-        uint8 decimalsOffset = underlyingAssetDecimals >= 18 ? 0 : (18 - underlyingAssetDecimals);
-
-        // Initialize the tranche's state
-        RoycoTrancheStorageLib.__RoycoTranche_init(_kernelAddress, _asset, _marketId, underlyingAssetDecimals, decimalsOffset, TRANCHE_TYPE());
+        RoycoTrancheStorageLib.__RoycoTranche_init(_kernelAddress, _asset, _marketId, TRANCHE_TYPE());
     }
 
     /// @inheritdoc IRoycoVaultTranche
@@ -690,7 +685,9 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
 
     /// @inheritdoc IERC20Metadata
     function decimals() public view virtual override(ERC20Upgradeable, IERC20Metadata) returns (uint8) {
-        return RoycoTrancheStorageLib._getRoycoTrancheStorage().underlyingAssetDecimals + _decimalsOffset();
+        // The Kernel always uses WAD precision for the NAV units
+        // Since virtual assets and shares are set to 1, the shares are minted in the same precision as the NAV units (WAD precision)
+        return uint8(WAD_DECIMALS);
     }
 
     /// @inheritdoc IRoycoVaultTranche
@@ -769,11 +766,6 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         return _withVirtualShares(_totalSupply).mulDiv(_assets, _withVirtualAssets(_totalAssets), _rounding);
     }
 
-    /// @dev Returns the vault share's decimal offset
-    function _decimalsOffset() internal view virtual returns (uint8) {
-        return RoycoTrancheStorageLib._getRoycoTrancheStorage().decimalsOffset;
-    }
-
     /**
      * @notice Checks if the caller is either the specified address or an approved operator
      * @param _account The address of the user to check
@@ -799,12 +791,14 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
 
     /// @dev Returns the specified share quantity added to the tranche's virtual shares
     function _withVirtualShares(uint256 _shares) internal view returns (uint256) {
-        return _shares + 10 ** _decimalsOffset();
+        // NAV units are always in WAD precision, therefore virtual shares are 10 ^ (WAD_DECIMALS - 18) = 1
+        return _shares + 1;
     }
 
     /// @dev Returns the specified share quantity subtracted from the tranche's virtual shares
     function _withoutVirtualShares(uint256 _shares) internal view returns (uint256) {
-        return _shares - 10 ** _decimalsOffset();
+        // NAV units are always in WAD precision, therefore virtual shares are 10 ^ (WAD_DECIMALS - 18) = 1
+        return _shares - 1;
     }
 
     /// @dev Returns the specified NAV added to the tranche's virtual NAV (1)

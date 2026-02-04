@@ -7,7 +7,7 @@ import {
     YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel
 } from "../../../../src/kernels/YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel.sol";
 import { IdenticalAssetsChainlinkOracleQuoter } from "../../../../src/kernels/base/quoter/base/IdenticalAssetsChainlinkOracleQuoter.sol";
-import { RAY, WAD } from "../../../../src/libraries/Constants.sol";
+import { WAD, WAD } from "../../../../src/libraries/Constants.sol";
 import { NAV_UNIT, TRANCHE_UNIT, toNAVUnits, toTrancheUnits, toUint256 } from "../../../../src/libraries/Units.sol";
 
 import { AbstractKernelTestSuite } from "../../abstract/AbstractKernelTestSuite.t.sol";
@@ -47,12 +47,12 @@ abstract contract YieldBearingERC20Chainlink_TestBase is AbstractKernelTestSuite
         return DEFAULT_STALENESS_THRESHOLD;
     }
 
-    /// @notice Returns the initial reference-asset-to-NAV conversion rate (in RAY precision)
-    /// @dev For stablecoins where reference asset ≈ USD, this should be RAY (1e27) for 1:1 conversion
+    /// @notice Returns the initial reference-asset-to-NAV conversion rate (in WAD precision)
+    /// @dev For stablecoins where reference asset ≈ USD, this should be WAD (1e18) for 1:1 conversion
     /// Override this for non-stablecoin assets where the reference asset has a different NAV
     function _getInitialConversionRate() internal view virtual returns (uint256) {
-        // Default: 1:1 conversion in RAY precision (for stablecoins)
-        return RAY;
+        // Default: 1:1 conversion in WAD precision (for stablecoins)
+        return WAD;
     }
 
     /// @notice Returns the JT redemption delay
@@ -210,16 +210,16 @@ abstract contract YieldBearingERC20Chainlink_TestBase is AbstractKernelTestSuite
     // STORED CONVERSION RATE HELPERS
     // ═══════════════════════════════════════════════════════════════════════════
 
-    /// @notice Gets the stored conversion rate (reference asset to NAV) in RAY precision
+    /// @notice Gets the stored conversion rate (reference asset to NAV) in WAD precision
     function _getStoredConversionRate() internal view returns (uint256) {
-        return YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel(address(KERNEL)).getStoredConversionRateRAY();
+        return YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel(address(KERNEL)).getStoredConversionRateWAD();
     }
 
-    /// @notice Sets the stored conversion rate (reference asset to NAV) in RAY precision
+    /// @notice Sets the stored conversion rate (reference asset to NAV) in WAD precision
     /// @dev Requires ADMIN_ORACLE_QUOTER_ROLE, which is granted to ORACLE_QUOTER_ADMIN_ADDRESS
-    function _setStoredConversionRate(uint256 _newRateRAY) internal {
+    function _setStoredConversionRate(uint256 _newRateWAD) internal {
         vm.prank(ORACLE_QUOTER_ADMIN_ADDRESS);
-        YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel(address(KERNEL)).setConversionRate(_newRateRAY);
+        YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel(address(KERNEL)).setConversionRate(_newRateWAD);
     }
 
     /// @notice Simulates yield in the stored conversion rate
@@ -414,7 +414,7 @@ abstract contract YieldBearingERC20Chainlink_TestBase is AbstractKernelTestSuite
 
         // Try to get conversion rate - should revert with PRICE_STALE
         vm.expectRevert(IdenticalAssetsChainlinkOracleQuoter.PRICE_STALE.selector);
-        YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel(address(KERNEL)).getTrancheUnitToNAVUnitConversionRateRAY();
+        YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel(address(KERNEL)).getTrancheUnitToNAVUnitConversionRateWAD();
     }
 
     /// @notice Tests that zero/negative price causes PRICE_INVALID revert
@@ -436,7 +436,7 @@ abstract contract YieldBearingERC20Chainlink_TestBase is AbstractKernelTestSuite
         );
 
         vm.expectRevert(IdenticalAssetsChainlinkOracleQuoter.PRICE_INVALID.selector);
-        YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel(address(KERNEL)).getTrancheUnitToNAVUnitConversionRateRAY();
+        YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel(address(KERNEL)).getTrancheUnitToNAVUnitConversionRateWAD();
     }
 
     /// @notice Tests that negative price causes PRICE_INVALID revert
@@ -458,7 +458,7 @@ abstract contract YieldBearingERC20Chainlink_TestBase is AbstractKernelTestSuite
         );
 
         vm.expectRevert(IdenticalAssetsChainlinkOracleQuoter.PRICE_INVALID.selector);
-        YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel(address(KERNEL)).getTrancheUnitToNAVUnitConversionRateRAY();
+        YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel(address(KERNEL)).getTrancheUnitToNAVUnitConversionRateWAD();
     }
 
     /// @notice Tests that incomplete round causes PRICE_INCOMPLETE revert
@@ -480,7 +480,7 @@ abstract contract YieldBearingERC20Chainlink_TestBase is AbstractKernelTestSuite
         );
 
         vm.expectRevert(IdenticalAssetsChainlinkOracleQuoter.PRICE_INCOMPLETE.selector);
-        YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel(address(KERNEL)).getTrancheUnitToNAVUnitConversionRateRAY();
+        YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel(address(KERNEL)).getTrancheUnitToNAVUnitConversionRateWAD();
     }
 
     /// @notice Tests that valid oracle data passes all checks
@@ -502,7 +502,7 @@ abstract contract YieldBearingERC20Chainlink_TestBase is AbstractKernelTestSuite
 
         // Should not revert
         uint256 rate = YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdminOracleQuoter_Kernel(address(KERNEL))
-            .getTrancheUnitToNAVUnitConversionRateRAY();
+            .getTrancheUnitToNAVUnitConversionRateWAD();
         assertGt(rate, 0, "Conversion rate should be positive");
     }
 
@@ -525,14 +525,14 @@ abstract contract YieldBearingERC20Chainlink_TestBase is AbstractKernelTestSuite
 
         bytes32 marketId = keccak256(abi.encodePacked(cfg.name, "-", cfg.name, "-", vm.getBlockTimestamp()));
 
-        // Get initial conversion rate (reference asset to NAV, in RAY precision)
+        // Get initial conversion rate (reference asset to NAV, in WAD precision)
         uint256 initialConversionRate = _getInitialConversionRate();
 
         DeployScript.YieldBearingERC20STYieldBearingERC20JTIdenticalAssetsChainlinkOracleQuoterKernelParams memory kernelParams =
             DeployScript.YieldBearingERC20STYieldBearingERC20JTIdenticalAssetsChainlinkOracleQuoterKernelParams({
                 trancheAssetToReferenceAssetOracle: chainlinkOracle,
                 stalenessThresholdSeconds: _getStalenessThreshold(),
-                initialConversionRateRAY: initialConversionRate
+                initialConversionRateWAD: initialConversionRate
             });
 
         DeployScript.AdaptiveCurveYDMParams memory ydmParams = DeployScript.AdaptiveCurveYDMParams({
@@ -552,8 +552,8 @@ abstract contract YieldBearingERC20Chainlink_TestBase is AbstractKernelTestSuite
             juniorTrancheSymbol: string(abi.encodePacked("RJ-", cfg.name)),
             seniorAsset: cfg.stAsset,
             juniorAsset: cfg.jtAsset,
-            stNAVDustTolerance: toNAVUnits(10 ** (27 - cfg.stDecimals)),
-            jtNAVDustTolerance: toNAVUnits(10 ** (27 - cfg.jtDecimals)),
+            stNAVDustTolerance: toNAVUnits(10 ** (18 - cfg.stDecimals)),
+            jtNAVDustTolerance: toNAVUnits(10 ** (18 - cfg.jtDecimals)),
             kernelType: DeployScript.KernelType.YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkOracleQuoter,
             kernelSpecificParams: abi.encode(kernelParams),
             protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS,

@@ -20,6 +20,12 @@ import { RolesConfiguration } from "./RolesConfiguration.sol";
  * @dev The factory deploys each market's constituent contracts using the UUPS proxy pattern
  */
 contract RoycoFactory is AccessManager, RolesConfiguration, IRoycoFactory {
+    /// @dev Mapping from a senior tranche to its corresponding junior tranche
+    mapping(address st => address jt) public seniorTrancheToJuniorTranche;
+
+    /// @dev Mapping from a junior tranche to its corresponding senior tranche
+    mapping(address jt => address st) public juniorTrancheToSeniorTranche;
+
     /**
      * @notice Initializes the Royco Factory
      * @param _admin The admin of the factory
@@ -48,6 +54,12 @@ contract RoycoFactory is AccessManager, RolesConfiguration, IRoycoFactory {
 
         // Configure the roles
         _configureRoles(roycoMarket, _params.roles);
+
+        // Update the mappings between the two deployed tranches
+        address seniorTranche = address(roycoMarket.seniorTranche);
+        address juniorTranche = address(roycoMarket.juniorTranche);
+        seniorTrancheToJuniorTranche[seniorTranche] = juniorTranche;
+        juniorTrancheToSeniorTranche[juniorTranche] = seniorTranche;
 
         emit MarketDeployed(roycoMarket, _params);
     }

@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import { IERC4626 } from "../../../../lib/openzeppelin-contracts/contracts/interfaces/IERC4626.sol";
 
-import { RAY } from "../../../../src/libraries/Constants.sol";
+import { WAD } from "../../../../src/libraries/Constants.sol";
 import { NAV_UNIT, TRANCHE_UNIT, toNAVUnits, toTrancheUnits } from "../../../../src/libraries/Units.sol";
 
 import { YieldBearingERC4626_TestBase } from "../base/YieldBearingERC4626_TestBase.t.sol";
@@ -47,10 +47,10 @@ contract stcUSD_stcUSD_Test is YieldBearingERC4626_TestBase {
         });
     }
 
-    /// @notice Returns the initial cUSD->USD conversion rate (in RAY precision)
-    /// @dev Hardcoded at 1:1, so we return RAY (1e27)
+    /// @notice Returns the initial cUSD->USD conversion rate (in WAD precision)
+    /// @dev Hardcoded at 1:1, so we return WAD (1e18)
     function _getInitialConversionRate() internal pure override returns (uint256) {
-        return RAY; // 1:1 cUSD to USD
+        return WAD; // 1:1 cUSD to USD
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -89,7 +89,7 @@ contract stcUSD_stcUSD_Test is YieldBearingERC4626_TestBase {
     /// @notice Verifies initial conversion rate is set correctly
     function test_stcUSD_initialConversionRate() external view {
         uint256 storedRate = _getConversionRate();
-        assertEq(storedRate, RAY, "Stored rate should be RAY (1:1 for stablecoin)");
+        assertEq(storedRate, WAD, "Stored rate should be WAD (1:1 for stablecoin)");
     }
 
     /// @notice Test that simulated yield works correctly for stcUSD

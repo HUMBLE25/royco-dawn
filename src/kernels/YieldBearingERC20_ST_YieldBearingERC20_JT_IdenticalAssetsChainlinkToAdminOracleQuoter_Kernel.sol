@@ -27,13 +27,13 @@ contract YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdm
      * @param _params The standard initialization parameters for the Royco Kernel
      * @param _trancheAssetToReferenceAssetOracle The tranche asset to reference asset oracle
      * @param _stalenessThresholdSeconds The staleness threshold seconds
-     * @param _initialConversionRateRAY The initial reference asset to NAV unit conversion rate, scaled to RAY precision
+     * @param _initialConversionRateWAD The initial reference asset to NAV unit conversion rate, scaled to WAD precision
      */
     function initialize(
         RoycoKernelInitParams calldata _params,
         address _trancheAssetToReferenceAssetOracle,
         uint48 _stalenessThresholdSeconds,
-        uint256 _initialConversionRateRAY
+        uint256 _initialConversionRateWAD
     )
         external
         initializer
@@ -41,6 +41,6 @@ contract YieldBearingERC20_ST_YieldBearingERC20_JT_IdenticalAssetsChainlinkToAdm
         // Initialize the base kernel state
         __RoycoKernel_init(_params);
         // Initialize the identical assets chainlink to admin oracle quoter
-        __IdenticalAssetsChainlinkToAdminOracleQuoter_init(_initialConversionRateRAY, _trancheAssetToReferenceAssetOracle, _stalenessThresholdSeconds);
+        __IdenticalAssetsChainlinkToAdminOracleQuoter_init(_initialConversionRateWAD, _trancheAssetToReferenceAssetOracle, _stalenessThresholdSeconds);
     }
 }

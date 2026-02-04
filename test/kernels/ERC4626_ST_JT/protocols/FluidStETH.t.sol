@@ -192,8 +192,8 @@ contract FluidStETH_Test is ERC4626_TestBase {
             juniorTrancheSymbol: string(abi.encodePacked("RJ-", cfg.name)),
             seniorAsset: cfg.stAsset,
             juniorAsset: cfg.jtAsset,
-            stNAVDustTolerance: toNAVUnits(5 * 10 ** (27 - cfg.stDecimals)), // 5 wei tolerance for stETH's 1-2 wei rounding per op
-            jtNAVDustTolerance: toNAVUnits(5 * 10 ** (27 - cfg.jtDecimals)), // 5 wei tolerance for stETH's 1-2 wei rounding per op
+            stNAVDustTolerance: toNAVUnits(5 * 10 ** (18 - cfg.stDecimals)), // 5 wei tolerance for stETH's 1-2 wei rounding per op
+            jtNAVDustTolerance: toNAVUnits(5 * 10 ** (18 - cfg.jtDecimals)), // 5 wei tolerance for stETH's 1-2 wei rounding per op
             kernelType: DeployScript.KernelType.ERC4626_ST_ERC4626_JT_InKindAssets,
             kernelSpecificParams: abi.encode(kernelParams),
             protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS,
