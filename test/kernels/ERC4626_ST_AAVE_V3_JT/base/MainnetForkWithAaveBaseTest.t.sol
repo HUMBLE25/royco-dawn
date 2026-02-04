@@ -111,8 +111,8 @@ abstract contract MainnetForkWithAaveTestBase is BaseTest {
             juniorTrancheSymbol: JUNIOR_TRANCHE_SYMBOL,
             seniorAsset: ETHEREUM_MAINNET_USDC_ADDRESS,
             juniorAsset: ETHEREUM_MAINNET_USDC_ADDRESS,
-            stNAVDustTolerance: toNAVUnits(uint256(10 ** 21)), // 10^(18-6) for USDC
-            jtNAVDustTolerance: toNAVUnits(uint256(10 ** 21)), // 10^(18-6) for USDC
+            stNAVDustTolerance: toNAVUnits(uint256(10 ** 12)), // 10^(18-6) for USDC
+            jtNAVDustTolerance: toNAVUnits(uint256(10 ** 12)), // 10^(18-6) for USDC
             kernelType: DeployScript.KernelType.ERC4626_ST_AaveV3_JT_InKindAssets,
             kernelSpecificParams: abi.encode(kernelParams),
             protocolFeeRecipient: PROTOCOL_FEE_RECIPIENT_ADDRESS,

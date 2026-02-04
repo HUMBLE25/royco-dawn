@@ -55,8 +55,8 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         TRANCHE_UNIT oneUnit = toTrancheUnits(1);
         NAV_UNIT stNav = KERNEL.stConvertTrancheUnitsToNAVUnits(oneUnit);
 
-        // For 6 decimal asset, scale factor = 10^(18-6) = 10^21
-        assertEq(toUint256(stNav), 1e21, "1 unit of 6-decimal asset must scale to 1e21 NAV");
+        // For 6 decimal asset, scale factor = 10^(18-6) = 10^12
+        assertEq(toUint256(stNav), 1e12, "1 unit of 6-decimal asset must scale to 1e21 NAV");
     }
 
     /// @notice Test round-trip conversion preserves value (asset -> NAV -> asset)
@@ -139,7 +139,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         // Max ST deposit should be JT_EFF_NAV / coverage
         // With coverage = 0.2 (20%), max ST = JT * 5
         NAV_UNIT jtEffNAV = JT.totalAssets().nav;
-        uint256 expectedMaxDeposit = toUint256(jtEffNAV) * WAD / COVERAGE_WAD / 1e21; // Convert NAV (WAD) to USDC (6 decimals)
+        uint256 expectedMaxDeposit = toUint256(jtEffNAV) * WAD / COVERAGE_WAD / 1e12; // Convert NAV (WAD) to USDC (6 decimals)
 
         TRANCHE_UNIT actualMaxDeposit = ST.maxDeposit(ALICE_ADDRESS);
 
@@ -4331,7 +4331,7 @@ contract KernelComprehensiveTest is MainnetForkWithAaveTestBase {
         uint256 stNAVDustTolerance = toUint256(state.stNAVDustTolerance);
 
         uint256 expectedMaxNAV = totalCoveredAssets - jtCoverageRequired - toUint256(stRawNAV) - stNAVDustTolerance;
-        uint256 expectedMaxTrancheUnits = expectedMaxNAV / 1e21; // Convert from NAV (18 decimals) to USDC (6 decimals)
+        uint256 expectedMaxTrancheUnits = expectedMaxNAV / 1e12; // Convert from NAV (18 decimals) to USDC (6 decimals)
 
         TRANCHE_UNIT actualMaxDeposit = ST.maxDeposit(BOB_ADDRESS);
 
