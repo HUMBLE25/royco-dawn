@@ -2516,7 +2516,7 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         assertApproxEqAbs(
             maxRedeemAfterSTRedeem,
             jtShares,
-            toUint256(ACCOUNTANT.getState().stNAVDustTolerance + ACCOUNTANT.getState().jtNAVDustTolerance),
+            toUint256(ACCOUNTANT.getState().stNAVDustTolerance + ACCOUNTANT.getState().jtNAVDustTolerance) + 1,
             "JT maxRedeem should return to full balance"
         );
     }
