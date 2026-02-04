@@ -190,7 +190,7 @@ abstract contract DeploymentConfig {
             jtProtocolFeeWAD: 0.2e18,
             coverageWAD: 0.1e18,
             betaWAD: 1e18,
-            lltvWAD: 0.9001e18,
+            lltvWAD: 0.91e18,
             fixedTermDurationSeconds: 0, // Market is not expected to have volatility, so no fixed term
             ydmType: DeployScript.YDMType.AdaptiveCurve,
             ydmSpecificParams: abi.encode(DeployScript.AdaptiveCurveYDMParams({ jtYieldShareAtTargetUtilWAD: 0.053e18, jtYieldShareAtFullUtilWAD: 1e18 }))
@@ -216,7 +216,7 @@ abstract contract DeploymentConfig {
             jtProtocolFeeWAD: 0.2e18,
             coverageWAD: 0.1e18,
             betaWAD: 1e18,
-            lltvWAD: 0.9001e18,
+            lltvWAD: 0.91e18,
             fixedTermDurationSeconds: 0, // Market is not expected to have volatility, so no fixed term
             ydmType: DeployScript.YDMType.AdaptiveCurve,
             ydmSpecificParams: abi.encode(DeployScript.AdaptiveCurveYDMParams({ jtYieldShareAtTargetUtilWAD: 0.1236e18, jtYieldShareAtFullUtilWAD: 1e18 }))
@@ -242,7 +242,7 @@ abstract contract DeploymentConfig {
             jtProtocolFeeWAD: 0.2e18,
             coverageWAD: 0.2e18,
             betaWAD: 1e18,
-            lltvWAD: 0.8002e18,
+            lltvWAD: 0.82e18,
             fixedTermDurationSeconds: 0, // Market is not expected to have volatility, so no fixed term
             ydmType: DeployScript.YDMType.AdaptiveCurve,
             ydmSpecificParams: abi.encode(DeployScript.AdaptiveCurveYDMParams({ jtYieldShareAtTargetUtilWAD: 0.1357e18, jtYieldShareAtFullUtilWAD: 1e18 }))
