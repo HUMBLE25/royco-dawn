@@ -1636,10 +1636,10 @@ contract RoycoAccountantRevertTest is BaseTest {
 
     /// @notice Fuzz test post-op invalid state transitions
     function testFuzz_revert_postOpSync_invalidState(uint256 initialST, uint256 initialJT, uint256 newST, uint256 newJT, uint8 opType) public {
-        initialST = bound(initialST, 10e18, 1e18);
-        initialJT = bound(initialJT, 10e18, 1e18);
-        newST = bound(newST, 1e18, 1e18);
-        newJT = bound(newJT, 1e18, 1e18);
+        initialST = bound(initialST, 10e18, 10e30);
+        initialJT = bound(initialJT, 10e18, 10e30);
+        newST = bound(newST, 1e18, 10e30);
+        newJT = bound(newJT, 1e18, 10e30);
         opType = uint8(bound(opType, 0, 3));
 
         vm.prank(MOCK_KERNEL);
@@ -2010,7 +2010,7 @@ contract RoycoAccountantLLTVInvariantTest is BaseTest {
     address internal MOCK_KERNEL;
     uint64 internal LLTV_WAD = 0.95e18;
     uint256 internal constant MIN_NAV = 1e6;
-    uint256 internal constant MAX_NAV = 1e18;
+    uint256 internal constant MAX_NAV = 1e30;
 
     function setUp() public {
         _setUpRoyco();
