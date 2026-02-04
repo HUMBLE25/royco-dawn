@@ -20,7 +20,7 @@ struct ERC4626KernelState {
 library ERC4626KernelStorageLib {
     /// @dev Storage slot for ERC4626KernelState using ERC-7201 pattern
     // keccak256(abi.encode(uint256(keccak256("Royco.storage.ERC4626KernelState")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant ERC4626_KERNEL_STORAGE_SLOT = 0x31dcae1a6c8e7be3177d6c56be6f186dd189c19bdd7d7f4820a1be934a634800;
+    bytes32 private constant ERC4626_KERNEL_STORAGE_SLOT = 0x31dcae1a6c8e7be3177d6c56be6f186dd279c19bdd7d7f4820a1be934a634800;
 
     /**
      * @notice Returns a storage pointer to the ERC4626KernelState storage
