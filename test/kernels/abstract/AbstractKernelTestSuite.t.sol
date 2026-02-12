@@ -2136,6 +2136,40 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         assertEq(JT.allowance(ALICE_ADDRESS, BOB_ADDRESS), allowanceBefore, "Allowance should not be spent for operators");
     }
 
+    function testFuzz_operator_canSyncRedeem_onBehalfOfUser(uint256 _jtAmount, uint256 _stPercentage) external {
+        _jtAmount = bound(_jtAmount, _minDepositAmount(), config.initialFunding / 2);
+        _stPercentage = bound(_stPercentage, 10, 50);
+
+        // Step 1: Alice deposits JT to provide coverage
+        _depositJT(ALICE_ADDRESS, _jtAmount);
+
+        // Step 2: Bob deposits ST
+        TRANCHE_UNIT maxSTDeposit = ST.maxDeposit(BOB_ADDRESS);
+        uint256 stAmount = toUint256(maxSTDeposit) * _stPercentage / 100;
+        if (stAmount < _minDepositAmount()) return;
+        _depositST(BOB_ADDRESS, stAmount);
+
+        uint256 maxRedeem = ST.maxRedeem(BOB_ADDRESS);
+        if (maxRedeem == 0) return;
+
+        // Step 3: Bob sets Charlie as operator on ST (no ERC20 allowance given)
+        vm.prank(BOB_ADDRESS);
+        ST.setOperator(CHARLIE_ADDRESS, true);
+        assertTrue(ST.isOperator(BOB_ADDRESS, CHARLIE_ADDRESS), "Charlie should be operator for Bob");
+
+        // Verify Charlie has NO ERC20 allowance from Bob
+        assertEq(ST.allowance(BOB_ADDRESS, CHARLIE_ADDRESS), 0, "Charlie should have zero allowance");
+
+        // Step 4: Charlie (operator) tries to sync-redeem Bob's ST shares
+        uint256 bobBalanceBefore = IERC20(config.stAsset).balanceOf(BOB_ADDRESS);
+
+        vm.prank(CHARLIE_ADDRESS);
+        ST.redeem(maxRedeem, BOB_ADDRESS, BOB_ADDRESS);
+
+        uint256 bobBalanceAfter = IERC20(config.stAsset).balanceOf(BOB_ADDRESS);
+        assertGt(bobBalanceAfter, bobBalanceBefore, "Bob should receive assets from operator-initiated redeem");
+    }
+
     // ═══════════════════════════════════════════════════════════════════════════
     // SECTION 17: ST REDEMPTION CANCELLATION TESTS (Should Revert)
     // ST uses synchronous redemption, so cancellation functions should revert.
