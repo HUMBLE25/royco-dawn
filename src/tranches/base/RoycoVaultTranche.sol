@@ -195,7 +195,6 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         override
         whenNotPaused
         restricted
-        onlyCallerOrOperator(_controller)
         returns (uint256 shares, bytes memory metadata)
     {
         require(_assets != toTrancheUnits(0), MUST_DEPOSIT_NON_ZERO_ASSETS());
@@ -206,6 +205,8 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         // If the deposit is asynchronous, the assets were transferred in during requestDeposit
         if (_isSync(Action.DEPOSIT)) {
             IERC20(asset()).safeTransferFrom(msg.sender, address(kernel_), toUint256(_assets));
+        } else {
+            require(_isCallerOrOperator(_controller), ONLY_CALLER_OR_OPERATOR());
         }
 
         // Deposit the assets into the underlying investment opportunity and get the fraction of total assets allocated
@@ -254,7 +255,6 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         override
         whenNotPaused
         restricted
-        onlyCallerOrOperator(_controller)
         returns (AssetClaims memory claims, bytes memory metadata)
     {
         require(_receiver != address(0), ERC20InvalidReceiver(address(0)));
@@ -287,6 +287,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
     function setOperator(address _operator, bool _approved) external virtual override(IRoycoAsyncVault) whenNotPaused returns (bool) {
         // Cannot set the null address as an operator
         require(_operator != address(0), NULL_ADDRESS());
+        require(!_isSync(Action.DEPOSIT) || !_isSync(Action.REDEEM), DEPOSIT_OR_REDEEM_MUST_BE_ASYNC());
 
         // Set the operator's approval status for the caller
         RoycoTrancheStorageLib._getRoycoTrancheStorage().isOperator[msg.sender][_operator] = _approved;
@@ -736,9 +737,10 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
             // Burn the shares being redeemed from the owner
             _burn(_owner, _shares);
             // If the vault is expected to burn shares on executing redeem, burn the locked shares
-        } else if (_requestRedeemSharesBehavior() == SharesRedemptionModel.BURN_ON_CLAIM_REDEEM) {
+        } else {
+            require(_isCallerOrOperator(_owner), ONLY_CALLER_OR_OPERATOR());
             // No need to spend allowance, that was already done during requestRedeem
-            _burn(address(this), _shares);
+            if (_requestRedeemSharesBehavior() == SharesRedemptionModel.BURN_ON_CLAIM_REDEEM) _burn(address(this), _shares);
         }
     }
 
