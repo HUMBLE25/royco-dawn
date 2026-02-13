@@ -254,7 +254,6 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         override
         whenNotPaused
         restricted
-        onlyCallerOrOperator(_controller)
         returns (AssetClaims memory claims, bytes memory metadata)
     {
         require(_receiver != address(0), ERC20InvalidReceiver(address(0)));
@@ -269,7 +268,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
 
         // Account for the redemption
         // Shares must be burned after the kernel processes the redemption since the kernel has a causal dependency on the pre-burn and post-sync total share supply
-        _redeem(msg.sender, _controller, _shares);
+        _redeem(_controller, _shares);
 
         emit Redeem(msg.sender, _receiver, claims, _shares, _redemptionRequestId, metadata);
     }
@@ -724,15 +723,14 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
     /**
      * @notice Executes a redeem for a user by burning the owner's shares
      * @dev Does not transfer assets to the receiver: this is the responsibility of the kernel.
-     * @param _caller The invoker of the redeem operation
      * @param _owner The owner of the shares to redeem (burn)
      * @param _shares The quantity of shares to redeem (burn) for the owner
      */
-    function _redeem(address _caller, address _owner, uint256 _shares) internal virtual {
+    function _redeem(address _owner, uint256 _shares) internal virtual {
         // If withdrawals are synchronous, burn the shares from the owner
         if (_isSync(Action.REDEEM)) {
-            // Spend the caller's share allowance if the caller isn't the owner
-            if (_caller != _owner) _spendAllowance(_owner, _caller, _shares);
+            // Spend the caller's share allowance if the caller isn't the owner or an approved operator
+            if (!_isCallerOrOperator(_owner)) _spendAllowance(_owner, msg.sender, _shares);
             // Burn the shares being redeemed from the owner
             _burn(_owner, _shares);
             // If the vault is expected to burn shares on executing redeem, burn the locked shares
