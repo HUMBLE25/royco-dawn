@@ -184,6 +184,8 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
     }
 
     /// @inheritdoc IRoycoAsyncVault
+    /// @dev For sync deposits (ERC-4626), `_controller` is not used for authorization - assets are transferred from msg.sender.
+    ///      For async deposits (ERC-7540), `_controller` is the request controller and caller must be controller or operator.
     function deposit(
         TRANCHE_UNIT _assets,
         address _receiver,
@@ -206,7 +208,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
             IERC20(asset()).safeTransferFrom(msg.sender, address(kernel_), toUint256(_assets));
         } else {
             // If the deposit is asynchronous, the assets were transferred in during requestDeposit
-            // Just esnure that the caller is the controller or an approved operator
+            // Ensure that the caller is the controller or an approved operator
             require(_isCallerOrOperator(_controller), ONLY_CALLER_OR_OPERATOR());
         }
 
@@ -245,6 +247,8 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
     }
 
     /// @inheritdoc IRoycoAsyncVault
+    /// @dev For sync redeems (ERC-4626), `_controller` acts as the owner - shares are burned from it and allowance is checked.
+    ///      For async redeems (ERC-7540), `_controller` is the request controller and caller must be controller or operator.
     function redeem(
         uint256 _shares,
         address _receiver,
