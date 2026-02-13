@@ -12,7 +12,7 @@ import { IRoycoAccountant } from "../../../src/interfaces/IRoycoAccountant.sol";
 import { IRoycoKernel } from "../../../src/interfaces/kernel/IRoycoKernel.sol";
 import { IRoycoVaultTranche } from "../../../src/interfaces/tranche/IRoycoVaultTranche.sol";
 import { SENTINEL_REQUEST_ID, WAD, ZERO_NAV_UNITS, ZERO_TRANCHE_UNITS } from "../../../src/libraries/Constants.sol";
-import { AssetClaims, MarketState, TrancheType } from "../../../src/libraries/Types.sol";
+import { AssetClaims, ExecutionModel, MarketState, TrancheType } from "../../../src/libraries/Types.sol";
 import { NAV_UNIT, TRANCHE_UNIT, UnitsMathLib, toNAVUnits, toTrancheUnits, toUint256 } from "../../../src/libraries/Units.sol";
 import { BaseTest } from "../../base/BaseTest.t.sol";
 import { IKernelTestHooks } from "../../interfaces/IKernelTestHooks.sol";
@@ -1739,8 +1739,12 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         assertGt(requestId, 0, "Request ID should be created");
     }
 
-    /// @notice Test that non-operator cannot call deposit on behalf of user
-    function testFuzz_nonOperator_cannotDeposit_onBehalfOfUser(uint256 _jtAmount) external {
+    /// @notice Test ERC-4626 sync deposit: anyone can deposit their own assets to mint shares to any receiver
+    /// @dev For sync deposits, the caller's assets are transferred, so no operator check is needed
+    function testFuzz_syncDeposit_anyoneCanDepositToAnyReceiver(uint256 _jtAmount) external {
+        // Skip if JT deposits are async (this test is for sync deposits only)
+        if (KERNEL.JT_DEPOSIT_EXECUTION_MODEL() != ExecutionModel.SYNC) return;
+
         _jtAmount = bound(_jtAmount, _minDepositAmount(), config.initialFunding / 4);
 
         // Fund BOB with JT assets
@@ -1750,11 +1754,154 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         vm.prank(BOB_ADDRESS);
         IERC20(config.jtAsset).approve(address(JT), _jtAmount);
 
-        // BOB (not an operator for ALICE) tries to call deposit with ALICE as controller
-        // Should revert with ONLY_CALLER_OR_OPERATOR since the onlyCallerOrOperator modifier checks controller
+        uint256 bobAssetsBefore = IERC20(config.jtAsset).balanceOf(BOB_ADDRESS);
+        uint256 aliceSharesBefore = JT.balanceOf(ALICE_ADDRESS);
+
+        // BOB deposits his own assets, minting shares to ALICE
+        // This should succeed per ERC-4626: caller spends their assets, receiver gets shares
+        vm.prank(BOB_ADDRESS);
+        (uint256 shares,) = JT.deposit(toTrancheUnits(_jtAmount), ALICE_ADDRESS, ALICE_ADDRESS);
+
+        // Verify BOB's assets were spent (use approx for rebasing tokens like stETH)
+        assertApproxEqAbs(IERC20(config.jtAsset).balanceOf(BOB_ADDRESS), bobAssetsBefore - _jtAmount, 2, "BOB's assets should be spent");
+
+        // Verify ALICE received the shares
+        assertEq(JT.balanceOf(ALICE_ADDRESS), aliceSharesBefore + shares, "ALICE should receive the shares");
+    }
+
+    /// @notice Test ERC-4626 sync redeem: third party with allowance can redeem on behalf of owner
+    /// @dev For sync redeems, allowance is checked via _spendAllowance, not operator status
+    function testFuzz_syncRedeem_thirdPartyWithAllowanceCanRedeem(uint256 _jtAmount) external {
+        // Skip if JT redeems are async (this test is for sync redeems only)
+        if (KERNEL.JT_REDEEM_EXECUTION_MODEL() != ExecutionModel.SYNC) return;
+
+        _jtAmount = bound(_jtAmount, _minDepositAmount(), config.initialFunding / 4);
+
+        // Deposit JT for ALICE
+        uint256 jtShares = _depositJT(ALICE_ADDRESS, _jtAmount);
+
+        // ALICE approves BOB to spend her shares (ERC20 allowance)
+        vm.prank(ALICE_ADDRESS);
+        JT.approve(BOB_ADDRESS, jtShares);
+
+        uint256 aliceSharesBefore = JT.balanceOf(ALICE_ADDRESS);
+        uint256 bobAssetsBefore = IERC20(config.jtAsset).balanceOf(BOB_ADDRESS);
+
+        // BOB (with allowance) redeems ALICE's shares, receiving assets to himself
+        vm.prank(BOB_ADDRESS);
+        (AssetClaims memory claims,) = JT.redeem(jtShares, BOB_ADDRESS, ALICE_ADDRESS);
+
+        // Verify ALICE's shares were burned
+        assertEq(JT.balanceOf(ALICE_ADDRESS), aliceSharesBefore - jtShares, "ALICE's shares should be burned");
+
+        // Verify BOB received the assets
+        assertGt(IERC20(config.jtAsset).balanceOf(BOB_ADDRESS), bobAssetsBefore, "BOB should receive assets");
+    }
+
+    /// @notice Test ERC-4626 sync redeem: third party WITHOUT allowance cannot redeem
+    /// @dev For sync redeems, lack of allowance should cause revert
+    function testFuzz_syncRedeem_thirdPartyWithoutAllowanceCannotRedeem(uint256 _jtAmount) external {
+        // Skip if JT redeems are async (this test is for sync redeems only)
+        if (KERNEL.JT_REDEEM_EXECUTION_MODEL() != ExecutionModel.SYNC) return;
+
+        _jtAmount = bound(_jtAmount, _minDepositAmount(), config.initialFunding / 4);
+
+        // Deposit JT for ALICE
+        uint256 jtShares = _depositJT(ALICE_ADDRESS, _jtAmount);
+
+        // BOB (no allowance, not an operator) tries to redeem ALICE's shares
+        // Should revert with ERC20InsufficientAllowance
+        vm.prank(BOB_ADDRESS);
+        vm.expectRevert(); // ERC20InsufficientAllowance
+        JT.redeem(jtShares, BOB_ADDRESS, ALICE_ADDRESS);
+    }
+
+    /// @notice Test ERC-7540 async deposit: only owner or operator can claim deposit
+    /// @dev For async deposits, operator check is required when claiming
+    function testFuzz_asyncDeposit_nonOperatorCannotClaimDeposit(uint256 _jtAmount) external {
+        // Skip if JT deposits are sync (this test is for async deposits only)
+        if (KERNEL.JT_DEPOSIT_EXECUTION_MODEL() != ExecutionModel.ASYNC) return;
+
+        _jtAmount = bound(_jtAmount, _minDepositAmount(), config.initialFunding / 4);
+
+        // Fund ALICE with JT assets
+        dealJTAsset(ALICE_ADDRESS, _jtAmount);
+
+        // ALICE approves and requests deposit
+        vm.startPrank(ALICE_ADDRESS);
+        IERC20(config.jtAsset).approve(address(JT), _jtAmount);
+        (uint256 requestId,) = JT.requestDeposit(toTrancheUnits(_jtAmount), ALICE_ADDRESS, ALICE_ADDRESS);
+        vm.stopPrank();
+
+        // BOB (not an operator for ALICE) tries to claim the deposit
+        // Should revert with ONLY_CALLER_OR_OPERATOR
         vm.prank(BOB_ADDRESS);
         vm.expectRevert(abi.encodeWithSelector(IRoycoVaultTranche.ONLY_CALLER_OR_OPERATOR.selector));
-        JT.deposit(toTrancheUnits(_jtAmount), ALICE_ADDRESS, ALICE_ADDRESS);
+        JT.deposit(toTrancheUnits(_jtAmount), ALICE_ADDRESS, ALICE_ADDRESS, requestId);
+    }
+
+    /// @notice Test ERC-7540 async redeem: only owner or operator can claim redeem
+    /// @dev For async redeems, operator check is required when claiming (not allowance)
+    function testFuzz_asyncRedeem_nonOperatorCannotClaimRedeem(uint256 _jtAmount) external {
+        // Skip if JT redeems are sync (this test is for async redeems only)
+        if (KERNEL.JT_REDEEM_EXECUTION_MODEL() == ExecutionModel.SYNC) return;
+
+        _jtAmount = bound(_jtAmount, _minDepositAmount(), config.initialFunding / 4);
+
+        // Deposit JT for ALICE
+        uint256 jtShares = _depositJT(ALICE_ADDRESS, _jtAmount);
+
+        // ALICE requests redeem
+        vm.prank(ALICE_ADDRESS);
+        (uint256 requestId,) = JT.requestRedeem(jtShares, ALICE_ADDRESS, ALICE_ADDRESS);
+
+        // Wait for redemption delay
+        vm.warp(block.timestamp + _getJTRedemptionDelay() + 1);
+
+        // Sync accounting to make shares claimable
+        vm.prank(SYNC_ROLE_ADDRESS);
+        KERNEL.syncTrancheAccounting();
+
+        // BOB (not an operator for ALICE) tries to claim the redeem
+        // Should revert with ONLY_CALLER_OR_OPERATOR
+        vm.prank(BOB_ADDRESS);
+        vm.expectRevert(abi.encodeWithSelector(IRoycoVaultTranche.ONLY_CALLER_OR_OPERATOR.selector));
+        JT.redeem(jtShares, BOB_ADDRESS, ALICE_ADDRESS, requestId);
+    }
+
+    /// @notice Test ERC-7540 async redeem: operator CAN claim redeem on behalf of owner
+    function testFuzz_asyncRedeem_operatorCanClaimRedeem(uint256 _jtAmount) external {
+        // Skip if JT redeems are sync (this test is for async redeems only)
+        if (KERNEL.JT_REDEEM_EXECUTION_MODEL() == ExecutionModel.SYNC) return;
+
+        _jtAmount = bound(_jtAmount, _minDepositAmount(), config.initialFunding / 4);
+
+        // Deposit JT for ALICE
+        uint256 jtShares = _depositJT(ALICE_ADDRESS, _jtAmount);
+
+        // ALICE sets BOB as her operator
+        vm.prank(ALICE_ADDRESS);
+        JT.setOperator(BOB_ADDRESS, true);
+
+        // ALICE requests redeem
+        vm.prank(ALICE_ADDRESS);
+        (uint256 requestId,) = JT.requestRedeem(jtShares, ALICE_ADDRESS, ALICE_ADDRESS);
+
+        // Wait for redemption delay
+        vm.warp(block.timestamp + _getJTRedemptionDelay() + 1);
+
+        // Sync accounting to make shares claimable
+        vm.prank(SYNC_ROLE_ADDRESS);
+        KERNEL.syncTrancheAccounting();
+
+        uint256 claimable = JT.claimableRedeemRequest(requestId, ALICE_ADDRESS);
+
+        // BOB (operator for ALICE) claims the redeem
+        vm.prank(BOB_ADDRESS);
+        (AssetClaims memory claims,) = JT.redeem(claimable, ALICE_ADDRESS, ALICE_ADDRESS, requestId);
+
+        // Verify assets were claimed
+        assertGt(toUint256(claims.stAssets) + toUint256(claims.jtAssets), 0, "Should have claimed assets");
     }
 
     /// @notice Test that non-operator without allowance cannot call requestRedeem on behalf of user

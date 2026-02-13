@@ -31,7 +31,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
 
     /**
      * @notice Modifier to ensure the specified action uses a synchronous execution model
-     * @param _action The action to check (DEPOSIT or WITHDRAW)
+     * @param _action The action to check (DEPOSIT or REDEEM)
      * @dev Reverts if the execution model for the action is asynchronous
      */
     /// forge-lint: disable-next-item(unwrapped-modifier-logic)
@@ -42,7 +42,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
 
     /**
      * @notice Modifier to ensure the specified action uses an asynchronous execution model
-     * @param _action The action to check (DEPOSIT or WITHDRAW)
+     * @param _action The action to check (DEPOSIT or REDEEM)
      * @dev Reverts if the execution model for the action is synchronous
      */
     /// forge-lint: disable-next-item(unwrapped-modifier-logic)
@@ -201,11 +201,12 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
 
         IRoycoKernel kernel_ = IRoycoKernel(kernel());
 
-        // Transfer the assets from the receiver to the kernel, if the deposit is synchronous
-        // If the deposit is asynchronous, the assets were transferred in during requestDeposit
+        // If the deposit is synchronous, transfer the assets from the caller to the kernel
         if (_isSync(Action.DEPOSIT)) {
             IERC20(asset()).safeTransferFrom(msg.sender, address(kernel_), toUint256(_assets));
         } else {
+            // If the deposit is asynchronous, the assets were transferred in during requestDeposit
+            // Just esnure that the caller is the controller or an approved operator
             require(_isCallerOrOperator(_controller), ONLY_CALLER_OR_OPERATOR());
         }
 
@@ -269,7 +270,18 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
 
         // Account for the redemption
         // Shares must be burned after the kernel processes the redemption since the kernel has a causal dependency on the pre-burn and post-sync total share supply
-        _redeem(msg.sender, _controller, _shares);
+        // If redemptions are synchronous, burn the shares from the owner
+        if (_isSync(Action.REDEEM)) {
+            // Spend the caller's share allowance if the caller isn't the owner
+            if (msg.sender != _controller) _spendAllowance(_controller, msg.sender, _shares);
+            // Burn the shares being redeemed from the owner
+            _burn(_controller, _shares);
+        } else {
+            // If redemptions are asynchronous, require the caller to be the owner or an approved operator
+            require(_isCallerOrOperator(_controller), ONLY_CALLER_OR_OPERATOR());
+            // If the vault is expected to burn shares on executing redeem, burn the locked shares
+            if (_requestRedeemSharesBehavior() == SharesRedemptionModel.BURN_ON_CLAIM_REDEEM) _burn(address(this), _shares);
+        }
 
         emit Redeem(msg.sender, _receiver, claims, _shares, _redemptionRequestId, metadata);
     }
@@ -287,6 +299,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
     function setOperator(address _operator, bool _approved) external virtual override(IRoycoAsyncVault) whenNotPaused returns (bool) {
         // Cannot set the null address as an operator
         require(_operator != address(0), NULL_ADDRESS());
+        // At least one flow needs to be async to set an operator
         require(!_isSync(Action.DEPOSIT) || !_isSync(Action.REDEEM), DEPOSIT_OR_REDEEM_MUST_BE_ASYNC());
 
         // Set the operator's approval status for the caller
@@ -298,7 +311,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
     }
 
     /// @inheritdoc IRoycoAsyncVault
-    /// @dev Will revert if this tranche does not employ an asynchronous withdrawal flow
+    /// @dev Will revert if this tranche does not employ an asynchronous deposit flow
     function requestDeposit(
         TRANCHE_UNIT _assets,
         address _controller,
@@ -328,7 +341,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
     }
 
     /// @inheritdoc IRoycoAsyncVault
-    /// @dev Will revert if this tranche does not employ an asynchronous withdrawal flow
+    /// @dev Will revert if this tranche does not employ an asynchronous deposit flow
     function pendingDepositRequest(
         uint256 _requestId,
         address _controller
@@ -347,7 +360,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
     }
 
     /// @inheritdoc IRoycoAsyncVault
-    /// @dev Will revert if this tranche does not employ an asynchronous withdrawal flow
+    /// @dev Will revert if this tranche does not employ an asynchronous deposit flow
     function claimableDepositRequest(
         uint256 _requestId,
         address _controller
@@ -461,7 +474,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
     // ===========================================
 
     /// @inheritdoc IRoycoAsyncCancellableVault
-    /// @dev Will revert if this tranche does not employ an asynchronous withdrawal flow
+    /// @dev Will revert if this tranche does not employ an asynchronous deposit flow
     function cancelDepositRequest(
         uint256 _requestId,
         address _controller
@@ -484,7 +497,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
     }
 
     /// @inheritdoc IRoycoAsyncCancellableVault
-    /// @dev Will revert if this tranche does not employ an asynchronous withdrawal flow
+    /// @dev Will revert if this tranche does not employ an asynchronous deposit flow
     function pendingCancelDepositRequest(
         uint256 _requestId,
         address _controller
@@ -502,7 +515,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
     }
 
     /// @inheritdoc IRoycoAsyncCancellableVault
-    /// @dev Will revert if this tranche does not employ an asynchronous withdrawal flow
+    /// @dev Will revert if this tranche does not employ an asynchronous deposit flow
     function claimableCancelDepositRequest(
         uint256 _requestId,
         address _controller
@@ -521,7 +534,7 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
     }
 
     /// @inheritdoc IRoycoAsyncCancellableVault
-    /// @dev Will revert if this tranche does not employ an asynchronous withdrawal flow
+    /// @dev Will revert if this tranche does not employ an asynchronous deposit flow
     function claimCancelDepositRequest(
         uint256 _requestId,
         address _receiver,
@@ -720,28 +733,6 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         uint256 sharesWithdrawableBasedOnJuniorConstraints =
             claimOnJtNAV == ZERO_NAV_UNITS ? _sharesOwned : totalSharesAfterMintingFees.mulDiv(jtMaxWithdrawableNAV, claimOnJtNAV, Math.Rounding.Floor);
         shares = Math.min(_sharesOwned, Math.min(sharesWithdrawableBasedOnSeniorConstraints, sharesWithdrawableBasedOnJuniorConstraints));
-    }
-
-    /**
-     * @notice Executes a redeem for a user by burning the owner's shares
-     * @dev Does not transfer assets to the receiver: this is the responsibility of the kernel.
-     * @param _caller The invoker of the redeem operation
-     * @param _owner The owner of the shares to redeem (burn)
-     * @param _shares The quantity of shares to redeem (burn) for the owner
-     */
-    function _redeem(address _caller, address _owner, uint256 _shares) internal virtual {
-        // If withdrawals are synchronous, burn the shares from the owner
-        if (_isSync(Action.REDEEM)) {
-            // Spend the caller's share allowance if the caller isn't the owner
-            if (_caller != _owner) _spendAllowance(_owner, _caller, _shares);
-            // Burn the shares being redeemed from the owner
-            _burn(_owner, _shares);
-            // If the vault is expected to burn shares on executing redeem, burn the locked shares
-        } else {
-            require(_isCallerOrOperator(_owner), ONLY_CALLER_OR_OPERATOR());
-            // No need to spend allowance, that was already done during requestRedeem
-            if (_requestRedeemSharesBehavior() == SharesRedemptionModel.BURN_ON_CLAIM_REDEEM) _burn(address(this), _shares);
-        }
     }
 
     /**
