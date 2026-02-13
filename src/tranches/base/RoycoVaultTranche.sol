@@ -254,7 +254,6 @@ abstract contract RoycoVaultTranche is IRoycoVaultTranche, RoycoBase, ERC20Pausa
         override
         whenNotPaused
         restricted
-        onlyCallerOrOperator(_controller)
         returns (AssetClaims memory claims, bytes memory metadata)
     {
         require(_receiver != address(0), ERC20InvalidReceiver(address(0)));
