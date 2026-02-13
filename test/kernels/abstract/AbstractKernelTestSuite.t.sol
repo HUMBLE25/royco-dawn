@@ -1688,6 +1688,20 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
         assertFalse(JT.isOperator(ALICE_ADDRESS, BOB_ADDRESS), "BOB should not be operator after removal");
     }
 
+    /// @notice Test that setOperator reverts when both deposit and redeem are sync
+    /// @dev Operators only make sense for async flows (ERC-7540). Fully sync vaults should revert.
+    function test_setOperator_revertsWhenFullySync() external {
+        // Skip if at least one flow is async (setOperator would succeed)
+        if (KERNEL.JT_DEPOSIT_EXECUTION_MODEL() != ExecutionModel.SYNC || KERNEL.JT_REDEEM_EXECUTION_MODEL() != ExecutionModel.SYNC) {
+            return;
+        }
+
+        // For fully sync vaults, setOperator should revert
+        vm.prank(ALICE_ADDRESS);
+        vm.expectRevert(abi.encodeWithSelector(IRoycoVaultTranche.DEPOSIT_OR_REDEEM_MUST_BE_ASYNC.selector));
+        JT.setOperator(BOB_ADDRESS, true);
+    }
+
     /// @notice Test that operator can call deposit on behalf of user
     /// @dev The operator provides the funds and calls deposit, but shares go to the controller (ALICE)
     function testFuzz_operator_canDeposit_onBehalfOfUser(uint256 _jtAmount) external {
@@ -2281,6 +2295,47 @@ abstract contract AbstractKernelTestSuite is BaseTest, IKernelTestHooks {
 
         // Allowance should NOT be spent because BOB is an operator
         assertEq(JT.allowance(ALICE_ADDRESS, BOB_ADDRESS), allowanceBefore, "Allowance should not be spent for operators");
+    }
+
+    /// @notice Test that operator can redeem on behalf of user when ST has async redeem
+    /// @dev Operators only exist when at least one flow is async. For fully sync kernels, use ERC20 allowance instead.
+    function testFuzz_operator_canRedeem_onBehalfOfUser(uint256 _jtAmount, uint256 _stPercentage) external {
+        // Skip if ST has no async flows (operators require at least one async flow)
+        if (KERNEL.ST_DEPOSIT_EXECUTION_MODEL() == ExecutionModel.SYNC && KERNEL.ST_REDEEM_EXECUTION_MODEL() == ExecutionModel.SYNC) {
+            return;
+        }
+
+        _jtAmount = bound(_jtAmount, _minDepositAmount(), config.initialFunding / 2);
+        _stPercentage = bound(_stPercentage, 10, 50);
+
+        // Step 1: Alice deposits JT to provide coverage
+        _depositJT(ALICE_ADDRESS, _jtAmount);
+
+        // Step 2: Bob deposits ST
+        TRANCHE_UNIT maxSTDeposit = ST.maxDeposit(BOB_ADDRESS);
+        uint256 stAmount = toUint256(maxSTDeposit) * _stPercentage / 100;
+        if (stAmount < _minDepositAmount()) return;
+        _depositST(BOB_ADDRESS, stAmount);
+
+        uint256 maxRedeem = ST.maxRedeem(BOB_ADDRESS);
+        if (maxRedeem == 0) return;
+
+        // Step 3: Bob sets Charlie as operator on ST (no ERC20 allowance given)
+        vm.prank(BOB_ADDRESS);
+        ST.setOperator(CHARLIE_ADDRESS, true);
+        assertTrue(ST.isOperator(BOB_ADDRESS, CHARLIE_ADDRESS), "Charlie should be operator for Bob");
+
+        // Verify Charlie has NO ERC20 allowance from Bob
+        assertEq(ST.allowance(BOB_ADDRESS, CHARLIE_ADDRESS), 0, "Charlie should have zero allowance");
+
+        // Step 4: Charlie (operator) redeems Bob's ST shares
+        uint256 bobBalanceBefore = IERC20(config.stAsset).balanceOf(BOB_ADDRESS);
+
+        vm.prank(CHARLIE_ADDRESS);
+        ST.redeem(maxRedeem, BOB_ADDRESS, BOB_ADDRESS);
+
+        uint256 bobBalanceAfter = IERC20(config.stAsset).balanceOf(BOB_ADDRESS);
+        assertGt(bobBalanceAfter, bobBalanceBefore, "Bob should receive assets from operator-initiated redeem");
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
